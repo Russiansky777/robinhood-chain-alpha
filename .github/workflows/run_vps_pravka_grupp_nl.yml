@@ -1,0 +1,153 @@
+name: "Файл групп: правка политики, создание группы, переносы адресов"
+
+# ЗАЧЕМ (пункт 3 владельца 27.09). Включение -- ФАЙЛОМ, а не окружением: файл
+# групп детектор перечитывает на ходу, окружение -- только при перезапуске.
+# Здесь правится тот самый файл на хосте, которым служба и пользуется.
+#
+# ЧТО УМЕЕТ, сверх politika_gruppy.py (то умеет одно числовое поле):
+#   * признаки (bloom_trades, lane_trades, fanout) и списки (lane_pools);
+#   * создание группы со своей политикой;
+#   * перенос адреса между группами;
+#   * ВЫКЛЮЧЕНИЕ адреса -- переводом в неторгующую группу. Просто убрать адрес
+#     из файла нельзя: отсутствующий адрес попадает в группу по умолчанию
+#     bloom_lane, а она торгует и полосой, и площадкой.
+#
+# САМОПРОВЕРКА ДЕНЕЖНОГО ПУТИ внутри скрипта: после записи файл перечитывается
+# тем же модулем, что у службы, и не сошлось -- файл возвращается из копии.
+on:
+  workflow_dispatch:
+    inputs:
+      pokazat:
+        description: "'yes' -- только показать группы и политики, ничего не менять"
+        required: false
+        default: "yes"
+      gruppa:
+        description: "группа, у которой правим поле"
+        required: false
+        default: ""
+      pole:
+        description: "поле политики (bloom_trades, lane_trades, lane_sol, bloom_sol, min_target_sol, lane_open_max, stop_loss_sol, day_cap_sol, lane_pools)"
+        required: false
+        default: ""
+      znachenie:
+        description: "значение: 1/0 для признаков, число, список через запятую для lane_pools, пусто -- None"
+        required: false
+        default: ""
+      sozdat:
+        description: "имя НОВОЙ группы"
+        required: false
+        default: ""
+      politika:
+        description: "политика новой группы, JSON"
+        required: false
+        default: ""
+      perenesti:
+        description: "адрес, который переносим"
+        required: false
+        default: ""
+      v:
+        description: "в какую группу перенести или выключить"
+        required: false
+        default: ""
+      pometka:
+        description: "пометка адреса в файле"
+        required: false
+        default: ""
+      otklyuchit:
+        description: "адрес -- выключить переводом в НЕТОРГУЮЩУЮ группу из v"
+        required: false
+        default: ""
+
+concurrency:
+  group: pravka-grupp
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  FILE: /home/bot/data/sources_2026-09-25.json
+  CODE_DIR: /home/bot/bloom_executor
+  OUT: data/pravka_grupp.txt
+
+jobs:
+  pravka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка скрипта разбирается"
+        run: python3 -m py_compile deploy/checks/pravka_grupp.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Правка на хосте"
+        env:
+          POKAZAT: ${{ inputs.pokazat }}
+          GRUPPA: ${{ inputs.gruppa }}
+          POLE: ${{ inputs.pole }}
+          ZNACHENIE: ${{ inputs.znachenie }}
+          SOZDAT: ${{ inputs.sozdat }}
+          POLITIKA: ${{ inputs.politika }}
+          PERENESTI: ${{ inputs.perenesti }}
+          V: ${{ inputs.v }}
+          POMETKA: ${{ inputs.pometka }}
+          OTKLYUCHIT: ${{ inputs.otklyuchit }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pravka_grupp.py" < deploy/checks/pravka_grupp.py
+          ARGS="--file $FILE"
+          if [ "$POKAZAT" = "yes" ]; then ARGS="$ARGS --pokazat"; fi
+          [ -n "$GRUPPA" ] && ARGS="$ARGS --gruppa $GRUPPA"
+          [ -n "$POLE" ] && ARGS="$ARGS --pole $POLE"
+          [ -n "$SOZDAT" ] && ARGS="$ARGS --sozdat $SOZDAT"
+          [ -n "$PERENESTI" ] && ARGS="$ARGS --perenesti $PERENESTI"
+          [ -n "$V" ] && ARGS="$ARGS --v $V"
+          [ -n "$OTKLYUCHIT" ] && ARGS="$ARGS --otklyuchit $OTKLYUCHIT"
+          echo "аргументы без значений в кавычках: $ARGS"
+          # Значения со пробелами и JSON уезжают отдельными аргументами через
+          # одинарные кавычки на удалённой стороне -- их пишем прямо в команду.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            nice -n 5 python3 /tmp/pravka_grupp.py $ARGS \
+              --znachenie '$ZNACHENIE' --politika '$POLITIKA' --pometka '$POMETKA'
+            rc=\$?
+            rm -f /tmp/pravka_grupp.py
+            chown bot:bot $FILE
+            chmod 644 $FILE
+            ls -l $FILE
+            exit \$rc" | tee "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Fayl grupp: pravka [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
