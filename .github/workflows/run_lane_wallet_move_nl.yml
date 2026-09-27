@@ -1,0 +1,126 @@
+name: "Переезд полосы: рента nonce, пробный перевод, остаток (по одному шагу)"
+
+# ЗАЧЕМ (владелец 27.09, вне очереди, шаги 3-4 переезда). Кошелёк полосы
+# переезжает: "сначала 0.001 SOL на новый адрес -- подпись и подтверждение по
+# цепи; потом весь остаток минус комиссия". Сюда же снятие ренты со счёта
+# долговечного nonce старого кошелька: он выведен из СТАРОГО адреса семенем, и
+# на новом адресе его не переиспользовать -- новый создаётся отдельным прогоном
+# run_vps_lane_nonce_nl.yml уже от нового кошелька.
+#
+# ОДНА ДВЕРЬ ДЛЯ SOL. Адрес получателя берётся ТОЛЬКО из data/lane_wallet_move.
+# json и только при "подтверждён_владельцем": true. Аргументом его передать
+# нельзя -- в модуле для этого нет входа. Правило владельца: "адреса из истории
+# транзакций не использовать никогда".
+#
+# ШАГИ ПО ОДНОМУ. Один прогон -- один шаг: chto=plan (только числа),
+# nonce, probnyy, ostatok. live=yes обязателен для всего, что тратит.
+on:
+  workflow_dispatch:
+    inputs:
+      chto:
+        description: "plan | nonce | probnyy | ostatok"
+        required: true
+        default: "plan"
+      live:
+        description: "'yes' -- ОТПРАВЛЯТЬ в цепь; иначе только расчёт"
+        required: false
+        default: "no"
+      confirm:
+        description: "для ostatok: ровно OSTATOK -- иначе шаг не делается"
+        required: false
+        default: ""
+
+concurrency:
+  group: lane-wallet-move
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  OUT: data/lane_wallet_move_result.json
+
+jobs:
+  move:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Гейт: остаток только по подтверждению словом"
+        run: |
+          set -e
+          if [ "${{ inputs.chto }}" = "ostatok" ] && [ "${{ inputs.live }}" = "yes" ]; then
+            [ "${{ inputs.confirm }}" = "OSTATOK" ] || { echo "СБОЙ: для ostatok нужно confirm=OSTATOK"; exit 1; }
+          fi
+          echo "шаг ${{ inputs.chto }}, live=${{ inputs.live }}"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить модуль и конфиг на хост"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/lwm/analysis /tmp/lwm/data"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/lwm/analysis/lane_wallet_move.py" < analysis/lane_wallet_move.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/lwm/data/lane_wallet_move.json" < data/lane_wallet_move.json
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cp $CODE_DIR/dbot_rescue.py /tmp/lwm/analysis/dbot_rescue.py && ls -l /tmp/lwm/analysis"
+
+      - name: "Самопроверка денежного пути НА ХОСТЕ, до всякой цепи"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd /tmp/lwm && python3 analysis/lane_wallet_move.py --chto self-test | tail -3"
+
+      - name: "Шаг"
+        run: |
+          set -e
+          LIVEFLAG=0
+          if [ "${{ inputs.live }}" = "yes" ]; then LIVEFLAG=1; fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a
+            . $ENV_DIR/env
+            set +a
+            cd /tmp/lwm
+            LANE_MOVE_LIVE=$LIVEFLAG python3 analysis/lane_wallet_move.py \
+              --chto '${{ inputs.chto }}' --out /tmp/lwm/result.json"
+
+      - name: "Забрать результат и убрать модуль с хоста"
+        if: always()
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/lwm/result.json 2>/dev/null || echo '{}'" > "$OUT"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/lwm"
+          cat "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Pereezd polosy: rezultat shaga [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
