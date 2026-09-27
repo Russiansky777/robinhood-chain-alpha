@@ -2229,6 +2229,32 @@ class Детектор:
         из_["stopped"] = float(итог) <= -из_["threshold_sol"]
         return из_
 
+    def признак_двухшагового(self) -> dict:
+        """Грузится ли модуль двухшаговой сборки и что он умеет. Проба один раз.
+
+        ЗАЧЕМ. Отказ "двухшаговая сборка не загрузилась" виден только в момент
+        сигнала, а сигналов с котировкой не SOL у лидера единицы в час: потерять
+        один, чтобы узнать про опечатку в списке доставки, слишком дорого.
+        Проба ничего не собирает и в сеть не ходит -- только импорт и наличие
+        двух нужных функций.
+        """
+        готово = getattr(self, "_двухшаговый_свод", None)
+        if готово is not None:
+            return готово
+        из_ = {"module": False, "why_not": None, "buy": False, "sell": False}
+        try:
+            import bloom_lane_two_step as TS_  # noqa: PLC0415
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        else:
+            из_["module"] = True
+            из_["buy"] = callable(getattr(TS_, "собрать", None))
+            из_["sell"] = callable(getattr(TS_, "собрать_продажу", None))
+            if not (из_["buy"] and из_["sell"]):
+                из_["why_not"] = "модуль есть, но сборки покупки/продажи в нём нет"
+        self._двухшаговый_свод = из_
+        return из_
+
     def признак_жизни(self) -> dict:
         st = {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
                "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -2423,6 +2449,11 @@ class Детектор:
             # не выясняться по журналу.
             "pool_nonce": (self.свод_нонса() if OS is not None else {})}
         st["leg_cache"] = self.признак_кэша_ног()
+        # ДВУХШАГОВЫЙ СТРОИТЕЛЬ: ГРУЗИТСЯ ЛИ ОН ВООБЩЕ. 27.09 первый настоящий
+        # двухшаговый сигнал пропал на ModuleNotFoundError -- модуля не было на
+        # хосте, и узнать это было можно ТОЛЬКО потеряв сигнал. Теперь видно до
+        # сигнала: пробуем импорт один раз и держим ответ.
+        st["two_step"] = self.признак_двухшагового()
         st["telegram_commands"] = (self.команды.признак_жизни()
                                     if self.команды is not None
                                     else {"enabled": False, "why_not": "не запущены"})
