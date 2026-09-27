@@ -85,7 +85,7 @@ jobs:
             systemctl is-enabled $SLUZHBA || true
             echo '--- файлы на месте ---'
             ls -l /etc/systemd/system/$SLUZHBA.service 2>/dev/null || echo 'юнита нет'
-            ls -l /home/bot/bloom_executor/shred_listener.py 2>/dev/null || echo 'модуля по этому пути нет'
+            ls -l /home/bot/shred_probe/shred_listener.py 2>/dev/null || echo 'модуля по этому пути нет'
             echo '--- нагрузка хоста после ---'
             cat /proc/loadavg" | tee -a "$OUT"
 
