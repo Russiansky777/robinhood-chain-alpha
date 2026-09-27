@@ -103,26 +103,10 @@ on:
         description: "'1' -- БОЕВОЙ ПУЛ шаг 1: одна подписанная покупка уходит ВСЕМИ подключёнными сервисами, чаевые всем <= 0.005 SOL на сделку (включено по решению владельца 25.09)"
         required: false
         default: "1"
-      close_on_sell:
-        description: "'1' -- закрывать токен-счёт при продаже (возврат ренты); 0 -- нет"
+      nochnye:
+        description: "пары ключ=значение через запятую: close_on_sell, tg_format, region_send, lane_max_pool_fee, copiers_file (у workflow_dispatch предел 25 входов, поэтому одной строкой)"
         required: false
-        default: "0"
-      tg_format:
-        description: "'2' -- формат Telegram 2 с полями строки BUY; пусто -- прежний"
-        required: false
-        default: ""
-      region_send:
-        description: "'1' -- региональная отправка; по умолчанию ВЫКЛЮЧЕНА"
-        required: false
-        default: "0"
-      lane_max_pool_fee:
-        description: "потолок комиссии пула для полосы, доля (0.05 = 5 %)"
-        required: false
-        default: "0.05"
-      copiers_file:
-        description: "файл списка копировщиков (каталог состояния, не каталог кода)"
-        required: false
-        default: "/home/bot/bloom_executor_live_data/kopirovshchiki.json"
+        default: "close_on_sell=0,tg_format=,region_send=0,lane_max_pool_fee=0.05,copiers_file=/home/bot/bloom_executor_live_data/kopirovshchiki.json"
 
 concurrency:
   group: bloom-detector-deploy
@@ -334,6 +318,43 @@ jobs:
             (touch $ENV_DIR/.proba_zapisi && echo 'каталог пишется' && rm -f $ENV_DIR/.proba_zapisi) || echo 'каталог НЕ пишется'
           "
 
+      - name: "Ночные флаги: разобрать одну строку входа в пять значений"
+        env:
+          NOCHNYE: ${{ inputs.nochnye }}
+        run: |
+          set -e
+          # У workflow_dispatch предел 25 входов, а нужных настроек больше,
+          # поэтому пять ночных приходят одной строкой пар ключ=значение.
+          # Разбор строгий: имя только из белого списка, значение только из
+          # безопасных знаков. Это не косметика -- значение уезжает в env
+          # службы, и пробел или кавычка в нём сломали бы строку окружения.
+          CLOSE_ON_SELL=0
+          TG_FORMAT=
+          REGION_SEND=0
+          LANE_MAX_POOL_FEE=0.05
+          COPIERS_FILE=/home/bot/bloom_executor_live_data/kopirovshchiki.json
+          IFS=,
+          for para in $NOCHNYE; do
+            imya=${para%%=*}
+            znach=${para#*=}
+            case "$znach" in
+              *[!A-Za-z0-9._/-]*) echo "СБОЙ: в значении $imya недопустимый знак"; exit 1 ;;
+            esac
+            case "$imya" in
+              close_on_sell)     CLOSE_ON_SELL=$znach ;;
+              tg_format)         TG_FORMAT=$znach ;;
+              region_send)       REGION_SEND=$znach ;;
+              lane_max_pool_fee) LANE_MAX_POOL_FEE=$znach ;;
+              copiers_file)      COPIERS_FILE=$znach ;;
+              *) echo "СБОЙ: имя $imya не из белого списка"; exit 1 ;;
+            esac
+          done
+          unset IFS
+          for pair in CLOSE_ON_SELL=$CLOSE_ON_SELL TG_FORMAT=$TG_FORMAT REGION_SEND=$REGION_SEND LANE_MAX_POOL_FEE=$LANE_MAX_POOL_FEE COPIERS_FILE=$COPIERS_FILE; do
+            echo "$pair" >> "$GITHUB_ENV"
+            echo "ночной флаг: $pair"
+          done
+
       - name: "env: ключи отправителей пула (значения только через stdin)"
         if: ${{ github.event.inputs.keep_env != 'yes' }}
         env:
@@ -478,11 +499,11 @@ jobs:
             #   BLOOM_COPIERS_FILE   -- список копировщиков в каталоге состояния.
             # НИ КАВЫЧЕК, НИ АПОСТРОФОВ В ЭТОМ КОММЕНТАРИИ: он внутри ssh.
             sed -i '/^BLOOM_CLOSE_ON_SELL=/d; /^BLOOM_TG_FORMAT=/d; /^BLOOM_REGION_SEND=/d; /^BLOOM_LANE_MAX_POOL_FEE=/d; /^BLOOM_COPIERS_FILE=/d' $ENV_DIR/env
-            echo 'BLOOM_CLOSE_ON_SELL=${{ inputs.close_on_sell }}' >> $ENV_DIR/env
-            echo 'BLOOM_TG_FORMAT=${{ inputs.tg_format }}' >> $ENV_DIR/env
-            echo 'BLOOM_REGION_SEND=${{ inputs.region_send }}' >> $ENV_DIR/env
-            echo 'BLOOM_LANE_MAX_POOL_FEE=${{ inputs.lane_max_pool_fee }}' >> $ENV_DIR/env
-            echo 'BLOOM_COPIERS_FILE=${{ inputs.copiers_file }}' >> $ENV_DIR/env
+            echo BLOOM_CLOSE_ON_SELL=$CLOSE_ON_SELL >> $ENV_DIR/env
+            echo BLOOM_TG_FORMAT=$TG_FORMAT >> $ENV_DIR/env
+            echo BLOOM_REGION_SEND=$REGION_SEND >> $ENV_DIR/env
+            echo BLOOM_LANE_MAX_POOL_FEE=$LANE_MAX_POOL_FEE >> $ENV_DIR/env
+            echo BLOOM_COPIERS_FILE=$COPIERS_FILE >> $ENV_DIR/env
             chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env
             ls -l $ENV_DIR/env
           "
