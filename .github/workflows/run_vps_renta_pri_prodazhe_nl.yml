@@ -1,0 +1,80 @@
+name: "Рента при продаже: записи close_on_sell из журнала позиций (только чтение)"
+
+# ЗАЧЕМ (пункт 2 владельца 27.09): после единого перезапуска надо числом
+# ответить, вернулась ли рента токен-счёта в продаже. Путь закрытия пишет итог
+# в позицию полем close_on_sell -- здесь оно достаётся потоком.
+#
+# Только чтение журнала на хосте. Ни отправок, ни правок.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "только позиции с этого UTC (пусто -- все)"
+        required: false
+        default: ""
+
+concurrency:
+  group: renta-pri-prodazhe
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/renta_pri_prodazhe.json
+
+jobs:
+  renta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Записи закрытия счёта из журнала позиций"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/renta_pri_prodazhe.py" < deploy/checks/renta_pri_prodazhe.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/renta_pri_prodazhe.py --state-dir '$STATE_DIR' \
+              --s '${{ inputs.s }}' --out /tmp/renta.json | tail -n 30
+            rc=\$?; rm -f /tmp/renta_pri_prodazhe.py; exit \$rc"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/renta.json" > "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/renta.json"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Renta pri prodazhe: zapisi close_on_sell [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
