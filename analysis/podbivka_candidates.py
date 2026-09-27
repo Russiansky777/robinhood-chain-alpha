@@ -25,15 +25,21 @@ import podbivka_tablicy as T  # noqa: E402
 
 def main() -> int:
     р = argparse.ArgumentParser()
-    р.add_argument("--katalog", default=str(КОРЕНЬ / "data" / "podbivka" / "koshelki"))
+    # Несколько каталогов: проход (а) и «досчитать»; кошелёк из более позднего
+    # каталога заменяет ранний (один общий адрес).
+    р.add_argument("--katalog", nargs="+", default=[str(КОРЕНЬ / "data" / "podbivka" / d)
+                                                    for d in ("koshelki", "koshelki_dos")])
     р.add_argument("--top", type=int, default=30)
     р.add_argument("--out", default=str(КОРЕНЬ / "data" / "podbivka" / "candidates_2026-09-27.csv"))
     а = р.parse_args()
     имена = {r["address"]: r.get("name") or "" for r in csv.DictReader(open(КОРЕНЬ / "data" / "podbivka" / "wallets.csv", encoding="utf-8"))}
     ряды, кошельков = [], 0
-    for ф in sorted(glob.glob(str(Path(а.katalog) / "*.json"))):
-        if Path(ф).name.startswith("_"):
-            continue
+    файлы: dict = {}
+    for кат in а.katalog:
+        for ф in sorted(glob.glob(str(Path(кат) / "*.json"))):
+            if not Path(ф).name.startswith("_"):
+                файлы[Path(ф).name] = ф
+    for ф in файлы.values():
         к = json.loads(Path(ф).read_text(encoding="utf-8"))
         кошельков += 1
         адрес = (к.get("строка") or {}).get("address")
