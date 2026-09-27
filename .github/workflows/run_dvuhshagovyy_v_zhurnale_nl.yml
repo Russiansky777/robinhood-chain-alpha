@@ -15,6 +15,10 @@ on:
         description: "сколько последних двухшаговых решений печатать целиком"
         required: false
         default: "12"
+      podpisi:
+        description: "подписи источников через запятую -- напечатать ВСЕ строки журнала по ним"
+        required: false
+        default: ""
 
 concurrency:
   group: dvuhshagovyy-v-zhurnale
@@ -50,7 +54,7 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
             "cat > /tmp/dvuhshagovyy_v_zhurnale.py" < deploy/checks/dvuhshagovyy_v_zhurnale.py
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
-            "python3 /tmp/dvuhshagovyy_v_zhurnale.py --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' --podrobno '${{ inputs.podrobno }}' --out /tmp/dv_zh.json" | tee /tmp/vyvod.txt
+            "python3 /tmp/dvuhshagovyy_v_zhurnale.py --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' --podrobno '${{ inputs.podrobno }}' --podpisi '${{ inputs.podpisi }}' --out /tmp/dv_zh.json" | tee /tmp/vyvod.txt
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
             "cat /tmp/dv_zh.json" > "$OUT"
 

@@ -58,9 +58,15 @@ def main() -> int:
     р.add_argument("--since-utc", required=True)
     р.add_argument("--podrobno", type=int, default=12)
     р.add_argument("--out", default="/tmp/dvuhshagovyy_v_zhurnale.json")
+    # ПОДПИСИ ЦЕЛИКОМ: по названной подписи печатаются ВСЕ строки журнала --
+    # так видно, звали ли полосу вообще и на какой стадии она встала.
+    р.add_argument("--podpisi", default="",
+                    help="подписи источников через запятую (можно начало)")
     а = р.parse_args()
     порог = в_секунды(а.since_utc)
 
+    искомые = tuple(x.strip() for x in (а.podpisi or "").split(",") if x.strip())
+    по_подписям: dict = {}
     двухшаговые = []
     причины = collections.Counter()
     стадии = collections.Counter()
@@ -87,6 +93,17 @@ def main() -> int:
             ст = з.get("stage")
             if ст:
                 стадии[ст] += 1
+            if искомые:
+                п_ = str(з.get("signature") or "")
+                for иск in искомые:
+                    if п_.startswith(иск):
+                        по_подписям.setdefault(иск, []).append(
+                            {к: v for к, v in з.items()
+                             if к in ("ts_utc", "stage", "ok", "action", "code",
+                                       "reason", "why_not", "group", "lane",
+                                       "lane_allowed", "mint", "source",
+                                       "spend_sol_eq", "dokupka", "dokupka_why",
+                                       "pool_program", "signature", "two_step_why_not")})
             код = з.get("code")
             if код:
                 коды[код] += 1
@@ -193,6 +210,7 @@ def main() -> int:
         "коды": dict(коды.most_common(12)),
         "отказы_гейта": dict(по_группам_гейт.most_common(10)),
         "налоговые_отказы": налоговые,
+        "по_подписям": {к: v[:20] for к, v in по_подписям.items()},
         "последние": двухшаговые[-а.podrobno:],
         "вне_размера_примеры": вне_размера[:12],
         "скорость_сигнал_отправка_по_часам": скорость,
