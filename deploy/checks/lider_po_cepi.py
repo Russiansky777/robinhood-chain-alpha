@@ -71,21 +71,55 @@ def main() -> int:
             не_подписант += 1
         if not (дельты["increased"] or дельты["decreased"]):
             без_токенов += 1
+        # ЧЕМ ПЛАТИЛИ. Лидер платит стейблами, а не нативным SOL: если требовать
+        # ухода нативного SOL, его покупки не видно вовсе (первый прогон дал
+        # 0 покупок из 88 транзакций). Считаем любой уход средств: нативный SOL,
+        # WSOL или USDC, и пишем, чем именно.
+        d = дельты.get("deltas") or {}
+
+        def отдал(минт_):
+            v = d.get(минт_)
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                return 0.0
+            return -v if v < 0 else 0.0
+
+        usdc_out = отдал(LG.USDC_MINT)
+        wsol_out = отдал(LG.SOL_MINT)
+        нативный_out = -sol if sol is not None and sol < 0 else 0.0
+        платил = (нативный_out > 0.000001 or wsol_out > 0.000001
+                  or usdc_out > 0.01)
         было = False
         for минт in дельты["increased"]:
-            if минт in (LG.USDC_MINT, LG.SOL_MINT) or sol >= -0.001:
+            if минт in (LG.USDC_MINT, LG.SOL_MINT) or not платил:
                 continue
-            покупки.append({"mint": минт, "sol": round(-sol, 9),
+            покупки.append({"mint": минт,
+                             "sol": round(нативный_out + wsol_out, 9),
+                             "usdc": round(usdc_out, 6) or None,
+                             "чем_платил": ("нативный SOL" if нативный_out > 0.000001
+                                            else "WSOL" if wsol_out > 0.000001
+                                            else "USDC"),
                              "подписант": подписант,
                              "signature": s["signature"],
                              "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                                   time.gmtime(s.get("blockTime") or 0)),
                              "slot": tx.get("slot")})
             было = True
+        def пришло(минт_):
+            try:
+                v = float(d.get(минт_))
+            except (TypeError, ValueError):
+                return 0.0
+            return v if v > 0 else 0.0
+
+        получил = ((sol or 0.0) > 0.000001
+                   or пришло(LG.SOL_MINT) > 0.000001
+                   or пришло(LG.USDC_MINT) > 0.01)
         for минт in дельты["decreased"]:
-            if минт in (LG.USDC_MINT, LG.SOL_MINT) or sol <= 0.001:
+            if минт in (LG.USDC_MINT, LG.SOL_MINT) or not получил:
                 continue
-            продажи.append({"mint": минт, "sol": round(sol, 9),
+            продажи.append({"mint": минт, "sol": round(sol or 0.0, 9),
                              "подписант": подписант,
                              "signature": s["signature"],
                              "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
