@@ -22,8 +22,8 @@ import sys
 import time
 
 # Порог фильтра устаревших сигналов -- тот же, что у детектора
-# (BLOOM_STALE_SLOTS, по умолчанию 3).
-ПОРОГ_STALE = int(os.environ.get("BLOOM_STALE_SLOTS", "3"))
+# (BLOOM_STALE_SLOTS, по умолчанию 10 -- слово владельца 27.09 вечером).
+ПОРОГ_STALE = int(os.environ.get("BLOOM_STALE_SLOTS", "10"))
 
 
 def строки(путь: str):
