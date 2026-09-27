@@ -115,21 +115,41 @@ def main() -> int:
     # времени деплоя.
     по_часам: dict = collections.defaultdict(list)
     все_мс = []
+    # КАКИЕ ПОЛЯ ВРЕМЕНИ ВООБЩЕ ЕСТЬ. Считаем присутствие каждого кандидата:
+    # молча вернуть "0 сделок" и назвать это замером нельзя.
+    поля_времени = collections.Counter()
+    позиций_полосы = 0
+    # Пары "ноль -> конец" по убыванию полноты замера. Первая, где есть оба
+    # числа, и идёт в счёт; название пары -- в отчёт, чтобы было видно, ЧТО
+    # именно замерено.
+    ПАРЫ = (("signal_recv_ts", "ts_sent", "сигнал -> отправка"),
+            ("t_recv_ts", "ts_sent", "сигнал -> отправка"),
+            ("ts_intent", "ts_sent", "решение -> отправка"),
+            ("ts_intent", "ts_accepted", "решение -> приём"))
+    чем_мерили = collections.Counter()
     for путь in файлы(а.state_dir, "positions.jsonl"):
         for з in строки(путь):
             if not з.get("lane"):
                 continue
-            ноль, ушло = з.get("signal_recv_ts"), з.get("ts_sent")
-            if not isinstance(ноль, (int, float)) or not isinstance(ушло, (int, float)):
-                continue
-            if float(ноль) < порог:
-                continue
-            мс = (float(ушло) - float(ноль)) * 1000.0
-            if not -1000 < мс < 600_000:
-                continue
-            час = time.strftime("%Y-%m-%dT%HZ", time.gmtime(float(ноль)))
-            по_часам[час].append(мс)
-            все_мс.append(мс)
+            позиций_полосы += 1
+            for к in ("signal_recv_ts", "t_recv_ts", "ts_intent", "ts_sent",
+                      "ts_accepted", "seen_lag_ms"):
+                if isinstance(з.get(к), (int, float)):
+                    поля_времени[к] += 1
+            for ноль_к, конец_к, имя in ПАРЫ:
+                ноль, ушло = з.get(ноль_к), з.get(конец_к)
+                if not isinstance(ноль, (int, float)) or not isinstance(ушло, (int, float)):
+                    continue
+                if float(ноль) < порог:
+                    break
+                мс = (float(ушло) - float(ноль)) * 1000.0
+                if not -1000 < мс < 600_000:
+                    break
+                час = time.strftime("%Y-%m-%dT%HZ", time.gmtime(float(ноль)))
+                по_часам[час].append(мс)
+                все_мс.append(мс)
+                чем_мерили[f"{ноль_к} -> {конец_к} ({имя})"] += 1
+                break
     скорость = {ч: {"сделок": len(v), "медиана_мс": round(statistics.median(v), 1),
                     "мин_мс": round(min(v), 1), "макс_мс": round(max(v), 1)}
                 for ч, v in sorted(по_часам.items())}
@@ -150,6 +170,9 @@ def main() -> int:
         "скорость_медиана_мс": (round(statistics.median(все_мс), 1)
                                  if все_мс else None),
         "скорость_сделок": len(все_мс),
+        "скорость_чем_мерили": dict(чем_мерили),
+        "позиций_полосы_прочитано": позиций_полосы,
+        "поля_времени_в_позициях": dict(поля_времени),
     }
     with open(а.out, "w", encoding="utf-8") as ф:
         json.dump(отчёт, ф, ensure_ascii=False, indent=1)
