@@ -1,0 +1,183 @@
+name: "Файл групп: заменить живой файл целиком из репозитория (с откатом)"
+
+# ЗАЧЕМ (финальный план владельца 27.09, п.2). Новый файл групп -- это четыре
+# группы вместо прежних четырёх, 19 торгующих адресов и 557 адресов только под
+# лог. Точечная правка полем тут не годится: меняется весь состав.
+#
+# ПОЧЕМУ ОТДЕЛЬНЫЙ ПРОГОН, А НЕ ДЕПЛОЙ. Деплой файла групп НЕ КАСАЕТСЯ нарочно:
+# 27.09 он перезаписал живой файл копией из репозитория и молча вернул деньги к
+# исходной настройке (Bloom включился на всех группах, размер полосы вырос с
+# 0.01 до 0.05). Поэтому замена -- осознанное отдельное действие с подтверждением
+# и откатом.
+#
+# ЗАМКИ. 1) Файл из репозитория читается ТЕМ ЖЕ модулем и обязан дать ожидаемый
+# хэш и ожидаемый список торгующих групп. 2) После записи живой файл читается
+# на хосте тем же кодом, что у службы, и обязан дать тот же хэш; не сошлось --
+# файл возвращается из копии. 3) Площадка не должна торговать ни по одной
+# группе -- это проверяется отдельно, потому что это деньги.
+#
+# ПЕРЕЗАПУСК НЕ НУЖЕН: с п.1а служба перечитывает файл по mtime. Прогон это и
+# проверяет -- показывает хэш из признака жизни после замены.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "напишите ZAMENIT, чтобы заменить живой файл групп"
+        required: false
+        default: "net"
+      hash:
+        description: "ожидаемый хэш нового файла (12 знаков)"
+        required: false
+        default: ""
+      torguyushchie:
+        description: "ожидаемые торгующие полосой группы через запятую"
+        required: false
+        default: "batch5,lane_s0,leader"
+
+concurrency:
+  group: gruppy-zamena
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  FILE: /home/bot/data/sources_2026-09-25.json
+  LOCAL: data/sources_2026-09-25.json
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: data/gruppy_zamena.txt
+
+jobs:
+  zamena:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки модуля групп и сборщика (до всякой записи)"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_source_groups.py --self-test
+          python3 gruppy_final_2026_09_27.py --self-test
+
+      - name: "Файл из репозитория даёт ожидаемый хэш и состав"
+        run: |
+          set -e
+          HASH_VHOD="${{ inputs.hash }}"
+          if [ -z "$HASH_VHOD" ]; then
+            HASH_VHOD=$(python3 -c "import hashlib;print(hashlib.sha256(open('$LOCAL','rb').read()).hexdigest()[:12])")
+            echo "хэш входом не задан -- берём из файла: $HASH_VHOD"
+          fi
+          echo "HASH_ZHDEM=$HASH_VHOD" >> "$GITHUB_ENV"
+          PYTHONPATH=analysis python3 deploy/checks/gruppy_v_boyu.py \
+            --fayl "$LOCAL" --zhdem-hash "$HASH_VHOD" \
+            --zhdem-torguyushchih '${{ inputs.torguyushchie }}'
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Что в бою сейчас (только чтение)"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/gruppy_v_boyu.py" < deploy/checks/gruppy_v_boyu.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            ls -l $FILE
+            set -a; . /etc/bloom-executor/env; set +a
+            PYTHONPATH=$CODE_DIR $PYBIN /tmp/gruppy_v_boyu.py --fayl $FILE || true" | tee /tmp/gr_before.txt
+
+      - name: "Замена файла (только по confirm=ZAMENIT)"
+        if: ${{ inputs.confirm == 'ZAMENIT' }}
+        run: |
+          set -e
+          set -o pipefail
+          # Копия живого файла -- ДО всякой записи, с меткой времени.
+          ssh -n $SSH_OPTS root@"$HOST" "cp -a $FILE $FILE.bak.\$(date -u +%Y%m%dT%H%M%SZ) && ls -1 $FILE.bak.* | tail -3"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/gruppy_novyy.json" < "$LOCAL"
+          # Запись АТОМАРНАЯ: временный файл в том же каталоге и mv. Служба
+          # читает файл на ходу, и увидеть его оборванным она не должна.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            python3 -c 'import json,sys; json.load(open(\"/tmp/gruppy_novyy.json\")); print(\"новый файл -- исправный JSON\")'
+            install -o bot -g bot -m 644 /tmp/gruppy_novyy.json $FILE.novyy
+            mv -f $FILE.novyy $FILE
+            rm -f /tmp/gruppy_novyy.json
+            ls -l $FILE"
+
+      - name: "Живой файл читается кодом службы и даёт тот же хэш -- иначе откат"
+        if: ${{ inputs.confirm == 'ZAMENIT' }}
+        run: |
+          set -e
+          set -o pipefail
+          if ssh -n $SSH_OPTS root@"$HOST" "
+                set -a; . /etc/bloom-executor/env; set +a
+                PYTHONPATH=$CODE_DIR $PYBIN /tmp/gruppy_v_boyu.py --fayl $FILE \
+                  --zhdem-hash '$HASH_ZHDEM' \
+                  --zhdem-torguyushchih '${{ inputs.torguyushchie }}'" | tee /tmp/gr_after.txt; then
+            echo "живой файл сошёлся с задуманным"
+          else
+            echo "СБОЙ: живой файл не сошёлся -- возвращаю из копии"
+            ssh -n $SSH_OPTS root@"$HOST" "
+              KOPIYA=\$(ls -1t $FILE.bak.* | head -1)
+              [ -n \"\$KOPIYA\" ] || { echo 'копии нет -- откатывать нечем'; exit 1; }
+              install -o bot -g bot -m 644 \"\$KOPIYA\" $FILE.novyy
+              mv -f $FILE.novyy $FILE
+              echo \"возвращено из \$KOPIYA\""
+            exit 1
+          fi
+
+      - name: "Служба перечитала файл БЕЗ перезапуска (хэш из признака жизни)"
+        if: ${{ inputs.confirm == 'ZAMENIT' }}
+        run: |
+          set -e
+          sleep 40
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/gruppy_v_priznake.py" < deploy/checks/gruppy_v_priznake.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            $PYBIN /tmp/gruppy_v_priznake.py --status $STATE_DIR/detector_status.json
+            rm -f /tmp/gruppy_v_priznake.py" | tee /tmp/gr_heartbeat.txt
+
+      - name: "Отчёт"
+        if: always()
+        run: |
+          set -e
+          {
+            echo "снято $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "confirm: ${{ inputs.confirm }}, ожидаемый хэш: $HASH_ZHDEM"
+            echo "--- в бою ДО ---"; cat /tmp/gr_before.txt 2>/dev/null || true
+            echo "--- в бою ПОСЛЕ ---"; cat /tmp/gr_after.txt 2>/dev/null || echo "замены не было"
+            echo "--- признак жизни ---"; cat /tmp/gr_heartbeat.txt 2>/dev/null || true
+          } > "$OUT"
+          cat "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Fayl grupp: zamena zhivogo fayla [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
