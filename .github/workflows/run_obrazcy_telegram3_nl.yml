@@ -1,0 +1,118 @@
+name: "Три образца формата 3 в Telegram тем же отправителем, что сделки (п.5)"
+
+# ЗАЧЕМ (п.5 плана владельца 27.09): "часовая строка и тревоги переведены на
+# того же отправителя и формат, что сделки; прислать по одному образцу сделки,
+# часовой строки и тревоги". Образец, посланный другим путём, ничего бы не
+# проверил -- поэтому отправка идёт bloom_notify.Оповещатель на ХОСТЕ, из
+# окружения службы, тем же кодом, что боевые строки.
+#
+# Числа образцов -- ТОЛЬКО из уже собранных файлов репозитория (позиции полосы),
+# ничего не выдумывается: чего в файлах нет, стоит чертой. Тревога берётся
+# только по реальному поводу из закрытого списка.
+#
+# Токен бота живёт ТОЛЬКО в окружении службы на хосте: в прогон он не
+# передаётся, в вывод не печатается.
+on:
+  workflow_dispatch:
+    inputs:
+      otpravit:
+        description: "'yes' -- послать образцы в Telegram; иначе только напечатать"
+        required: false
+        default: "no"
+
+concurrency:
+  group: obrazcy-telegram3
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  CODE_DIR: /home/bot/bloom_executor
+  ENV_FILE: /etc/bloom-executor/env
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: data/obrazcy_telegram3.json
+
+jobs:
+  obrazcy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Формат 3: самопроверка до всякой отправки"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_tg_format3.py --self-test
+
+      - name: "Образцы локально (без сети): видно, что строки собираются"
+        run: python3 deploy/checks/obrazcy_telegram3.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить образцы и данные на хост"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/obrazcy_telegram3.py" < deploy/checks/obrazcy_telegram3.py
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/lane_table_raw.json" < data/lane_table_raw.json
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/lane_table.json" < data/lane_table.json
+
+      - name: "Печать образцов на хосте (без отправки)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            PYTHONPATH=$CODE_DIR $PYBIN /tmp/obrazcy_telegram3.py \
+              --syrye /tmp/lane_table_raw.json --tablica /tmp/lane_table.json" | tee /tmp/obr.txt
+
+      - name: "Отправка тем же отправителем (только по otpravit=yes)"
+        if: ${{ inputs.otpravit == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -a; . $ENV_FILE; set +a
+            PYTHONPATH=$CODE_DIR $PYBIN /tmp/obrazcy_telegram3.py \
+              --syrye /tmp/lane_table_raw.json --tablica /tmp/lane_table.json \
+              --otpravit --out /tmp/obr3.json" | tee /tmp/obr_send.txt
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/obr3.json" > "$OUT"
+
+      - name: "Отчёт"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] || { mkdir -p data; { echo "{"; echo " \"отправки не было\": true"; echo "}"; } > "$OUT"; }
+          cat /tmp/obr.txt 2>/dev/null || true
+          cat /tmp/obr_send.txt 2>/dev/null || true
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Tri obraztsa formata 3 v Telegram [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
