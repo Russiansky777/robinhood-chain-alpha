@@ -38,6 +38,10 @@ on:
         description: "подписи покупок DBot через запятую -- разобрать отдельно (названные владельцем)"
         required: false
         default: ""
+      dbot_koshelki:
+        description: "кошельки DBot через запятую -- по ним раскрываются усечённые подписи"
+        required: false
+        default: ""
 
 concurrency:
   group: dbot-sverka
@@ -94,6 +98,7 @@ jobs:
               --s '${{ inputs.s }}' --po '${{ inputs.po }}' \
               --zadachi '${{ inputs.zadachi }}' \
               --podpisi '${{ inputs.podpisi }}' \
+              --dbot-koshelki '${{ inputs.dbot_koshelki }}' \
               --state-dir '$STATE_DIR' --out /tmp/sverka/out.json"
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/sverka/out.json" > "$OUT"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/sverka"
