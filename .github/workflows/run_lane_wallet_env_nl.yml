@@ -1,0 +1,180 @@
+name: "Переезд полосы: ключ и адрес полосы в окружение службы, перезапуск"
+
+# ЗАЧЕМ (владелец 27.09, шаг 5 переезда). "Окружение службы: ключ полосы -- из
+# LIVE_PRIVATE, адрес полосы и nonce -- новые; сверка 'ни одно имя не потеряно';
+# перезапуск при нуле позиций; признак жизни показывает новый адрес полосы".
+#
+# КЛЮЧ НИКУДА НЕ ПЕЧАТАЕТСЯ. Значение секрета не идёт ни в аргумент команды
+# (он виден в списке процессов на хосте), ни в журнал прогона: строка
+# собирается в файл на бегунке через printf и уезжает на хост по stdin ssh.
+# На хосте файл затирается сразу после применения.
+#
+# ГЛАВНАЯ ЗАЩИТА ЭТОГО ПРОГОНА: ключ ставится ТОЛЬКО если выведенный из него
+# адрес РАВЕН адресу, подтверждённому владельцем в data/lane_wallet_move.json.
+# Чужой ключ в окружении полосы означал бы подпись чужого кошелька.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: lane-wallet-move
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: data/lane_wallet_env.txt
+
+jobs:
+  env_polosy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение бегунка"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/lwe"
+          "$RUNNER_TEMP/lwe/bin/pip" install -q solders base58
+          echo "RPY=$RUNNER_TEMP/lwe/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Ключ даёт ИМЕННО подтверждённый адрес -- иначе стоп"
+        env:
+          LIVE_PRIVATE: ${{ secrets.LIVE_PRIVATE }}
+        run: |
+          set -e
+          [ -n "$LIVE_PRIVATE" ] || { echo "СБОЙ: секрет LIVE_PRIVATE не задан"; exit 1; }
+          $RPY deploy/checks/adres_iz_sekreta.py --env LIVE_PRIVATE --out /tmp/addr.json
+          ADDR=$($RPY -c "import json;print(json.load(open('/tmp/addr.json'))['адрес'])")
+          OZHID=$($RPY -c "import json;print(json.load(open('data/lane_wallet_move.json'))['новый_адрес'])")
+          PODTV=$($RPY -c "import json;print(json.load(open('data/lane_wallet_move.json'))['подтверждён_владельцем'])")
+          echo "адрес из ключа: $ADDR"
+          echo "адрес из конфига: $OZHID (подтверждён: $PODTV)"
+          [ "$PODTV" = "True" ] || { echo "СБОЙ: адрес не подтверждён владельцем"; exit 1; }
+          [ "$ADDR" = "$OZHID" ] || { echo "СБОЙ: ключ даёт не подтверждённый адрес"; exit 1; }
+          NONCE=$($RPY -c "from solders.pubkey import Pubkey; print(Pubkey.create_with_seed(Pubkey.from_string('$ADDR'),'bloom-lane-nonce',Pubkey.from_string('11111111111111111111111111111111')))")
+          echo "адрес nonce нового кошелька: $NONCE"
+          echo "NOVYY_ADRES=$ADDR" >> "$GITHUB_ENV"
+          echo "NOVYY_NONCE=$NONCE" >> "$GITHUB_ENV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Три строки в окружение, с копией и сверкой имён"
+        env:
+          LIVE_PRIVATE: ${{ secrets.LIVE_PRIVATE }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort" > /tmp/do.txt
+          echo "имён в окружении до правки: $(wc -l < /tmp/do.txt)" | tee "$OUT"
+          umask 077
+          printf 'OWN_SEND_WALLET_KEY=%s\nOWN_SEND_WALLET=%s\nBLOOM_LANE_NONCE=%s\n' \
+            "$LIVE_PRIVATE" "$NOVYY_ADRES" "$NOVYY_NONCE" > /tmp/novye.env
+          ssh $SSH_OPTS root@"$HOST" "umask 077; cat > /tmp/novye.env" < /tmp/novye.env
+          shred -u /tmp/novye.env 2>/dev/null || rm -f /tmp/novye.env
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            cp -a $ENV_DIR/env $ENV_DIR/env.bak.\$(date -u +%Y%m%dT%H%M%SZ)
+            sed -i '/^OWN_SEND_WALLET_KEY=/d;/^OWN_SEND_WALLET=/d;/^BLOOM_LANE_NONCE=/d' $ENV_DIR/env
+            cat /tmp/novye.env >> $ENV_DIR/env
+            shred -u /tmp/novye.env 2>/dev/null || rm -f /tmp/novye.env
+            chown root:root $ENV_DIR/env
+            chmod 600 $ENV_DIR/env
+            echo 'строк OWN_SEND_WALLET_KEY:' \$(grep -c '^OWN_SEND_WALLET_KEY=' $ENV_DIR/env)
+            echo 'строк OWN_SEND_WALLET:' \$(grep -c '^OWN_SEND_WALLET=' $ENV_DIR/env)
+            echo 'строк BLOOM_LANE_NONCE:' \$(grep -c '^BLOOM_LANE_NONCE=' $ENV_DIR/env)
+            grep '^OWN_SEND_WALLET=' $ENV_DIR/env
+            grep '^BLOOM_LANE_NONCE=' $ENV_DIR/env" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort" > /tmp/posle.txt
+          echo "имён в окружении после правки: $(wc -l < /tmp/posle.txt)" | tee -a "$OUT"
+          POTERYANO=$(comm -23 /tmp/do.txt /tmp/posle.txt | tr "\n" " ")
+          if [ -n "$(echo "$POTERYANO" | tr -d " ")" ]; then
+            echo "СБОЙ: правка потеряла имена: $POTERYANO"
+            ssh -n $SSH_OPTS root@"$HOST" "
+              set -e
+              newest=\$(ls -1t $ENV_DIR/env.bak.* | head -1)
+              cp -a \"\$newest\" $ENV_DIR/env
+              chown root:root $ENV_DIR/env
+              chmod 600 $ENV_DIR/env
+              echo vosstanovleno"
+            exit 1
+          fi
+          echo "имена целы" | tee -a "$OUT"
+
+      - name: "Ключ в окружении хоста даёт тот же адрес (проверка на месте)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/adres_iz_sekreta.py" < deploy/checks/adres_iz_sekreta.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            LIVE_PRIVATE=\$OWN_SEND_WALLET_KEY $PYBIN /tmp/adres_iz_sekreta.py --env LIVE_PRIVATE \
+              | $PYBIN -c 'import sys,json; print(\"адрес из окружения:\", json.load(sys.stdin).get(\"адрес\"))'
+            rm -f /tmp/adres_iz_sekreta.py" | tee -a "$OUT"
+          grep -q "$NOVYY_ADRES" "$OUT" || { echo "СБОЙ: ключ в окружении даёт не тот адрес"; exit 1; }
+          echo "ключ в окружении согласован с адресом" | tee -a "$OUT"
+
+      - name: "Перезапуск двух служб при нуле открытых позиций"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
+          ssh -n $SSH_OPTS root@"$HOST" "$PYBIN /tmp/pered_perezapuskom_sluzhby.py" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/pered_perezapuskom_sluzhby.py"
+          ssh -n $SSH_OPTS root@"$HOST" "systemctl restart bloom-seller; systemctl restart bloom-detector"
+          sleep 12
+          ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active bloom-seller; systemctl is-active bloom-detector" | tee -a "$OUT"
+
+      - name: "Признак жизни показывает новый адрес полосы"
+        run: |
+          set -e
+          set -o pipefail
+          for i in $(seq 1 20); do
+            OUT_JSON=$(ssh -n $SSH_OPTS root@"$HOST" "cat $STATE_DIR/detector_status.json 2>/dev/null || echo '{}'")
+            ADDR=$(printf '%s' "$OUT_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin) if sys.stdin else {}; print(((d.get('own_send') or {}).get('wallet')) or '')" 2>/dev/null || echo "")
+            echo "признак жизни: кошелёк полосы = ${ADDR:-нет}"
+            if [ "$ADDR" = "$NOVYY_ADRES" ]; then
+              echo "признак жизни показывает новый адрес полосы: $ADDR" | tee -a "$OUT"
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "СБОЙ: за 120 с признак жизни не показал новый адрес полосы"
+          exit 1
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Pereezd polosy: klyuch i adres polosy v okruzhenii, perezapusk [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
