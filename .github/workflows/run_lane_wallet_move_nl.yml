@@ -39,6 +39,7 @@ env:
   ENV_DIR: /etc/bloom-executor
   TARGET_HOST: 127.0.0.1
   OUT: data/lane_wallet_move_result.json
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
 
 jobs:
   move:
@@ -81,7 +82,10 @@ jobs:
       - name: "Самопроверка денежного пути НА ХОСТЕ, до всякой цепи"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cd /tmp/lwm && python3 analysis/lane_wallet_move.py --chto self-test | tail -3"
+          # ИНТЕРПРЕТАТОР СЛУЖБЫ, а не системный: solders стоит только в её
+          # окружении, и первый прогон 27.09 упал ровно на этом (ничего при
+          # этом не ушло -- падение случилось до сборки инструкции).
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd /tmp/lwm && $PYBIN analysis/lane_wallet_move.py --chto self-test | tail -3"
 
       - name: "Шаг"
         run: |
@@ -94,7 +98,7 @@ jobs:
             . $ENV_DIR/env
             set +a
             cd /tmp/lwm
-            LANE_MOVE_LIVE=$LIVEFLAG python3 analysis/lane_wallet_move.py \
+            LANE_MOVE_LIVE=$LIVEFLAG $PYBIN analysis/lane_wallet_move.py \
               --chto '${{ inputs.chto }}' --out /tmp/lwm/result.json"
 
       - name: "Забрать результат и убрать модуль с хоста"
