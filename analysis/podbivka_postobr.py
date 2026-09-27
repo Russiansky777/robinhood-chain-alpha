@@ -206,14 +206,15 @@ def m5(уз: S.Узел, п: dict) -> dict:
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--spisok", action="store_true")
-    р.add_argument("--rezhim", choices=("m4", "m5", "m6"))
+    р.add_argument("--rezhim", choices=("m4", "m5", "m6", "m7"))
     р.add_argument("--s", type=int, default=0)
     р.add_argument("--po", type=int, default=0)
     р.add_argument("--push", action="store_true")
     а = р.parse_args()
     if а.spisok:
         return собрать_список()
-    спис = json.loads((КОРЕНЬ / "data" / "podbivka" / "postobr_spisok.json").read_text(encoding="utf-8"))[а.rezhim]
+    имя_списка = "postobr_spisok_m7.json" if а.rezhim == "m7" else "postobr_spisok.json"
+    спис = json.loads((КОРЕНЬ / "data" / "podbivka" / имя_списка).read_text(encoding="utf-8"))[а.rezhim]
     спис = спис[а.s:(а.po or None)]
     out = КОРЕНЬ / "data" / "podbivka" / "postobr" / f"{а.rezhim}_{а.s}_{а.po or 'end'}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -237,6 +238,10 @@ def main() -> int:
                     if а.rezhim == "m4":
                         рез = S._симулировать(уз, п, горизонты=S.ГОРИЗОНТЫ_ДОП, доп=True)  # noqa: SLF001
                         рез = {к: рез.get(к) for к in ("why_not", "чистый_пп", "доп", "режим", "без_свопов")}
+                    elif а.rezhim == "m7":
+                        # п.23: наши speed_only с n >= 5, билеты S+0, выход +72.
+                        рез = S._симулировать(уз, п, горизонты=(72,), билеты=(0.02, 0.05, 0.1, 0.2, 0.5))  # noqa: SLF001
+                        рез = {к: рез.get(к) for к in ("why_not", "режим", "билеты_72", "резерв_s0", "ликвидность_sol")}
                     elif а.rezhim == "m5":
                         рез = m5(уз, п)
                     else:
