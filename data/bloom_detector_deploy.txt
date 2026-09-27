@@ -1,5 +1,3 @@
-  "slippage_pct": 35.0,
-  "priority_fee": 0.001,
   "processor_tip": 0.001,
   "sell_after_s": 28.8,
   "sell_slippage_pct": 40.0,
@@ -32,8 +30,10 @@
       "mint_cooldown_s": 900.0,
       "max_buys_per_mint": 2
     },
-    "open_positions": 0,
-    "open_mints": [],
+    "open_positions": 1,
+    "open_mints": [
+      "gYfECNPMwGpmsMJAfGiLTWgvWcHytNHxjbxoCRGU2gz"
+    ],
     "counters": {
       "api_error_streak": 0,
       "unsold_streak": 0,
@@ -42,12 +42,12 @@
       "api_error_last_ts": 1790381356.4951322
     },
     "day_pnl": {
-      "realized_sol": -0.066215278,
-      "spent_sol": 0.06395776,
+      "realized_sol": -0.124889501,
+      "spent_sol": 0.16513836,
       "buys": 0,
-      "sells": 34,
+      "sells": 58,
       "tz_unavailable": false,
-      "updated_utc": "2026-09-27T11:04:09Z"
+      "updated_utc": "2026-09-27T16:10:04Z"
     },
     "bloom_request_budget": {
       "limit_week": 10000,
@@ -79,3 +79,555 @@ Traceback (most recent call last):
            ^^^^^^^^
   File "<frozen codecs>", line 322, in decode
 UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
+{
+  "schema_version": 2,
+  "updated_utc": "2026-09-27T16:10:43Z",
+  "updated_ts": 1790525443.4911835,
+  "alive_since_utc": "2026-09-27T16:10:32Z",
+  "mode": "live",
+  "sources": 85,
+  "source_groups": {
+    "file": "/home/bot/data/sources_2026-09-25.json",
+    "why_not": null,
+    "hash": "c5eedf6af14e",
+    "mtime_utc": "2026-09-27T13:57:21Z",
+    "alarm": null,
+    "in_file": {
+      "lane_only": 38,
+      "speed_only": 30
+    },
+    "subscribed": {
+      "off": 17,
+      "speed_only": 30,
+      "lane_only": 38
+    },
+    "policies": {
+      "bloom_lane": {
+        "lane_sol": 0.01,
+        "bloom_trades": false,
+        "lane_trades": true,
+        "bloom_sol": 0.05,
+        "fanout": true,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.15,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "lane_size": 0.01
+      },
+      "lane_only": {
+        "lane_sol": 0.01,
+        "bloom_trades": false,
+        "lane_trades": true,
+        "bloom_sol": 0.05,
+        "fanout": true,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.15,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "lane_size": 0.01
+      },
+      "speed_only": {
+        "lane_sol": 0.01,
+        "bloom_trades": false,
+        "lane_trades": false,
+        "bloom_sol": 0.01,
+        "fanout": false,
+        "day_cap_sol": 3.0,
+        "stop_loss_sol": 0.15,
+        "min_target_sol": 0.5,
+        "lane_open_max": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "lane_size": 0.01
+      },
+      "candidates": {
+        "lane_sol": 0.01,
+        "bloom_trades": false,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": 1.0,
+        "stop_loss_sol": 0.2,
+        "min_target_sol": 2.0,
+        "lane_open_max": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "lane_size": 0.01
+      }
+    }
+  },
+  "sender_connections": {
+    "by_sender": {
+      "astralane": {
+        "age_s": 0.3,
+        "last_use_s": null,
+        "last_ping_s": 0.3,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "blockrazor": {
+        "age_s": 0.3,
+        "last_use_s": null,
+        "last_ping_s": 0.3,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "helius": {
+        "age_s": 0.3,
+        "last_use_s": null,
+        "last_ping_s": 0.3,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "jito": {
+        "age_s": 0.3,
+        "last_use_s": null,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "nozomi": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "zeroslot": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      }
+    },
+    "warm_period_s": 25.0,
+    "last_warm_s": 0.3,
+    "last_warm": {
+      "ok": 6,
+      "failed": 0
+    }
+  },
+  "bloom_skipped_by_group": 0,
+  "sources_from": "DBot живьём + групп источников: 65 + тестовых источников из окружения: 2",
+  "sources_generation": 0,
+  "subscribe_method": "transactionSubscribe",
+  "subscribe_drops": 0,
+  "signals_seen": 5,
+  "to_buy": 0,
+  "by_code": {
+    "NOT_A_BUY": 3,
+    "TOKEN_RECEIVED_NOT_BOUGHT": 1,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 1
+  },
+  "by_code_test_source": {},
+  "test_sources": [
+    "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+    "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
+  ],
+  "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+  "test_min_sol": 0.05,
+  "max_tx_version": 1,
+  "rate_source": "geckoterminal",
+  "rate_usd_sol": 121.95282469468941,
+  "rate_fresh": true,
+  "rate_stale_used": 0,
+  "rate_failures": [],
+  "kill_path": "/etc/bloom-executor/KILL",
+  "kill_readable": true,
+  "kill_active": false,
+  "kill_note": "путь рубильника доступен на чтение",
+  "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
+  "kill_bloom_active": false,
+  "kill_bloom_note": "",
+  "net_slot": 451046691,
+  "slot_notifications": 35,
+  "net_slot_age_s": 0.29,
+  "balance_sol": 0.000810942,
+  "balance_age_s": 0.91,
+  "rpc_calls": 72,
+  "rpc_by_method": {
+    "getBalance": 4,
+    "getLatestBlockhash": 1,
+    "getAccountInfo": 1,
+    "getTransaction": 61,
+    "getMultipleAccounts": 1,
+    "simulateTransaction": 1,
+    "getSignatureStatuses": 1,
+    "getBlock": 2
+  },
+  "session_credits": 72,
+  "handler_crashes": 0,
+  "telegram": {
+    "enabled": true,
+    "configured": true,
+    "format2": false,
+    "format3": true,
+    "tracked_messages": 0,
+    "tracked_texts": 0,
+    "sent": 0,
+    "failed": 0,
+    "last_error": "",
+    "off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
+    "log_configured": false,
+    "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
+    "by_target": {
+      "main": {
+        "sent": 0,
+        "failed": 0,
+        "last_error": ""
+      },
+      "log": {
+        "sent": 0,
+        "failed": 0,
+        "last_error": ""
+      }
+    }
+  },
+  "own_tx_seen": 0,
+  "chain_ok_backfilled": 0,
+  "block_position_backfilled": 0,
+  "block_position": {
+    "module_loaded": true,
+    "why_not": ""
+  },
+  "fallback_seconds": 0,
+  "fallback_window_s": 5.0,
+  "subscribe_main_path": true,
+  "fallback": {
+    "switches_total": 0,
+    "switches_short": 0,
+    "seconds_total": 0.0,
+    "hour_switches": 0,
+    "hour_seconds": 0.0,
+    "on_fallback_now": false,
+    "report_threshold_s": 30.0,
+    "silent_ticks": 2,
+    "tick_s": 2.0,
+    "breaks_by_reason": {}
+  },
+  "shadow": {
+    "enabled": true,
+    "built": 1,
+    "would_pass": 0,
+    "over_cap": 0,
+    "failed": 0,
+    "module_loaded": true,
+    "module_why_not": "",
+    "passed_in_row_by_pool": {
+      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 0
+    },
+    "hour": {
+      "since_ts": 1790525432.2739944,
+      "since_utc": "2026-09-27T16:10:32Z",
+      "signals": 1,
+      "built": 1,
+      "sim_failed": 1,
+      "not_built": {},
+      "crashed": 0
+    },
+    "restarts": 0,
+    "last_restart_utc": "",
+    "credits_day": 2944,
+    "credits_write_why_not": ""
+  },
+  "route_tax_filter": {
+    "price_curve_loaded": true,
+    "price_curve_why_not": "",
+    "module_loaded": true,
+    "module_why_not": "",
+    "code": "SKIP_TAXED_ROUTE",
+    "skipped": 0,
+    "skipped_test": 0
+  },
+  "own_send": {
+    "enabled": true,
+    "live": true,
+    "module_loaded": true,
+    "module_why_not": "",
+    "paths": 0,
+    "starts": 0,
+    "threads_alive": 0,
+    "sent": 0,
+    "by_stage": {},
+    "bought_backfilled": 1,
+    "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+    "own_wallet": true,
+    "wallet_ready": {
+      "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "own_wallet": true,
+      "ok": true,
+      "why_not": null
+    },
+    "balance_sol": 6.043711064,
+    "balance_day_threshold": {
+      "ok": true,
+      "kill": false,
+      "why": "просадка от 00:00 0.0 SOL при пороге 0.5",
+      "threshold_sol": 0.5,
+      "day": "20260927",
+      "open_sol": 6.043711064,
+      "balance_sol": 6.043711064,
+      "drop_sol": 0.0
+    },
+    "balance_age_s": 0.9,
+    "sim_shadow": {
+      "done": 0,
+      "would_fail": 0
+    },
+    "blockhash_age_s": 11.0,
+    "blockhash_updates": 1,
+    "blockhash_why_not": "",
+    "last": {},
+    "lane_kill": [
+      false,
+      ""
+    ],
+    "limits": {
+      "open": 1,
+      "per_day": 50,
+      "open_by_group": {
+        "bloom_lane": 1,
+        "candidates": 1,
+        "lane_only": 1,
+        "speed_only": 1
+      },
+      "size_sol": 0.05,
+      "stop_failed_in_row": 5,
+      "stop_loss_sol": 0.3
+    },
+    "lane_state": {
+      "open": 1,
+      "stuck": 0,
+      "day": "20260927",
+      "day_start_ts": 1790460000.0,
+      "day_how": "Europe/Madrid",
+      "pnl_all_groups_sol": -0.086393374,
+      "today_all_groups": 40,
+      "today": 40,
+      "failed_in_row": 0,
+      "pnl_sol": -0.086393374,
+      "pnl_trade_sol": 0.073001186,
+      "spend_sol": 0.15939456,
+      "uncountable_today": 25,
+      "no_result_today": 2,
+      "uncountable_why": [
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
+      ],
+      "total": 143,
+      "group": "деньги (все группы кроме скорости)",
+      "day_turnover_sol": 0.4792,
+      "day_spend_sol": 0.15939456
+    },
+    "lane_state_by_group": {
+      "money": {
+        "open": 1,
+        "stuck": 0,
+        "day": "20260927",
+        "day_start_ts": 1790460000.0,
+        "day_how": "Europe/Madrid",
+        "pnl_all_groups_sol": -0.086393374,
+        "today_all_groups": 40,
+        "today": 40,
+        "failed_in_row": 0,
+        "pnl_sol": -0.086393374,
+        "pnl_trade_sol": 0.073001186,
+        "spend_sol": 0.15939456,
+        "uncountable_today": 25,
+        "no_result_today": 2,
+        "uncountable_why": [
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
+        ],
+        "total": 143,
+        "group": "деньги (все группы кроме скорости)",
+        "day_turnover_sol": 0.4792,
+        "day_spend_sol": 0.15939456
+      },
+      "speed_only": {
+        "open": 1,
+        "stuck": 0,
+        "day": "20260927",
+        "day_start_ts": 1790460000.0,
+        "day_how": "Europe/Madrid",
+        "pnl_all_groups_sol": -0.086393374,
+        "today_all_groups": 40,
+        "today": 31,
+        "failed_in_row": 0,
+        "pnl_sol": -0.060007233,
+        "pnl_trade_sol": 0.054489447,
+        "spend_sol": 0.11449668,
+        "uncountable_today": 18,
+        "no_result_today": 2,
+        "uncountable_why": [
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
+        ],
+        "total": 129,
+        "group": "speed_only",
+        "day_turnover_sol": 0.371155,
+        "day_spend_sol": 0.11449668
+      }
+    },
+    "control": {
+      "enabled": false,
+      "senders_seen": 0,
+      "spent_today": {
+        "day": "20260927",
+        "n": 42,
+        "signals": 7,
+        "spent_lamports": 28917000,
+        "why_not": null,
+        "spent_sol": 0.028917
+      },
+      "limits": {
+        "signals_per_day": 20,
+        "spend_sol_per_day": 0.1,
+        "per_sender_sol": 0.001
+      },
+      "by_sender": {}
+    },
+    "pool": {
+      "enabled": true,
+      "tip_cap_sol": 0.005,
+      "winners": {
+        "blockrazor": 21,
+        "nozomi": 37,
+        "astralane": 63,
+        "helius": 19,
+        "zeroslot": 2,
+        "jito": 1
+      }
+    },
+    "pool_nonce": {
+      "enabled": true,
+      "account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+      "wait_slots": 8,
+      "wait_s": 3.2,
+      "pending_shift": false,
+      "pending_why": null,
+      "shift_signature": null,
+      "warm": {
+        "есть": true,
+        "возраст_с": 10.94,
+        "почему": "",
+        "обновлений": 1,
+        "взят_тёплым": 0,
+        "взят_по_сети": 0,
+        "срок_с": 30.0
+      }
+    }
+  },
+  "leg_cache": {
+    "enabled": false,
+    "why_not": "замер двухшаговой тени снят словом владельца 25.09: 2 сигнала из 41 977 за сутки (BLOOM_SHADOW_LEGS_OFF=0 включает обратно)"
+  },
+  "telegram_commands": {
+    "enabled": true,
+    "why_not": "",
+    "accepted": 0,
+    "from_strangers": 0,
+    "errors": 0,
+    "last_error": "",
+    "last_command": "",
+    "last_command_utc": "",
+    "offset": 396350741,
+    "seen_chats": {}
+  },
+  "bloom_keepalive": {
+    "enabled": true,
+    "period_s": 20.0,
+    "ok": 2,
+    "failed": 0,
+    "skipped_while_buying": 0,
+    "last_code": 200,
+    "last_utc": "2026-09-27T16:10:32Z",
+    "last_error": ""
+  },
+  "executor_attached": true,
+  "executed": 0,
+  "exec_by_code": {},
+  "executor": {
+    "schema_version": 2,
+    "mode": "live",
+    "live_buy_enabled": true,
+    "live_test_enabled": false,
+    "dry_run": false,
+    "bump_sol": 0.005,
+    "buy_sol": 0.2,
+    "slippage_pct": 35.0,
+    "priority_fee": 0.001,
+    "processor_tip": 0.001,
+    "sell_after_s": 28.8,
+    "sell_slippage_pct": 40.0,
+    "sent": 0,
+    "refused": 0,
+    "last_error": "",
+    "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  "credits_logged": true,
+  "credits_log_error": "",
+  "decide_latency_ms": {
+    "n": 5,
+    "median": 0.8,
+    "min": 0.6,
+    "max": 24.1
+  }
+}--- решений в журнале ---
+49451
+--- позиций в журнале (должно быть 0: покупать нечем) ---
+1415
