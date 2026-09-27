@@ -46,7 +46,7 @@ G_БЕЗ_ПРОДАЖ = 0.985
 ТОЧКИ = ("S0", "S0_дно", "S1", "S2")
 
 
-БАЗА = ("signature", "mint", "wallet", "sol_экв", "группа")
+БАЗА = ("signature", "mint", "wallet", "sol_экв", "группа", "вид", "слотов_от_предыдущей")
 # x*y=k по хранилищам проверена в A3 на Raydium CP; Pump AMM и AMM v4 -- та же
 # формула. LaunchLab -- виртуальные резервы из события (как в основном
 # симуляторе). CLMM/DLMM/Whirlpool/DAMM v2/DBC -- хранилища цену не дают: отказ.
@@ -82,6 +82,11 @@ def цена_котировочного(уз: S.Узел, tsrc: dict, q: str):
 
 
 ГОРИЗОНТЫ = (72, 150)
+# Прогон лидера 27.09 (вечер): максимум по свопам, продажи источника, SOL-пулы.
+МАКС_ОКНА: tuple = ()          # (36, 150, 600, 1800) -- окна максимума; () -- выкл.
+МАКС_ЧТЕНИЙ = 300              # состояний на покупку: все свопы, иначе конец слота, иначе шаг
+ПРОДАЖИ = False                # слоты продаж источника (по его счёту минта) и выход по первой
+SOL_ПУЛ = False                # котировка SOL: та же модель режима 2, цена q = 1
 
 
 def одна(уз: S.Узел, п: dict) -> dict:
@@ -95,7 +100,7 @@ def одна(уз: S.Узел, п: dict) -> dict:
     из_.update(slot=s0, quote_mint=q, pool_vault=пул.get("pool_vault"), split=bool(пул.get("split")))
     if not пул.get("pool_vault") or not пул.get("quote_vault"):
         return {**из_, "why_not": "пул не опознан"}
-    if q in SOLы:
+    if q in SOLы and not SOL_ПУЛ:
         return {**из_, "why_not": "котировка SOL -- основной симулятор"}
     import c2_pool_programs as PP  # noqa: PLC0415
     прог = PP.pool_program(tsrc, пул["pool_vault"], PP.labels()).get("pool_program")
@@ -110,11 +115,15 @@ def одна(уз: S.Узел, п: dict) -> dict:
     ст0 = S.состояние(tsrc, режим, пул, п["mint"])
     if not ст0:
         return {**из_, "why_not": "состояние после источника не читается"}
-    цена_q, откуда = цена_котировочного(уз, tsrc, q)
+    if q in SOLы:
+        цена_q, откуда = 1.0, "котировка SOL"
+    else:
+        цена_q, откуда = цена_котировочного(уз, tsrc, q)
     из_["цена_q_откуда"] = откуда
     if not цена_q:
         return {**из_, "why_not": f"курс котировочного: {откуда}"}
-    нал_т, нал_q = S.налог_минта(уз, п["mint"]), S.налог_минта(уз, q)
+    нал_т = S.налог_минта(уз, п["mint"])
+    нал_q = {"bps": 0} if q in SOLы else S.налог_минта(уз, q)
     из_.update(налог_токена_bps=нал_т.get("bps"), налог_q_bps=нал_q.get("bps"))
     for чей, нал in (("токена", нал_т), ("котировочного", нал_q)):
         if нал.get("why_not"):
@@ -204,7 +213,23 @@ def одна(уз: S.Узел, п: dict) -> dict:
                         for к, с in точки.items() if к != "S0"}
     из_["резерв_q_s0"] = ст0["x"] if режим == "xyk" else ст0["rq"]
     из_["резерв_s0_sol"] = round(из_["резерв_q_s0"] * цена_q / 1e9, 3)
+    def выход(вх_, св, вставка=True):
+        т_брутто, в_пул_вход, в_пул = вх_
+        if режим == "xyk":
+            X, Y = (св["x"] + в_пул_вход, св["y"] - т_брутто) if вставка else (св["x"], св["y"])
+            q_out = int(X * g * в_пул / (Y + в_пул)) if Y > 0 else None
+        else:
+            покупка = {"в_пул": в_пул_вход, "tokens": т_брутто} if вставка else {"в_пул": 0, "tokens": 0}
+            пр = S.наша_продажа("launchlab", св, покупка, в_пул, f=f, кривая_bps=(0, 0), g=None)
+            q_out = пр["lamports"] if пр.get("ok") else None
+        if q_out is None:
+            return None
+        q_out -= S.удержано(q_out, нал_q)      # пул токена -> мы
+        q_out -= S.удержано(q_out, нал_q)      # мы -> пул q/SOL
+        return S.чистый_пп(int(q_out * цена_q))
+
     res: dict = {}
+    наши: dict = {}
     for к, с in точки.items():
         if not с:
             res[к] = None
@@ -222,30 +247,120 @@ def одна(уз: S.Узел, п: dict) -> dict:
             continue
         т = т_брутто - S.удержано(т_брутто, нал_т)
         в_пул = т - S.удержано(т, нал_т)
+        наши[к] = (т_брутто, в_пул_вход, в_пул)
         р = {"наценка_пп": round(((q_raw / т_брутто) / p0 - 1) * 100, 3)}
         for H, св in выходы.items():
-            if not св:
-                р[f"потолок_{H}"] = р[f"дно_{H}"] = None
-                continue
             for вид, вставка in (("потолок", True), ("дно", False)):
-                if режим == "xyk":
-                    X, Y = (св["x"] + в_пул_вход, св["y"] - т_брутто) if вставка else (св["x"], св["y"])
-                    q_out = int(X * g * в_пул / (Y + в_пул)) if Y > 0 else None
-                else:
-                    покупка = {"в_пул": в_пул_вход, "tokens": т_брутто} if вставка else {"в_пул": 0, "tokens": 0}
-                    пр = S.наша_продажа("launchlab", св, покупка, в_пул, f=f, кривая_bps=(0, 0), g=None)
-                    q_out = пр["lamports"] if пр.get("ok") else None
-                if q_out is None:
-                    р[f"{вид}_{H}"] = None
-                    continue
-                q_out -= S.удержано(q_out, нал_q)      # пул токена -> мы
-                q_out -= S.удержано(q_out, нал_q)      # мы -> пул q/SOL
-                р[f"{вид}_{H}"] = S.чистый_пп(int(q_out * цена_q))
+                р[f"{вид}_{H}"] = выход(наши[к], св, вставка) if св else None
         res[к] = р
     из_["входы"] = res
+    ВХ_М = [к for к in ("S0", "S0_дно") if к in наши]
+    if МАКС_ОКНА:
+        # максимум по свопам пула в окне: состояние после каждого свопа (или
+        # конец слота / шаг, если свопов больше МАКС_ЧТЕНИЙ) -- наш выход-потолок
+        idx = [i for i, з in enumerate(сп) if з["slot"] <= s0 + max(МАКС_ОКНА) - 1]
+        всего = len(idx)
+        способ = "все свопы"
+        if len(idx) > МАКС_ЧТЕНИЙ:
+            посл: dict = {}
+            for i in idx:
+                посл[сп[i]["slot"]] = i
+            idx = sorted(посл.values())
+            способ = "конец слота"
+            if len(idx) > МАКС_ЧТЕНИЙ:
+                шаг = len(idx) / МАКС_ЧТЕНИЙ
+                idx = sorted({idx[int(k * шаг)] for k in range(МАКС_ЧТЕНИЙ)} | {idx[-1]})
+                способ = "конец слота, шаг"
+        нужны = [сп[i]["signature"] for i in idx if i not in кэш]
+        if нужны:
+            пак = уз.пакет(нужны)
+            for i in idx:
+                if i not in кэш and сп[i]["signature"] in пак:
+                    кэш[i] = пак[сп[i]["signature"]]
+        макс: dict = {к: {} for к in ВХ_М}
+        макс["спот_пп"] = {}
+        прочитано = 0
+        for i in idx:
+            с = S.состояние(txi(i), режим, пул, п["mint"])
+            if not с:
+                continue
+            прочитано += 1
+            сл = сп[i]["slot"]
+            сп_пп = (спот(с) / p0 - 1) * 100
+            for W in МАКС_ОКНА:
+                if сл > s0 + W - 1:
+                    continue
+                м = макс["спот_пп"].get(str(W))
+                if м is None or сп_пп > м["пп"]:
+                    макс["спот_пп"][str(W)] = {"пп": round(сп_пп, 3), "слот": сл}
+                for к in ВХ_М:
+                    v = выход(наши[к], с)
+                    м = макс[к].get(str(W))
+                    if v is not None and (м is None or v > м["пп"]):
+                        макс[к][str(W)] = {"пп": v, "слот": сл}
+        из_["максимум"] = макс
+        из_["максимум_чтение"] = {"свопов_в_окне": всего, "прочитано": прочитано, "способ": способ}
+    if ПРОДАЖИ:
+        из_["продажи"] = продажи_источника(уз, tsrc, п, s0, пул, режим, ВХ_М, наши, выход, спот, p0)
     из_["не_читаются"] = len(не_читаются)
     из_["флаги"] = ["курс котировочного к SOL на выходе = на входе (шаг 2)",
                     "проскальзывание нашей ноги SOL<->котировочный не моделируется"]
+    return из_
+
+
+def продажи_источника(уз, tsrc, п, s0, пул, режим, ВХ_М, наши, выход, спот, p0) -> dict:
+    """Продажи источника по его счетам минта (после сделки источника): слоты,
+    доля остатка; наш выход-потолок по состоянию пула сразу после первой продажи
+    (сделка продажи, если она через этот пул, иначе последняя сделка пула до неё)."""
+    счета = sorted({r["account"] for r in C.token_rows(tsrc).values()
+                    if r["owner"] == п["wallet"] and r["mint"] == п["mint"] and r["account"]})
+    if not счета:
+        return {"why_not": "счёт минта источника в сделке не найден"}
+    подп: dict = {}
+    for сч in счета:
+        до = None
+        for _ in range(3):
+            стр = уз.подписи(сч, до=до, по=п["signature"], limit=1000)
+            for з in стр:
+                if з.get("err") is None and (з.get("slot") or 0) >= s0:
+                    подп[з["signature"]] = з.get("slot")
+            if len(стр) < 1000:
+                break
+            до = стр[-1]["signature"]
+    порядок = sorted(подп, key=lambda x: подп[x])[:60]
+    txs = уз.пакет(порядок) if порядок else {}
+    продажи = []
+    for с_ in порядок:
+        т = txs.get(с_)
+        if not т or (т.get("meta") or {}).get("err") is not None:
+            continue
+        ряды = [r for r in C.token_rows(т).values() if r["owner"] == п["wallet"] and r["mint"] == п["mint"]]
+        до_, после = sum(r["pre"] for r in ряды), sum(r["post"] for r in ряды)
+        if после < до_:
+            продажи.append({"slot": т.get("slot"), "signature": с_, "доля": round((до_ - после) / до_, 4) if до_ else None,
+                            "через_пул": S.состояние(т, режим, пул, п["mint"]) is not None, "_tx": т})
+        if len(продажи) >= 10:
+            break
+    из_ = {"счетов": len(счета), "подписей_счёта": len(подп), "всего_продаж_найдено": len(продажи),
+           "слоты": [{к: v for к, v in x.items() if к != "_tx"} for x in продажи]}
+    if not продажи:
+        из_["why_not"] = "продаж после покупки не найдено (до времени скана)"
+        return из_
+    п1 = продажи[0]
+    ст_ = S.состояние(п1["_tx"], режим, пул, п["mint"])
+    if not ст_:
+        пред = уз.подписи(пул["pool_vault"], до=п1["signature"], limit=5)
+        for з in пред:
+            if з.get("err") is None:
+                ст_ = S.состояние(уз.tx(з["signature"]), режим, пул, п["mint"])
+                if ст_:
+                    break
+    if not ст_:
+        из_["why_not"] = "состояние пула у первой продажи не читается"
+        return из_
+    из_["первая"] = {"slot": п1["slot"], "слотов_от_s0": п1["slot"] - s0, "доля": п1["доля"],
+                     "спот_пп": round((спот(ст_) / p0 - 1) * 100, 3),
+                     "выход": {к: выход(наши[к], ст_) for к in ВХ_М}}
     return из_
 
 
@@ -257,9 +372,16 @@ def main() -> int:
     р.add_argument("--spisok", default="rezhim2_spisok.json")
     р.add_argument("--prefiks", default="")
     р.add_argument("--gorizonty", default="72,150")
+    р.add_argument("--maks", default="", help="окна максимума по свопам, напр. 36,150,600,1800")
+    р.add_argument("--prodazhi", action="store_true")
+    р.add_argument("--sol-pul", action="store_true")
     а = р.parse_args()
-    global ГОРИЗОНТЫ
+    global ГОРИЗОНТЫ, МАКС_ОКНА, ПРОДАЖИ, SOL_ПУЛ
     ГОРИЗОНТЫ = tuple(int(x) for x in а.gorizonty.split(","))
+    МАКС_ОКНА = tuple(int(x) for x in а.maks.split(",") if x)
+    ПРОДАЖИ, SOL_ПУЛ = а.prodazhi, а.sol_pul
+    if МАКС_ОКНА and max(МАКС_ОКНА) > max(ГОРИЗОНТЫ):
+        ГОРИЗОНТЫ = tuple(sorted(set(ГОРИЗОНТЫ) | {max(МАКС_ОКНА)}))
     import podbivka_run as R  # noqa: PLC0415
     спис = json.loads((КОРЕНЬ / "data" / "podbivka" / а.spisok).read_text(encoding="utf-8"))["покупки"]
     спис = спис[а.s:(а.po or None)]
