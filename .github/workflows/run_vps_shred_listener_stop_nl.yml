@@ -69,7 +69,10 @@ jobs:
             systemctl show $SLUZHBA -p CPUUsageNSec -p ActiveEnterTimestamp -p MainPID || true
             ps -o pid,pcpu,etime,comm -p \$(systemctl show -p MainPID --value $SLUZHBA 2>/dev/null || echo 1) 2>/dev/null || true
             echo '--- нагрузка хоста ---'
-            cat /proc/loadavg" | tee "$OUT"
+            cat /proc/loadavg
+            echo '--- код и юнит на месте (проверяется в ЛЮБОМ режиме) ---'
+            ls -l /etc/systemd/system/$SLUZHBA.service 2>/dev/null || echo 'юнита нет'
+            ls -l /home/bot/shred_probe/shred_listener.py 2>/dev/null || echo 'модуля по этому пути нет'" | tee "$OUT"
 
       - name: "Остановить и выключить автозапуск"
         if: ${{ inputs.chto == 'stop' }}
@@ -83,9 +86,6 @@ jobs:
             echo '--- после ---'
             systemctl is-active $SLUZHBA || true
             systemctl is-enabled $SLUZHBA || true
-            echo '--- файлы на месте ---'
-            ls -l /etc/systemd/system/$SLUZHBA.service 2>/dev/null || echo 'юнита нет'
-            ls -l /home/bot/shred_probe/shred_listener.py 2>/dev/null || echo 'модуля по этому пути нет'
             echo '--- нагрузка хоста после ---'
             cat /proc/loadavg" | tee -a "$OUT"
 
