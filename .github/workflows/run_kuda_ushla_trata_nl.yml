@@ -1,0 +1,108 @@
+name: "Pump AMM: доля траты, дошедшей до пула, по лампортам (только чтение)"
+
+# ЗАЧЕМ (пункт 7 владельца 27.09 плюс вопрос второй сессии по п.22). У неё доля
+# траты, дошедшей до пула, на четверти первых покупок Pump AMM ниже 0.80, и
+# принятые худшие стоят у самой границы с расхождением -19 п.п. Догадка: в трату
+# берётся ВСЁ уменьшение нативного SOL у кошелька, а туда входят выплаты мимо
+# пула -- чаевые, сбор бота, вторая нога. Проверяется это по лампортам.
+#
+# ДВА ИСТОЧНИКА ПОДПИСЕЙ: наши покупки Pump AMM с хоста (журнал позиций, потоком)
+# и два списка второй сессии (ветка claude/podbivka, скопированы в data/podbivka).
+# Ни одной отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      predel:
+        description: "сколько последних наших покупок Pump AMM брать"
+        required: false
+        default: "60"
+      spiski_code2:
+        description: "'yes' -- добавить к разбору два списка второй сессии"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: kuda-ushla-trata
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  NASHI: data/nashi_pump_amm.json
+  OUT: data/kuda_ushla_trata.json
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/kt_venv"
+          "$RUNNER_TEMP/kt_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/kt_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Наши покупки Pump AMM с хоста"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/nashi_pump_amm.py" < deploy/checks/nashi_pump_amm.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/nashi_pump_amm.py --state-dir '$STATE_DIR' \
+              --predel '${{ inputs.predel }}' --out /tmp/nashi_pump_amm.json | tail -n 20
+            rc=\$?; rm -f /tmp/nashi_pump_amm.py; exit \$rc"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/nashi_pump_amm.json" > "$NASHI"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/nashi_pump_amm.json"
+
+      - name: "Разбор по лампортам"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          SPISKI=""
+          if [ "${{ inputs.spiski_code2 }}" = "yes" ]; then
+            SPISKI="--csv data/podbivka/pump_amm_top20.csv --csv data/podbivka/pump_amm_vne_ramki_top20.csv"
+          fi
+          $PY deploy/checks/kuda_ushla_trata.py --nashi "$NASHI" $SPISKI --out "$OUT"
+
+      - name: "Ключей в отчётах быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$NASHI" "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$NASHI" "$OUT"; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Pump AMM: kuda ushla trata po lamportam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
