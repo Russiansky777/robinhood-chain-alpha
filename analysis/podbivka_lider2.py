@@ -31,7 +31,14 @@ def вх(р, e, H):
 
 
 def мx(р, e, W):
-    return (((р.get("максимум") or {}).get(e) or {}).get(str(W)) or {}).get("пп")
+    """Максимум по свопам в окне и точки таймера в нём (если в окне свопов не было,
+    состояние на таймере -- то же, что до окна)."""
+    if not р.get("максимум"):
+        return None
+    м = (((р.get("максимум") or {}).get(e) or {}).get(str(W)) or {}).get("пп")
+    точки = [t for t in (36, 150, 600, 1800) if (W == "после_150" and t >= 600) or (W != "после_150" and t <= W)]
+    xs = [x for x in [м] + [вх(р, e, t) for t in точки] if x is not None]
+    return max(xs) if xs else None
 
 
 def группа(р) -> str:
