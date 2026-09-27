@@ -41,7 +41,7 @@ jobs:
         run: |
           set -e
           python3 -m venv "$RUNNER_TEMP/lwe"
-          "$RUNNER_TEMP/lwe/bin/pip" install -q solders base58
+          "$RUNNER_TEMP/lwe/bin/pip" install -q requests solders base58
           echo "RPY=$RUNNER_TEMP/lwe/bin/python" >> "$GITHUB_ENV"
 
       - name: "Ключ даёт ИМЕННО подтверждённый адрес -- иначе стоп"
