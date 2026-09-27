@@ -24,6 +24,7 @@ env:
   ENV_DIR: /etc/bloom-executor
   STATE_DIR: /home/bot/bloom_executor_live_data
   PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  CODE_DIR: /home/bot/bloom_executor
   OUT: data/lane_wallet_env.txt
 
 jobs:
@@ -121,18 +122,20 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          # СКРИПТ КЛАДЁТСЯ РЯДОМ С МОДУЛЯМИ, а не в /tmp: он ищет разборщик
-          # ключа по пути от своего файла, и из /tmp корень репозитория
-          # оказывается корнем диска -- разборщик не находится, и проверка
-          # печатает "адрес: None". Первый прогон 27.09 именно так и прошёл, а
-          # мой grep нашёл адрес в строке ОТЧЁТА выше и выдал ложный зелёный.
-          ssh $SSH_OPTS root@"$HOST" "cat > /home/bot/robinhood-chain-alpha/deploy/checks/adres_iz_sekreta.py" < deploy/checks/adres_iz_sekreta.py
+          # РАЗБОРЩИК ПОДКЛЮЧАЕТСЯ ЧЕРЕЗ PYTHONPATH. Скрипт ищет его по пути от
+          # своего файла, и из /tmp корень репозитория оказывается корнем диска
+          # -- разборщик не находится и наружу идёт "адрес: None" (так прошёл
+          # первый прогон 27.09, а мой grep нашёл адрес в строке ОТЧЁТА выше и
+          # выдал ложный зелёный). Каталога deploy/checks на хосте нет вовсе,
+          # поэтому кладём в /tmp и указываем каталог кода службы, где лежит
+          # dbot_rescue.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/adres_iz_sekreta.py" < deploy/checks/adres_iz_sekreta.py
           ADDR_HOST=$(ssh -n $SSH_OPTS root@"$HOST" "
             set -e
             set -a; . $ENV_DIR/env; set +a
-            cd /home/bot/robinhood-chain-alpha
-            LIVE_PRIVATE=\$OWN_SEND_WALLET_KEY $PYBIN deploy/checks/adres_iz_sekreta.py --env LIVE_PRIVATE \
-              | $PYBIN -c 'import sys,json; print(json.load(sys.stdin).get(\"адрес\") or \"НЕТ\")'")
+            LIVE_PRIVATE=\$OWN_SEND_WALLET_KEY PYTHONPATH=$CODE_DIR $PYBIN /tmp/adres_iz_sekreta.py --env LIVE_PRIVATE \
+              | $PYBIN -c 'import sys,json; print(json.load(sys.stdin).get(\"адрес\") or \"НЕТ\")'
+            rm -f /tmp/adres_iz_sekreta.py")
           echo "адрес из ключа окружения хоста: $ADDR_HOST" | tee -a "$OUT"
           [ "$ADDR_HOST" = "$NOVYY_ADRES" ] || { echo "СБОЙ: ключ в окружении даёт не тот адрес ($ADDR_HOST)"; exit 1; }
           echo "ключ в окружении согласован с адресом" | tee -a "$OUT"
