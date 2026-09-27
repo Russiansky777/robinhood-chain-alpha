@@ -379,6 +379,24 @@ def load_leg_pools(path: str | None = None, quotes=QUOTES_GE_2PCT) -> dict:
     return {q: pools[q] for q in quotes if q in pools}
 
 
+def load_leg_pools_all(path: str | None = None) -> dict:
+    """ВСЕ котировки из файла пулов ног, а не только четыре зашитых.
+
+    ЗАЧЕМ (финальный план владельца 27.09, п.3). load_leg_pools фильтрует файл
+    списком QUOTES_GE_2PCT -- это снимок котировок на 24.09. Лидер торгует
+    другими: 27.09 из 13 сверенных сделок ни одна котировка в тот список не
+    входила, и двухшаговый путь отказал бы "шаблона в кэше нет". Файл при этом
+    собирается свежим прогоном, поэтому правильный список -- тот, что В ФАЙЛЕ.
+    """
+    import json  # noqa: PLC0415
+
+    f = Path(path) if path else sorted(C.DATA.glob("c2_leg_pools_2*.json"))[-1]
+    pools = json.loads(f.read_text(encoding="utf-8"))["pools"]
+    return {q: п for q, п in pools.items()
+            if isinstance(п, dict) and п.get("program") and п.get("q_vault")
+            and п.get("w_vault")}
+
+
 def warm_lut_keys(pools: dict, top: int = 32) -> list:
     """Таблицы адресов для прогрева: те, что встречаются в настоящих
     транзакциях образцов, где есть хранилища этих пулов, и в транзакциях
