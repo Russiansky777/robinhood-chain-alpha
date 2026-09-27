@@ -1188,7 +1188,10 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
         return строка
 
     можно, почему, код2 = состояние.can_open_detailed(
-        mint=сигнал["mint"], source_sig=сигнал["signature"], balance_sol=баланс_sol)
+        mint=сигнал["mint"], source_sig=сигнал["signature"], balance_sol=баланс_sol,
+        # ПАРА "ИСТОЧНИК + МИНТ": предел покупок на токен считается по паре, а
+        # не по минту (слово владельца 27.09, вечер).
+        source=сигнал.get("source"))
     if not можно:
         строка.update({"action": "skip", "code": код2, "reason": почему,
                         "filter": "наш лимит",
@@ -3613,7 +3616,11 @@ class Детектор:
                 # владельца 27.09 про lane_s0). Без него полоса по группе с
                 # таким пределом не покупает вовсе -- неясность на денежном
                 # пути читается как запрет.
-                слот_сети=self.слот_сети)
+                слот_сети=self.слот_сети,
+                # РАЗМЕР ПОКУПКИ ИСТОЧНИКА в SOL-эквиваленте -- тем же числом,
+                # которым решение сравнивало порог группы. Им задаётся таймер
+                # выхода (hold_slots_small у leader). Отдельного запроса нет.
+                трата_источника_sol=строка.get("spend_sol_eq"))
             запись.update(рез or {})
             # ЕДИНЫЙ НОЛЬ ДЛЯ ПАРЫ -- в позицию полосы, той же величиной, что и
             # у Bloom: время прихода сигнала источника на наш узел.
@@ -6170,15 +6177,30 @@ def self_test() -> int:
             r3.get("lane_allowed") is True and полосу_пускать(r3) is True, r3)
         chk("помечено, что DBot бы купил", r3.get("dbot_бы_купил") is True, r3.get("dbot_бы_купил"))
 
-        # дубль по минту -- отдельный код, а не «расхождение»
+        # ДУБЛЬ СЧИТАЕТСЯ ПО ПАРЕ "ИСТОЧНИК + МИНТ" (слово владельца 27.09,
+        # вечер). Открытая позиция ДРУГОГО источника в том же токене больше не
+        # закрывает сигнал: это отдельная первая покупка отдельного кошелька, и
+        # копировать её надо. Дубль по своей паре по-прежнему отказ.
         st.write_intent(client_order_id="c1", mint="MINTA", source_sig="ДРУГАЯ",
                          source_slot=1, sol_in=0.2, pool=None, program=None,
-                         taxed=None, tax_bps=None, mode="dry", sell_after_s=28.8)
+                         taxed=None, tax_bps=None, mode="dry", sell_after_s=28.8,
+                         source="ДРУГОЙ_ИСТОЧНИК")
         r4 = решение(s, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=101)
-        chk("дубль по минту -- SKIPPED_DUP_MINT", r4["code"] == "SKIPPED_DUP_MINT", r4["code"])
-        chk("дубль помечен как наш лимит", r4.get("filter") == "наш лимит", r4.get("filter"))
-        chk("дубль минта глушит и полосу: метки нет (одно и то же дважды не берём)",
-            r4.get("lane_allowed") is None and полосу_пускать(r4) is False, r4)
+        chk("открытая позиция ДРУГОГО источника в том же токене сигнал не глушит",
+            r4["code"] == КОД_КУПИТЬ and r4["action"] == "buy", r4["code"])
+        st.write_intent(client_order_id="c1s", mint="MINTA", source_sig="ЕЩЁ",
+                         source_slot=1, sol_in=0.2, pool=None, program=None,
+                         taxed=None, tax_bps=None, mode="dry", sell_after_s=28.8,
+                         source=s["source"])
+        r4п = решение(s, состояние=st, трата_sol=2.5, баланс_sol=3.0, текущий_слот=101)
+        chk("дубль по СВОЕЙ паре -- SKIPPED_DUP_MINT",
+            r4п["code"] == "SKIPPED_DUP_MINT", r4п["code"])
+        chk("дубль помечен как наш лимит", r4п.get("filter") == "наш лимит",
+            r4п.get("filter"))
+        chk("дубль своей пары глушит и полосу (одно и то же дважды не берём)",
+            r4п.get("lane_allowed") is None and полосу_пускать(r4п) is False, r4п)
+        st.update_position("c1s", state=ST.STATE_CLOSED)
+        st.update_position("c1", state=ST.STATE_CLOSED)
 
         # ТРИ РУБИЛЬНИКА -- ТРИ ПОВЕДЕНИЯ (слово владельца 26.09). Проверяются
         # порознь, потому что до правки все три вели себя одинаково: решение

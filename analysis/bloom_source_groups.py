@@ -148,7 +148,15 @@ HOLD_SLOTS_ПО_УМОЛЧАНИЮ = 72
                           # момент входа. None -- предела нет.
                           "min_pool_sol_reserve": None,
                           # ВЫХОД ПО ТАЙМЕРУ: сколько слотов от s0 держим.
-                          "hold_slots": HOLD_SLOTS_ПО_УМОЛЧАНИЮ}
+                          "hold_slots": HOLD_SLOTS_ПО_УМОЛЧАНИЮ,
+                          # ДЕРЖАТЬ МЕНЬШЕ НА МЕЛКОЙ ПОКУПКЕ ИСТОЧНИКА (слово
+                          # владельца 27.09, вечер): при размере покупки
+                          # источника ниже hold_slots_small_below_sol держим
+                          # hold_slots_small слотов, при размере выше или равном
+                          # -- обычные hold_slots. Оба поля пустые -- правила
+                          # нет, таймер один на всю группу.
+                          "hold_slots_small": None,
+                          "hold_slots_small_below_sol": None}
 _КЭШ: dict | None = None
 # МЕТКА ФАЙЛА, при которой снят кэш: (путь, mtime_ns, размер). Слово владельца
 # 27.09: "файл групп перечитывается по mtime без перезапуска". До этого кэш
@@ -317,6 +325,18 @@ def загрузить(путь: str | None = None, *, заново: bool = Fals
                             if isinstance(г.get("hold_slots"), (int, float))
                             and float(г["hold_slots"]) > 0
                             else HOLD_SLOTS_ПО_УМОЛЧАНИЮ),
+            # Мелкая покупка источника -- свой таймер. Ноль и минус не
+            # принимаются по той же причине, что и у hold_slots.
+            "hold_slots_small": (float(г["hold_slots_small"])
+                                  if isinstance(г.get("hold_slots_small"),
+                                                (int, float))
+                                  and float(г["hold_slots_small"]) > 0
+                                  else None),
+            "hold_slots_small_below_sol": (
+                float(г["hold_slots_small_below_sol"])
+                if isinstance(г.get("hold_slots_small_below_sol"), (int, float))
+                and float(г["hold_slots_small_below_sol"]) > 0
+                else None),
         }
         # ОДНО ЧИСЛО ПОД ДВУМЯ ИМЕНАМИ. lane_size -- имя финального плана,
         # lane_sol -- прежнее; читатели денежного пути спрашивают lane_sol, и
@@ -435,6 +455,10 @@ def self_test() -> int:
         and л["hold_slots"] == 150 and л["slippage"] == 0.2, л)
     chk("лидер: на тонком пуле (резерв ниже 30 SOL-экв.) наценка 0.5",
         л["slippage_thin_pool"] == 0.5 and л["thin_pool_below_sol"] == 30, л)
+    # ЧИСЛА ВЛАДЕЛЬЦА 27.09 (вечер): таймер выхода зависит от размера покупки
+    # источника -- 36 слотов ниже 15 SOL-экв., 150 при 15 и выше.
+    chk("лидер: на мелкой покупке источника (<15 SOL-экв.) держим 36 слотов",
+        л["hold_slots_small"] == 36 and л["hold_slots_small_below_sol"] == 15, л)
     chk("лидер: налоговый маршрут берём, предел открытых 3",
         л["allow_taxed_route"] is True and л["lane_open_max"] == 3, л)
     б = политика("batch5")

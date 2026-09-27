@@ -281,6 +281,9 @@ class Executor:
             pool=(адрес if вид_адреса == "pool" else None),
             program=(route.get("programs") or [None])[0],
             taxed=decision.get("taxed"), tax_bps=decision.get("tax_bps"),
+            # АДРЕС ИСТОЧНИКА -- в позицию: по паре "источник + минт" считается
+            # предел покупок (слово владельца 27.09, вечер).
+            source=decision.get("source"),
             mode=self.mode, sell_after_s=self.sell_after_s)
 
         # 4. Один POST. Повторов нет.
@@ -289,7 +292,8 @@ class Executor:
 
         # 5. Отметки и разбор ответа.
         self.state.mark_signature(sig, source="executor")
-        self.state.mark_mint_buy(mint, mode=self.mode)
+        self.state.mark_mint_buy(mint, mode=self.mode,
+                                  source=decision.get("source"))
 
         if res.get("ok"):
             self.sent += 1

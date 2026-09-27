@@ -584,22 +584,38 @@ class ExecState:
                            (sig, time.time(), source))
         self.db().commit()
 
-    def mint_state(self, mint: str) -> tuple[float | None, int]:
+    @staticmethod
+    def ключ_пары(mint: str, source: str | None) -> str:
+        """Ключ счёта покупок: ПАРА "источник + минт", а не минт.
+
+        Слово владельца 27.09 (вечер): "Лимит покупок на токен -- по паре
+        «источник + минт», не по минту: первые покупки разных источников в один
+        токен копируются каждая". Разделитель "|" в адресе base58 и в минте не
+        встречается, поэтому ключ пары не может совпасть с ключом минта, и
+        старые записи по минту остаются читаемыми как есть.
+        """
+        return f"{source}|{mint}" if source else mint
+
+    def mint_state(self, mint: str, source: str | None = None) -> tuple[float | None, int]:
+        """(когда покупали, сколько раз) по ПАРЕ, если назван источник."""
+        ключ = self.ключ_пары(mint, source)
         row = self.db().execute("SELECT ts, buys FROM mint_last WHERE mint=?",
-                                 (mint,)).fetchone()
+                                 (ключ,)).fetchone()
         return (float(row[0]), int(row[1])) if row else (None, 0)
 
-    def mark_mint_buy(self, mint: str, *, mode: str = MODE_LIVE) -> None:
-        """Отметить покупку по минту. Для dry-run НЕ отмечаем: иначе
-        придуманная покупка закроет минт для настоящей."""
+    def mark_mint_buy(self, mint: str, *, mode: str = MODE_LIVE,
+                       source: str | None = None) -> None:
+        """Отметить покупку по паре "источник + минт". Для dry-run НЕ отмечаем:
+        иначе придуманная покупка закроет пару для настоящей."""
         if not is_real_mode(mode):
             return
-        self._mark_mint_buy(mint)
+        self._mark_mint_buy(mint, source=source)
 
-    def _mark_mint_buy(self, mint: str) -> None:
-        ts, buys = self.mint_state(mint)
+    def _mark_mint_buy(self, mint: str, source: str | None = None) -> None:
+        ключ = self.ключ_пары(mint, source)
+        ts, buys = self.mint_state(mint, source)
         self.db().execute("INSERT OR REPLACE INTO mint_last(mint, ts, buys) VALUES(?,?,?)",
-                           (mint, time.time(), buys + 1))
+                           (ключ, time.time(), buys + 1))
         self.db().commit()
 
     # -------------------------------------------------------------- позиции
@@ -726,6 +742,7 @@ class ExecState:
                       source_slot: int | None, sol_in: float, pool: str | None,
                       program: str | None, taxed: bool | None, tax_bps: int | None,
                       mode: str, sell_after_s: float,
+                      source: str | None = None,
                       lane: str | None = None,
                       lane_group: str | None = None,
                       lane_wallet: str | None = None) -> dict:
@@ -748,6 +765,10 @@ class ExecState:
                 # (токены, баланс) пойдёт не по тому кошельку -- так и вышло
                 # 25.09 при проверке трёх покупок полосы.
                 "wallet": (lane_wallet or EXECUTOR_WALLET)}
+        # АДРЕС ИСТОЧНИКА в позиции: без него предел "по паре источник + минт"
+        # проверить нечем -- в записи была только подпись сделки источника.
+        if source:
+            row["source"] = source
         # Метка полосы пишется ТОЛЬКО когда она есть: у покупок Bloom поля
         # lane нет вовсе, и сравнение p.get("lane") == МЕТКА_ПОЛОСЫ у них
         # ложно без всяких оговорок.
@@ -991,16 +1012,19 @@ class ExecState:
     # ------------------------------------------------------------- главный гейт
 
     def can_open(self, *, mint: str, source_sig: str, balance_sol: float | None,
-                  now: float | None = None) -> tuple[bool, str]:
+                  now: float | None = None,
+                  source: str | None = None) -> tuple[bool, str]:
         """Совместимая обёртка: (можно, причина). Код отказа -- в
         can_open_detailed."""
         можно, причина, _ = self.can_open_detailed(
-            mint=mint, source_sig=source_sig, balance_sol=balance_sol, now=now)
+            mint=mint, source_sig=source_sig, balance_sol=balance_sol, now=now,
+            source=source)
         return можно, причина
 
     def can_open_detailed(self, *, mint: str, source_sig: str,
                            balance_sol: float | None,
-                           now: float | None = None) -> tuple[bool, str, str]:
+                           now: float | None = None,
+                           source: str | None = None) -> tuple[bool, str, str]:
         """Можно ли открыть позицию. Вызывается НЕПОСРЕДСТВЕННО перед
         отправкой, а не при приёме сигнала: между этими моментами могло
         измениться всё."""
@@ -1050,17 +1074,30 @@ class ExecState:
             return False, (f"уже открыто {len(открытые)} позиций при лимите "
                             f"{self.max_open}"), КОД_ЛИМИТ_ОТКРЫТЫХ
 
-        # Лимит считается ПО МИНТАМ, а не по записям: пять позиций в двух
-        # токенах -- это не диверсификация, а концентрация.
-        if any(p.get("mint") == mint for p in открытые):
-            return False, (f"по минту {mint[:10]} уже есть открытая позиция"), КОД_ДУБЛЬ_МИНТА
+        # ПАРА "ИСТОЧНИК + МИНТ", А НЕ МИНТ. Слово владельца 27.09 (вечер):
+        # "первые покупки разных источников в один токен копируются каждая;
+        # MAX_BUY_TIMES_PER_TOKEN по минту убрать". Пока считалось по минту,
+        # второй источник в тот же токен отсекался чужой покупкой -- а это
+        # отдельный сигнал отдельного кошелька, и копировать его надо.
+        #
+        # Источник не назван -- считаем по минту, как раньше, и говорим это
+        # словом: молчаливое "ограничения нет" на денежном пути хуже строгого.
+        if source:
+            дубль = any(p.get("mint") == mint and p.get("source") == source
+                        for p in открытые)
+            если_пара = f"паре {(source or '')[:10]}+{mint[:10]}"
+        else:
+            дубль = any(p.get("mint") == mint for p in открытые)
+            если_пара = f"минту {mint[:10]} (источник не назван)"
+        if дубль:
+            return False, (f"по {если_пара} уже есть открытая позиция"), КОД_ДУБЛЬ_МИНТА
 
-        ts, buys = self.mint_state(mint)
+        ts, buys = self.mint_state(mint, source)
         if buys >= self.max_buys_per_mint > 0:
-            return False, (f"по минту {mint[:10]} уже {buys} покупок при лимите "
+            return False, (f"по {если_пара} уже {buys} покупок при лимите "
                             f"{self.max_buys_per_mint}"), КОД_ПОКУПОК_НА_МИНТ
         if ts is not None and (now - ts) < self.mint_cooldown_s:
-            return False, (f"по минту {mint[:10]} кулдаун: прошло "
+            return False, (f"по {если_пара} кулдаун: прошло "
                             f"{now - ts:.0f} с из {self.mint_cooldown_s:.0f}"), КОД_ДУБЛЬ_МИНТА
 
         if self.seen_signature(source_sig):
@@ -1529,6 +1566,60 @@ def self_test() -> None:
     st7.mark_mint_buy("CD")
     ok, почему10 = st7.can_open(mint="CD", source_sig="S10", balance_sol=1.0)
     chk("кулдаун по минту держится", ok is False and "кулдаун" in почему10, почему10)
+
+    # --- ПАРА "ИСТОЧНИК + МИНТ" (слово владельца 27.09, вечер). Это деньги:
+    # пока счёт шёл по минту, первая покупка ВТОРОГО источника в тот же токен
+    # отсекалась чужой покупкой, то есть сигнал терялся.
+    st6п = ExecState(base=base / "state6par", kill=kill)
+    st6п.mark_mint_buy("PM", source="SRC_A")
+    st6п.mark_mint_buy("PM", source="SRC_A")
+    ok_a, почему_a = st6п.can_open(mint="PM", source_sig="Sa", balance_sol=1.0,
+                                    source="SRC_A")
+    chk("две покупки пары -- третья по той же паре запрещена",
+        ok_a is False and "при лимите" in почему_a, почему_a)
+    chk("и в причине названа пара, а не минт", "SRC_A"[:10] in почему_a, почему_a)
+    ok_b, почему_b = st6п.can_open(mint="PM", source_sig="Sb", balance_sol=1.0,
+                                    source="SRC_B")
+    chk("первая покупка ДРУГОГО источника в тот же токен разрешена",
+        ok_b is True, почему_b)
+    chk("счёт пары A не виден паре B",
+        st6п.mint_state("PM", "SRC_B") == (None, 0)
+        and st6п.mint_state("PM", "SRC_A")[1] == 2,
+        (st6п.mint_state("PM", "SRC_B"), st6п.mint_state("PM", "SRC_A")))
+    # Кулдаун -- тоже по паре: иначе он один в один заменял бы снятый предел.
+    st7п = ExecState(base=base / "state7par", kill=kill)
+    st7п.mark_mint_buy("CDP", source="SRC_A")
+    ok_ка, почему_ка = st7п.can_open(mint="CDP", source_sig="Sk", balance_sol=1.0,
+                                      source="SRC_A")
+    chk("кулдаун держится по своей паре",
+        ok_ка is False and "кулдаун" in почему_ка, почему_ка)
+    ok_кб, почему_кб = st7п.can_open(mint="CDP", source_sig="Sk2", balance_sol=1.0,
+                                      source="SRC_B")
+    chk("и не держит другой источник в том же токене", ok_кб is True, почему_кб)
+    # Открытая позиция: своя пара блокирует, чужая -- нет.
+    st8п = ExecState(base=base / "state8par", kill=kill)
+    st8п.write_intent(client_order_id="p1", mint="OPM", source_sig="Sp1",
+                      source_slot=1, sol_in=0.1, pool=None, program=None,
+                      taxed=None, tax_bps=None, mode=MODE_LIVE,
+                      sell_after_s=30.0, source="SRC_A")
+    ok_оа, почему_оа = st8п.can_open(mint="OPM", source_sig="Sp2", balance_sol=1.0,
+                                      source="SRC_A")
+    chk("открытая позиция своей пары -- вторую не открываем",
+        ok_оа is False and "уже есть открытая позиция" in почему_оа, почему_оа)
+    ok_об, почему_об = st8п.can_open(mint="OPM", source_sig="Sp3", balance_sol=1.0,
+                                      source="SRC_B")
+    chk("открытая позиция чужой пары в том же токене не мешает",
+        ok_об is True, почему_об)
+    chk("адрес источника лёг в запись позиции",
+        any(p_.get("source") == "SRC_A" for p_ in st8п.open_positions()),
+        st8п.open_positions())
+    # Источник не назван -- старое поведение по минту, и это сказано словом.
+    st9п = ExecState(base=base / "state9par", kill=kill)
+    st9п.mark_mint_buy("NOSRC")
+    st9п.mark_mint_buy("NOSRC")
+    ok_нс, почему_нс = st9п.can_open(mint="NOSRC", source_sig="Sn", balance_sol=1.0)
+    chk("без источника счёт идёт по минту и причина это называет",
+        ok_нс is False and "источник не назван" in почему_нс, почему_нс)
 
     # --- дневной лимит потерь
     st8 = ExecState(base=base / "state8", kill=kill)
