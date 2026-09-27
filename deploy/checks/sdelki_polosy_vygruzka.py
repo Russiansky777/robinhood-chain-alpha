@@ -122,7 +122,49 @@ def main() -> int:
             "source_block_index": п.get("source_block_index"),
             "wallet": п.get("lane_wallet"),
             "chain_ok": п.get("chain_ok"),
+            # ДЕНЬГИ СДЕЛКИ -- сырыми полями плюс итог тем же счётом, каким
+            # считает служба (ST.итог_позиции): иначе таблица толпы и все
+            # прочие доклады считали бы итог по-разному.
+            "sol_in": п.get("sol_in"),
+            "closed_sol_net": п.get("closed_sol_net"),
+            "tips_sol": п.get("lane_tips_total_sol"),
+            "priority_lamports": п.get("lane_priority_lamports"),
+            "state": п.get("state"),
+            "closed_reason": п.get("closed_reason"),
+            "итог_sol": None, "расход_sol": None,
         })
+    # ИТОГ -- ТЕМ ЖЕ МОДУЛЕМ, ЧТО У СЛУЖБЫ. Порядок каталогов важен: служба
+    # работает из /home/bot/bloom_executor, а рядом лежит возможно устаревшая
+    # выписка репозитория.
+    учёт = None
+    for кат in ("/home/bot/bloom_executor",
+                "/home/bot/robinhood-chain-alpha/analysis",
+                os.path.join(os.path.dirname(os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__)))), "analysis")):
+        if not os.path.exists(os.path.join(кат, "bloom_exec_state.py")):
+            continue
+        if кат not in sys.path:
+            sys.path.insert(0, кат)
+        try:
+            import importlib  # noqa: PLC0415
+
+            учёт = importlib.import_module("bloom_exec_state")
+            print(f"учёт из {учёт.__file__}")
+            break
+        except Exception as exc:  # noqa: BLE001
+            print(f"учёт из {кат} не загружен: {type(exc).__name__}", file=sys.stderr)
+    if учёт is not None and hasattr(учёт, "итог_позиции"):
+        по_cid_все = по_cid
+        for ряд in ряды:
+            поз = по_cid_все.get(ряд["cid"]) or {}
+            try:
+                итог, расход = учёт.итог_позиции(поз)
+            except Exception as exc:  # noqa: BLE001
+                ряд["итог_почему"] = f"{type(exc).__name__}"
+                continue
+            ряд["итог_sol"] = (round(итог, 9) if итог is not None else None)
+            ряд["расход_sol"] = round(расход, 9)
+
     свод = {"снято_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "с": а.s, "строк_просмотрено": просмотрено, "сделок": len(ряды),
              "с_минтом_и_слотом": sum(1 for р_ in ряды
