@@ -232,6 +232,42 @@ def причина_закрытия(п: dict):
     return None, None
 
 
+def _денежные_доли(поз: dict, расход, вход, возврат_, итог) -> dict:
+    """Чаевые, приоритет, рента покупки и возврат ренты -- по отдельности.
+
+    ЗАЧЕМ (ошибка #19). В одном числе pnl_sol сложены три разные вещи: разница
+    цен по свопам, плата за доставку (чаевые с приоритетом) и движение ренты
+    токен-счёта. Владелец 27.09 велел развести их по колонкам -- иначе не видно,
+    что съедает результат: рынок или доставка.
+    """
+    из_ = {"tips_sol": None, "priority_sol": None, "renta_pokupki_sol": None,
+            "renta_vozvrat_sol": None, "pnl_swap_sol": None,
+            "pnl_s_rentoy_sol": None}
+    чаевые = поз.get("lane_tips_total_sol")
+    приоритет = поз.get("lane_priority_lamports")
+    if isinstance(чаевые, (int, float)):
+        из_["tips_sol"] = round(float(чаевые), 9)
+    if isinstance(приоритет, (int, float)):
+        из_["priority_sol"] = round(float(приоритет) / 1_000_000_000, 9)
+    if (расход is not None and из_["tips_sol"] is not None
+            and из_["priority_sol"] is not None):
+        рента = float(расход) - из_["tips_sol"] - из_["priority_sol"]
+        # Отрицательная "рента" значит, что расход меньше чаевых с приоритетом
+        # -- такое бывает у не севшей покупки; ноль тут честнее выдуманного
+        # числа, а сам расход остаётся в своей колонке.
+        из_["renta_pokupki_sol"] = round(рента, 9) if рента > 0 else 0.0
+    закрытие = поз.get("close_on_sell") or {}
+    если_рента = закрытие.get("rent_returned_sol")
+    if isinstance(если_рента, (int, float)):
+        из_["renta_vozvrat_sol"] = round(float(если_рента), 9)
+    if вход is not None and возврат_ is not None:
+        из_["pnl_swap_sol"] = round(float(возврат_) - float(вход), 9)
+    if итог is not None:
+        из_["pnl_s_rentoy_sol"] = round(
+            float(итог) + float(из_["renta_vozvrat_sol"] or 0.0), 9)
+    return из_
+
+
 def собрать(поз: dict, итог_фн, расход_фн) -> dict:
     б, откуда_б = подпись_покупки(поз)
     пр, откуда_пр = подпись_продажи(поз)
@@ -287,10 +323,18 @@ def собрать(поз: dict, итог_фн, расход_фн) -> dict:
         "sell_sig": пр,
         "sell_sig_field": откуда_пр,
         "in_sol": None if вход is None else round(вход, 9),
+        # back_sol -- ВОЗВРАТ ПО ПРОДАЖЕ, БЕЗ РЕНТЫ: рента возвращается ОТДЕЛЬНОЙ
+        # транзакцией закрытия счёта, и складывать её в возврат по продаже
+        # значило бы выдавать возврат заперного за выручку (ошибка #19).
         "back_sol": None if вз is None else round(вз, 9),
         "spend_sol": None if расход is None else round(float(расход), 9),
         "pnl_sol": None if итог is None else round(float(итог), 9),
         "pnl_source": источник_итога,
+        # ---- РАЗДЕЛЕНИЕ РЕНТЫ И СВОПОВ (ошибка #19, слово владельца 27.09) ----
+        # spend_sol -- это всё, что ушло с кошелька сверх входа, и рента
+        # токен-счёта при покупке в него ВХОДИТ. Сколько именно -- считается
+        # вычитанием чаевых и приоритета, оба известны по полям позиции.
+        **_денежные_доли(поз, расход, вход, вз, итог),
         "close_reason": прич,
         "close_reason_field": откуда_прич,
         "state": поз.get("state"),
@@ -479,6 +523,33 @@ def самопроверка() -> int:
     ок(с["pnl_sol"] == -0.004 and с["spend_sol"] == 0.0011,
        "посчитанный службой итог не пересчитывается")
     ок(с["in_sol"] == 0.05 and с["back_sol"] == 0.047, "вход и возврат на месте")
+
+    # ---- РАЗДЕЛЕНИЕ РЕНТЫ И СВОПОВ (ошибка #19). Проверяется на числах: в
+    # spend_sol рента ВХОДИТ, в back_sol её НЕТ, своп считается отдельно.
+    ср = собрать({"client_order_id": "c_renta", "sol_in": 0.01,
+                  "closed_sol_net": 0.0119, "state": "closed",
+                  "pnl_counted": True, "pnl_counted_sol": -0.0001,
+                  "pnl_counted_spend_sol": 0.004039,
+                  "lane_tips_total_sol": 0.001,
+                  "lane_priority_lamports": 1_000_000,
+                  "close_on_sell": {"rent_returned_sol": 0.00203928}},
+                 None, None)
+    ок(ср["tips_sol"] == 0.001 and ср["priority_sol"] == 0.001,
+       "чаевые и приоритет своими колонками")
+    ок(abs(ср["renta_pokupki_sol"] - 0.002039) < 1e-6,
+       f"рента покупки = расход минус чаевые и приоритет ({ср['renta_pokupki_sol']})")
+    ок(ср["renta_vozvrat_sol"] == 0.00203928,
+       "возврат ренты -- из записи закрытия счёта, а не из возврата по продаже")
+    ок(ср["pnl_swap_sol"] == 0.0019,
+       f"итог по свопам -- возврат минус вход, без доставки ({ср['pnl_swap_sol']})")
+    ок(abs(ср["pnl_s_rentoy_sol"] - 0.00193928) < 1e-9,
+       f"итог с возвратом ренты считается отдельно ({ср['pnl_s_rentoy_sol']})")
+    ср2 = собрать({"client_order_id": "c_renta2", "sol_in": 0.01,
+                   "state": "bought", "pnl_counted_spend_sol": 0.0005,
+                   "lane_tips_total_sol": 0.001,
+                   "lane_priority_lamports": 1_000_000}, None, None)
+    ок(ср2["renta_pokupki_sol"] == 0.0 and ср2["pnl_swap_sol"] is None,
+       "расход меньше чаевых с приоритетом -- рента ноль, а не выдуманное число")
 
     # Итог не посчитан -- считает схема хоста, а не своя формула.
     с2 = собрать({"client_order_id": "c2", "sol_in": 0.05, "closed_sol_net": 0.047,
