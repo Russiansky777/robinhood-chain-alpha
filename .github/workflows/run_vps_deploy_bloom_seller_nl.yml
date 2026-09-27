@@ -169,6 +169,13 @@ jobs:
             # Сам env остаётся 600 root:root: systemd читает его root-ом.
           "
 
+      - name: "Все нужные модули есть в списке доставки"
+        # ЗАЧЕМ. 27.09 первый настоящий двухшаговый сигнал пропал на
+        # ModuleNotFoundError: bloom_lane_two_step.py не было в списке ниже.
+        # Проверка ловит весь этот класс: по объединению списков обоих
+        # прогонов транзитивно ищутся импорты наших модулей.
+        run: python3 analysis/check_deploy_modules.py
+
       - name: "Доставка кода + СВЕРКА sha256 (расхождение = падение)"
         run: |
           set -e
@@ -178,7 +185,7 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_own_send.py; do
+          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_own_send.py bloom_lane_two_step.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
