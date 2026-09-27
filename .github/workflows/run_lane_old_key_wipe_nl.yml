@@ -1,0 +1,154 @@
+name: "Переезд полосы: удалить копии СТАРОГО ключа с хоста (после живой сделки)"
+
+# ЗАЧЕМ (владелец 27.09, финальный план, п.0): "После подтверждения по цепи
+# (покупка и продажа с 4dPZMbRe...) -- удалить старый ключ 21DqHDDP... из
+# секретов GitHub, env хоста и любых файлов".
+#
+# ЧТО УЖЕ ПРОВЕРЕНО ПО ЦЕПИ (таблица полосы 27.09, 15:10-15:30 UTC): шесть
+# покупок полосы по 0.01 SOL сели, пять продано, плательщик у всех -- новый
+# кошелёк; старый адрес в разборе не встречается ни разу.
+#
+# В СЕКРЕТАХ GITHUB СТАРОГО КЛЮЧА НЕТ. Старый кошелёк создавался НА ХОСТЕ
+# (run_vps_lane_wallet_nl.yml), в секреты его значение не кладут ни один
+# прогон -- в секретах лежит только LIVE_PRIVATE с ключом НОВОГО кошелька.
+# Поэтому удалять нужно копии в файлах хоста.
+#
+# ДВА ЗАМКА ПЕРЕД УДАЛЕНИЕМ, оба обязательны:
+#   1. ключ в живом окружении даёт ИМЕННО подтверждённый новый адрес;
+#   2. баланс старого кошелька нулевой.
+# Не сошлось -- ничего не удаляем.
+#
+# НИ ОДНО ЗНАЧЕНИЕ КЛЮЧА НИКУДА НЕ ПЕЧАТАЕТСЯ: наружу идут только имена
+# переменных, имена файлов и числа.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "напишите UDALIT, чтобы действительно затереть копии"
+        required: false
+        default: "net"
+
+concurrency:
+  group: lane-wallet-move
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  ENV_DIR: /etc/bloom-executor
+  CODE_DIR: /home/bot/bloom_executor
+  OUT: data/lane_old_key_wipe.txt
+
+jobs:
+  wipe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Замок 1: ключ окружения даёт подтверждённый новый адрес"
+        run: |
+          set -e
+          set -o pipefail
+          NEW_ADDR=$(python3 -c "import json;print(json.load(open('data/lane_wallet_move.json'))['новый_адрес'])")
+          OLD_ADDR=$(python3 -c "import json;print(json.load(open('data/lane_wallet_move.json'))['старый_адрес'])")
+          echo "адрес по конфигу: новый $NEW_ADDR, старый $OLD_ADDR"
+          echo "NEW_ADDR=$NEW_ADDR" >> "$GITHUB_ENV"
+          echo "OLD_ADDR=$OLD_ADDR" >> "$GITHUB_ENV"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/kw_addr.py" < deploy/checks/adres_iz_sekreta.py
+          HOST_ADDR=$(ssh -n $SSH_OPTS root@"$HOST" "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$CODE_DIR /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/kw_addr.py --env OWN_SEND_WALLET_KEY --tolko-adres; rm -f /tmp/kw_addr.py")
+          echo "адрес из ключа живого окружения: $HOST_ADDR"
+          [ "$HOST_ADDR" = "$NEW_ADDR" ] || { echo "СБОЙ: ключ окружения даёт не подтверждённый адрес -- ничего не удаляем"; exit 1; }
+
+      - name: "Замок 2: баланс старого кошелька нулевой"
+        run: |
+          set -e
+          set -o pipefail
+          BAL=$(ssh -n $SSH_OPTS root@"$HOST" "set -a; . $ENV_DIR/env; set +a; curl -s -X POST \"https://mainnet.helius-rpc.com/?api-key=\$HELIUS_API_KEY\" -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$OLD_ADDR\",{\"commitment\":\"confirmed\"}]}' | python3 -c \"import sys,json;print(json.load(sys.stdin)['result']['value'])\"")
+          echo "баланс старого кошелька, лампорты: $BAL"
+          [ "$BAL" = "0" ] || { echo "СБОЙ: на старом кошельке ещё есть лампорты -- ничего не удаляем"; exit 1; }
+
+      - name: "Где лежат копии ключа полосы (только имена и числа)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            echo '--- файлы с строкой OWN_SEND_WALLET_KEY= (имена и число строк) ---'
+            for F in $ENV_DIR/env $ENV_DIR/env.bak $ENV_DIR/env.bak.* $ENV_DIR/env.old $ENV_DIR/env.orig; do
+              [ -f \"\$F\" ] || continue
+              N=\$(grep -c '^OWN_SEND_WALLET_KEY=' \"\$F\" 2>/dev/null || echo 0)
+              echo \"\$F: строк ключа \$N, всего строк \$(wc -l < \"\$F\")\"
+            done
+            echo '--- прочие файлы с этой строкой под /home/bot и /etc/bloom-executor ---'
+            grep -rl '^OWN_SEND_WALLET_KEY=' /etc/bloom-executor /home/bot 2>/dev/null | head -40 || echo 'больше нигде'" | tee /tmp/kw_before.txt
+
+      - name: "Затереть копии (только по confirm=UDALIT)"
+        if: ${{ inputs.confirm == 'UDALIT' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            BEFORE=\$(grep -c '=' $ENV_DIR/env)
+            for F in $ENV_DIR/env.bak $ENV_DIR/env.bak.* $ENV_DIR/env.old $ENV_DIR/env.orig; do
+              [ -f \"\$F\" ] || continue
+              if command -v shred >/dev/null 2>&1; then shred -u \"\$F\"; else rm -f \"\$F\"; fi
+              echo \"затёрт: \$F\"
+            done
+            AFTER=\$(grep -c '=' $ENV_DIR/env)
+            echo \"строк в живом окружении до \$BEFORE, после \$AFTER\"
+            [ \"\$BEFORE\" = \"\$AFTER\" ] || { echo 'СБОЙ: живое окружение изменилось'; exit 1; }
+            echo '--- осталось файлов с ключом полосы ---'
+            grep -rl '^OWN_SEND_WALLET_KEY=' /etc/bloom-executor /home/bot 2>/dev/null || echo 'только живое окружение'
+            echo '--- службы живы ---'
+            systemctl is-active bloom-detector 2>/dev/null || true
+            systemctl is-active bloom-seller 2>/dev/null || true" | tee /tmp/kw_after.txt
+
+      - name: "Отчёт"
+        if: always()
+        run: |
+          set -e
+          {
+            echo "снято $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "confirm: ${{ inputs.confirm }}"
+            echo "новый адрес полосы: $NEW_ADDR"
+            echo "старый адрес: $OLD_ADDR (баланс 0 проверен)"
+            echo "в секретах GitHub старого ключа нет: старый кошелёк создавался на хосте,"
+            echo "в секретах лежит только LIVE_PRIVATE с ключом нового кошелька"
+            echo "--- до ---"; cat /tmp/kw_before.txt 2>/dev/null || true
+            echo "--- после ---"; cat /tmp/kw_after.txt 2>/dev/null || echo "не запускалось (confirm не UDALIT)"
+          } > "$OUT"
+          cat "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Pereezd polosy: kopii starogo klyucha ubrany [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

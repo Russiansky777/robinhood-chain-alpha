@@ -43,6 +43,11 @@ def main() -> int:
     р.add_argument("--env", default="LIVE_PRIVATE",
                     help="имя переменной окружения с секретом")
     р.add_argument("--out", default=None)
+    # ТОЛЬКО АДРЕС, одной строкой. Нужно, чтобы прогон мог сравнить адрес
+    # оболочкой: JSON для этого пришлось бы разбирать вторым питоном, а на
+    # хосте это лишний путь на денежной проверке.
+    р.add_argument("--tolko-adres", action="store_true",
+                    help="печатать только адрес, без JSON")
     а = р.parse_args()
 
     сырое = (os.environ.get(а.env) or "").strip()
@@ -74,7 +79,10 @@ def main() -> int:
         print(json.dumps(итог, ensure_ascii=False, indent=1))
         return 1
     итог.update(ok=True, адрес=адрес)
-    print(json.dumps(итог, ensure_ascii=False, indent=1))
+    if а.tolko_adres:
+        print(адрес)
+    else:
+        print(json.dumps(итог, ensure_ascii=False, indent=1))
     if а.out:
         with open(а.out, "w", encoding="utf-8") as ф:
             json.dump(итог, ф, ensure_ascii=False, indent=1)
