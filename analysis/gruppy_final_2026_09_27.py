@@ -75,42 +75,46 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
 # ---- политики групп: числа владельца, слово в слово из плана ----
 ПОЛИТИКИ = {
     "leader": {
-        "lane_size": 0.2, "lane_trades": True, "bloom_trades": False,
+        "lane_size": 0.5, "lane_trades": True, "bloom_trades": False,
         "bloom_sol": None, "fanout": False,
-        "min_target_sol": 15, "max_slots_from_source": None,
+        "min_target_sol": 10, "max_slots_from_source": None,
         "skip_flippers": False, "allow_taxed_route": True,
         "slippage": 0.25, "min_pool_sol_reserve": None,
-        "lane_open_max": 3, "stop_loss_sol": 0.30, "hold_slots": 150,
+        "lane_open_max": 3, "stop_loss_sol": 0.75, "hold_slots": 150,
         "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
-        "note": ("Лидер. Размер 0.2 SOL, порог источника 15 SOL-экв., налоговый "
+        "note": ("Лидер. Размер 0.5 SOL, порог источника 10 SOL-экв., налоговый "
                   "маршрут берём и пишем налог в строку решения, наценка входа до "
-                  "0.25, три открытых, стоп -0.30 за сутки, держим 150 слотов от "
+                  "0.25, три открытых, стоп -0.75 за сутки, держим 150 слотов от "
                   "s0. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и "
                   "двухшаговый маршрут через котировочный токен (п.3). LaunchLab, "
                   "CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), "
                   "поэтому их в списке ПОКА НЕТ."),
     },
     "batch5": {
-        "lane_size": 0.05, "lane_trades": True, "bloom_trades": False,
+        "lane_size": 0.3, "lane_trades": True, "bloom_trades": False,
         "bloom_sol": None, "fanout": False,
         "min_target_sol": 2, "max_slots_from_source": None,
         "skip_flippers": False, "allow_taxed_route": True,
-        "slippage": 0.40, "min_pool_sol_reserve": 30,
-        "lane_open_max": 3, "stop_loss_sol": 0.15, "hold_slots": 72,
+        # РЕЗЕРВ ПУЛА У batch5 -- НЕ ПРЕДЕЛ (слово владельца 27.09, дополнение
+        # п.2): "min_pool_sol_reserve -- нет; резерв только пишется в строку
+        # позиции". None и значит "не проверять": число всё равно идёт в строку.
+        "slippage": 0.40, "min_pool_sol_reserve": None,
+        "lane_open_max": 3, "stop_loss_sol": 0.45, "hold_slots": 72,
         "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
-        "note": ("Восемь названных кошельков BATCH-5. 0.05 SOL, порог 2 SOL-экв., "
-                  "наценка входа до 0.40, резерв пула не ниже 30 SOL-экв., три "
-                  "открытых, стоп -0.15, держим 72 слота от s0."),
+        "note": ("Восемь названных кошельков BATCH-5. 0.3 SOL, порог 2 SOL-экв., "
+                  "наценка входа до 0.40, предела резерва пула НЕТ (резерв только "
+                  "пишется в строку позиции), три открытых, стоп -0.45, держим 72 "
+                  "слота от s0."),
     },
     "lane_s0": {
-        "lane_size": 0.05, "lane_trades": True, "bloom_trades": False,
+        "lane_size": 0.3, "lane_trades": True, "bloom_trades": False,
         "bloom_sol": None, "fanout": False,
         "min_target_sol": 2, "max_slots_from_source": 3,
         "skip_flippers": True, "allow_taxed_route": False,
         "slippage": 0.35, "min_pool_sol_reserve": 30,
-        "lane_open_max": 3, "stop_loss_sol": 0.15, "hold_slots": 72,
+        "lane_open_max": 3, "stop_loss_sol": 0.45, "hold_slots": 72,
         "lane_pools": ["bonding"],
-        "note": ("Десять кошельков с усечённым S+0. 0.05 SOL, порог 2 SOL-экв., "
+        "note": ("Десять кошельков с усечённым S+0. 0.3 SOL, порог 2 SOL-экв., "
                   "не покупаем, если от слота источника прошло больше 3 слотов, "
                   "помеченных перекупщиками пропускаем (сейчас не помечен ни "
                   "один -- по таблице Code-2 все десять проходят), налоговый "
@@ -295,17 +299,18 @@ def self_test() -> int:
     chk("наших кошельков в источниках нет",
         not (set(НАШИ_КОШЕЛЬКИ) & set(все)), set(НАШИ_КОШЕЛЬКИ) & set(все))
     # ДЕНЬГИ: размеры и стопы -- те, что назвал владелец.
-    chk("размер лидера 0.2, стоп -0.30, порог 15",
-        ф["groups"]["leader"]["lane_size"] == 0.2
-        and ф["groups"]["leader"]["stop_loss_sol"] == 0.30
-        and ф["groups"]["leader"]["min_target_sol"] == 15, ф["groups"]["leader"])
-    chk("batch5 0.05, стоп -0.15, резерв 30, наценка 0.40",
-        ф["groups"]["batch5"]["lane_size"] == 0.05
-        and ф["groups"]["batch5"]["stop_loss_sol"] == 0.15
-        and ф["groups"]["batch5"]["min_pool_sol_reserve"] == 30
+    chk("размер лидера 0.5, стоп -0.75, порог 10",
+        ф["groups"]["leader"]["lane_size"] == 0.5
+        and ф["groups"]["leader"]["stop_loss_sol"] == 0.75
+        and ф["groups"]["leader"]["min_target_sol"] == 10, ф["groups"]["leader"])
+    chk("batch5 0.3, стоп -0.45, предела резерва нет, наценка 0.40",
+        ф["groups"]["batch5"]["lane_size"] == 0.3
+        and ф["groups"]["batch5"]["stop_loss_sol"] == 0.45
+        and ф["groups"]["batch5"]["min_pool_sol_reserve"] is None
         and ф["groups"]["batch5"]["slippage"] == 0.40, ф["groups"]["batch5"])
-    chk("lane_s0 0.05, три слота от s0, только кривая, налог не берём",
-        ф["groups"]["lane_s0"]["lane_size"] == 0.05
+    chk("lane_s0 0.3, стоп -0.45, три слота от s0, только кривая, налог не берём",
+        ф["groups"]["lane_s0"]["lane_size"] == 0.3
+        and ф["groups"]["lane_s0"]["stop_loss_sol"] == 0.45
         and ф["groups"]["lane_s0"]["max_slots_from_source"] == 3
         and ф["groups"]["lane_s0"]["lane_pools"] == ["bonding"]
         and ф["groups"]["lane_s0"]["allow_taxed_route"] is False,
