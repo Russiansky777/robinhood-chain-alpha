@@ -1,0 +1,109 @@
+name: "История пула вокруг нашей покупки (только чтение)"
+
+# ЗАЧЕМ (вопрос владельца 27.09, ночь). По одной живой сделке нужно видеть всё
+# окружение: покупки и продажи того же токена рядом с нашей, их слоты и индексы
+# в блоке, время нашего приёма сигнала источника и слот нашей отправки. По этому
+# видно, кто успел раньше нас и на сколько, и кто настоящий получатель токенов в
+# транзакции роутера (у OKX DEX Router плательщик газа и получатель -- разные).
+#
+# Только чтение: getSignaturesForAddress по минту, getTransaction по каждой
+# подписи, getBlock со списком подписей (по вызову на слот) и наш журнал
+# потоком. Ни одной отправки в цепь, задачи DBot не трогаются.
+on:
+  workflow_dispatch:
+    inputs:
+      mint:
+        description: "минт токена"
+        required: true
+        default: ""
+      nasha_podpis:
+        description: "наша подпись покупки (полная)"
+        required: true
+        default: ""
+      istochnik_podpis:
+        description: "подпись источника (можно начало) -- наши числа из журнала"
+        required: false
+        default: ""
+      podpisi:
+        description: "начала подписей, названных владельцем, через запятую"
+        required: false
+        default: ""
+      okno_slotov:
+        description: "сколько слотов вокруг нашего смотреть"
+        required: false
+        default: "40"
+
+concurrency:
+  group: istoriya-pula
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  TARGET_HOST: 127.0.0.1
+  OUT: data/istoriya_pula.json
+
+jobs:
+  zamer:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается"
+        run: python3 -m py_compile deploy/checks/istoriya_pula.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить замер и посчитать"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pyl"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pyl/istoriya_pula.py" < deploy/checks/istoriya_pula.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            $PYBIN /tmp/pyl/istoriya_pula.py --state-dir '$STATE_DIR' \
+              --mint '${{ inputs.mint }}' \
+              --nasha-podpis '${{ inputs.nasha_podpis }}' \
+              --istochnik-podpis '${{ inputs.istochnik_podpis }}' \
+              --podpisi '${{ inputs.podpisi }}' \
+              --okno-slotov '${{ inputs.okno_slotov }}' \
+              --out /tmp/pyl/out.json" | tail -5
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pyl/out.json" > "$OUT"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/pyl"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Istoriya pula vokrug nashey pokupki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
