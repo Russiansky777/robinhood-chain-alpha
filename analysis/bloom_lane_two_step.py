@@ -84,7 +84,8 @@ def собрать(*, tx_источника: dict, источник: str, мин
             чаевые_лампорты: int = 1_000_000, чаевые_списком: list | None = None,
             чаевые_адрес: str | None = None, семя: str | None = None,
             нонс: tuple | None = None, rpc_call=None, кэш_ног=None,
-            налог_котировки_bps=None, потолок_комиссии: float | None = None) -> dict:
+            налог_котировки_bps=None, налог_минта=None,
+            потолок_комиссии: float | None = None) -> dict:
     """Одна транзакция: SOL -> котировочный -> токен. Без подписи и отправки."""
     из_ = {"ok": False, "why_not": None, "route": "two_step", "steps": 2,
             "pool_program": None, "leg1_pool_program": None, "quote_mint": None,
@@ -158,6 +159,21 @@ def собрать(*, tx_источника: dict, источник: str, мин
             из_["why_not"] = "у шаблона шага 1 нет цены котировочного токена"
             return из_
         mv1 = e["mv"]
+        # НАЛОГ СПРАШИВАЕМ ТОЛЬКО ЕСЛИ ОН МОЖЕТ БЫТЬ: у классического SPL Token
+        # налога на перевод не бывает вовсе, и лишний вызов сети на денежном
+        # пути тут не нужен. У Token-2022 -- спрашиваем и, если не ответили,
+        # отказываемся.
+        if (налог_котировки_bps is None and mv1.get("base_program") == TOKEN_2022
+                and callable(налог_минта)):
+            try:
+                от_сети = налог_минта(q) or {}
+                if isinstance(от_сети.get("fee_bps"), int):
+                    налог_котировки_bps = int(от_сети["fee_bps"])
+                elif от_сети.get("taxed") is False:
+                    налог_котировки_bps = 0
+                из_["quote_fee_from"] = "сеть"
+            except Exception as exc:  # noqa: BLE001
+                из_["quote_fee_why_not"] = type(exc).__name__
         нал = налог_известен(mv1.get("base_program"), налог_котировки_bps)
         из_["quote_fee_bps"] = нал.get("bps")
         if not нал["ok"]:
