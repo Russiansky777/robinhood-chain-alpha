@@ -28,6 +28,12 @@ import urllib.request
 from pathlib import Path
 
 WSOL = "So11111111111111111111111111111111111111112"
+# ВЕРСИЯ ТРАНЗАКЦИЙ. Просить только нулевую -- значит не увидеть свопы через
+# таблицы адресов: узел на них отвечает ошибкой, и строка выходила "транзакцию
+# узел не отдал". Найдено 28.09: так пропали 10 транзакций из 116 в окне, и одна
+# из них -- покупка названного владельцем адреса. Детектор просит 1 (ПОТОЛОК
+# ВЕРСИИ_TX), здесь то же число.
+ВЕРСИЯ_TX = 1
 ЛАМПОРТОВ_В_SOL = 1_000_000_000
 
 
@@ -301,7 +307,7 @@ def индексы_блока(слот: int) -> dict:
     """{подпись: индекс в блоке} -- один вызов на слот."""
     б = rpc("getBlock", [слот, {"transactionDetails": "signatures",
                                  "rewards": False,
-                                 "maxSupportedTransactionVersion": 0}])
+                                 "maxSupportedTransactionVersion": ВЕРСИЯ_TX}])
     if not isinstance(б, dict) or not б.get("signatures"):
         return {}
     return {п: и for и, п in enumerate(б["signatures"])}
@@ -334,7 +340,7 @@ def главное() -> int:
                                                         time.gmtime())}
     наша = rpc("getTransaction", [а.nasha_podpis,
                                    {"encoding": "jsonParsed",
-                                    "maxSupportedTransactionVersion": 0}])
+                                    "maxSupportedTransactionVersion": ВЕРСИЯ_TX}])
     if not isinstance(наша, dict) or not наша.get("meta"):
         итог["почему_нет"] = "нашу транзакцию узел не отдал"
         print(json.dumps(итог, ensure_ascii=False, indent=1))
@@ -394,7 +400,7 @@ def главное() -> int:
     for з in sorted(в_окне, key=lambda x: (x["slot"], x.get("signature") or "")):
         п = з.get("signature")
         tx = rpc("getTransaction", [п, {"encoding": "jsonParsed",
-                                         "maxSupportedTransactionVersion": 0}])
+                                         "maxSupportedTransactionVersion": ВЕРСИЯ_TX}])
         if not isinstance(tx, dict) or not tx.get("meta"):
             ряды.append({"подпись": п, "слот": з.get("slot"),
                           "почему_нет": "транзакцию узел не отдал"})
@@ -441,7 +447,7 @@ def главное() -> int:
                                  "почему_нет": "в окне такой подписи нет"})
                 continue
             tx = rpc("getTransaction", [полная, {"encoding": "jsonParsed",
-                                                  "maxSupportedTransactionVersion": 0}])
+                                                  "maxSupportedTransactionVersion": ВЕРСИЯ_TX}])
             if not isinstance(tx, dict) or not tx.get("meta"):
                 разборы.append({"названо": кусок, "подпись": полная,
                                  "почему_нет": "транзакцию узел не отдал"})
@@ -486,7 +492,7 @@ def главное() -> int:
             for з in sorted(найдено, key=lambda x: (x["slot"], x.get("signature"))):
                 п_ = з.get("signature")
                 tx = rpc("getTransaction", [п_, {"encoding": "jsonParsed",
-                                                  "maxSupportedTransactionVersion": 0}])
+                                                  "maxSupportedTransactionVersion": ВЕРСИЯ_TX}])
                 if not isinstance(tx, dict) or not tx.get("meta"):
                     ряды_а.append({"подпись": п_, "слот": з.get("slot"),
                                     "почему_нет": "транзакцию узел не отдал"})
