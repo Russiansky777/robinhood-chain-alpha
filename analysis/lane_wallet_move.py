@@ -166,7 +166,11 @@ def _ключ_старого():
 def отправить_и_дождаться(call, tx_b64: str, *, ждать_s: float = 45.0) -> dict:
     from dbot_rescue import send_raw_b64  # noqa: PLC0415
 
-    подпись = send_raw_b64(call, tx_b64)
+    # УРОВНИ СОГЛАСОВАНЫ: blockhash берётся на confirmed, значит и предполётная
+    # проверка должна идти на confirmed. Иначе узел отвечает BlockhashNotFound
+    # и транзакция не уходит -- так упал первый шаг переезда 27.09.
+    подпись = send_raw_b64(call, tx_b64,
+                            opts={"preflightCommitment": "confirmed"})
     из_ = {"подпись": подпись, "село": False, "слот": None, "ошибка": None}
     крайний = time.time() + ждать_s
     while time.time() < крайний:

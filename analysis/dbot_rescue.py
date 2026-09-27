@@ -406,12 +406,22 @@ def build_close_account(keypair, token_account: str, program_id: str, blockhash_
 
 # ---------- цепь: отправка своих транзакций ----------
 
-def send_raw_b64(rpc: Callable, tx_b64: str) -> str:
+def send_raw_b64(rpc: Callable, tx_b64: str, *, opts: dict | None = None) -> str:
     """Отправить подписанную транзакцию. Подпись возвращается сразу, но
-    это ещё не исполнение -- подтверждение проверяется по балансу."""
-    return rpc("sendTransaction", [tx_b64, {"encoding": "base64",
-                                              "skipPreflight": False,
-                                              "maxRetries": 3}])
+    это ещё не исполнение -- подтверждение проверяется по балансу.
+
+    opts дописывает поля запроса, НЕ меняя поведения прежних вызовов (они его
+    не передают). Нужно это из-за согласования уровней: blockhash здесь берётся
+    с commitment=confirmed, а предполётная проверка sendTransaction по
+    умолчанию идёт на finalized, где такого хеша ещё может не быть -- узел
+    отвечает BlockhashNotFound и транзакция не уходит вовсе. Ровно это случилось
+    27.09 на первом шаге переезда полосы. Кто берёт хеш на confirmed, тот
+    передаёт сюда preflightCommitment=confirmed.
+    """
+    тело = {"encoding": "base64", "skipPreflight": False, "maxRetries": 3}
+    if opts:
+        тело.update(opts)
+    return rpc("sendTransaction", [tx_b64, тело])
 
 
 def latest_blockhash(rpc: Callable) -> str:

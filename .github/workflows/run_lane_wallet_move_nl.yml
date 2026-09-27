@@ -77,7 +77,11 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/lwm/analysis /tmp/lwm/data"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/lwm/analysis/lane_wallet_move.py" < analysis/lane_wallet_move.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/lwm/data/lane_wallet_move.json" < data/lane_wallet_move.json
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cp $CODE_DIR/dbot_rescue.py /tmp/lwm/analysis/dbot_rescue.py && ls -l /tmp/lwm/analysis"
+          # dbot_rescue ДОСТАВЛЯЕМ ИЗ РЕПОЗИТОРИЯ, а не копируем с хоста:
+          # согласование уровня предполётной проверки (preflightCommitment)
+          # живёт в репозитории, а развёрнутая на хосте копия его ещё не знает.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/lwm/analysis/dbot_rescue.py" < analysis/dbot_rescue.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "ls -l /tmp/lwm/analysis"
 
       - name: "Самопроверка денежного пути НА ХОСТЕ, до всякой цепи"
         run: |
