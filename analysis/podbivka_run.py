@@ -146,7 +146,7 @@ class Факт:
         self.host: list = []
         if host_path and Path(host_path).exists():
             д = json.loads(Path(host_path).read_text(encoding="utf-8"))
-            for с in д.get("сделки") or []:
+            for с in д.get("сделки") or д.get("sdelki") or []:
                 т = float(с.get("ts_intent") or 0)
                 if с_ts <= т < до_ts and с.get("source") in все:
                     self.host.append(с)

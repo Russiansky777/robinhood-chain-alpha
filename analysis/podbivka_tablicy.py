@@ -89,6 +89,30 @@ def строка_порога(покупки: list) -> dict:
     return из_
 
 
+_ХОСТ: dict = {}
+
+
+def факт_по_источнику(адрес: str, к: dict) -> list:
+    """Строка «факт»: DBot -- из прогона (журнал сделок, net_sol по цепи);
+    Bloom/полоса -- из выгрузки Code-1 data/podbivka/nashi_sdelki_host.json
+    (коммит b4542e3 ветки первой сессии; итог -- pnl_sol). Число симулятора
+    по сигналу -- из прогона наших по source_sig, если сигнал там считался."""
+    if not _ХОСТ:
+        п = КОРЕНЬ / "data" / "podbivka" / "nashi_sdelki_host.json"
+        if п.exists():
+            for x in json.loads(п.read_text(encoding="utf-8")).get("sdelki") or []:
+                _ХОСТ.setdefault(x.get("source"), []).append(x)
+        _ХОСТ.setdefault("_", [])
+    симы = {x.get("source_sig"): x.get("sim") for x in (к.get("факт") or []) if x.get("sim")}
+    симы.update({п["signature"]: п.get("sim") for п in (к.get("покупки") or []) if п.get("sim")})
+    из_ = [x for x in (к.get("факт") or []) if x.get("канал") == "DBot"]
+    for x in _ХОСТ.get(адрес, []):
+        из_.append({"канал": "полоса" if x.get("side") == "lane" else "Bloom",
+                    "task": x.get("group_effective"), "source_sig": x.get("source_sig"),
+                    "факт_net_sol": x.get("pnl_sol"), "sim": симы.get(x.get("source_sig"))})
+    return из_
+
+
 _ИТОГ_ПОЛОСЫ: dict = {}
 
 
@@ -309,7 +333,7 @@ def main() -> int:
         все_п2.extend(б + [{"sim": x.get("sim")} for x in к.get("факт") or []])
         for пор in ПОРОГИ:
             строки_п2.append((f"{адрес[:8]} (б)", пор, строка_порога([п for п in б if п["порог"] == пор])))
-        ф = [исправить_факт(x) for x in (к.get("факт") or [])]
+        ф = факт_по_источнику(адрес, к)
         фп = [{"sim": x.get("sim"), "порог": None} for x in ф]
         кол = строка_порога(фп)
         sol = sum(float(x.get("факт_net_sol") or 0) for x in ф if x.get("факт_net_sol") is not None)
