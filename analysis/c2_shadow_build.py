@@ -104,7 +104,7 @@ import c2_swap_build as B  # noqa: E402
 CAP_SKIP_USD = 200_000
 SUPPORTED = {B.PUMP_AMM: "Pump AMM", B.CPMM: "Raydium CPMM", B.DAMM2: "Meteora DAMM v2",
              B.LAUNCHLAB: "Raydium Launchlab", B.DLMM: "Meteora DLMM", B.CLMM: "Raydium CLMM",
-             B.BONDING: "Pump.fun bonding curve"}
+             B.BONDING: "Pump.fun bonding curve", B.DBC: "Meteora DBC"}
 PRICE_DEPENDENT = {B.DLMM, B.CLMM}    # счета инструкции (бины, тики) зависят от цены
 LEG_MAX_AGE_S = 30
 LEG_REFRESH_S = 10
@@ -509,8 +509,13 @@ def shadow_build(source_tx: dict, source_wallet: str, mint: str, our_wallet: str
         res["supported"] = True
         mo = B.min_out_from_reserves(tpl, source_tx, amount_lamports, slippage)
         if mo.get("ok"):
+            # ИМЯ МЕТОДА -- ЧЕСТНОЕ: у DAMM v2 и DBC цена берётся не из резервов,
+            # а из события свопа (цена после сделки источника плюс решённая
+            # ликвидность), и называть это "xyk по резервам" было бы неправдой.
             метод = ("launchlab_virtual_reserves" if prog == B.LAUNCHLAB
                      else "pumpfun_curve_after_source" if prog == B.BONDING
+                     else "damm2_sqrt_price_after_source" if prog == B.DAMM2
+                     else "dbc_sqrt_price_after_source" if prog == B.DBC
                      else "xyk_reserves_after_source")
             res.update(min_out=mo["min_out"], expected_out=mo["expected_out"], min_out_method=метод)
             if prog == B.BONDING:
@@ -587,6 +592,12 @@ def self_test() -> int:
         if "разновидность инструкции кривой не известна" in (r.get("why_not") or ""):
             pf_чужих += 1
             continue
+        # КРИВАЯ С КОТИРОВКОЙ ЧУЖИМ ТОКЕНОМ (разновидность 27 счетов встречается
+        # и такой) -- это тоже честный отказ: один шаг тут невозможен, нужен
+        # второй. Считаем её к отказанным, а не к собранным.
+        if "котировка не SOL" in (r.get("why_not") or ""):
+            pf_чужих += 1
+            continue
         pf_n += 1
         # quote_mint в ответе -- от опознания пула (там бывает и WSOL, когда
         # сделка источника оборачивала SOL); сборка при этом нативная, что
@@ -595,7 +606,14 @@ def self_test() -> int:
                       and r["quote_mint"] in (C.NATIVE_QUOTE, C.WSOL)
                       and r["min_out_method"] == "pumpfun_curve_after_source"
                       and 0 < r["min_out"] < r["expected_out"]
-                      and r.get("max_sol_cost") == 10_000_000
+                      # ПРЕДЕЛ ТРАТЫ -- ТОЛЬКО У РАЗНОВИДНОСТИ "ТОЧНЫЙ ВЫХОД":
+                      # там он отдельный аргумент. У "точного входа" (в том
+                      # числе у разновидности на 27 счетов) трата -- это сам
+                      # первый аргумент, и отдельного предела нет.
+                      and (r.get("max_sol_cost") == 10_000_000
+                           if B.SPECS[B.BONDING].get("exact_out")
+                           and r.get("max_sol_cost") is not None
+                           else True)
                       and 0 < r.get("sol_to_curve", 0) < 10_000_000)
     checks.append((f"кривая pump.fun: один шаг, минимум по кривой, предел траты = наша трата "
                    f"({pf_ok} из {pf_n}); непокрытых разновидностей отказано {pf_чужих}",

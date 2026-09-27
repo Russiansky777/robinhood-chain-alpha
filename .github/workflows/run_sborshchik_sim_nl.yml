@@ -1,0 +1,121 @@
+name: "Сборщик: примет ли программа нашу сборку (симуляция, любой тип пула)"
+
+# ЗАЧЕМ. Ночью 27.09 добавлены сборщики Meteora DAMM v2 и Meteora DBC и
+# разновидность инструкции кривой pump.fun. Байт в байт они сверены на
+# сохранённых живых сделках, но ответ на вопрос "примет ли САМА ПРОГРАММА нашу
+# покупку" даёт только цепь -- simulateTransaction: та же транзакция, тот же
+# кошелёк, подпись не проверяется, ничего не отправляется.
+#
+# Свежие сигналы берутся ПОТОКОМ из живого журнала решений на хосте по выбранной
+# программе пула. Флаги полосы прогон не трогает: он только считает.
+on:
+  workflow_dispatch:
+    inputs:
+      program:
+        description: "программа пула (DAMM v2 cpamdp..., DBC dbcij3..., кривая 6EF8rr...)"
+        required: false
+        default: "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+      limit:
+        description: "сколько последних сигналов проверить"
+        required: false
+        default: "10"
+      sol:
+        description: "трата на нашу покупку, SOL"
+        required: false
+        default: "0.01"
+      rotated:
+        description: "'yes' -- искать и в ротированных .gz"
+        required: false
+        default: "no"
+
+concurrency:
+  group: sborshchik-sim
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки сборки и тени (без них проверять нечего)"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/ss_venv"
+          "$RUNNER_TEMP/ss_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/ss_venv/bin/python" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/ss_venv/bin/python" analysis/c2_swap_build.py --self-test | tail -8
+          "$RUNNER_TEMP/ss_venv/bin/python" analysis/c2_shadow_build.py --self-test | tail -3
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Свежие сигналы этой программы из живого журнала (потоком)"
+        run: |
+          set -e
+          set -o pipefail
+          mkdir -p /tmp/ssim
+          PROG='${{ inputs.program }}'
+          ROT=""
+          [ "${{ inputs.rotated }}" = "yes" ] && ROT="yes"
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "ION=\$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true); \
+             { nice -n 15 \$ION grep -F -e $PROG $STATE_DIR/decisions.jsonl; \
+               if [ -n \"$ROT\" ]; then \
+                 for G in $STATE_DIR/decisions.jsonl.*.gz; do [ -e \"\$G\" ] || continue; \
+                   nice -n 15 \$ION zgrep -F -e $PROG \"\$G\" || true; done; \
+               fi; } | tail -n 400" \
+            > /tmp/ssim/rows.jsonl && RC=0 || RC=$?
+          echo "выборка завершилась кодом $RC"
+          wc -l < /tmp/ssim/rows.jsonl
+
+      - name: "Симуляция нашей покупки"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY analysis/bonding_sim_check.py \
+            --decisions /tmp/ssim/rows.jsonl \
+            --program '${{ inputs.program }}' \
+            --limit "${{ inputs.limit }}" \
+            --sol "${{ inputs.sol }}" \
+            --out data/sborshchik_sim_check.json
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py data/sborshchik_sim_check.json
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f data/sborshchik_sim_check.json ] && git add data/sborshchik_sim_check.json
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Sborshchik: simulyatsiya nashey sborki po tipu pula [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

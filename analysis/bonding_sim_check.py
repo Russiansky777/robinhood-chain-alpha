@@ -28,17 +28,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 КРИВАЯ = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 
 
-def строки_решений(путь: Path, *, предел: int) -> list:
+def строки_решений(путь: Path, *, предел: int, программа: str = КРИВАЯ) -> list:
+    """Строки решений по ОДНОЙ программе пула. Программа -- параметр: тем же
+    прогоном проверяются симуляцией и DAMM v2, и DBC, а не только кривая."""
     из_ = []
     with open(путь, encoding="utf-8", errors="replace") as ф:
         for ln in ф:
-            if КРИВАЯ not in ln:
+            if программа not in ln:
                 continue
             try:
                 r = json.loads(ln)
             except ValueError:
                 continue
-            if r.get("pool_program") != КРИВАЯ:
+            if r.get("pool_program") != программа:
                 continue
             if not (r.get("signature") and r.get("mint") and r.get("source")):
                 continue
@@ -56,7 +58,7 @@ def строки_решений(путь: Path, *, предел: int) -> list:
     return хвост
 
 
-def форма_инструкции(tx: dict, минт: str) -> dict:
+def форма_инструкции(tx: dict, минт: str, программа: str = КРИВАЯ) -> dict:
     """Как выглядит инструкция кривой у источника: дискриминатор, сколько счетов,
     сколько байт аргументов, есть ли в ней второй минт (котировка не SOL) и
     сколько программ токена. Ничего не решает -- только описывает."""
@@ -65,7 +67,7 @@ def форма_инструкции(tx: dict, минт: str) -> dict:
                  "ix_args": None, "ix_token_programs": None, "ix_other_mint": None}
     лучший = None
     for ix in B.all_instructions(tx):
-        if ix.get("programId") != КРИВАЯ:
+        if ix.get("programId") != программа:
             continue
         сч = ix.get("accounts") or []
         if len(сч) <= 1:          # событие Anchor -- не инструкция сделки
@@ -73,7 +75,7 @@ def форма_инструкции(tx: dict, минт: str) -> dict:
         if лучший is None or len(сч) > len(лучший.get("accounts") or []):
             лучший = ix
     if лучший is None:
-        из_["ix_disc"] = "инструкции кривой в сделке нет"
+        из_["ix_disc"] = "инструкции этой программы в сделке нет"
         return из_
     данные = B.b58decode(лучший["data"])
     сч = лучший["accounts"]
@@ -104,17 +106,19 @@ def main() -> int:
                    help="файл: сохранить по паре настоящих сделок на каждую разновидность "
                         "инструкции (они нужны, чтобы собрать и проверить сборку байт в байт)")
     р.add_argument("--per-variant", type=int, default=3)
+    р.add_argument("--program", default=КРИВАЯ,
+                   help="программа пула: по умолчанию кривая pump.fun")
     а = р.parse_args()
 
     import c2_common as C  # noqa: PLC0415
     import c2_shadow_build as SB  # noqa: PLC0415
     from solana_crowd_scan import Rpc, helius_key  # noqa: PLC0415
 
-    ряды = строки_решений(Path(а.decisions), предел=а.limit)
+    ряды = строки_решений(Path(а.decisions), предел=а.limit, программа=а.program)
     кошелёк = а.wallet or C.EXECUTOR_WALLET
     ключ, имя = helius_key()
     rpc = Rpc(ключ, service="bonding_sim")
-    print(f"ключ Helius из {имя}; сигналов кривой к проверке: {len(ряды)}; "
+    print(f"ключ Helius из {имя}; программа {а.program}; сигналов к проверке: {len(ряды)}; "
           f"кошелёк {кошелёк}; трата {а.sol} SOL")
     лампорты = int(round(а.sol * 1_000_000_000))
 
@@ -137,7 +141,7 @@ def main() -> int:
         # ФОРМА ИНСТРУКЦИИ -- ВСЕГДА, даже когда сборка откажется. Иначе отказ
         # "у источника инструкция <hex>, не buy" говорит только о том, что мы
         # её не знаем, и ничего о том, что это за инструкция.
-        строка.update(форма_инструкции(tx, r["mint"]))
+        строка.update(форма_инструкции(tx, r["mint"], а.program))
         res = SB.shadow_build(tx, r["source"], r["mint"], кошелёк, лампорты, rpc.call,
                               slippage=0.35)
         строка.update({к: res.get(к) for к in (
