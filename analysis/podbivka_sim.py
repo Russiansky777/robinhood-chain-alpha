@@ -419,6 +419,7 @@ def налог_минта(уз: Узел, минт: str) -> dict:
                 из_["max"] = int(новый.get("maximumFee") or 0)
     except RuntimeError as exc:
         из_["why_not"] = чисто(str(exc))[:160]
+        return из_                      # неудача не кешируется (проверка кода 27.09)
     _НАЛОГ[минт] = из_
     return из_
 

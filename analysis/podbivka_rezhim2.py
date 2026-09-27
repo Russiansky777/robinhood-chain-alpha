@@ -46,9 +46,36 @@ G_БЕЗ_ПРОДАЖ = 0.985
 ТОЧКИ = ("S0", "S0_дно", "S1", "S2")
 
 
-def одна(уз: S.Узел, п: dict) -> dict:
+БАЗА = ("signature", "mint", "wallet", "sol_экв", "группа")
+# x*y=k по хранилищам проверена в A3 на Raydium CP; Pump AMM и AMM v4 -- та же
+# формула. LaunchLab -- виртуальные резервы из события (как в основном
+# симуляторе). CLMM/DLMM/Whirlpool/DAMM v2/DBC -- хранилища цену не дают: отказ.
+AMM_V4 = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+ПРОГРАММЫ_XYK = {S.SB.CPMM, S.SB.PUMP_AMM, AMM_V4}
+_КНИГА: dict = {}
+
+
+def цена_котировочного(уз: S.Узел, tsrc: dict, q: str):
+    """Лампорты за сырую единицу q: как в шаге 2 (плечо в сделке источника);
+    иначе USDC/USDT -- 1 USD за единицу по курсу опорного пула на то же время."""
     import podbivka_lider_kotirovka as LK  # noqa: PLC0415
-    из_ = {к: п.get(к) for к in ("signature", "mint", "wallet", "sol_экв", "группа")}
+    цена, откуда = LK.цена_q_в_sol(tsrc, q, tsrc.get("blockTime"))
+    if цена:
+        return цена, откуда
+    if q in (C.USDC, C.USDT):
+        if id(уз) not in _КНИГА:
+            _КНИГА[id(уз)] = S.КурсПулом(S.КурсУзла(уз))
+        try:
+            курс = _КНИГА[id(уз)].rate_for(tsrc)[0]
+        except Exception:  # noqa: BLE001
+            курс = None
+        if курс:
+            return 1e-6 / float(курс) * 1e9, "стейбл: 1 USD по курсу опорного пула"
+    return None, откуда
+
+
+def одна(уз: S.Узел, п: dict) -> dict:
+    из_ = {к: п.get(к) for к in БАЗА}
     tsrc = уз.tx(п["signature"])
     if not tsrc:
         return {**из_, "why_not": "узел не отдал сделку источника"}
@@ -61,16 +88,27 @@ def одна(уз: S.Узел, п: dict) -> dict:
     if q in SOLы:
         return {**из_, "why_not": "котировка SOL -- основной симулятор"}
     import c2_pool_programs as PP  # noqa: PLC0415
-    из_["program"] = PP.pool_program(tsrc, пул["pool_vault"], PP.labels()).get("pool_program")
-    ст0 = S.состояние(tsrc, "xyk", пул, п["mint"])
+    прог = PP.pool_program(tsrc, пул["pool_vault"], PP.labels()).get("pool_program")
+    из_["program"] = прог
+    if прог == S.SB.LAUNCHLAB:
+        режим = "launchlab"
+    elif прог in ПРОГРАММЫ_XYK:
+        режим = "xyk"
+    else:
+        return {**из_, "why_not": f"программа пула {прог}: хранилища не x*y=k-резервы, режим 2 не проверен"}
+    из_["режим"] = режим
+    ст0 = S.состояние(tsrc, режим, пул, п["mint"])
     if not ст0:
         return {**из_, "why_not": "состояние после источника не читается"}
-    цена_q, откуда = LK.цена_q_в_sol(tsrc, q, tsrc.get("blockTime"))
+    цена_q, откуда = цена_котировочного(уз, tsrc, q)
     из_["цена_q_откуда"] = откуда
     if not цена_q:
         return {**из_, "why_not": f"курс котировочного: {откуда}"}
     нал_т, нал_q = S.налог_минта(уз, п["mint"]), S.налог_минта(уз, q)
     из_.update(налог_токена_bps=нал_т.get("bps"), налог_q_bps=нал_q.get("bps"))
+    for чей, нал in (("токена", нал_т), ("котировочного", нал_q)):
+        if нал.get("why_not"):
+            return {**из_, "why_not": f"налог {чей} не прочитан: {нал['why_not'][:80]}"}
     ист = S.история_пула(уз, пул["pool_vault"], п["signature"], s0,
                          опора=(S.подпись_после_слота(уз, s0 + 151) if уз.текущий == "helius" else None),
                          до_слота=s0 + 150)
@@ -80,68 +118,95 @@ def одна(уз: S.Узел, п: dict) -> dict:
     из_["окно_полное"] = S.текущий_слот(уз) > s0 + 150
     из_["толпа_s0_2"] = sum(1 for з in сп if з["slot"] <= s0 + 2)
     кэш: dict = {}
+    не_читаются: list = []
 
     def txi(i):
         if i not in кэш:
-            кэш[i] = уз.tx(сп[i]["signature"])
+            try:
+                кэш[i] = уз.tx(сп[i]["signature"])
+            except RuntimeError:              # как ст_до основного симулятора
+                кэш[i] = None
+                не_читаются.append(сп[i]["signature"])
         return кэш[i]
 
     def ст(i):
-        while i is not None and i >= 0:
-            с = S.состояние(txi(i), "xyk", пул, п["mint"])
+        # не дальше ШАГОВ_НАЗАД назад, как в основном симуляторе
+        for j in range(i, max(-1, i - S.ШАГОВ_НАЗАД - 1), -1):
+            с = S.состояние(txi(j), режим, пул, п["mint"])
             if с:
                 return с
-            i -= 1
-        return ст0
+        return None
 
     def ст_до(слот):
         канд = [i for i, з in enumerate(сп) if з["slot"] <= слот]
-        return ст(канд[-1]) if канд else ст0
+        return (ст(канд[-1]) if канд else ст0)
+
     # калибровки
-    f = A3.f_по_хранилищам(tsrc, пул)
-    из_["f_источника"] = round(f, 5) if f else None
-    if not f or not (0.95 <= f <= 1.0):
-        доли = []
-        for i in range(min(len(сп), 40)):
-            ff = A3.f_по_хранилищам(txi(i), пул)
-            if ff and 0.95 <= ff <= 1.0:
-                доли.append(ff)
-            if len(доли) >= 3:
-                break
-        f = statistics.median(доли) if доли else None
-        из_["f_откуда"] = f"первые покупки пула после источника ({len(доли)})" if f else None
+    if режим == "launchlab":
+        мо = S.SB.launchlab_min_out(tsrc, 10 ** 6, 0.0)
+        f = мо.get("fee_rate") if мо.get("ok") else None      # доля КОМИССИИ (как в основном симуляторе)
+        из_["f"], из_["f_откуда"] = f, "событие LaunchLab источника"
+        if f is None:
+            return {**из_, "why_not": "LaunchLab: нет события сделки источника"}
+        g = None
     else:
-        из_["f_откуда"] = "хранилища, сделка источника"
-    из_["f"] = round(f, 5) if f else None
-    if not f:
-        return {**из_, "why_not": "доля траты не калибруется"}
-    доли_g = []
-    for i in range(len(сп)):
-        т = txi(i)
-        кв, тв = A3.дельта_счёта(т, пул["quote_vault"]), A3.дельта_счёта(т, пул["pool_vault"])
-        if кв and тв and тв[1] > тв[0] and кв[1] < кв[0] and кв[0] > 0:
-            dy, dx = тв[1] - тв[0], кв[0] - кв[1]
-            g_ = dx * (тв[0] + dy) / (кв[0] * dy)
-            if 0.5 <= g_ <= 1.0:
-                доли_g.append(g_)
-        if len(доли_g) >= 8:
-            break
-    g = statistics.median(доли_g) if доли_g else G_БЕЗ_ПРОДАЖ
-    из_["g"], из_["g_откуда"] = round(g, 5), (f"продажи пула ({len(доли_g)})" if доли_g else "продаж нет: 0.985")
+        f_ист = A3.f_по_хранилищам(tsrc, пул)
+        из_["f_источника"] = round(f_ист, 5) if f_ист else None
+        f = f_ист if f_ист and 0.95 <= f_ист <= 1.0 else None
+        if f:
+            из_["f_откуда"] = "хранилища, сделка источника"
+        else:
+            # как в A3 (прогон 5): ближайшая покупка пула после источника, окно 0.5–1.0
+            for i in range(min(len(сп), 30)):
+                ff = A3.f_по_хранилищам(txi(i), пул)
+                if ff and 0.5 <= ff <= 1.0:
+                    f = ff
+                    из_["f_откуда"] = "ближайшая покупка пула после источника"
+                    break
+        из_["f"] = round(f, 5) if f else None
+        if not f:
+            return {**из_, "why_not": "доля траты не калибруется"}
+        доли_g = []
+        for i in range(min(len(сп), 80)):
+            т = txi(i)
+            кв, тв = A3.дельта_счёта(т, пул["quote_vault"]), A3.дельта_счёта(т, пул["pool_vault"])
+            if кв and тв and тв[1] > тв[0] and кв[1] < кв[0] and кв[0] > 0:
+                dy, dx = тв[1] - тв[0], кв[0] - кв[1]
+                g_ = dx * (тв[0] + dy) / (кв[0] * dy)
+                if 0.5 <= g_ <= 1.0:
+                    доли_g.append(g_)
+            if len(доли_g) >= 8:
+                break
+        g = statistics.median(доли_g) if доли_g else G_БЕЗ_ПРОДАЖ
+        из_["g"], из_["g_откуда"] = round(g, 5), (f"продажи пула ({len(доли_g)})" if доли_g else "продаж нет: 0.985")
+
+    def спот(с):
+        return с["x"] / с["y"] if режим == "xyk" else с["quote"] / с["base"]
+
     # наш вход
     q_raw = int(РАЗМЕР / цена_q)
     q_raw -= S.удержано(q_raw, нал_q)            # пул q/SOL -> мы
     q_raw -= S.удержано(q_raw, нал_q)            # мы -> пул токена
-    p0 = ст0["x"] / ст0["y"]
+    p0 = спот(ст0)
     точки = {"S0": ст0, "S0_дно": ст_до(s0), "S1": ст_до(s0 + 1), "S2": ст_до(s0 + 2)}
     выходы = {H: ст_до(s0 + H - 1) for H in (72, 150)}
-    из_["путь_цены"] = {к: round((с["x"] / с["y"] / p0 - 1) * 100, 3) for к, с in точки.items() if к != "S0"}
-    из_["резерв_q_s0"] = ст0["x"]
-    из_["резерв_s0_sol"] = round(ст0["x"] * цена_q / 1e9, 3)
+    из_["путь_цены"] = {к: (round((спот(с) / p0 - 1) * 100, 3) if с else None)
+                        for к, с in точки.items() if к != "S0"}
+    из_["резерв_q_s0"] = ст0["x"] if режим == "xyk" else ст0["rq"]
+    из_["резерв_s0_sol"] = round(из_["резерв_q_s0"] * цена_q / 1e9, 3)
     res: dict = {}
     for к, с in точки.items():
-        x, y = с["x"], с["y"]
-        т_брутто = int(y * f * q_raw / (x + f * q_raw))
+        if not с:
+            res[к] = None
+            continue
+        if режим == "xyk":
+            x, y = с["x"], с["y"]
+            т_брутто = int(y * f * q_raw / (x + f * q_raw))
+            в_пул_вход = q_raw
+        else:
+            пок = S.наша_покупка("launchlab", с, f=f, кривая_bps=(0, 0), размер=q_raw)
+            т_брутто = пок["tokens"] if пок.get("ok") else 0
+            в_пул_вход = пок.get("в_пул") or 0
         if т_брутто <= 0:
             res[к] = None
             continue
@@ -149,16 +214,26 @@ def одна(уз: S.Узел, п: dict) -> dict:
         в_пул = т - S.удержано(т, нал_т)
         р = {"наценка_пп": round(((q_raw / т_брутто) / p0 - 1) * 100, 3)}
         for H, св in выходы.items():
-            for вид, (X, Y) in (("потолок", (св["x"] + q_raw, св["y"] - т_брутто)), ("дно", (св["x"], св["y"]))):
-                if Y <= 0:
+            if not св:
+                р[f"потолок_{H}"] = р[f"дно_{H}"] = None
+                continue
+            for вид, вставка in (("потолок", True), ("дно", False)):
+                if режим == "xyk":
+                    X, Y = (св["x"] + в_пул_вход, св["y"] - т_брутто) if вставка else (св["x"], св["y"])
+                    q_out = int(X * g * в_пул / (Y + в_пул)) if Y > 0 else None
+                else:
+                    покупка = {"в_пул": в_пул_вход, "tokens": т_брутто} if вставка else {"в_пул": 0, "tokens": 0}
+                    пр = S.наша_продажа("launchlab", св, покупка, в_пул, f=f, кривая_bps=(0, 0), g=None)
+                    q_out = пр["lamports"] if пр.get("ok") else None
+                if q_out is None:
                     р[f"{вид}_{H}"] = None
                     continue
-                q_out = int(X * g * в_пул / (Y + в_пул))
                 q_out -= S.удержано(q_out, нал_q)      # пул токена -> мы
                 q_out -= S.удержано(q_out, нал_q)      # мы -> пул q/SOL
                 р[f"{вид}_{H}"] = S.чистый_пп(int(q_out * цена_q))
         res[к] = р
     из_["входы"] = res
+    из_["не_читаются"] = len(не_читаются)
     из_["флаги"] = ["курс котировочного к SOL на выходе = на входе (шаг 2)",
                     "проскальзывание нашей ноги SOL<->котировочный не моделируется"]
     return из_
@@ -193,7 +268,7 @@ def main() -> int:
                 try:
                     рез = одна(уз, п)
                 except Exception as exc:  # noqa: BLE001
-                    рез = {"signature": п["signature"], "why_not": S.чисто(f"{type(exc).__name__}: {exc}")[:200]}
+                    рез = {**{к: п.get(к) for к in БАЗА}, "why_not": S.чисто(f"{type(exc).__name__}: {exc}")[:200]}
             уз._кэш.clear()  # noqa: SLF001
             рез["узел"] = S.узел_по_времени(п.get("blockTime"))
             ф.write(json.dumps(рез, ensure_ascii=False) + "\n")
