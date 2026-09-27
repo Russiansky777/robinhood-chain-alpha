@@ -32,6 +32,10 @@ on:
         description: "сколько слотов вокруг нашего смотреть"
         required: false
         default: "40"
+      sbor_podpisi:
+        description: "подписи (или начала) для разбора комиссий, приоритета и чаевых"
+        required: false
+        default: ""
 
 concurrency:
   group: istoriya-pula
@@ -40,6 +44,7 @@ concurrency:
 env:
   ENV_DIR: /etc/bloom-executor
   STATE_DIR: /home/bot/bloom_executor_live_data
+  CODE_DIR: /home/bot/bloom_executor
   PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
   TARGET_HOST: 127.0.0.1
   OUT: data/istoriya_pula.json
@@ -75,6 +80,10 @@ jobs:
           set -o pipefail
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pyl"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pyl/istoriya_pula.py" < deploy/checks/istoriya_pula.py
+          # Реестр отправителей везём С РАННЕРА: на хосте он лежит не рядом с
+          # кодом службы, и путь к нему угадывать нельзя -- иначе каналы чаевых
+          # назовутся "счёта нет в реестре" при живом реестре в репозитории.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pyl/senders.json" < data/senders.json
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             set -a; . $ENV_DIR/env; set +a
@@ -84,6 +93,8 @@ jobs:
               --istochnik-podpis '${{ inputs.istochnik_podpis }}' \
               --podpisi '${{ inputs.podpisi }}' \
               --okno-slotov '${{ inputs.okno_slotov }}' \
+              --sbor-podpisi '${{ inputs.sbor_podpisi }}' \
+              --senders /tmp/pyl/senders.json \
               --out /tmp/pyl/out.json" | tail -5
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pyl/out.json" > "$OUT"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/pyl"
