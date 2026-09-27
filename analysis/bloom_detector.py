@@ -1168,6 +1168,13 @@ def решение(сигнал: dict, *, состояние, трата_sol: fl
         строка["would_skip_fee"] = bool(фил.get("would_skip_fee"))
         if фил.get("reason") and not фил.get("skip"):
             строка["route_tax_note"] = фил["reason"]
+        # ПОРОГ И ЕГО ПРИМЕНЕНИЕ -- В СТРОКЕ РЕШЕНИЯ, а не только в причине
+        # отказа: владелец просил видеть налог по прошедшим покупкам, и по
+        # журналу должно быть ясно, какой порог применялся и применялся ли.
+        if фил.get("route_tax_threshold_bps") is not None:
+            строка["route_tax_threshold_bps"] = фил["route_tax_threshold_bps"]
+        if фил.get("route_tax_reported"):
+            строка["route_tax_reported"] = True
     if фил.get("skip"):
         строка.update({"action": "skip", "code": КОД_НАЛОГ_МАРШРУТА,
                         "reason": фил.get("reason"),
@@ -2423,7 +2430,19 @@ class Детектор:
                 пакет = self.helius.налоги_минтов(минты_маршрута)
                 сиг["route_tax"] = RT.налог_маршрута(
                     tx, сиг["mint"], self.helius.налог_минта, откуда="source")
-                сиг["route_tax_filter"] = RT.фильтр_маршрута(сиг["route_tax"])
+                # ПОРОГ НАЛОГА -- ПО ГРУППЕ ИСТОЧНИКА (владелец 27.09: "не
+                # отказывать, а писать налог в строку решения; порог по налогу
+                # -- поле группы, по умолчанию 600 bps"). Порога нет -- фильтр
+                # режет как до 27.09, и ни один старый путь не меняется.
+                порог_налога = None
+                if OS is not None:
+                    try:
+                        порог_налога = OS.порог_налога_маршрута_bps(
+                            OS.группа_источника(источник))
+                    except Exception:  # noqa: BLE001
+                        порог_налога = None
+                сиг["route_tax_filter"] = RT.фильтр_маршрута(
+                    сиг["route_tax"], порог_bps=порог_налога)
                 сиг["route_tax_batch"] = пакет
             except Exception as exc:  # noqa: BLE001
                 # Фильтр не смог посчитать -- покупка НЕ отменяется, но причина
