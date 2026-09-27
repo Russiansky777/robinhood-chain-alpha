@@ -127,29 +127,42 @@ def main() -> int:
             ("ts_intent", "ts_sent", "решение -> отправка"),
             ("ts_intent", "ts_accepted", "решение -> приём"))
     чем_мерили = collections.Counter()
+    # СТРОКИ ЖУРНАЛА -- ЭТО ОБНОВЛЕНИЯ ОДНОЙ ПОЗИЦИИ, а не готовые записи:
+    # ts_intent приходит одной строкой, ts_sent -- другой. Мерить по строке
+    # значит не найти ни одной пары (первый прогон так и вышло: 0 сделок при
+    # 205 строках с числами). Поэтому сначала сводим строки по cid.
+    по_cid: dict = {}
     for путь in файлы(а.state_dir, "positions.jsonl"):
         for з in строки(путь):
-            if not з.get("lane"):
+            cid = з.get("client_order_id")
+            if not cid:
                 continue
-            позиций_полосы += 1
-            for к in ("signal_recv_ts", "t_recv_ts", "ts_intent", "ts_sent",
-                      "ts_accepted", "seen_lag_ms"):
-                if isinstance(з.get(к), (int, float)):
-                    поля_времени[к] += 1
-            for ноль_к, конец_к, имя in ПАРЫ:
-                ноль, ушло = з.get(ноль_к), з.get(конец_к)
-                if not isinstance(ноль, (int, float)) or not isinstance(ушло, (int, float)):
-                    continue
-                if float(ноль) < порог:
-                    break
-                мс = (float(ушло) - float(ноль)) * 1000.0
-                if not -1000 < мс < 600_000:
-                    break
-                час = time.strftime("%Y-%m-%dT%HZ", time.gmtime(float(ноль)))
-                по_часам[час].append(мс)
-                все_мс.append(мс)
-                чем_мерили[f"{ноль_к} -> {конец_к} ({имя})"] += 1
+            зап = по_cid.setdefault(cid, {})
+            for к, v in з.items():
+                if v is not None:
+                    зап[к] = v
+    for зап in по_cid.values():
+        if not зап.get("lane"):
+            continue
+        позиций_полосы += 1
+        for к in ("signal_recv_ts", "t_recv_ts", "ts_intent", "ts_sent",
+                  "ts_accepted", "seen_lag_ms"):
+            if isinstance(зап.get(к), (int, float)):
+                поля_времени[к] += 1
+        for ноль_к, конец_к, имя in ПАРЫ:
+            ноль, ушло = зап.get(ноль_к), зап.get(конец_к)
+            if not isinstance(ноль, (int, float)) or not isinstance(ушло, (int, float)):
+                continue
+            if float(ноль) < порог:
                 break
+            мс = (float(ушло) - float(ноль)) * 1000.0
+            if not -1000 < мс < 600_000:
+                break
+            час = time.strftime("%Y-%m-%dT%HZ", time.gmtime(float(ноль)))
+            по_часам[час].append(мс)
+            все_мс.append(мс)
+            чем_мерили[f"{ноль_к} -> {конец_к} ({имя})"] += 1
+            break
     скорость = {ч: {"сделок": len(v), "медиана_мс": round(statistics.median(v), 1),
                     "мин_мс": round(min(v), 1), "макс_мс": round(max(v), 1)}
                 for ч, v in sorted(по_часам.items())}
