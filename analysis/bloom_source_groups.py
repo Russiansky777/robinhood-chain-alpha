@@ -68,7 +68,16 @@ def файл() -> str:
                           # lane_only и candidates. Ноль и отрицательное группу
                           # НЕ выключают -- уходят в общий предел, как и все
                           # остальные числа политики; выключает lane_trades.
-                          "lane_open_max": None}
+                          "lane_open_max": None,
+                          # КАКИЕ ТИПЫ ПУЛОВ БЕРЁТ ПОЛОСА ПО ЭТОЙ ГРУППЕ, сверх
+                          # постоянных Pump AMM и Raydium CPMM: список имён
+                          # ("bonding", "damm2", "dbc", "dlmm"). None или пустой
+                          # список значат "как в окружении" (флаги LANE_*);
+                          # список в файле СИЛЬНЕЕ окружения, потому что файл
+                          # перечитывается на ходу, а окружение службы -- только
+                          # при перезапуске. Слово владельца 27.09: включение по
+                          # одному, без перезапусков.
+                          "lane_pools": None}
 _КЭШ: dict | None = None
 
 
@@ -114,6 +123,7 @@ def загрузить(путь: str | None = None, *, заново: bool = Fals
             "stop_loss_sol": г.get("stop_loss_sol"),
             "min_target_sol": г.get("min_target_sol"),
             "lane_open_max": г.get("lane_open_max"),
+            "lane_pools": г.get("lane_pools"),
         }
         # Адреса лежат двумя видами: словарь {адрес: партия} и списки
         # объектов с полем address. Оба читаем, третий вид не изобретаем.
@@ -238,6 +248,11 @@ def self_test() -> int:
     chk("поле lane_open_max есть в политике и читается как есть",
         "lane_open_max" in политика("bloom_lane")
         and политика("bloom_lane")["lane_open_max"] is None,
+        политика("bloom_lane"))
+
+    chk("поле lane_pools есть в политике и по умолчанию пусто",
+        "lane_pools" in политика("bloom_lane")
+        and политика("bloom_lane")["lane_pools"] is None,
         политика("bloom_lane"))
 
     chk("незнакомый адрес -- bloom_lane, как было до 25.09",
