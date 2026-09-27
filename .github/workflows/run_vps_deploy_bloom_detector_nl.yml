@@ -260,12 +260,14 @@ jobs:
           # <родитель каталога кода>/data/senders.json, то есть на хосте
           # /home/bot/data/senders.json. Без файла подключённых отправителей
           # нет вовсе, и веер контролей пуст.
-          # data/sources_2026-09-25.json -- ГРУППЫ ИСТОЧНИКОВ (решение владельца
-          # 25.09, пункты 1.1 и 1.2): 38 кошельков только для полосы и источники
-          # скорости. Без файла детектор слушает только BATCH-3/5 из DBot, то
-          # есть 60 источников молча не работают, а размер сделки полосы падает
-          # до значения окружения.
-          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json data/c2_leg_pools_2026-09-24.json data/c2_pool_samples data/senders.json data/sources_2026-09-25.json"
+          # ФАЙЛ ГРУПП ИСТОЧНИКОВ ЗДЕСЬ НЕ ЕДЕТ. 27.09 деплой перезаписал живой
+          # /home/bot/data/sources_2026-09-25.json копией из репозитория, и это
+          # молча вернуло деньги к исходной настройке: Bloom включился на всех
+          # группах (9 живых покупок, -0.080487 SOL у исполнителя), а размер
+          # полосы вырос с 0.01 до 0.05. Живой файл групп правится отдельным
+          # прогоном (run_vps_pravka_grupp_nl.yml) и перечитывается службой на
+          # ходу -- деплою его касаться нельзя вовсе.
+          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json data/c2_leg_pools_2026-09-24.json data/c2_pool_samples data/senders.json"
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
@@ -286,6 +288,7 @@ jobs:
             ls /home/bot/data/c2_pool_samples | wc -l
             ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
             ls -l /home/bot/data/senders.json
+            echo 'fayl grupp deploy ne trogal, pokazyvaem ego vremya kak est:'
             ls -l /home/bot/data/sources_2026-09-25.json
           "
 
