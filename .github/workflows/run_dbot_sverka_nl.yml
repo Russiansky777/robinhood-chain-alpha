@@ -34,6 +34,10 @@ on:
         description: "'yes' -- свод строкой владельцу в основной чат"
         required: false
         default: "no"
+      podpisi:
+        description: "подписи покупок DBot через запятую -- разобрать отдельно (названные владельцем)"
+        required: false
+        default: ""
 
 concurrency:
   group: dbot-sverka
@@ -89,6 +93,7 @@ jobs:
             PYTHONPATH=$CODE_DIR $PYBIN dbot_sverka_v_obe_storony.py \
               --s '${{ inputs.s }}' --po '${{ inputs.po }}' \
               --zadachi '${{ inputs.zadachi }}' \
+              --podpisi '${{ inputs.podpisi }}' \
               --state-dir '$STATE_DIR' --out /tmp/sverka/out.json"
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/sverka/out.json" > "$OUT"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/sverka"
