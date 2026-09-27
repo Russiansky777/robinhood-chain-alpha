@@ -71,6 +71,30 @@ def сделки(адрес: str, предел: int) -> list:
     return [з["signature"] for з in п if not з.get("err")]
 
 
+def налог_минта(минт: str) -> dict:
+    """Налог на перевод у минта Token-2022: {"taxed", "fee_bps"}.
+
+    Читается из расширений самого минта (transferFeeConfig), а не берётся на
+    глаз: это число прямо уменьшает то, что доходит до пула.
+    """
+    из_ = {"taxed": False, "fee_bps": 0}
+    try:
+        о = rpc("getAccountInfo", [минт, {"encoding": "jsonParsed"}]) or {}
+    except Exception as exc:  # noqa: BLE001
+        return {"taxed": None, "fee_bps": None, "why_not": type(exc).__name__}
+    инфо = ((((о.get("value") or {}).get("data") or {}).get("parsed") or {})
+            .get("info") or {})
+    for расш in инфо.get("extensions") or []:
+        if расш.get("extension") != "transferFeeConfig":
+            continue
+        сост = расш.get("state") or {}
+        for ключ in ("newerTransferFee", "olderTransferFee"):
+            bps = ((сост.get(ключ) or {}).get("transferFeeBasisPoints"))
+            if isinstance(bps, int):
+                return {"taxed": bps > 0, "fee_bps": bps}
+    return из_
+
+
 def пулы_sol_q(tx: dict, C, B, программы: set) -> list:
     """(программа, хранилище Q, хранилище WSOL, Q) для пулов SOL<->Q в транзакции.
 
@@ -112,6 +136,13 @@ def main() -> int:
         "%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "лампорты": а.lamporty, "ряды": []}
     подписи = сделки(а.lider, а.predel)
     итог["подписей_лидера"] = len(подписи)
+    # РЕЕСТР ПУЛОВ НОГ -- тот же, что читает служба (data/c2_leg_pools_*.json).
+    try:
+        реестр_ног = SB.load_leg_pools()
+    except Exception as exc:  # noqa: BLE001
+        реестр_ног = {}
+        итог["реестр_ног_почему"] = type(exc).__name__
+    итог["реестр_ног"] = sorted(реестр_ног)
     ноги_программы = {B.PUMP_AMM, B.CPMM, B.DAMM2, B.LAUNCHLAB, B.DLMM, B.CLMM}
     совпало = разошлось = не_собрано = 0
     for подпись in подписи:
@@ -137,10 +168,21 @@ def main() -> int:
                 "котировка": q, "трата_источника": сиг.get("spend_ui")}
         прог2 = PP.pool_program(tx, пул["pool_vault"], SB._labels())["pool_program"]
         ряд["программа_пула"] = прог2
-        # ШАБЛОН ПЕРВОГО ШАГА: пул SOL<->Q ищем сначала в самой сделке лидера,
-        # потом по свежим сделкам котировочного минта -- как c2_twohop.
-        кандидаты = [к for к in пулы_sol_q(tx, C, B, ноги_программы) if к[3] == q]
+        # ШАБЛОН ПЕРВОГО ШАГА: сначала ГОТОВЫЙ реестр пулов ног (его же читает
+        # служба), потом сама сделка лидера, потом свежие сделки котировочного
+        # минта -- как c2_twohop.
+        кандидаты = []
+        готовый = (реестр_ног or {}).get(q)
+        if готовый and готовый.get("q_vault") and готовый.get("w_vault"):
+            кандидаты = [(готовый["program"], готовый["q_vault"],
+                          готовый["w_vault"], q)]
+            ряд["шаг_1_из"] = "реестр ног"
         if not кандидаты:
+            кандидаты = [к for к in пулы_sol_q(tx, C, B, ноги_программы) if к[3] == q]
+            if кандидаты:
+                ряд["шаг_1_из"] = "сделка лидера"
+        if not кандидаты:
+            ряд["шаг_1_из"] = "свежие сделки котировочного минта"
             for п2 in сделки(q, 12):
                 tx2 = транзакция(п2)
                 if not tx2:
@@ -168,7 +210,7 @@ def main() -> int:
                           проскальзывание=0.35, cu_units=800_000,
                           приоритет_лампорты=1_000_000, чаевые_лампорты=0,
                           кэш_ног=кэш, rpc_call=lambda м, п: rpc(м, п),
-                          налог_котировки_bps=None)
+                          налог_минта=налог_минта)
         ряд["наша_сборка"] = {к: наша.get(к) for к in
                                ("ok", "why_not", "quote_fee_bps", "leg1_min_out",
                                 "leg2_amount_in", "leg2_to_pool", "min_out",
