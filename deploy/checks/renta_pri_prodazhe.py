@@ -46,7 +46,11 @@ def пути(каталог: str, имя: str) -> list:
     return обороты + ([основной] if os.path.exists(основной) else [])
 
 
-def метка(т: str) -> float:
+def метка(т) -> float:
+    # В журнале позиций время бывает и строкой, и числом epoch: первый прогон
+    # упал на float.replace. Принимаем оба вида.
+    if isinstance(т, (int, float)):
+        return float(т)
     т = (т or "").replace("Z", "")
     try:
         return calendar.timegm(time.strptime(т, "%Y-%m-%dT%H:%M:%S"))
@@ -76,6 +80,8 @@ def main() -> int:
     ряды = []
     for cid, поз in по_cid.items():
         т = поз.get("ts_intent") or поз.get("ts_utc") or ""
+        if isinstance(т, (int, float)):
+            т = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(float(т)))
         if с_ and метка(т) < с_:
             continue
         зак = поз.get("close_on_sell")
