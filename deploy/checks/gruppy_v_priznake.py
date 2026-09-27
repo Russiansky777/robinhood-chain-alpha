@@ -43,6 +43,10 @@ def main() -> int:
             "обрывов_подписки": d.get("subscribe_drops"),
             "способ_подписки": d.get("subscribe_method"),
             "кредитов_за_сеанс": d.get("session_credits"),
+            # ПОЧЕМУ НЕ ПОКУПАЕМ -- по кодам решений: без этого "сигналов 261,
+            # к покупке 0" не отличить от "детектор не решает вовсе".
+            "по_кодам": d.get("by_code"),
+            "площадка_не_звана_по_группе": d.get("bloom_skipped_by_group"),
             "полоса": {к: (d.get("own_send") or {}).get(к)
                         for к in ("enabled", "live", "sent", "by_stage", "wallet",
                                    "balance_sol", "limits", "last",
