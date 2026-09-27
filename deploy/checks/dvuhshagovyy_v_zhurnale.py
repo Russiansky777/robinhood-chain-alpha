@@ -163,6 +163,14 @@ def main() -> int:
             все_мс.append(мс)
             чем_мерили[f"{ноль_к} -> {конец_к} ({имя})"] += 1
             break
+    # ДИАГНОСТИКА: какие поля времени реально лежат у СВЕЖИХ позиций полосы.
+    свежие = sorted((з for з in по_cid.values() if з.get("lane")),
+                    key=lambda з: str(з.get("ts_intent_utc") or ""), reverse=True)[:3]
+    примеры_времени = [{к: v for к, v in з.items()
+                        if ("ts" in к or "signal" in к or "recv" in к
+                            or "lag" in к or к == "lane_group")}
+                       for з in свежие]
+
     скорость = {ч: {"сделок": len(v), "медиана_мс": round(statistics.median(v), 1),
                     "мин_мс": round(min(v), 1), "макс_мс": round(max(v), 1)}
                 for ч, v in sorted(по_часам.items())}
@@ -186,6 +194,7 @@ def main() -> int:
         "скорость_чем_мерили": dict(чем_мерили),
         "позиций_полосы_прочитано": позиций_полосы,
         "поля_времени_в_позициях": dict(поля_времени),
+        "примеры_времени_свежих": примеры_времени,
     }
     with open(а.out, "w", encoding="utf-8") as ф:
         json.dump(отчёт, ф, ensure_ascii=False, indent=1)
