@@ -23,6 +23,10 @@ on:
         description: "потолок кредитов Helius на прогон"
         required: false
         default: "250000"
+      svoi:
+        description: "наши кошельки (исполнитель и полоса) -- исключаются из толпы"
+        required: false
+        default: "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N,21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w"
 
 concurrency:
   group: tolpa-za-istochnikom
@@ -86,7 +90,8 @@ jobs:
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
           $PY deploy/checks/tolpa_za_istochnikom.py --rows "$ROWS" --out "$OUT" \
-            --limit "${{ inputs.limit }}" --credit-budget "${{ inputs.credit_budget }}"
+            --limit "${{ inputs.limit }}" --credit-budget "${{ inputs.credit_budget }}" \
+            --svoi "${{ inputs.svoi }}"
 
       - name: "Ключей в отчёте быть не должно"
         if: always()
