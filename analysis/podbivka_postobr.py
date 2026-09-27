@@ -220,8 +220,18 @@ def main() -> int:
     уз = S.Узел()
     последний = time.time()
     import podbivka_run as R  # noqa: PLC0415
+    готово = set()
+    if out.exists():
+        for l in out.read_text(encoding="utf-8").splitlines():
+            try:
+                готово.add(json.loads(l)["signature"])
+            except (ValueError, KeyError):
+                pass
+    R.записано(out)
     with open(out, "a", encoding="utf-8") as ф:
         for н, п in enumerate(спис):
+            if п["signature"] in готово:
+                continue
             with уз.на(S.узел_по_времени(п.get("blockTime"))):
                 try:
                     if а.rezhim == "m4":

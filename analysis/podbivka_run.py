@@ -16,6 +16,7 @@ import argparse
 import calendar
 import csv
 import json
+import os
 import subprocess
 import sys
 import time
@@ -50,26 +51,54 @@ def список(имя: str) -> list:
     raise SystemExit(f"неизвестный список {имя}")
 
 
+ЗАПИСАНО: set = set()
+
+
+def записано(путь) -> None:
+    """Файл, записанный этим заданием: только такие коммитит пуш и шаг
+    «Final commit» (список -- в файле PODB_MANIFEST)."""
+    п = str(путь)
+    if п in ЗАПИСАНО:
+        return
+    ЗАПИСАНО.add(п)
+    м = os.environ.get("PODB_MANIFEST")
+    if м:
+        with open(м, "a", encoding="utf-8") as ф:
+            ф.write(os.path.relpath(п, КОРЕНЬ) + "\n")
+
+
 def пуш(сообщение: str, пути: list) -> None:
-    """git add/commit/push с повтором; ошибки git не валят прогон."""
+    """git commit/push своих файлов с повтором; ошибки git не валят прогон.
+
+    27.09: rebase в мелком клоне при частых пушах соседей терял базу, коммит
+    оставался локальным и пропадал. Теперь без rebase: HEAD переставляется на
+    свежую вершину ветки (reset --mixed, файлы на диске не трогаются), и
+    коммитятся ТОЛЬКО файлы, записанные этим заданием (каталог в `пути`
+    раскрывается по ЗАПИСАНО -- чужие файлы того же каталога не трогаются).
+    """
+    файлы = []
+    for п in пути:
+        п = str(п)
+        if os.path.isdir(п):
+            файлы += sorted(x for x in ЗАПИСАНО if x.startswith(п.rstrip("/") + "/"))
+        elif os.path.exists(п):
+            файлы.append(п)
+    if not файлы:
+        return
     try:
-        subprocess.run(["git", "add", *пути], check=False, capture_output=True)
-        р = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
-        if р.returncode == 0:
-            return
-        subprocess.run(["git", "commit", "-q", "-m", сообщение], check=False, capture_output=True)
-        for _ in range(6):
+        for _ in range(8):
+            subprocess.run(["git", "fetch", "-q", "--depth=1", "origin", "claude/podbivka"],
+                           check=False, capture_output=True)
+            subprocess.run(["git", "reset", "-q", "FETCH_HEAD"], check=False, capture_output=True)
+            subprocess.run(["git", "add", "--", *файлы], check=False, capture_output=True)
+            if subprocess.run(["git", "diff", "--cached", "--quiet"], check=False).returncode == 0:
+                return
+            subprocess.run(["git", "commit", "-q", "-m", сообщение], check=False, capture_output=True)
             if subprocess.run(["git", "push", "-q", "origin", "HEAD:claude/podbivka"],
                               check=False, capture_output=True).returncode == 0:
                 return
-            # Клон мелкий: догружаем хвост ветки и перекладываем свой коммит
-            # поверх. Файлы у пакетов разные, конфликтов по содержимому нет.
-            subprocess.run(["git", "fetch", "-q", "--depth=50", "origin", "claude/podbivka"],
-                           check=False, capture_output=True)
-            if subprocess.run(["git", "rebase", "-q", "FETCH_HEAD"], check=False,
-                              capture_output=True).returncode != 0:
-                subprocess.run(["git", "rebase", "--abort"], check=False, capture_output=True)
             time.sleep(3)
+        print("git: пуш не прошёл за 8 попыток")
     except Exception as exc:  # noqa: BLE001
         print("git:", S.чисто(str(exc))[:120])
 
@@ -275,6 +304,7 @@ def main() -> int:
             рез = {"строка": строка, "why_not": S.чисто(f"{type(exc).__name__}: {exc}")[:200]}
             итог["не_разобрались"].append({"address": строка["address"], "причина": рез["why_not"]})
         путь.write_text(json.dumps(рез, ensure_ascii=False, indent=1), encoding="utf-8")
+        записано(путь)
         print(f"{а.zadacha} {н + 1}/{len(строки)}: {строка['address'][:8]} "
               f"покупок {len(рез.get('покупки') or [])} минут {рез.get('минут')} "
               f"{'ОТКАЗ ' + рез['why_not'][:60] if рез.get('why_not') else ''}", flush=True)
@@ -284,6 +314,7 @@ def main() -> int:
     свод_путь = каталог / f"_svod_{а.s}_{а.po or 'end'}.json"
     свод_путь.write_text(json.dumps({**итог, "расход_узла": уз.расход()}, ensure_ascii=False, indent=1),
                          encoding="utf-8")
+    записано(свод_путь)
     if а.push:
         пуш(f"Podbivka-2: {а.zadacha} {а.s}-{а.po or 'end'} gotovo [automated]", [str(каталог)])
     print(json.dumps(итог, ensure_ascii=False))
