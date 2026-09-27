@@ -32,6 +32,18 @@ on:
         description: "сколько слотов вокруг нашего смотреть"
         required: false
         default: "40"
+      adresa:
+        description: "адреса через запятую -- все их транзакции в диапазоне слотов"
+        required: false
+        default: ""
+      slot_ot:
+        description: "слот от (для режима по адресам)"
+        required: false
+        default: "0"
+      slot_do:
+        description: "слот до (для режима по адресам)"
+        required: false
+        default: "0"
       sbor_podpisi:
         description: "подписи (или начала) для разбора комиссий, приоритета и чаевых"
         required: false
@@ -94,6 +106,8 @@ jobs:
               --podpisi '${{ inputs.podpisi }}' \
               --okno-slotov '${{ inputs.okno_slotov }}' \
               --sbor-podpisi '${{ inputs.sbor_podpisi }}' \
+              --adresa '${{ inputs.adresa }}' \
+              --slot-ot '${{ inputs.slot_ot }}' --slot-do '${{ inputs.slot_do }}' \
               --senders /tmp/pyl/senders.json \
               --out /tmp/pyl/out.json" | tail -5
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pyl/out.json" > "$OUT"

@@ -109,6 +109,20 @@ def наши_числа(state_dir: str, подпись_источника: str) 
     return из_
 
 
+def дельта_адреса(tx: dict, минт: str, адрес: str):
+    """Дельта минта у ЭТОГО адреса: плюс -- купил, минус -- продал."""
+    meta = (tx or {}).get("meta") or {}
+    до = сумма = 0.0
+    было = после = 0.0
+    for б in meta.get("preTokenBalances") or []:
+        if б.get("mint") == минт and б.get("owner") == адрес:
+            было += float(((б.get("uiTokenAmount") or {}).get("uiAmount")) or 0.0)
+    for б in meta.get("postTokenBalances") or []:
+        if б.get("mint") == минт and б.get("owner") == адрес:
+            после += float(((б.get("uiTokenAmount") or {}).get("uiAmount")) or 0.0)
+    return round(после - было, 9)
+
+
 def разбор(tx: dict, минт: str) -> dict:
     """Кто, сколько SOL и кто получил токен. Только по meta, без догадок."""
     meta = (tx or {}).get("meta") or {}
@@ -224,7 +238,7 @@ def сбор_комиссий(tx: dict, чаевые_счета: dict) -> dict:
             предел_cu = int.from_bytes(д[1:5], "little")
         elif код == 3 and len(д) >= 9:
             цена_мк = int.from_bytes(д[1:9], "little")
-    чаевые = []
+    чаевые, прочие = [], []
     for и in все_инструкции(tx):
         if not isinstance(и, dict):
             continue
@@ -237,11 +251,16 @@ def сбор_комиссий(tx: dict, чаевые_счета: dict) -> dict:
         if not isinstance(сколько, int) or сколько <= 0:
             continue
         имя = чаевые_счета.get(куда)
-        if имя or сколько >= 100_000:
-            чаевые.append({"счёт": куда, "канал": имя or "счёта нет в нашем реестре",
-                            "лампортов": сколько,
-                            "sol": round(сколько / ЛАМПОРТОВ_В_SOL, 9),
-                            "от": инфо.get("source")})
+        зап = {"счёт": куда, "канал": имя, "лампортов": сколько,
+                "sol": round(сколько / ЛАМПОРТОВ_В_SOL, 9),
+                "от": инфо.get("source")}
+        # ЧАЕВЫЕ -- ТОЛЬКО ПЕРЕВОДЫ НА tip-СЧЁТ ИЗ НАШЕГО РЕЕСТРА. Остальные
+        # системные переводы (сам своп, плата пулу или сервису) идут отдельным
+        # полем: складывать их в чаевые значило бы назвать своп чаевыми.
+        if имя:
+            чаевые.append(зап)
+        elif сколько >= 100_000:
+            прочие.append(зап)
     каналы = sorted({з["канал"] for з in чаевые if з.get("канал")})
     return {
         "подписей_в_транзакции": подписей,
@@ -253,19 +272,28 @@ def сбор_комиссий(tx: dict, чаевые_счета: dict) -> dict:
         "цена_cu_микролампортов": цена_мк,
         "предел_cu": предел_cu,
         "cu_потрачено": meta.get("computeUnitsConsumed"),
-        "приоритет_по_цене_sol": (
+        # ПЛАТА БЕРЁТСЯ ПО ПРЕДЕЛУ, А НЕ ПО СОЖЖЁННЫМ CU. Проверено на живых
+        # транзакциях 27.09: цена 2 500 000 x предел 400 000 = ровно 0.001 SOL,
+        # хотя сожжено 115 210. Числа по сожжённым оставлены отдельной строкой,
+        # чтобы видеть переплату за незанятые единицы.
+        "приоритет_по_пределу_sol": (
+            None if цена_мк is None or предел_cu is None
+            else round(цена_мк * int(предел_cu) / 1e6 / ЛАМПОРТОВ_В_SOL, 9)),
+        "приоритет_по_сожжённым_sol": (
             None if цена_мк is None or meta.get("computeUnitsConsumed") is None
             else round(цена_мк * int(meta["computeUnitsConsumed"]) / 1e6
                        / ЛАМПОРТОВ_В_SOL, 9)),
         "чаевые": чаевые,
+        "прочие_системные_переводы": прочие,
         "чаевых_всего_sol": round(sum(з["sol"] for з in чаевые), 9) if чаевые else 0.0,
         "каналы": каналы,
         "канал_словом": (", ".join(каналы) if каналы else
-                          "чаевых нет -- обычная отправка без tip-счёта"),
+                          "чаевых на tip-счёт из реестра нет"),
         "бандл": ("да (чаевые на tip-счёт Jito берутся только бандлом)"
                    if any("Jito" in к for к in каналы) else
                    ("нет: чаевые ушли на tip-счёт " + ", ".join(каналы)
-                    if каналы else "нет: чаевых в транзакции нет")),
+                    if каналы else
+                    "нет: чаевых на tip-счёт из реестра в транзакции нет")),
     }
 
 
@@ -292,6 +320,10 @@ def главное() -> int:
                     help="сколько страниц по 1000 подписей листать назад")
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--gruppy", default="/home/bot/data/sources_2026-09-25.json")
+    р.add_argument("--adresa", default="",
+                    help="адреса через запятую: все их транзакции в диапазоне слотов")
+    р.add_argument("--slot-ot", type=int, default=0)
+    р.add_argument("--slot-do", type=int, default=0)
     р.add_argument("--sbor-podpisi", default="",
                     help="подписи (или их начала) для разбора комиссий и чаевых")
     р.add_argument("--senders", default="/home/bot/bloom_executor/senders.json")
@@ -420,6 +452,67 @@ def главное() -> int:
         итог["разбор_комиссий"] = разборы
     if а.istochnik_podpis:
         итог["наши_числа"] = наши_числа(а.state_dir, а.istochnik_podpis)
+    # --- ПО АДРЕСАМ В ДИАПАЗОНЕ СЛОТОВ. Отдельный проход: подписи минта
+    # показывают только те транзакции, где ЕСТЬ САМ СЧЁТ МИНТА (обычно это
+    # transferChecked). Свопы, где токен двигают простым transfer, в списке
+    # минта не появляются вовсе -- поэтому покупку конкретного адреса надо
+    # искать ПО АДРЕСУ, а не по минту.
+    адреса = tuple(x.strip() for x in (а.adresa or "").split(",") if x.strip())
+    if адреса and а.slot_ot and а.slot_do:
+        счета_ч = чаевые_реестр(а.senders)
+        из_минта = {з.get("signature") for з in подписи}
+        по_адресам = []
+        for адр in адреса:
+            найдено, до_п, стр_ = [], None, 0
+            while стр_ < а.stranic:
+                парам = {"limit": 1000}
+                if до_п:
+                    парам["before"] = до_п
+                пачка = rpc("getSignaturesForAddress", [адр, парам])
+                if not isinstance(пачка, list) or not пачка:
+                    break
+                стр_ += 1
+                for з in пачка:
+                    с_ = з.get("slot")
+                    if isinstance(с_, int) and а.slot_ot <= с_ <= а.slot_do:
+                        найдено.append(з)
+                до_п = пачка[-1].get("signature")
+                посл = пачка[-1].get("slot")
+                if isinstance(посл, int) and посл < а.slot_ot:
+                    break
+                if len(пачка) < 1000:
+                    break
+            ряды_а = []
+            for з in sorted(найдено, key=lambda x: (x["slot"], x.get("signature"))):
+                п_ = з.get("signature")
+                tx = rpc("getTransaction", [п_, {"encoding": "jsonParsed",
+                                                  "maxSupportedTransactionVersion": 0}])
+                if not isinstance(tx, dict) or not tx.get("meta"):
+                    ряды_а.append({"подпись": п_, "слот": з.get("slot"),
+                                    "почему_нет": "транзакцию узел не отдал"})
+                    continue
+                слот_ = tx.get("slot")
+                if слот_ not in кэш_блоков:
+                    кэш_блоков[слот_] = индексы_блока(слот_)
+                д = дельта_адреса(tx, а.mint, адр)
+                зап = {"подпись": п_, "слот": слот_,
+                        "индекс_в_блоке": кэш_блоков[слот_].get(п_),
+                        "utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                               time.gmtime(tx.get("blockTime")))
+                                 if tx.get("blockTime") else None),
+                        "дельта_минта_ui": д,
+                        "направление": ("купил" if д > 0 else
+                                         ("продал" if д < 0 else
+                                          "минт не двигался в этой транзакции")),
+                        "в_списке_подписей_минта": п_ in из_минта,
+                        "ошибка": (tx.get("meta") or {}).get("err")}
+                зап.update(сбор_комиссий(tx, счета_ч))
+                ряды_а.append(зап)
+            по_адресам.append({"адрес": адр, "транзакций_в_диапазоне": len(ряды_а),
+                                "ряды": ряды_а})
+        итог["по_адресам"] = по_адресам
+        итог["диапазон_слотов"] = [а.slot_ot, а.slot_do]
+
     текст = json.dumps(итог, ensure_ascii=False, indent=1)
     print(текст)
     if а.out:
