@@ -576,6 +576,27 @@ def dlmm_включён(группа: str | None = None) -> bool:
 ПОТОЛОК_КОМИССИИ_ПУЛА = ST.env_float("BLOOM_LANE_MAX_POOL_FEE", 0.05)
 
 
+def _доля_комиссии_пула(мо: dict, tpl=None, tx=None):
+    """Комиссия пула по ответу сборщика минимума -- одним числом для всех типов.
+
+    Считает bloom_lane_two_step.доля_комиссии: fee_share у сосредоточенной
+    ликвидности, а у пулов x*y=k -- ЗАМЕР по сделке источника (какая доля его
+    траты не дошла до хранилища пула). Раньше спрашивался только fee_share, и
+    потолок не срабатывал на CPMM, Pump AMM, Launchlab и кривой вовсе.
+    Модуль подтягивается лениво: он же держит двухшаговую сборку, и обратной
+    зависимости во время загрузки быть не должно.
+    """
+    if мо.get("fee_share") is not None:
+        return float(мо["fee_share"])
+    if tpl is None or tx is None:
+        return None
+    try:
+        import bloom_lane_two_step as TS_  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return None
+    return TS_.доля_мимо_пула(tpl, tx)
+
+
 # ---------------------------------------- маршрут покупки (Jupiter, 27.09)
 
 # Имя маршрута в поле группы lane_route. Второго имени не изобретаем: одно
@@ -1511,7 +1532,12 @@ def собрать(*, tx_источника: dict, источник: str, мин
                                              else "виртуальный")
             except (TypeError, ValueError):
                 из_["pool_reserve_sol"] = None
-        доля_ком = мо.get("fee_share")
+        # КОМИССИЯ ПУЛА -- ОДНОЙ ФУНКЦИЕЙ ДЛЯ ВСЕХ ТИПОВ. У x*y=k сборщик
+        # отдаёт fee_factor (доля, доходящая до пула), у сосредоточенной
+        # ликвидности -- fee_share (сама комиссия). Спрашивать только второй
+        # ключ значило не проверять потолок на CPMM, Pump AMM, Launchlab и
+        # кривой вовсе.
+        доля_ком = _доля_комиссии_пула(мо, tpl, tx_источника)
         из_["pool_fee_share"] = доля_ком
         if доля_ком is not None and float(доля_ком) > ПОТОЛОК_КОМИССИИ_ПУЛА:
             из_["why_not"] = (f"комиссия пула {float(доля_ком) * 100:.2f} % выше "
@@ -4337,6 +4363,36 @@ def self_test() -> int:
     # боевой файл (где у групп свой список lane_pools) в этих проверках только
     # мешал бы -- источники образцов числятся в боевых группах.
     _группы_для_проверки({})
+    # ПОТОЛОК КОМИССИИ ПУЛА НА x*y=k. Сборщик минимума отдаёт fee_share только
+    # у сосредоточенной ликвидности; спрашивать только его значило не проверять
+    # потолок на CPMM, Pump AMM, Launchlab и кривой вовсе. Теперь для них
+    # комиссия ЗАМЕРЯЕТСЯ по сделке источника.
+    chk("комиссия пула: fee_share берётся как есть",
+        _доля_комиссии_пула({"fee_share": 0.509}) == 0.509)
+    chk("комиссия пула: без fee_share и без сделки источника -- неизвестна",
+        _доля_комиссии_пула({"fee_factor": 0.9975}) is None)
+    if C_ж is not None:
+        обр_cpmm = [x for x in B_ж.load_samples(B_ж.CPMM) if x.get("pool_vault")]
+        зам_cpmm = []
+        for x_ in обр_cpmm:
+            t_ = B_ж.extract_template(x_["tx"], B_ж.CPMM, x_["pool_vault"])
+            if not t_.get("ok"):
+                continue
+            мо_ = B_ж.min_out_from_reserves(t_, x_["tx"], 10_000_000, 0.35)
+            if not мо_.get("ok"):
+                continue
+            зам_cpmm.append((_доля_комиссии_пула(мо_, t_, x_["tx"]), мо_.get("fee_share")))
+        chk(f"комиссия пула замерена на живых образцах CPMM ({len(зам_cpmm)} шт.)",
+            len(зам_cpmm) >= 5, len(зам_cpmm))
+        if зам_cpmm:
+            chk("у CPMM сборщик fee_share не даёт -- значит раньше потолок тут "
+                "не срабатывал ни разу",
+                all(f is None for _, f in зам_cpmm))
+            chk("замеренная комиссия -- число в [0, потолок): защита включена и "
+                "честные сигналы не отказываются",
+                all(isinstance(d, float) and 0.0 <= d < ПОТОЛОК_КОМИССИИ_ПУЛА
+                    for d, _ in зам_cpmm),
+                sorted((round(d, 6) for d, _ in зам_cpmm), reverse=True)[:3])
     обр_кр = []
     if C_ж is not None:
         файл_кр = (Path(__file__).resolve().parent.parent / "data" / "c2_pool_samples"
