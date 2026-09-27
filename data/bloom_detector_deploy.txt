@@ -81,9 +81,9 @@ Traceback (most recent call last):
 UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-27T17:47:06Z",
-  "updated_ts": 1790531226.3841124,
-  "alive_since_utc": "2026-09-27T17:46:54Z",
+  "updated_utc": "2026-09-27T17:55:18Z",
+  "updated_ts": 1790531718.3459365,
+  "alive_since_utc": "2026-09-27T17:55:06Z",
   "mode": "live",
   "sources": 589,
   "source_groups": {
@@ -267,14 +267,14 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "nozomi": {
         "age_s": 0.2,
         "last_use_s": null,
-        "last_ping_s": 0.2,
+        "last_ping_s": 0.1,
         "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "zeroslot": {
-        "age_s": 0.2,
+        "age_s": 0.1,
         "last_use_s": null,
         "last_ping_s": 0.1,
         "pings_ok": 1,
@@ -295,12 +295,12 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 55,
+  "signals_seen": 58,
   "to_buy": 0,
   "by_code": {
-    "NOT_A_BUY": 34,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 17,
-    "TOKEN_RECEIVED_NOT_BOUGHT": 3,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 12,
+    "NOT_A_BUY": 41,
+    "TOKEN_RECEIVED_NOT_BOUGHT": 4,
     "INSUFFICIENT_BALANCE": 1
   },
   "by_code_test_source": {},
@@ -312,7 +312,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 121.81752138800177,
+  "rate_usd_sol": 121.88756496092037,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -323,21 +323,21 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
   "kill_bloom_active": false,
   "kill_bloom_note": "",
-  "net_slot": 451068253,
-  "slot_notifications": 43,
-  "net_slot_age_s": 0.21,
+  "net_slot": 451070070,
+  "slot_notifications": 42,
+  "net_slot_age_s": 0.13,
   "balance_sol": 0.000810942,
-  "balance_age_s": 1.96,
-  "rpc_calls": 90,
+  "balance_age_s": 1.33,
+  "rpc_calls": 84,
   "rpc_by_method": {
+    "getMultipleAccounts": 6,
     "getBalance": 4,
     "getLatestBlockhash": 1,
     "getTransaction": 60,
-    "getAccountInfo": 1,
-    "getMultipleAccounts": 7,
-    "simulateTransaction": 17
+    "simulateTransaction": 12,
+    "getAccountInfo": 1
   },
-  "session_credits": 194,
+  "session_credits": 292,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -389,7 +389,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   },
   "shadow": {
     "enabled": true,
-    "built": 18,
+    "built": 13,
     "would_pass": 0,
     "over_cap": 0,
     "failed": 0,
@@ -400,20 +400,20 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 0
     },
     "hour": {
-      "since_ts": 1790531214.0785806,
-      "since_utc": "2026-09-27T17:46:54Z",
-      "signals": 18,
-      "built": 17,
-      "sim_failed": 17,
+      "since_ts": 1790531706.689634,
+      "since_utc": "2026-09-27T17:55:06Z",
+      "signals": 13,
+      "built": 12,
+      "sim_failed": 12,
       "not_built": {
-        "шаблон: счетов 28, ожидалось 27": 1
+        "шаблон: разновидность инструкции кривой не известна: b817ee6167c5d33d": 1
       },
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 5438,
-    "credits_write_why_not": ""
+    "credits_day": 5969,
+    "credits_write_why_not": "FileNotFoundError"
   },
   "route_tax_filter": {
     "price_curve_loaded": true,
@@ -462,12 +462,12 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "stopped": false,
       "why_not": null
     },
-    "balance_age_s": 1.9,
+    "balance_age_s": 1.3,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 12.0,
+    "blockhash_age_s": 11.4,
     "blockhash_updates": 1,
     "blockhash_why_not": "",
     "last": {
@@ -476,7 +476,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "why_not": "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)",
       "signature": null,
       "pool_program": null,
-      "ts_utc": "2026-09-27T17:47:02Z"
+      "ts_utc": "2026-09-27T17:55:12Z"
     },
     "lane_kill": [
       false,
@@ -619,7 +619,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "shift_signature": null,
       "warm": {
         "есть": true,
-        "возраст_с": 11.99,
+        "возраст_с": 11.05,
         "почему": "",
         "обновлений": 1,
         "взят_тёплым": 0,
@@ -670,7 +670,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-27T17:46:54Z",
+    "last_utc": "2026-09-27T17:55:06Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -697,12 +697,12 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "credits_logged": true,
   "credits_log_error": "",
   "decide_latency_ms": {
-    "n": 55,
-    "median": 0.9,
-    "min": 0.3,
-    "max": 43.3
+    "n": 58,
+    "median": 1.0,
+    "min": 0.4,
+    "max": 37.8
   }
 }--- решений в журнале ---
-87898
+91483
 --- позиций в журнале (должно быть 0: покупать нечем) ---
 1495
