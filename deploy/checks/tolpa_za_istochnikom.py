@@ -168,9 +168,13 @@ def main() -> int:
             return кэш[слот]
         если_нет = {"известен": False, "разбор": []}
         try:
+            # ВЕРСИЯ ТРАНЗАКЦИЙ -- 1, а не 0: с нулём узел отвечает ошибкой
+            # -32015 на любом блоке, где есть версионная транзакция, то есть
+            # практически на каждом. Первый прогон 27.09 так и упал -- все 152
+            # слота отдали ошибку, и числа вышли пустыми.
             б = rpc.call("getBlock", [слот, {
                 "encoding": "jsonParsed", "transactionDetails": "accounts",
-                "rewards": False, "maxSupportedTransactionVersion": 0,
+                "rewards": False, "maxSupportedTransactionVersion": 1,
                 "commitment": "confirmed"}])
         except Exception as exc:  # noqa: BLE001
             кэш[слот] = dict(если_нет, why_not=f"{type(exc).__name__}: {str(exc)[:120]}")
@@ -204,6 +208,14 @@ def main() -> int:
         # мог не успеть их записать, а блок знает точно.
         и_ист = next((с["index"] for с in б0["разбор"]
                       if с["signature"] == r.get("source_sig")), None)
+        # КОШЕЛЁК ИСТОЧНИКА -- ИЗ ЕГО ЖЕ ТРАНЗАКЦИИ. В позиции полосы поля
+        # "source" нет вовсе (write_intent его не пишет), а исключать источник
+        # из толпы обязательно: иначе он попадёт в неё сам. Берём тех, кто
+        # получил этот минт в транзакции источника.
+        if и_ист is not None:
+            своя_tx = next((с for с in б0["разбор"] if с["index"] == и_ист), None)
+            for владелец in ((своя_tx or {}).get("покупки") or {}).get(минт, {}):
+                свои.add(владелец)
         наши = set(r.get("our_signatures") or [])
         и_наш = next((с["index"] for с in б0["разбор"]
                       if с["signature"] in наши), None)
