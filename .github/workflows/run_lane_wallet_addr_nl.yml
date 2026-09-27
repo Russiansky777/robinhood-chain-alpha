@@ -1,0 +1,90 @@
+name: "Полоса: публичный адрес нового кошелька из секрета (только чтение)"
+
+# ЗАЧЕМ (владелец 27.09, вне очереди, п.1 переезда полосы). Секрет LIVE_PRIVATE
+# -- приватный ключ НОВОГО кошелька полосы. Задача: "вывести из LIVE_PRIVATE
+# публичный адрес (внутри прогона), доложить его и ждать подтверждения
+# владельца, что это его новый кошелёк. До подтверждения ничего не переводить".
+#
+# СЕКРЕТ НАРУЖУ НЕ ВЫХОДИТ. Он читается только внутри шага, из него берётся
+# публичный адрес, и в отчёт идёт ТОЛЬКО адрес. Текст исключений разбора не
+# печатается: в него может попасть сам секрет.
+#
+# Ни одной отправки: никаких переводов, подписей и правок окружения здесь нет.
+# Заодно читается состояние обоих кошельков по цепи -- чтобы шаги 2-4 переезда
+# делались по числам, а не на память.
+on:
+  workflow_dispatch:
+    inputs:
+      staryy:
+        description: "старый кошелёк полосы (для чтения остатков)"
+        required: false
+        default: "21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w"
+      nonce_schet:
+        description: "счёт nonce полосы (для чтения владельца и ренты)"
+        required: false
+        default: "7b6Ag2fdBd7TktrnnuceUvGvv9TpfaoTek3rbwdaxPyp"
+
+concurrency:
+  group: lane-wallet-move
+  cancel-in-progress: false
+
+env:
+  OUT: data/lane_new_wallet.json
+
+jobs:
+  adres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/lw_venv"
+          "$RUNNER_TEMP/lw_venv/bin/pip" install -q requests solders base58
+          echo "PY=$RUNNER_TEMP/lw_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Адрес из секрета"
+        env:
+          LIVE_PRIVATE: ${{ secrets.LIVE_PRIVATE }}
+        run: |
+          set -e
+          [ -n "$LIVE_PRIVATE" ] || { echo "СБОЙ: секрет LIVE_PRIVATE не задан"; exit 1; }
+          $PY deploy/checks/adres_iz_sekreta.py --env LIVE_PRIVATE --out "$OUT"
+
+      - name: "Что по цепи: новый адрес, старый кошелёк, счёт nonce"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY deploy/checks/koshelki_pered_pereezdom.py --out "$OUT" \
+            --staryy '${{ inputs.staryy }}' --nonce '${{ inputs.nonce_schet }}'
+
+      - name: "Ключей в отчёте быть не должно"
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Доклад"
+        if: always()
+        run: python3 -c "import json;d=json.load(open('data/lane_new_wallet.json'));print(json.dumps(d,ensure_ascii=False,indent=1))"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Polosa: publichnyy adres novogo koshelka i sostoyanie pered pereezdom [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
