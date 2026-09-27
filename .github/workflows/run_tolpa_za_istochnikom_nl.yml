@@ -1,0 +1,109 @@
+name: "Толпа за источником на наших сделках (только чтение)"
+
+# ЗАЧЕМ (задание владельца 27.09, пункт 1): по сделкам полосы -- сколько чужих
+# покупок того же минта стоит между источником и нами, сколько их после
+# источника в его слоте, в слоте+1 и в слоте+2, на сколько SOL, и какие адреса
+# встречаются у трёх и более разных событий.
+#
+# Полные минты и подписи берутся из журнала позиций на хосте (в таблице полосы
+# они урезаны), блоки -- у Helius с transactionDetails=accounts. Ничего не
+# отправляется, хост только читается.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "с какой метки UTC брать сделки полосы"
+        required: false
+        default: "2026-09-25T18:00"
+      limit:
+        description: "сколько сделок разобрать (0 -- все)"
+        required: false
+        default: "0"
+      credit_budget:
+        description: "потолок кредитов Helius на прогон"
+        required: false
+        default: "250000"
+
+concurrency:
+  group: tolpa-za-istochnikom
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ROWS: data/sdelki_polosy_dlya_tolpy.json
+  OUT: data/tolpa_za_istochnikom.json
+
+jobs:
+  tolpa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/tl_venv"
+          "$RUNNER_TEMP/tl_venv/bin/pip" install -q requests
+          echo "PY=$RUNNER_TEMP/tl_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Сделки полосы с полными минтами и подписями (хост, потоком)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/sdelki_polosy_vygruzka.py" < deploy/checks/sdelki_polosy_vygruzka.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/sdelki_polosy_vygruzka.py --state-dir '$STATE_DIR' \
+              --s '${{ inputs.s }}' --out /tmp/sdelki_polosy.json
+            rc=\$?; rm -f /tmp/sdelki_polosy_vygruzka.py; exit \$rc"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/sdelki_polosy.json" > "$ROWS"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/sdelki_polosy.json"
+          $PY -c "import json;d=json.load(open('$ROWS'));print('сделок',d['сделок'],'с минтом и слотом',d['с_минтом_и_слотом'])"
+
+      - name: "Толпа по цепи (Helius)"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY deploy/checks/tolpa_za_istochnikom.py --rows "$ROWS" --out "$OUT" \
+            --limit "${{ inputs.limit }}" --credit-budget "${{ inputs.credit_budget }}"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" "$ROWS"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT" "$ROWS"; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Tolpa za istochnikom na nashih sdelkah [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
