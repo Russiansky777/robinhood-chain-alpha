@@ -88,7 +88,7 @@ jobs:
           set -e
           ssh -n $SSH_OPTS root@"$HOST" "
             echo '--- файлы с строкой OWN_SEND_WALLET_KEY= (имена и число строк) ---'
-            for F in $ENV_DIR/env $ENV_DIR/env.bak $ENV_DIR/env.bak.* $ENV_DIR/env.old $ENV_DIR/env.orig; do
+            for F in $ENV_DIR/env $ENV_DIR/env.bak* $ENV_DIR/env.old* $ENV_DIR/env.orig*; do
               [ -f \"\$F\" ] || continue
               N=\$(grep -c '^OWN_SEND_WALLET_KEY=' \"\$F\" 2>/dev/null || echo 0)
               echo \"\$F: строк ключа \$N, всего строк \$(wc -l < \"\$F\")\"
@@ -103,7 +103,7 @@ jobs:
           ssh -n $SSH_OPTS root@"$HOST" "
             set -e
             BEFORE=\$(grep -c '=' $ENV_DIR/env)
-            for F in $ENV_DIR/env.bak $ENV_DIR/env.bak.* $ENV_DIR/env.old $ENV_DIR/env.orig; do
+            for F in $ENV_DIR/env.bak* $ENV_DIR/env.old* $ENV_DIR/env.orig*; do
               [ -f \"\$F\" ] || continue
               if command -v shred >/dev/null 2>&1; then shred -u \"\$F\"; else rm -f \"\$F\"; fi
               echo \"затёрт: \$F\"
