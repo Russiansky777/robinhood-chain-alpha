@@ -1,0 +1,134 @@
+name: "Сверка с DBot в обе стороны (за сутки, по запросу или в 07:00 Мадрид)"
+
+# ЗАЧЕМ (владелец 27.09, пункт 4): "Ежедневная сверка с DBot в обе стороны
+# (измерительный код, без тестов): по кошелькам DBot BATCH-3 и BATCH-5 по цепи
+# за сутки -- каждая сделка DBot: видели ли, купили ли, причина; и каждая наша:
+# взял ли DBot, итог. Свод по причинам и SOL в Telegram, 07:00 Мадрид и по
+# запросу".
+#
+# ДВЕ СТОРОНЫ. Сделки DBot берутся ПО ЦЕПИ (отчёт может умолчать, цепь не
+# может) и сверяются с нашим журналом решений; наши покупки сверяются обратно --
+# брал ли DBot тот же минт в окне допуска.
+#
+# АДРЕСА ЗАДАЧ -- ЖИВЬЁМ, тем же GET, которым их берёт детектор: задачи владелец
+# правит в DBot, и зашитый список разошёлся бы молча. Только чтение, задачи не
+# меняются и не удаляются.
+#
+# Прогон идёт НА ХОСТЕ: там журналы и там ключ DBot. Журналы читаются потоком.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "начало окна UTC"
+        required: false
+        default: "2026-09-26T00:00:00"
+      po:
+        description: "конец окна UTC"
+        required: false
+        default: "2026-09-27T06:00:00"
+      zadachi:
+        description: "задачи DBot через запятую"
+        required: false
+        default: "BATCH-3,BATCH-5"
+      telegram:
+        description: "'yes' -- свод строкой владельцу в основной чат"
+        required: false
+        default: "no"
+
+concurrency:
+  group: dbot-sverka
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  TARGET_HOST: 127.0.0.1
+  OUT: data/dbot_sverka.json
+
+jobs:
+  sverka:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается"
+        run: python3 -m py_compile analysis/dbot_sverka_v_obe_storony.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить модуль на хост"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/sverka"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/sverka/dbot_sverka_v_obe_storony.py" < analysis/dbot_sverka_v_obe_storony.py
+
+      - name: "Сверка"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            cd /tmp/sverka
+            PYTHONPATH=$CODE_DIR $PYBIN dbot_sverka_v_obe_storony.py \
+              --s '${{ inputs.s }}' --po '${{ inputs.po }}' \
+              --zadachi '${{ inputs.zadachi }}' \
+              --state-dir '$STATE_DIR' --out /tmp/sverka/out.json"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/sverka/out.json" > "$OUT"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/sverka"
+
+      - name: "Строка владельцу (по запросу)"
+        if: ${{ inputs.telegram == 'yes' }}
+        run: |
+          set -e
+          python3 deploy/checks/sverka_stroka.py "$OUT" > /tmp/sverka_stroka.txt
+          cat /tmp/sverka_stroka.txt
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/sverka_stroka.txt" < /tmp/sverka_stroka.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            if [ -z \"\$TELEGRAM_BOT_TOKEN\" ] || [ -z \"\$TELEGRAM_CHAT_ID\" ]; then
+              echo 'Telegram не настроен на хосте -- строка не ушла'; rm -f /tmp/sverka_stroka.txt; exit 0
+            fi
+            code=\$(curl -s -o /tmp/tg_sverka.out -w '%{http_code}' \
+              -X POST \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/sendMessage\" \
+              --data-urlencode chat_id=\"\$TELEGRAM_CHAT_ID\" \
+              --data-urlencode text@/tmp/sverka_stroka.txt)
+            echo \"telegram http \$code\"
+            head -c 200 /tmp/tg_sverka.out; echo
+            rm -f /tmp/tg_sverka.out /tmp/sverka_stroka.txt"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Sverka s DBot v obe storony [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
