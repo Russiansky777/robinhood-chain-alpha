@@ -1,0 +1,75 @@
+name: "Двухшаговый путь полосы в бою: разбор журнала решений (только чтение)"
+
+# ЗАЧЕМ. В признаке жизни у полосы появилась стадия two_step_build, но отправки
+# нет. Счётчик не говорит ПОЧЕМУ: нет шаблона первого шага, шаблон старый, налог
+# котировки неизвестен, минимум не выдаётся, размер пакета, комиссия пула выше
+# потолка. Прогон читает журнал решений на хосте потоком и печатает причины.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "с какого времени смотреть решения"
+        required: false
+        default: "2026-09-27T17:00:00Z"
+      podrobno:
+        description: "сколько последних двухшаговых решений печатать целиком"
+        required: false
+        default: "12"
+
+concurrency:
+  group: dvuhshagovyy-v-zhurnale
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/dvuhshagovyy_v_zhurnale.json
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Ключ доступа"
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: "Доставить разбор и прочитать журнал"
+        run: |
+          set -e
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
+            "cat > /tmp/dvuhshagovyy_v_zhurnale.py" < deploy/checks/dvuhshagovyy_v_zhurnale.py
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
+            "python3 /tmp/dvuhshagovyy_v_zhurnale.py --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' --podrobno '${{ inputs.podrobno }}' --out /tmp/dv_zh.json" | tee /tmp/vyvod.txt
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
+            "cat /tmp/dv_zh.json" > "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Dvukhshagovyy put v boyu: razbor zhurnala [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
