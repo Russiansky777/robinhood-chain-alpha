@@ -2200,6 +2200,35 @@ class Детектор:
             s0=s0, сделок_всего=всего, dbot_sol=None,
             стоп_группа=стоп_гр, стоп_текущий=стоп_тек, стоп_порог=стоп_пор)
 
+    def свод_суточного_стопа(self) -> dict:
+        """Суточный стоп полосы: порог, текущий итог по всем группам, взведён ли.
+
+        Порог -- LANE_DAILY_LOSS_SOL (по умолчанию 0.5). Итог берётся из
+        OS.состояние_полосы по всем группам -- той же величиной, по которой стоп
+        и срабатывает. Если посчитать нечем, так и сказано словами: пустого
+        нуля тут быть не должно, иначе стоп будет выглядеть взведённым, не
+        будучи им.
+        """
+        из_ = {"threshold_sol": None, "pnl_all_groups_sol": None,
+                "stopped": None, "why_not": None}
+        if OS is None:
+            из_["why_not"] = "модуль полосы не загружен"
+            return из_
+        из_["threshold_sol"] = float(getattr(OS, "СТОП_ПОЛОСЫ_СУТКИ_SOL", 0.0))
+        try:
+            поз = self.состояние.positions()
+            с = OS.состояние_полосы(поз, сейчас=time.time())
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"итог суток не посчитан ({type(exc).__name__})"
+            return из_
+        итог = с.get("pnl_all_groups_sol")
+        if итог is None:
+            из_["why_not"] = "итог суток по всем группам не выдаётся"
+            return из_
+        из_["pnl_all_groups_sol"] = round(float(итог), 9)
+        из_["stopped"] = float(итог) <= -из_["threshold_sol"]
+        return из_
+
     def признак_жизни(self) -> dict:
         st = {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
                "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -2334,6 +2363,11 @@ class Детектор:
             # ПОРОГ KILL ПО БАЛАНСУ -- в признак жизни: владелец должен видеть,
             # что он взведён и от какого числа считается (п.1е).
             "balance_day_threshold": getattr(self, "порог_полосы", None),
+            # СУТОЧНЫЙ СТОП ПОЛОСЫ (п.1е, число владельца LANE_DAILY_LOSS_SOL) --
+            # рядом с порогом KILL: владелец должен видеть ОБА, а не один.
+            # Итог суток по ВСЕМ группам считает тот же состояние_полосы, что
+            # и сам стоп: два написания одного числа когда-нибудь разойдутся.
+            "lane_daily_stop": self.свод_суточного_стопа(),
             "balance_age_s": (round(time.time() - self.t_баланс_полосы, 1)
                                if self.t_баланс_полосы else None),
             "sim_shadow": {"done": self.полос_тень_сим,
