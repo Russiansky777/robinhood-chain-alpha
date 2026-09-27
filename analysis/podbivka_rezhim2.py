@@ -81,6 +81,9 @@ def цена_котировочного(уз: S.Узел, tsrc: dict, q: str):
     return None, откуда
 
 
+ГОРИЗОНТЫ = (72, 150)
+
+
 def одна(уз: S.Узел, п: dict) -> dict:
     из_ = {к: п.get(к) for к in БАЗА}
     tsrc = уз.tx(п["signature"])
@@ -117,12 +120,12 @@ def одна(уз: S.Узел, п: dict) -> dict:
         if нал.get("why_not"):
             return {**из_, "why_not": f"налог {чей} не прочитан: {нал['why_not'][:80]}"}
     ист = S.история_пула(уз, пул["pool_vault"], п["signature"], s0,
-                         опора=(S.подпись_после_слота(уз, s0 + 151) if уз.текущий == "helius" else None),
-                         до_слота=s0 + 150)
+                         опора=(S.подпись_после_слота(уз, s0 + max(ГОРИЗОНТЫ) + 1) if уз.текущий == "helius" else None),
+                         до_слота=s0 + max(ГОРИЗОНТЫ))
     if ист["why_not"] or ист["предел"]:
         return {**из_, "why_not": f"история пула: {ист['why_not'] or 'предел страниц'}"}
     сп = [з for з in ист["подписи"] if з["ok"]]
-    из_["окно_полное"] = S.текущий_слот(уз) > s0 + 150
+    из_["окно_полное"] = S.текущий_слот(уз) > s0 + max(ГОРИЗОНТЫ)
     из_["толпа_s0_2"] = sum(1 for з in сп if з["slot"] <= s0 + 2)
     кэш: dict = {}
     не_читаются: list = []
@@ -196,7 +199,7 @@ def одна(уз: S.Узел, п: dict) -> dict:
     q_raw -= S.удержано(q_raw, нал_q)            # мы -> пул токена
     p0 = спот(ст0)
     точки = {"S0": ст0, "S0_дно": ст_до(s0), "S1": ст_до(s0 + 1), "S2": ст_до(s0 + 2)}
-    выходы = {H: ст_до(s0 + H - 1) for H in (72, 150)}
+    выходы = {H: ст_до(s0 + H - 1) for H in ГОРИЗОНТЫ}
     из_["путь_цены"] = {к: (round((спот(с) / p0 - 1) * 100, 3) if с else None)
                         for к, с in точки.items() if к != "S0"}
     из_["резерв_q_s0"] = ст0["x"] if режим == "xyk" else ст0["rq"]
@@ -253,7 +256,10 @@ def main() -> int:
     р.add_argument("--push", action="store_true")
     р.add_argument("--spisok", default="rezhim2_spisok.json")
     р.add_argument("--prefiks", default="")
+    р.add_argument("--gorizonty", default="72,150")
     а = р.parse_args()
+    global ГОРИЗОНТЫ
+    ГОРИЗОНТЫ = tuple(int(x) for x in а.gorizonty.split(","))
     import podbivka_run as R  # noqa: PLC0415
     спис = json.loads((КОРЕНЬ / "data" / "podbivka" / а.spisok).read_text(encoding="utf-8"))["покупки"]
     спис = спис[а.s:(а.po or None)]
