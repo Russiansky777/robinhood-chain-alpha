@@ -1,0 +1,76 @@
+name: "Окружение служб: безопасные значения BLOOM_* (только чтение)"
+
+# ЗАЧЕМ. Деплой детектора переписывает часть окружения ИЗ ВХОДОВ прогона, и
+# вход, оставленный по умолчанию, молча меняет деньги: у прогона buy_sol по
+# умолчанию 0.05, а на хосте живёт 0.2; own_send по умолчанию 0, а полоса
+# работает. Значит перед любым перезапуском надо ЗНАТЬ, что стоит сейчас.
+#
+# ЧТО ПЕЧАТАЕТСЯ. Только имена из белого списка ниже -- настройки поведения, не
+# ключи. Любая строка, чьё ИМЯ похоже на секрет (KEY, TOKEN, SECRET, AUTH,
+# PASS, WALLET_KEY), отбрасывается второй, независимой проверкой -- даже если
+# кто-то однажды впишет такое имя в белый список.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: env-bloom-read
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  ENV_DIR: /etc/bloom-executor
+  OUT: data/env_bloom_safe.txt
+
+jobs:
+  chtenie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Безопасные значения окружения"
+        run: |
+          set -e
+          set -o pipefail
+          SAFE='^(BLOOM_MODE|BLOOM_TASKS|BLOOM_EXEC|BLOOM_LIVE_BUY|BLOOM_BUY_SOL|BLOOM_OWN_SEND|BLOOM_OWN_SEND_LIVE|BLOOM_OWN_SEND_SOL|BLOOM_SENDER_REGION|BLOOM_LANE_CONTROL|BLOOM_POOL_SEND|BLOOM_POOL_NONCE|BLOOM_POOL_NONCE_ACCOUNT|BLOOM_SHADOW_LEGS|BLOOM_SHADOW_LEGS_CREDITS|BLOOM_LIVE_TEST|BLOOM_TELEGRAM_LIVE_TEST|BLOOM_TELEGRAM_REAL|BLOOM_MIN_START_BALANCE|BLOOM_CLOSE_ON_SELL|BLOOM_TG_FORMAT|BLOOM_REGION_SEND|BLOOM_LANE_MAX_POOL_FEE|BLOOM_COPIERS_FILE|BLOOM_SOURCE_GROUPS|BLOOM_STATE_DIR|BLOOM_KILL_FILE|BLOOM_KILL_SELL_FILE|BLOOM_LIVE_SELL|BLOOM_SELL_AFTER_S|BLOOM_SELL_MAX_ATTEMPTS|BLOOM_SELL_SLIPPAGE_PCT|BLOOM_SELL_GRACE_S|BLOOM_SELL_RETRY_EVERY_S|BLOOM_SELL_GIVE_UP_AFTER_S|BLOOM_SELLER_LOOP_S|BLOOM_SELL_VIA_JUPITER|BLOOM_JUP_FLOOR_PCT|BLOOM_JUP_MIN_QUOTE_PCT|BLOOM_MAX_OPEN|BLOOM_DAILY_LOSS_SOL|BLOOM_PRIORITY_FEE|BLOOM_PROCESSOR_TIP|LANE_BONDING_CURVE|LANE_BONDING_CURVE_GROUPS|LANE_DAMM2|LANE_DAMM2_GROUPS|LANE_DBC|LANE_DBC_GROUPS|LANE_DLMM|LANE_DLMM_GROUPS)='
+          ssh -n $SSH_OPTS root@"$HOST" "grep -E '$SAFE' $ENV_DIR/env || true" \
+            | grep -vEi '(KEY|TOKEN|SECRET|AUTH|PASS)=' \
+            | sort | tee "$OUT"
+          echo "--- имена всех ключей окружения (без значений) ---"
+          ssh -n $SSH_OPTS root@"$HOST" "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort" | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Okruzhenie sluzhb: bezopasnye znacheniya BLOOM [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
