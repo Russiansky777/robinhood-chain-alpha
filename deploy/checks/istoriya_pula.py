@@ -159,6 +159,116 @@ def разбор(tx: dict, минт: str) -> dict:
              "ошибка": meta.get("err")}
 
 
+# ------------------------------------------------- комиссии, приоритет, чаевые
+
+БАЗА_ЗА_ПОДПИСЬ_ЛАМПОРТОВ = 5000
+COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111"
+СИСТЕМНАЯ = "11111111111111111111111111111111"
+_АЛФАВИТ58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def из58(с: str) -> bytes:
+    """base58 без внешних библиотек: данные ComputeBudget приходят так."""
+    число = 0
+    for знак in с:
+        и = _АЛФАВИТ58.find(знак)
+        if и < 0:
+            return b""
+        число = число * 58 + и
+    байты = число.to_bytes((число.bit_length() + 7) // 8, "big") if число else b""
+    нули = len(с) - len(с.lstrip("1"))
+    return b"\x00" * нули + байты
+
+
+def чаевые_реестр(путь: str) -> dict:
+    """{счёт чаевых: имя канала} из нашего же реестра отправителей."""
+    из_ = {}
+    try:
+        д = json.loads(Path(путь).read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return из_
+    for имя, з in (д.get("senders") or {}).items():
+        for адрес in (з.get("tip_accounts") or []):
+            из_[адрес] = з.get("name") or имя
+    return из_
+
+
+def все_инструкции(tx: dict) -> list:
+    сооб = ((tx or {}).get("transaction") or {}).get("message") or {}
+    сп = list(сооб.get("instructions") or [])
+    for гр in ((tx or {}).get("meta") or {}).get("innerInstructions") or []:
+        сп.extend(гр.get("instructions") or [])
+    return сп
+
+
+def сбор_комиссий(tx: dict, чаевые_счета: dict) -> dict:
+    """Базовая комиссия, приоритет (цена и лимит CU) и чаевые -- по счетам.
+
+    Бандл САМ ПО СЕБЕ в транзакции не виден: видно только, НА КАКОЙ tip-счёт
+    ушли чаевые, а он и называет канал. Поэтому здесь пишется канал по счёту, а
+    слово "бандл" ставится только для Jito -- у него чаевые иначе не берутся.
+    """
+    meta = (tx or {}).get("meta") or {}
+    подписей = len(((tx or {}).get("transaction") or {}).get("signatures") or [])
+    база = подписей * БАЗА_ЗА_ПОДПИСЬ_ЛАМПОРТОВ
+    всего = meta.get("fee")
+    цена_мк, предел_cu = None, None
+    for и in все_инструкции(tx):
+        if not isinstance(и, dict) or и.get("programId") != COMPUTE_BUDGET:
+            continue
+        д = из58(str(и.get("data") or ""))
+        if not д:
+            continue
+        код = д[0]
+        if код == 2 and len(д) >= 5:
+            предел_cu = int.from_bytes(д[1:5], "little")
+        elif код == 3 and len(д) >= 9:
+            цена_мк = int.from_bytes(д[1:9], "little")
+    чаевые = []
+    for и in все_инструкции(tx):
+        if not isinstance(и, dict):
+            continue
+        раз = (и.get("parsed") or {})
+        if и.get("programId") != СИСТЕМНАЯ or раз.get("type") != "transfer":
+            continue
+        инфо = раз.get("info") or {}
+        куда = инфо.get("destination")
+        сколько = инфо.get("lamports")
+        if not isinstance(сколько, int) or сколько <= 0:
+            continue
+        имя = чаевые_счета.get(куда)
+        if имя or сколько >= 100_000:
+            чаевые.append({"счёт": куда, "канал": имя or "счёта нет в нашем реестре",
+                            "лампортов": сколько,
+                            "sol": round(сколько / ЛАМПОРТОВ_В_SOL, 9),
+                            "от": инфо.get("source")})
+    каналы = sorted({з["канал"] for з in чаевые if з.get("канал")})
+    return {
+        "подписей_в_транзакции": подписей,
+        "базовая_комиссия_sol": round(база / ЛАМПОРТОВ_В_SOL, 9),
+        "комиссия_всего_sol": (None if всего is None
+                                else round(всего / ЛАМПОРТОВ_В_SOL, 9)),
+        "приоритет_sol": (None if всего is None
+                           else round(max(0, всего - база) / ЛАМПОРТОВ_В_SOL, 9)),
+        "цена_cu_микролампортов": цена_мк,
+        "предел_cu": предел_cu,
+        "cu_потрачено": meta.get("computeUnitsConsumed"),
+        "приоритет_по_цене_sol": (
+            None if цена_мк is None or meta.get("computeUnitsConsumed") is None
+            else round(цена_мк * int(meta["computeUnitsConsumed"]) / 1e6
+                       / ЛАМПОРТОВ_В_SOL, 9)),
+        "чаевые": чаевые,
+        "чаевых_всего_sol": round(sum(з["sol"] for з in чаевые), 9) if чаевые else 0.0,
+        "каналы": каналы,
+        "канал_словом": (", ".join(каналы) if каналы else
+                          "чаевых нет -- обычная отправка без tip-счёта"),
+        "бандл": ("да (чаевые на tip-счёт Jito берутся только бандлом)"
+                   if any("Jito" in к for к in каналы) else
+                   ("нет: чаевые ушли на tip-счёт " + ", ".join(каналы)
+                    if каналы else "нет: чаевых в транзакции нет")),
+    }
+
+
 def индексы_блока(слот: int) -> dict:
     """{подпись: индекс в блоке} -- один вызов на слот."""
     б = rpc("getBlock", [слот, {"transactionDetails": "signatures",
@@ -182,6 +292,9 @@ def главное() -> int:
                     help="сколько страниц по 1000 подписей листать назад")
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--gruppy", default="/home/bot/data/sources_2026-09-25.json")
+    р.add_argument("--sbor-podpisi", default="",
+                    help="подписи (или их начала) для разбора комиссий и чаевых")
+    р.add_argument("--senders", default="/home/bot/bloom_executor/senders.json")
     р.add_argument("--out", default="/tmp/istoriya_pula.json")
     а = р.parse_args()
 
@@ -280,6 +393,31 @@ def главное() -> int:
             "wsol_дельта_всех_sol": р_["wsol_дельта_всех_sol"],
             "программы": р_["программы"], "ошибка": р_["ошибка"]})
     итог["ряды"] = ряды
+
+    # РАЗБОР КОМИССИЙ по названным подписям: база, приоритет, чаевые, канал.
+    нужны = tuple(x.strip() for x in (а.sbor_podpisi or "").split(",") if x.strip())
+    if нужны:
+        счета = чаевые_реестр(а.senders)
+        итог["чаевых_счетов_в_реестре"] = len(счета)
+        разборы = []
+        for кусок in нужны:
+            подходят = [р_["подпись"] for р_ in ряды
+                        if str(р_.get("подпись") or "").startswith(кусок)]
+            полная = подходят[0] if подходят else (кусок if len(кусок) >= 60 else None)
+            if not полная:
+                разборы.append({"названо": кусок,
+                                 "почему_нет": "в окне такой подписи нет"})
+                continue
+            tx = rpc("getTransaction", [полная, {"encoding": "jsonParsed",
+                                                  "maxSupportedTransactionVersion": 0}])
+            if not isinstance(tx, dict) or not tx.get("meta"):
+                разборы.append({"названо": кусок, "подпись": полная,
+                                 "почему_нет": "транзакцию узел не отдал"})
+                continue
+            з = {"названо": кусок, "подпись": полная, "слот": tx.get("slot")}
+            з.update(сбор_комиссий(tx, счета))
+            разборы.append(з)
+        итог["разбор_комиссий"] = разборы
     if а.istochnik_podpis:
         итог["наши_числа"] = наши_числа(а.state_dir, а.istochnik_podpis)
     текст = json.dumps(итог, ensure_ascii=False, indent=1)
