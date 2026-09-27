@@ -1,16 +1,16 @@
 {
  "since_utc": "2026-09-27T17:00:00Z",
- "generated_utc": "2026-09-27T22:11:52Z",
- "строк_прочитано": 699446,
+ "generated_utc": "2026-09-27T22:16:12Z",
+ "строк_прочитано": 701074,
  "двухшаговых_решений": 1,
  "причины_двухшагового": {
   "двухшаговая сборка не загрузилась: ModuleNotFoundError": 1
  },
  "стадии": {
-  "shadow": 15825,
-  "gate": 1663,
+  "shadow": 16069,
+  "gate": 1691,
   "leg_cache": 180,
-  "build": 27,
+  "build": 29,
   "skip_price": 27,
   "lane_sim": 2,
   "sent": 2,
@@ -18,20 +18,20 @@
   "two_step_build": 1
  },
  "коды": {
-  "NOT_A_BUY": 79272,
-  "TARGET_AMOUNT_OUT_OF_RANGE": 13386,
-  "TOKEN_RECEIVED_NOT_BOUGHT": 6096,
-  "INSUFFICIENT_BALANCE": 1693,
+  "NOT_A_BUY": 80261,
+  "TARGET_AMOUNT_OUT_OF_RANGE": 13594,
+  "TOKEN_RECEIVED_NOT_BOUGHT": 6212,
+  "INSUFFICIENT_BALANCE": 1723,
   "STALE": 713,
-  "SKIP_TARGET_INCREASE_POSITION": 419,
-  "AMBIGUOUS_TX": 274,
+  "SKIP_TARGET_INCREASE_POSITION": 425,
+  "AMBIGUOUS_TX": 279,
   "THRESHOLD_EDGE": 174,
   "SKIP_TAXED_ROUTE": 28,
   "MAX_BUY_TIMES_PER_TOKEN_REACHED": 28
  },
  "отказы_гейта": {
-  "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)": 1619,
-  "предел полосы: по группе off полоса не торгует (lane_trades выключен)": 44
+  "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)": 1646,
+  "предел полосы: по группе off полоса не торгует (lane_trades выключен)": 45
  },
  "налоговые_отказы": [
   {
@@ -240,6 +240,21 @@
    },
    {
     "ts_utc": "2026-09-27T17:47:42Z",
+    "stage": "build",
+    "signature": null,
+    "mint": "5zfBmzXxtwq3e2hw6TGebcwycvVHNpaC1te7u56jCE1G",
+    "source": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+    "ok": false,
+    "why_not": "размер 0.3 SOL выше потолка полосы 0.05 SOL",
+    "lane": "own_send",
+    "source_sig": "3wxix8maMD2MxFHJbEZmLPw9jBXWhgkzfZvPRE55DgLNKNLFn9MsqJ2SL9njexTd5mnvLowYod32tPmZuM1jmzed",
+    "group": "batch5",
+    "lamports": 300000000,
+    "size_sol": 0.3,
+    "pool_program": null
+   },
+   {
+    "ts_utc": "2026-09-27T17:47:42Z",
     "stage": "shadow",
     "signature": "3wxix8maMD2MxFHJbEZmLPw9jBXWhgkzfZvPRE55DgLNKNLFn9MsqJ2SL9njexTd5mnvLowYod32tPmZuM1jmzed",
     "mint": "5zfBmzXxtwq3e2hw6TGebcwycvVHNpaC1te7u56jCE1G",
@@ -263,6 +278,21 @@
    },
    {
     "ts_utc": "2026-09-27T21:01:43Z",
+    "stage": "build",
+    "signature": null,
+    "mint": "F4K2SbLNgyz9gzNqT8bPeLpRkxy4oMA9twaffUDdZtB6",
+    "source": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+    "ok": false,
+    "why_not": "размер 0.3 SOL выше потолка полосы 0.05 SOL",
+    "lane": "own_send",
+    "source_sig": "54nsjo9TFrAM2BnNF2fGZPCJ8PNnQmc4RtppQD9qcpL83ocDKc2S5W5sgibRXuoa2TbZQVP9JM9F1kJ2UAFHX3V",
+    "group": "lane_s0",
+    "lamports": 300000000,
+    "size_sol": 0.3,
+    "pool_program": null
+   },
+   {
+    "ts_utc": "2026-09-27T21:01:43Z",
     "stage": "shadow",
     "signature": "54nsjo9TFrAM2BnNF2fGZPCJ8PNnQmc4RtppQD9qcpL83ocDKc2S5W5sgibRXuoa2TbZQVP9JM9F1kJ2UAFHX3V",
     "mint": "F4K2SbLNgyz9gzNqT8bPeLpRkxy4oMA9twaffUDdZtB6",
@@ -283,6 +313,21 @@
     "code": "INSUFFICIENT_BALANCE",
     "reason": "баланса не хватает: 0.0008 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
     "lane_allowed": true
+   },
+   {
+    "ts_utc": "2026-09-27T21:23:49Z",
+    "stage": "build",
+    "signature": null,
+    "mint": "5mrhfiiAfZFE5V32ftcG5a9pyMzb7wCQC2aVjZutCZ6N",
+    "source": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+    "ok": false,
+    "why_not": "размер 0.3 SOL выше потолка полосы 0.05 SOL",
+    "lane": "own_send",
+    "source_sig": "2mSzJV8hNRqZJzxJZePxnNKVTUyGnnXAtWePLefKyMs9L1tsvNn8vzZ5c7zcV1Bys7RbYdBzvAcpx53iRReChtN9",
+    "group": "lane_s0",
+    "lamports": 300000000,
+    "size_sol": 0.3,
+    "pool_program": null
    },
    {
     "ts_utc": "2026-09-27T21:23:49Z",
