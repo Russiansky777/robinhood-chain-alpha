@@ -1,0 +1,115 @@
+name: "Ночные 10: таблица по минтам + лидер по цепи (только чтение)"
+
+# ЗАЧЕМ (пункт 0 владельца, утро 27.09): по каждому из 10 минтов, которые DBot
+# купил ночью, одна строка -- источник, его группа, размер в SOL-эквиваленте,
+# котировка пула, причина отказа. Плюс лидер: в какой он группе, сколько его
+# строк в журнале решений и покупал ли он эти минты ПО ЦЕПИ (без этого нельзя
+# честно сказать, почему по нему нет строки).
+#
+# Только чтение: цепь у Helius, журнал решений -- потоком на хосте. Ни одной
+# отправки, служб не трогаем.
+on:
+  workflow_dispatch:
+    inputs:
+      minty:
+        description: "минты через запятую"
+        required: false
+        default: "G2KB6Yvhs2ojSVtQ8AmCLAMR6wLxzAscS8nNERcYtUVD,HcRLc9VDgjLeK154xDawfb1dmVJ98DoSqcwTHGqiDeJR,HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT,6JrR1iqPdinYTNvNPWTR2P7e2wSJ1rwdsrKGyhnzjUVr,3bHzNdUb9Ko2EZyYvg2okPHQt1tJP8CFLZfkKrvBNtAc,H8xQ6poBjB9DTPMDTKWzWPrnxu4bDEhybxiouF8Ppump,Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump,26VfKb7jjtdEdvfovoBijScoZmJbWWasFZkgfUD5w7cy,BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump,H6ibmg2HroqMWMFbTkzsuGsnRumuULFBL6hoMLmZmLe"
+      lider:
+        description: "адрес лидера"
+        required: false
+        default: "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      okno_s:
+        description: "начало окна UTC (00:00 Мадрида 27.09)"
+        required: false
+        default: "2026-09-26T22:00:00Z"
+      okno_po:
+        description: "конец окна UTC (03:00 Мадрида)"
+        required: false
+        default: "2026-09-27T01:00:00Z"
+
+concurrency:
+  group: nochnye-10-tablica
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT_LIDER: data/lider_po_cepi.json
+  OUT_TABL: data/nochnye_10_tablica.json
+
+jobs:
+  tablica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/n10_venv"
+          "$RUNNER_TEMP/n10_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/n10_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Лидер по цепи: покупал ли он эти минты"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY deploy/checks/lider_po_cepi.py --wallet '${{ inputs.lider }}' \
+            --okno-s '${{ inputs.okno_s }}' --okno-po '${{ inputs.okno_po }}' \
+            --minty '${{ inputs.minty }}' --out "$OUT_LIDER"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Журнал решений на хосте: таблица и лидер"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/nochnye_10_tablica.py" < deploy/checks/nochnye_10_tablica.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/nochnye_10_tablica.py --state-dir '$STATE_DIR' \
+              --minty '${{ inputs.minty }}' --lider '${{ inputs.lider }}' \
+              --okno-s '${{ inputs.okno_s }}' --okno-po '${{ inputs.okno_po }}' \
+              --out /tmp/nochnye_10.json | tail -n 40
+            rc=\$?; rm -f /tmp/nochnye_10_tablica.py; exit \$rc"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/nochnye_10.json" > "$OUT_TABL"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/nochnye_10.json"
+
+      - name: "Ключей в отчётах быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_LIDER" "$OUT_TABL" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT_LIDER" "$OUT_TABL"; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Nochnye 10: tablitsa po mintam i lider po cepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
