@@ -1,0 +1,92 @@
+name: "Двухшаговая сборка против реальных GP-сделок лидера (только чтение)"
+
+# ЗАЧЕМ (условие владельца 27.09 перед боем, п.3): "раскладку инструкций сверить
+# с реальными транзакциями лидера по его GP-парам до совпадения программ и
+# счетов; затем три живые сделки по 0.01".
+#
+# Прогон берёт сделки лидера ПО ЦЕПИ, оставляет покупки с котировкой не SOL,
+# собирает НАШУ двухшаговую транзакцию и сравнивает инструкцию второго шага с
+# инструкцией самого лидера -- программа, число счетов и каждый счёт по номеру.
+# Расхождения по НАШИМ счетам (кошелёк и наши токен-счета) ожидаемы и считаются
+# отдельно от чужих.
+#
+# Ни подписи, ни отправки. Наш адрес нужен только как плательщик в сборке.
+on:
+  workflow_dispatch:
+    inputs:
+      lider:
+        description: "адрес лидера"
+        required: false
+        default: "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      predel:
+        description: "сколько последних подписей лидера смотреть"
+        required: false
+        default: "60"
+      lamporty:
+        description: "размер сборки в лампортах (0.01 SOL = 10000000)"
+        required: false
+        default: "10000000"
+
+concurrency:
+  group: dvuhshagovyy-vs-lider
+  cancel-in-progress: false
+
+env:
+  OUT: data/dvuhshagovyy_vs_lider.json
+
+jobs:
+  sverka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/dv"
+          "$RUNNER_TEMP/dv/bin/pip" install -q requests solders base58
+          echo "PY=$RUNNER_TEMP/dv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Самопроверка двухшаговой сборки (байт в байт с теневой)"
+        run: |
+          set -e
+          cd analysis
+          $PY bloom_lane_two_step.py --self-test
+
+      - name: "Сверка с сделками лидера"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY deploy/checks/dvuhshagovyy_vs_lider.py \
+            --lider '${{ inputs.lider }}' \
+            --nash 4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x \
+            --predel '${{ inputs.predel }}' \
+            --lamporty '${{ inputs.lamporty }}' \
+            --out "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Dvukhshagovaya sborka protiv sdelok lidera [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
