@@ -89,6 +89,23 @@ def строка_порога(покупки: list) -> dict:
     return из_
 
 
+_ИТОГ_ПОЛОСЫ: dict = {}
+
+
+def исправить_факт(x: dict) -> dict:
+    """Ошибка 15: у полосы closed_sol_net -- ВОЗВРАТ SOL; чистый итог -- pnl_counted_sol."""
+    if x.get("канал") != "полоса":
+        return x
+    if not _ИТОГ_ПОЛОСЫ:
+        п = КОРЕНЬ / "data" / "podbivka" / "lane_table_raw_iz_vetki1.json"
+        if п.exists():
+            for v in json.loads(п.read_text(encoding="utf-8")).values():
+                if v.get("source_sig"):
+                    _ИТОГ_ПОЛОСЫ[v["source_sig"]] = v.get("pnl_counted_sol")
+        _ИТОГ_ПОЛОСЫ.setdefault("_", None)
+    return {**x, "факт_net_sol": _ИТОГ_ПОЛОСЫ.get(x.get("source_sig"))}
+
+
 def каталог_задачи(имя: str) -> Path:
     п = Path(имя)
     return п if п.is_absolute() else КОРЕНЬ / "data" / "podbivka" / имя
@@ -292,7 +309,7 @@ def main() -> int:
         все_п2.extend(б + [{"sim": x.get("sim")} for x in к.get("факт") or []])
         for пор in ПОРОГИ:
             строки_п2.append((f"{адрес[:8]} (б)", пор, строка_порога([п for п in б if п["порог"] == пор])))
-        ф = к.get("факт") or []
+        ф = [исправить_факт(x) for x in (к.get("факт") or [])]
         фп = [{"sim": x.get("sim"), "порог": None} for x in ф]
         кол = строка_порога(фп)
         sol = sum(float(x.get("факт_net_sol") or 0) for x in ф if x.get("факт_net_sol") is not None)
