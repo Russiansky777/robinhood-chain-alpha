@@ -1,0 +1,98 @@
+name: "Jupiter: зонд покупки SOL -> токен (только чтение)"
+
+# ЗАЧЕМ (владелец 27.09, вне очереди). Полоса должна покупать и там, где
+# котировка пула не в SOL -- маршрутом Jupiter, но с подписью НАШИМ ключом и
+# отправкой НАШИМ пулом отправителей. Значит транзакцию собираем мы, а от
+# Jupiter берём котировку и инструкции. Имена полей ответа выдумывать нельзя:
+# из контейнера Claude jup.ag закрыт прокси (CONNECT 403), поэтому зонд идёт
+# с NL-хоста, тем же путём, что и сторож на продаже.
+#
+# Ни подписи, ни отправки: только GET котировки и POST за инструкциями.
+on:
+  workflow_dispatch:
+    inputs:
+      mint:
+        description: "что покупаем за SOL (по умолчанию USDC)"
+        required: false
+        default: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      sol:
+        description: "размер котировки в SOL"
+        required: false
+        default: "0.01"
+      povtorov:
+        description: "сколько замеров котировки (первый -- холодный)"
+        required: false
+        default: "7"
+
+concurrency:
+  group: jup-buy-probe
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  OUT: data/jup_buy_probe.json
+
+jobs:
+  zond:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Зонд с NL-хоста"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/jup_buy_probe.py" < deploy/checks/jup_buy_probe.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            ENV_FILE=/etc/bloom-executor/env
+            TAKER=\$(grep -m1 '^OWN_SEND_WALLET=' \$ENV_FILE 2>/dev/null | cut -d= -f2-)
+            [ -n \"\$TAKER\" ] || { echo 'СБОЙ: OWN_SEND_WALLET не найден в env'; exit 1; }
+            echo \"кошелёк полосы из env: \${TAKER:0:12}...\"
+            JUPITER_API_KEY=\$(grep -m1 '^JUPITER_API_KEY=' \$ENV_FILE 2>/dev/null | cut -d= -f2-)
+            export JUPITER_API_KEY
+            python3 /tmp/jup_buy_probe.py --mint '${{ inputs.mint }}' --sol '${{ inputs.sol }}' \
+              --taker \"\$TAKER\" --povtorov '${{ inputs.povtorov }}' --out /tmp/jup_buy_probe.json >/dev/null
+            rm -f /tmp/jup_buy_probe.py"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/jup_buy_probe.json" > "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/jup_buy_probe.json"
+
+      - name: "Ключей в отчёте быть не должно"
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Что вышло"
+        if: always()
+        run: python3 -c "import json;d=json.load(open('data/jup_buy_probe.json'));[print(b, json.dumps({k:v for k,v in т.items() if k!='swap_instructions'}, ensure_ascii=False)[:1200]) or print('  инструкции:', json.dumps(т.get('swap_instructions'), ensure_ascii=False)[:1200]) for b,т in d['базы'].items()]"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Jupiter: zond pokupki SOL -> token [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
