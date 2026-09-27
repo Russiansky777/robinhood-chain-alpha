@@ -441,7 +441,9 @@ def self_test() -> int:
     # ЧЕТЫРЕ ГРУППЫ ФИНАЛЬНОГО ПЛАНА (владелец 27.09). Числа -- деньги, поэтому
     # проверяются по одному, а не "файл прочитан -- значит верно".
     chk("в leader один адрес", с["by_group"].get("leader") == 1, с["by_group"])
-    chk("в batch5 восемь адресов", с["by_group"].get("batch5") == 8, с["by_group"])
+    # ДВЕНАДЦАТЬ: восемь прежних плюс четыре названных владельцем 27.09 вечером
+    # (Avast, AviFelman, Nach, Pasterniq).
+    chk("в batch5 двенадцать адресов", с["by_group"].get("batch5") == 12, с["by_group"])
     chk("в lane_s0 десять адресов", с["by_group"].get("lane_s0") == 10, с["by_group"])
     chk("в off девять адресов", с["by_group"].get("off") == 9, с["by_group"])
     chk("в log_only адреса есть -- подписка и лог сохранены",
@@ -455,10 +457,12 @@ def self_test() -> int:
         and л["hold_slots"] == 150 and л["slippage"] == 0.2, л)
     chk("лидер: на тонком пуле (резерв ниже 30 SOL-экв.) наценка 0.5",
         л["slippage_thin_pool"] == 0.5 and л["thin_pool_below_sol"] == 30, л)
-    # ЧИСЛА ВЛАДЕЛЬЦА 27.09 (вечер): таймер выхода зависит от размера покупки
-    # источника -- 36 слотов ниже 15 SOL-экв., 150 при 15 и выше.
-    chk("лидер: на мелкой покупке источника (<15 SOL-экв.) держим 36 слотов",
-        л["hold_slots_small"] == 36 and л["hold_slots_small_below_sol"] == 15, л)
+    # ОТМЕНА ТОГО ЖЕ ВЕЧЕРА: "leader: hold_slots 150 при любом размере".
+    # Полей hold_slots_small в файле быть НЕ должно -- иначе таймер снова
+    # обрезался бы на мелкой покупке.
+    chk("лидер: таймер 150 при любом размере, правила мелкой покупки нет",
+        л["hold_slots_small"] is None
+        and л["hold_slots_small_below_sol"] is None, л)
     chk("лидер: налоговый маршрут берём, предел открытых 3",
         л["allow_taxed_route"] is True and л["lane_open_max"] == 3, л)
     б = политика("batch5")
@@ -471,8 +475,13 @@ def self_test() -> int:
     chk("lane_s0: 0.3 SOL, стоп -0.45, три слота от s0, перекупщиков пропускаем",
         s["lane_size"] == 0.3 and s["max_slots_from_source"] == 3
         and s["stop_loss_sol"] == 0.45 and s["skip_flippers"] is True, s)
-    chk("lane_s0: налоговый маршрут НЕ берём, только кривая pump.fun",
-        s["allow_taxed_route"] is False and s["lane_pools"] == ["bonding"], s)
+    # ПРАВИЛА lane_s0 ПРИРАВНЕНЫ К batch5 (слово владельца 27.09, вечер, п.5):
+    # все типы пулов вместе с двухшаговым, налоговый маршрут берём, предела
+    # резерва пула нет, наценка 0.40. Своё остаётся одно -- три слота от s0.
+    chk("lane_s0: правила batch5 -- все типы пулов, налоговый маршрут, 0.40, без предела резерва",
+        s["allow_taxed_route"] is True and s["slippage"] == 0.40
+        and s["min_pool_sol_reserve"] is None
+        and set(s["lane_pools"] or []) == {"pump_amm", "cpmm", "bonding", "two_step"}, s)
     chk("Bloom не торгует ни по одной группе файла",
         not any(п.get("bloom_trades") for п in д["политики"].values()),
         [и for и, п in д["политики"].items() if п.get("bloom_trades")])

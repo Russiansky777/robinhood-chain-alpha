@@ -57,6 +57,13 @@ DEFAULT_API_ERROR_STREAK = 5
 DEFAULT_UNSOLD_STREAK = 3
 DEFAULT_RATE_LIMITED_PAUSE_S = 300.0  # 429 дольше пяти минут подряд
 DEFAULT_MINT_COOLDOWN_S = 900.0
+# ОКНО ДОКУПКИ -- слово владельца 27.09 (вечер): "докупка = тот же источник и
+# тот же минт в пределах 1800 слотов (~12 мин) от его предыдущей покупки;
+# позже -- новый сигнал, копируем как первую покупку. Лимит по паре -- с тем же
+# окном". В слотах, потому что владелец назвал слоты; в секундах -- та же
+# величина при 0.4 с на слот, и нужна там, где слота нет (пределы площадки).
+ОКНО_ДОКУПКИ_СЛОТОВ = 1800
+ОКНО_ДОКУПКИ_S = 720.0
 DEFAULT_MAX_BUYS_PER_MINT = 2         # семантика maxBuyTimesPerToken=2
 DEFAULT_SEEN_TTL_S = 24 * 3600
 
@@ -568,6 +575,12 @@ class ExecState:
                           "(sig TEXT PRIMARY KEY, ts REAL, source TEXT)")
             conn.execute("CREATE TABLE IF NOT EXISTS mint_last "
                           "(mint TEXT PRIMARY KEY, ts REAL, buys INTEGER)")
+            # ПОКУПКИ САМИХ ИСТОЧНИКОВ по паре "источник + минт". Нужны, чтобы
+            # отличить ДОКУПКУ от нового сигнала: слово владельца 27.09
+            # (вечер) -- "докупка = тот же источник и тот же минт в пределах
+            # 1800 слотов от его предыдущей покупки; позже -- новый сигнал".
+            conn.execute("CREATE TABLE IF NOT EXISTS source_buys "
+                          "(key TEXT PRIMARY KEY, slot INTEGER, ts REAL, sig TEXT)")
             conn.commit()
             self._потоковое.db = conn
             self._db = conn        # для совместимости со старым полем
@@ -595,6 +608,80 @@ class ExecState:
         старые записи по минту остаются читаемыми как есть.
         """
         return f"{source}|{mint}" if source else mint
+
+    def source_buy_state(self, source: str | None,
+                          mint: str) -> tuple[int | None, float | None]:
+        """(слот, время) ПРЕДЫДУЩЕЙ покупки этой пары САМИМ источником."""
+        слот, вр, _ = self._source_buy_row(source, mint)
+        return слот, вр
+
+    def _source_buy_row(self, source: str | None, mint: str):
+        """(слот, время, подпись) запомненной покупки пары."""
+        row = self.db().execute(
+            "SELECT slot, ts, sig FROM source_buys WHERE key=?",
+            (self.ключ_пары(mint, source),)).fetchone()
+        if not row:
+            return None, None, None
+        слот = int(row[0]) if row[0] is not None else None
+        вр = float(row[1]) if row[1] is not None else None
+        return слот, вр, (row[2] or None)
+
+    def mark_source_buy(self, source: str | None, mint: str,
+                         slot: int | None = None,
+                         now: float | None = None,
+                         sig: str | None = None) -> None:
+        """Запомнить покупку ИСТОЧНИКА. Пишется на КАЖДЫЙ покупочный сигнал,
+        купили мы по нему или нет: окно докупки считается от покупок источника,
+        а не от наших."""
+        if not mint:
+            return
+        self.db().execute(
+            "INSERT OR REPLACE INTO source_buys(key, slot, ts, sig) VALUES(?,?,?,?)",
+            (self.ключ_пары(mint, source),
+             int(slot) if isinstance(slot, int) else None,
+             float(now if now is not None else time.time()),
+             str(sig) if sig else None))
+        self.db().commit()
+
+    def докупка_в_окне(self, source: str | None, mint: str,
+                        slot: int | None = None,
+                        now: float | None = None,
+                        sig: str | None = None,
+                        окно_слотов: int = ОКНО_ДОКУПКИ_СЛОТОВ,
+                        окно_s: float = ОКНО_ДОКУПКИ_S) -> tuple[bool, str]:
+        """Докупка ли это по правилу владельца: (да/нет, словами почему).
+
+        Предыдущей покупки пары нет -- НЕ докупка (новый сигнал). Есть, и от
+        неё прошло не больше окна -- докупка. Прошло больше -- новый сигнал,
+        копируем как первую покупку. Слоты главнее времени: владелец назвал
+        слоты, а время берётся только когда слота нет.
+        """
+        пред_слот, пред_ts, пред_sig = self._source_buy_row(source, mint)
+        if пред_слот is None and пред_ts is None:
+            return False, "предыдущей покупки этой пары источник+минт мы не видели"
+        # ТА ЖЕ ПОДПИСЬ -- ТА ЖЕ ПОКУПКА, А НЕ ДОКУПКА. Один сигнал может
+        # прийти дважды (два способа подписки, повтор после обрыва), и без
+        # этой проверки повтор читался бы как "докупка через 0 слотов".
+        if sig and пред_sig and str(sig) == str(пред_sig):
+            return False, "это та же покупка источника (та же подпись), а не докупка"
+        if isinstance(slot, int) and пред_слот is not None:
+            разница = slot - int(пред_слот)
+            if 0 <= разница <= окно_слотов:
+                return True, (f"тот же источник и минт через {разница} слотов "
+                               f"после его покупки (окно {окно_слотов})")
+            if разница < 0:
+                return False, (f"сигнал старше запомненной покупки на "
+                                f"{-разница} слотов -- как первую покупку")
+            return False, (f"прошло {разница} слотов, больше окна "
+                            f"{окно_слотов} -- новый сигнал")
+        if пред_ts is not None:
+            прошло = float(now if now is not None else time.time()) - float(пред_ts)
+            if 0 <= прошло <= окно_s:
+                return True, (f"тот же источник и минт через {прошло:.0f} с после "
+                               f"его покупки (окно {окно_s:.0f} с; слота нет)")
+            return False, (f"прошло {прошло:.0f} с, больше окна {окно_s:.0f} с "
+                            "(слота нет) -- новый сигнал")
+        return False, "ни слота, ни времени предыдущей покупки -- как первую покупку"
 
     def mint_state(self, mint: str, source: str | None = None) -> tuple[float | None, int]:
         """(когда покупали, сколько раз) по ПАРЕ, если назван источник."""
@@ -1092,13 +1179,20 @@ class ExecState:
         if дубль:
             return False, (f"по {если_пара} уже есть открытая позиция"), КОД_ДУБЛЬ_МИНТА
 
+        # ПРЕДЕЛ ПО ПАРЕ -- С ОКНОМ ДОКУПКИ (слово владельца 27.09, вечер:
+        # "лимит по паре -- с тем же окном"). Покупки старше окна не считаются
+        # вовсе: после окна это новый сигнал, а не повтор. Кулдаун по той же
+        # причине не может быть длиннее окна.
         ts, buys = self.mint_state(mint, source)
-        if buys >= self.max_buys_per_mint > 0:
+        в_окне = ts is not None and (now - ts) <= ОКНО_ДОКУПКИ_S
+        кулдаун = min(float(self.mint_cooldown_s), ОКНО_ДОКУПКИ_S)
+        if в_окне and buys >= self.max_buys_per_mint > 0:
             return False, (f"по {если_пара} уже {buys} покупок при лимите "
-                            f"{self.max_buys_per_mint}"), КОД_ПОКУПОК_НА_МИНТ
-        if ts is not None and (now - ts) < self.mint_cooldown_s:
+                            f"{self.max_buys_per_mint} в окне "
+                            f"{ОКНО_ДОКУПКИ_S:.0f} с"), КОД_ПОКУПОК_НА_МИНТ
+        if в_окне and (now - ts) < кулдаун:
             return False, (f"по {если_пара} кулдаун: прошло "
-                            f"{now - ts:.0f} с из {self.mint_cooldown_s:.0f}"), КОД_ДУБЛЬ_МИНТА
+                            f"{now - ts:.0f} с из {кулдаун:.0f}"), КОД_ДУБЛЬ_МИНТА
 
         if self.seen_signature(source_sig):
             return False, (f"подпись источника {source_sig[:10]} уже обработана"), КОД_ПОДПИСЬ_ВИДЕЛИ
@@ -1613,6 +1707,50 @@ def self_test() -> None:
     chk("адрес источника лёг в запись позиции",
         any(p_.get("source") == "SRC_A" for p_ in st8п.open_positions()),
         st8п.open_positions())
+    # --- ОКНО ДОКУПКИ 1800 СЛОТОВ (слово владельца 27.09, вечер). Это деньги:
+    # по нему решается, копировать сигнал или считать его докупкой.
+    stо = ExecState(base=base / "stateokno", kill=kill)
+    да0, почему0 = stо.докупка_в_окне("SRC_A", "WM", slot=1000)
+    chk("покупки пары мы не видели -- НЕ докупка, копируем как первую",
+        да0 is False and "не видели" in почему0, (да0, почему0))
+    stо.mark_source_buy("SRC_A", "WM", slot=1000)
+    да1, почему1 = stо.докупка_в_окне("SRC_A", "WM", slot=1000 + 1799)
+    chk("через 1799 слотов -- ещё докупка", да1 is True, (да1, почему1))
+    да2, почему2 = stо.докупка_в_окне("SRC_A", "WM", slot=1000 + 1800)
+    chk("ровно 1800 слотов -- ещё докупка (окно включительно)", да2 is True,
+        (да2, почему2))
+    да3, почему3 = stо.докупка_в_окне("SRC_A", "WM", slot=1000 + 1801)
+    chk("через 1801 слот -- НОВЫЙ сигнал, копируем как первую покупку",
+        да3 is False and "больше окна" in почему3, (да3, почему3))
+    да4, _ = stо.докупка_в_окне("SRC_B", "WM", slot=1000 + 10)
+    chk("другой источник в том же минте -- не докупка (пара своя)",
+        да4 is False, да4)
+    да5, почему5 = stо.докупка_в_окне("SRC_A", "WM", slot=None,
+                                       now=time.time() + 100.0)
+    chk("без слота считаем по времени и говорим это словом",
+        да5 is True and "слота нет" in почему5, (да5, почему5))
+    stо2 = ExecState(base=stо.base, kill=kill)
+    chk("покупки источников переживают перезапуск (лежат в sqlite)",
+        stо2.докупка_в_окне("SRC_A", "WM", slot=1001)[0] is True,
+        stо2.source_buy_state("SRC_A", "WM"))
+    # ПРЕДЕЛ ПО ПАРЕ -- С ТЕМ ЖЕ ОКНОМ: покупка старше окна не считается.
+    stп_о = ExecState(base=base / "stateokno2", kill=kill)
+    старое = time.time() - ОКНО_ДОКУПКИ_S - 60.0
+    stп_о.db().execute(
+        "INSERT OR REPLACE INTO mint_last(mint, ts, buys) VALUES(?,?,?)",
+        (stп_о.ключ_пары("OWM", "SRC_A"), старое, 5))
+    stп_о.db().commit()
+    ok_ок, почему_ок = stп_о.can_open(mint="OWM", source_sig="So1",
+                                      balance_sol=1.0, source="SRC_A")
+    chk("пять покупок пары СТАРШЕ окна предел не держат",
+        ok_ок is True, почему_ок)
+    stп_о.mark_mint_buy("OWM2", source="SRC_A")
+    stп_о.mark_mint_buy("OWM2", source="SRC_A")
+    ok_вн, почему_вн = stп_о.can_open(mint="OWM2", source_sig="So2",
+                                      balance_sol=1.0, source="SRC_A")
+    chk("а две покупки пары В окне -- держат, и окно названо",
+        ok_вн is False and "в окне" in почему_вн, почему_вн)
+
     # Источник не назван -- старое поведение по минту, и это сказано словом.
     st9п = ExecState(base=base / "state9par", kill=kill)
     st9п.mark_mint_buy("NOSRC")

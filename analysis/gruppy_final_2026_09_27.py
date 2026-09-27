@@ -53,6 +53,14 @@ BATCH5 = {
     "5opd5KBmodmoNuAThQ5cmXKbRxHbQDfomWGKAs3uEUP9": "soby",
     "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2": "rasmr",
     "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": "dreamloader",
+    # Четыре адреса, названные владельцем 27.09 вечером (п.6). Два из них
+    # (Nach, Pasterniq) уже были подписаны и лежали в log_only -- слово
+    # владельца переводит их в batch5; Avast и AviFelman в файле новые, и с
+    # ними подписка вырастает на два адреса (555 в логе вместо 557).
+    "8xL8S7P4QLdTGRquHas8NP5EVjp2qUGbmSgrkh97mvmq": "Avast",
+    "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN": "AviFelman",
+    "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1": "Nach",
+    "9zZCjLr9xfXfp3qdqvPh6YeaEaagepz21khLhca69B18": "Pasterniq",
 }
 LANE_S0_ПОЛНЫЕ = {
     "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ": "frank",
@@ -86,19 +94,17 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
         # наценка до 100 %, то есть min-out 50 % ожидания.
         "slippage": 0.2, "min_pool_sol_reserve": None,
         "slippage_thin_pool": 0.5, "thin_pool_below_sol": 30,
+        # ТАЙМЕР ВЫХОДА -- 150 СЛОТОВ ПРИ ЛЮБОМ РАЗМЕРЕ. Правило "36 слотов на
+        # покупке источника меньше 15 SOL-экв." владелец отменил тем же вечером
+        # 27.09; полей hold_slots_small здесь нет, и правило не действует.
         "lane_open_max": 3, "stop_loss_sol": 0.75, "hold_slots": 150,
-        # ТАЙМЕР ВЫХОДА ПО РАЗМЕРУ ПОКУПКИ ИСТОЧНИКА -- числа владельца 27.09
-        # (вечер): 36 слотов при покупке источника меньше 15 SOL-экв., 150 при
-        # 15 и выше. Размер берётся из решения детектора (meta сделки
-        # источника), отдельного запроса нет.
-        "hold_slots_small": 36, "hold_slots_small_below_sol": 15,
         "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
         "note": ("Лидер. Размер 0.5 SOL, порог источника 3 SOL-экв., налоговый "
                   "маршрут берём и пишем налог в строку решения, наценка входа до "
                   "0.2 (min-out 80 %, наценка 25 %), а на пуле с резервом ниже "
                   "30 SOL-экв. -- 0.5 (наценка до 100 %); три открытых, стоп "
                   "-0.75 за сутки, держим 36 слотов от s0 при покупке "
-                  "источника меньше 15 SOL-экв. и 150 при 15 и выше. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и "
+                  "150 слотов от s0 при любом размере покупки источника. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и "
                   "двухшаговый маршрут через котировочный токен (п.3). LaunchLab, "
                   "CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), "
                   "поэтому их в списке ПОКА НЕТ."),
@@ -122,18 +128,24 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
     "lane_s0": {
         "lane_size": 0.3, "lane_trades": True, "bloom_trades": False,
         "bloom_sol": None, "fanout": False,
+        # ПРАВИЛА КАК У batch5 (слово владельца 27.09, вечер, п.5): все типы
+        # пулов вместе с двухшаговым маршрутом, налоговый маршрут берём, предела
+        # резерва пула нет (резерв только пишется в строку позиции), наценка
+        # входа до 0.40. Предел "не больше 3 слотов от s0" остаётся -- он и есть
+        # смысл этой группы.
         "min_target_sol": 2, "max_slots_from_source": 3,
-        "skip_flippers": True, "allow_taxed_route": False,
-        "slippage": 0.35, "min_pool_sol_reserve": 30,
+        "skip_flippers": True, "allow_taxed_route": True,
+        "slippage": 0.40, "min_pool_sol_reserve": None,
         "lane_open_max": 3, "stop_loss_sol": 0.45, "hold_slots": 72,
-        "lane_pools": ["bonding"],
-        "note": ("Десять кошельков с усечённым S+0. 0.3 SOL, порог 2 SOL-экв., "
-                  "не покупаем, если от слота источника прошло больше 3 слотов, "
-                  "помеченных перекупщиками пропускаем (сейчас не помечен ни "
-                  "один -- по таблице Code-2 все десять проходят), налоговый "
-                  "маршрут НЕ берём, наценка входа до 0.35, резерв пула не ниже "
-                  "30 SOL-экв. ТОЛЬКО кривая pump.fun: список lane_pools здесь "
-                  "ПОЛНЫЙ, он же и запрещает Pump AMM с Raydium CPMM."),
+        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
+        "note": ("Десять кошельков с усечённым S+0. Правила как у batch5 "
+                  "(слово владельца 27.09, вечер): 0.3 SOL, порог 2 SOL-экв., "
+                  "наценка входа до 0.40, налоговый маршрут берём, предела "
+                  "резерва пула нет (резерв только пишется в строку позиции), "
+                  "все типы пулов вместе с двухшаговым маршрутом. Своё у группы "
+                  "одно: не покупаем, если от слота источника прошло больше 3 "
+                  "слотов, и помеченных перекупщиками пропускаем (сейчас не "
+                  "помечен ни один)."),
     },
     "off": {
         "lane_size": None, "lane_trades": False, "bloom_trades": False,
@@ -294,12 +306,23 @@ def self_test() -> int:
     с = собрать(SG.ФАЙЛ_ПО_УМОЛЧАНИЮ)
     ф = с["файл"]
     chk("спорных префиксов нет", not с["спорные"], с["спорные"])
-    chk("торгующих адресов ровно 19 (слово владельца)", с["торгующих"] == 19,
+    # 23 = 1 лидер + 12 batch5 (восемь прежних и четыре названных владельцем
+    # 27.09 вечером) + 10 lane_s0.
+    chk("торгующих адресов ровно 23 (слово владельца)", с["торгующих"] == 23,
         с["торгующих"])
     chk("в leader один адрес", len(ф["groups"]["leader"]["addresses"]) == 1,
         len(ф["groups"]["leader"]["addresses"]))
-    chk("в batch5 восемь", len(ф["groups"]["batch5"]["addresses"]) == 8,
+    chk("в batch5 двенадцать", len(ф["groups"]["batch5"]["addresses"]) == 12,
         len(ф["groups"]["batch5"]["addresses"]))
+    for _адр, _имя in (("8xL8S7P4QLdTGRquHas8NP5EVjp2qUGbmSgrkh97mvmq", "Avast"),
+                        ("BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN", "AviFelman"),
+                        ("GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1", "Nach"),
+                        ("9zZCjLr9xfXfp3qdqvPh6YeaEaagepz21khLhca69B18", "Pasterniq")):
+        chk(f"{_имя} в batch5, и ни в одной другой группе",
+            _адр in ф["groups"]["batch5"]["addresses"]
+            and not any(_адр in (ф["groups"][г].get("addresses") or {})
+                        for г in ("leader", "lane_s0", "off", "log_only")),
+            _адр[:10])
     chk("в lane_s0 десять", len(ф["groups"]["lane_s0"]["addresses"]) == 10,
         len(ф["groups"]["lane_s0"]["addresses"]))
     chk("в off девять", len(ф["groups"]["off"]["addresses"]) == 9,
@@ -325,12 +348,16 @@ def self_test() -> int:
         and ф["groups"]["batch5"]["stop_loss_sol"] == 0.45
         and ф["groups"]["batch5"]["min_pool_sol_reserve"] is None
         and ф["groups"]["batch5"]["slippage"] == 0.40, ф["groups"]["batch5"])
-    chk("lane_s0 0.3, стоп -0.45, три слота от s0, только кривая, налог не берём",
+    # ПРАВИЛА lane_s0 ПРИРАВНЕНЫ К batch5 (слово владельца 27.09, вечер, п.5).
+    chk("lane_s0 0.3, стоп -0.45, три слота от s0, правила batch5",
         ф["groups"]["lane_s0"]["lane_size"] == 0.3
         and ф["groups"]["lane_s0"]["stop_loss_sol"] == 0.45
         and ф["groups"]["lane_s0"]["max_slots_from_source"] == 3
-        and ф["groups"]["lane_s0"]["lane_pools"] == ["bonding"]
-        and ф["groups"]["lane_s0"]["allow_taxed_route"] is False,
+        and ф["groups"]["lane_s0"]["slippage"] == 0.40
+        and ф["groups"]["lane_s0"]["min_pool_sol_reserve"] is None
+        and set(ф["groups"]["lane_s0"]["lane_pools"])
+        == {"pump_amm", "cpmm", "bonding", "two_step"}
+        and ф["groups"]["lane_s0"]["allow_taxed_route"] is True,
         ф["groups"]["lane_s0"])
     chk("Bloom не торгует ни по одной группе",
         not any(г.get("bloom_trades") for г in ф["groups"].values()),
