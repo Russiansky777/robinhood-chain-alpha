@@ -62,15 +62,22 @@ def цена_котировочного(уз: S.Узел, tsrc: dict, q: str):
     цена, откуда = LK.цена_q_в_sol(tsrc, q, tsrc.get("blockTime"))
     if цена:
         return цена, откуда
+    # нет курса USD/SOL в ряду детектора (эпоха Helius): курс опорного пула
+    # SOL/USDC на то же время (КурсПулом через узел)
+    if id(уз) not in _КНИГА:
+        _КНИГА[id(уз)] = S.КурсПулом(S.КурсУзла(уз))
+    try:
+        курс = _КНИГА[id(уз)].rate_for(tsrc)[0]
+    except Exception:  # noqa: BLE001
+        курс = None
+    if not курс:
+        return None, откуда
     if q in (C.USDC, C.USDT):
-        if id(уз) not in _КНИГА:
-            _КНИГА[id(уз)] = S.КурсПулом(S.КурсУзла(уз))
-        try:
-            курс = _КНИГА[id(уз)].rate_for(tsrc)[0]
-        except Exception:  # noqa: BLE001
-            курс = None
-        if курс:
-            return 1e-6 / float(курс) * 1e9, "стейбл: 1 USD по курсу опорного пула"
+        return 1e-6 / float(курс) * 1e9, "стейбл: 1 USD по курсу опорного пула"
+    пл = LK.плечи(tsrc, q).get("USD")
+    if пл:
+        usd_за_q_raw = statistics.median([x["b_за_q_raw"] for x in пл]) / 10 ** пл[0]["dec_b"]
+        return usd_за_q_raw / float(курс) * 1e9, "плечо к USD в той же сделке и курс опорного пула"
     return None, откуда
 
 
