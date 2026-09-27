@@ -19,6 +19,10 @@ on:
         description: "адрес лидера"
         required: false
         default: "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
+      pary:
+        description: "подпись:источник через запятую -- размер покупки источника по цепи"
+        required: false
+        default: "4aQ1YummNLRe8L7aQrxu6HvezGDsYybWHsG1XXGszao5fBht7kaQSuD6U8GhR8GVbvPtvYzs6itFJFqSw86rhmtR:EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ,4ynoEaNMtmkC6mh1Bv4cov9TaBPVvhU736QXsPJLFfNMSNCEbiLsixDiA7gkRp65L3S3GTyN596CVynRgfNwSV3x:Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit,3Hr6dr29CwoXi2TAeuosmh6temuWgQLTKHvzGz9RoUJfFP8AfaRaadEhv1KwJAYhTL77p9EmCfZVe668s6AcB6HE:Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit,eQAvJewBmu4FmkUAg2rhdwmnrAgckoa3zz5x5r22e2XHCJHSmZhoxScPh1UAnpNwCWV4V6z7mxdKZkh3wAihjUC:2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq,22pvQttT6a43hq9EubBngodu6g1vp5rsb651p9xNKW6wh2f68o39d8VFcoLti7xS6qiPDpfnXXgzq1yfoAraBumy:Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit,4NCUnGdeEc7zLzVnFFCcJmPDvkBU78NZaGCQumkLDq5DRWvb9fyMNu8Vf31zL5aUMSn9c5E8m4izt8i29Hh7onrC:Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit,4UpwVV7bcCE7aRQXiyDBLLw2eb4QKHyhQkVnNhSq2UyaNfCDXzH88aM4r9YYpfYfZ5Sy3zuyVhqaZyuxdvFaLYH2:Gi5DyNkCLVQkcjykXVWUheM1EzCg8XjUPdcf7E8Gj2eh,GvKtBaPFPRvqz7aYpftTsCBX7FDRKwEWNbsypLaSNhVqX4fHnbkY8LREbgTx6eULdFAirXszen3eoEMbKW2d1pK:Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit,2iU56CGTdaEPgBC8ajCaFHMbqeySvjsT7Lfokk8TAWLu5NVCTyEw1VNPJVTXnsRR1ysQwDKKpyrVUFfs2MMF4Bp:4bkq7rLkyVYCdGozmnYKq931qPXXsUrV6LdXnFqZuLQ9,cXJ4Hy97gTL7P5jqQg32EsVSaSDjcp7d2WWqCVGsdLVopK3RyjGUjY6EUFfzyyYpVGKKsN5uj8iuYogUN26LswT:Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
       okno_s:
         description: "начало окна UTC (00:00 Мадрида 27.09)"
         required: false
@@ -64,7 +68,8 @@ jobs:
           [ -n "$HELIUS_API" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
           $PY deploy/checks/lider_po_cepi.py --wallet '${{ inputs.lider }}' \
             --okno-s '${{ inputs.okno_s }}' --okno-po '${{ inputs.okno_po }}' \
-            --minty '${{ inputs.minty }}' --out "$OUT_LIDER"
+            --minty '${{ inputs.minty }}' --pary '${{ inputs.pary }}' \
+            --out "$OUT_LIDER"
 
       - name: "SSH key"
         env:
