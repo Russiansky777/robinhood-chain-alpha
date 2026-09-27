@@ -40,7 +40,8 @@ def main() -> int:
     ярлыки = json.loads(T.ЯРЛЫКИ_ПУЛОВ.read_text(encoding="utf-8")) if T.ЯРЛЫКИ_ПУЛОВ.exists() else {}
     ярлыки.setdefault("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", "pump.fun кривая")
     все = []
-    for к in T.читать(T.каталог_задачи("koshelki")) + T.читать(T.каталог_задачи("koshelki_proba")):
+    # Проба -- подмножество koshelki (те же 10 кошельков, ранний код): не читается.
+    for к in T.читать(T.каталог_задачи("koshelki")):
         адрес = (к.get("строка") or {}).get("address")
         if адрес and not к.get("why_not") and not (к.get("скан") or {}).get("why_not"):
             все += T.пересчёт_порога(к.get("покупки") or [], адрес)
