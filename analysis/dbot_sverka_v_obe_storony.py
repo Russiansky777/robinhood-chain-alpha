@@ -201,11 +201,23 @@ def покупки_кошелька(адрес: str, от: int, до: int, *, п
         if кончили or not курсор:
             break
     из_ = []
+    непрочитанных = 0
     for з in подписи:
-        tx = rpc("getTransaction", [з["signature"],
-                                     {"encoding": "jsonParsed",
-                                      "maxSupportedTransactionVersion": 0}])
+        # ВЕРСИЯ 1, А НЕ 0. С нулём узел отвечает "Transaction version (1) is
+        # not supported" и первая же версионная транзакция роняет прогон -- так
+        # и случилось на первом прогоне 27.09. В репозитории принято 1.
+        try:
+            tx = rpc("getTransaction", [з["signature"],
+                                         {"encoding": "jsonParsed",
+                                          "maxSupportedTransactionVersion": 1}])
+        except RuntimeError:
+            # ОДНА НЕЧИТАЕМАЯ ПОДПИСЬ НЕ ВАЛИТ СВЕРКУ. Их число уходит в
+            # отчёт: молча пропущенная сделка DBot -- это ровно то, что сверка
+            # должна была найти.
+            непрочитанных += 1
+            continue
         if not tx:
+            непрочитанных += 1
             continue
         мета = tx.get("meta") or {}
         if мета.get("err"):
@@ -243,6 +255,10 @@ def покупки_кошелька(адрес: str, от: int, до: int, *, п
                                            time.gmtime(з.get("blockTime") or 0)),
                      "кошелёк": адрес, "минт": минт,
                      "получено": прирост, "трата_sol": трата})
+    if непрочитанных:
+        из_.append({"кошелёк": адрес, "непрочитанных": непрочитанных,
+                     "подпись": None, "минт": None, "utc": None,
+                     "трата_sol": None, "служебная": True})
     return из_
 
 
@@ -286,6 +302,10 @@ def main() -> int:
     по_причинам: dict = {}
     for адрес, задача in sorted(адреса.items()):
         for п in покупки_кошелька(адрес, от, до_, предел=а.predel_na_koshelek):
+            if п.get("служебная"):
+                итог["непрочитанных_подписей"] = (
+                    итог.get("непрочитанных_подписей", 0) + int(п["непрочитанных"]))
+                continue
             реш = решения.get(п["подпись"])
             наша = next((н for н in наши
                           if н.get("подпись_источника") == п["подпись"]), None)
