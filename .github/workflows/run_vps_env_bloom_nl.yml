@@ -55,6 +55,26 @@ jobs:
           echo "--- имена всех ключей окружения (без значений) ---"
           ssh -n $SSH_OPTS root@"$HOST" "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort" | tee -a "$OUT"
 
+      - name: "Диагностика файла окружения: строки, копии, целостность (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. 27.09 после деплоя число имён в окружении упало с 39 до 22.
+          # Чтобы не гадать, здесь печатаются только счётные признаки: сколько
+          # строк, сколько пар имя=значение, есть ли перевод строки в конце
+          # файла (без него следующая дописанная строка склеится с последней),
+          # и какие копии лежат рядом с их временем и размером. Значений нет.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            echo strok: \$(wc -l < $ENV_DIR/env)
+            echo par: \$(grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env)
+            echo bajt: \$(wc -c < $ENV_DIR/env)
+            if [ -n \"\$(tail -c 1 $ENV_DIR/env)\" ]; then echo 'perevoda stroki v konce NET'; else echo 'perevod stroki v konce est'; fi
+            echo '--- kopii ---'
+            ls -1t --time-style=+%Y-%m-%dT%H:%M:%SZ $ENV_DIR/env.bak.* 2>/dev/null | head -8
+            for b in \$(ls -1t $ENV_DIR/env.bak.* 2>/dev/null | head -8); do
+              echo \"\$b par=\$(grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' \$b) bajt=\$(wc -c < \$b)\"
+            done" | tee -a "$OUT"
+
       - name: "Ключей в отчёте быть не должно"
         if: always()
         run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
