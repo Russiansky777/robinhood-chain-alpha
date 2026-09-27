@@ -1,0 +1,80 @@
+name: "Полоса: куда ушла просадка (по подписям, только чтение)"
+
+# ЗАЧЕМ (владелец 27.09, пункт 5): "Просадка полосы 0.016 за ночь без сделок:
+# что именно списано (nonce, рента, иное), сколько в сутки; если периодическая
+# прокрутка nonce -- перевести на прокрутку только после использования".
+#
+# Разбор идёт ПО ПОДПИСЯМ кошелька за окно, и причина каждого списания берётся
+# из инструкций транзакции, а не из догадки. Что не опознано -- попадает в
+# "иное" и перечисляется поштучно: иначе "иное" стало бы ковром.
+#
+# Ни одной отправки. Ночное окно смотрится на СТАРОМ кошельке полосы: просадка
+# случилась там, и его история теперь неизменна, значит замер воспроизводим.
+on:
+  workflow_dispatch:
+    inputs:
+      koshelek:
+        description: "кошелёк (по умолчанию старый кошелёк полосы -- там и была просадка)"
+        required: false
+        default: "21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w"
+      s:
+        description: "начало окна UTC"
+        required: false
+        default: "2026-09-26T21:00:00"
+      po:
+        description: "конец окна UTC"
+        required: false
+        default: "2026-09-27T06:00:00"
+      predel:
+        description: "сколько подписей брать"
+        required: false
+        default: "400"
+
+concurrency:
+  group: prosadka-polosy
+  cancel-in-progress: false
+
+env:
+  OUT: data/prosadka_polosy.json
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Разбор по подписям"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          python3 deploy/checks/prosadka_polosy.py \
+            --koshelek '${{ inputs.koshelek }}' \
+            --s '${{ inputs.s }}' --po '${{ inputs.po }}' \
+            --predel '${{ inputs.predel }}' --out "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Polosa: kuda ushla prosadka, razbor po podpisyam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
