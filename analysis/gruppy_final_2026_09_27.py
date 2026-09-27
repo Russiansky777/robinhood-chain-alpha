@@ -27,6 +27,7 @@ Bloom не торгует НИ ПО ОДНОЙ группе (bloom_trades=false 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import re
 import sys
@@ -162,6 +163,30 @@ def адреса_прежнего(д: dict) -> list:
     return [(а, г) for а, г in из_ if а]
 
 
+ФАЙЛ_543 = "data/podbivka/wallets.csv"
+
+
+def адреса_543(путь: str | None = None) -> list:
+    """Адреса списка 543 из файла второй сессии. Нет файла -- пустой список.
+
+    Молча резать список нельзя (слово владельца), но и выдумывать адреса,
+    которых в файле нет, тоже: если файла нет, сборка добавит ноль адресов, и
+    это будет видно по числу в отчёте.
+    """
+    п = Path(путь or ФАЙЛ_543)
+    if not п.exists():
+        п = Path(__file__).resolve().parent.parent / (путь or ФАЙЛ_543)
+    if not п.exists():
+        return []
+    из_ = []
+    with open(п, encoding="utf-8") as ф:
+        for стр in csv.DictReader(ф):
+            а = (стр.get("address") or "").strip()
+            if len(а) >= 32:
+                из_.append((а, f"список 543: {(стр.get('group') or '')[:40]}"))
+    return из_
+
+
 def собрать(путь_прежнего: str) -> dict:
     прежний = json.loads(Path(путь_прежнего).read_text(encoding="utf-8"))
     все_в_файле = set(re.findall(r'"([1-9A-HJ-NP-Za-km-z]{32,44})"',
@@ -196,6 +221,17 @@ def собрать(путь_прежнего: str) -> dict:
         if а in названные or а in НАШИ_КОШЕЛЬКИ:
             continue
         группы["log_only"]["addresses"][а] = {"from": f"прежний файл: {откуда}"}
+    # СПИСОК 543 (дополнение владельца 27.09): все адреса подбивки Code-2 --
+    # в лог-группу, lane_trades=false, только лог сигналов. Список читается из
+    # файла второй сессии, а не переписывается сюда руками: переписанный он
+    # разошёлся бы с её таблицей молча.
+    for а, откуда in адреса_543():
+        if а in названные or а in НАШИ_КОШЕЛЬКИ:
+            continue
+        if а in группы["log_only"]["addresses"]:
+            группы["log_only"]["addresses"][а]["also"] = откуда
+            continue
+        группы["log_only"]["addresses"][а] = {"from": откуда}
 
     новый = {
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -267,6 +303,26 @@ def self_test() -> int:
     chk("веер выключен везде",
         not any(г.get("fanout") for г in ф["groups"].values()),
         [и for и, г in ф["groups"].items() if г.get("fanout")])
+    chk("список 543 прочитан из файла второй сессии, а не переписан руками",
+        len(адреса_543()) >= 500, len(адреса_543()))
+    торг = set(list(ф["groups"]["leader"]["addresses"])
+               + list(ф["groups"]["batch5"]["addresses"])
+               + list(ф["groups"]["lane_s0"]["addresses"]))
+    # Часть списка 543 -- это и есть кошельки, которых владелец назвал для
+    # торговли (их оттуда и выбирали). Правило не "их там нет", а "список 543
+    # не перебивает названную группу и не двоит адрес".
+    общие = set(а for а, _ in адреса_543()) & торг
+    chk("адреса из 543, названные для торговли, остались в торгующей группе и "
+        "в log_only не задвоены",
+        общие and not (общие & set(ф["groups"]["log_only"]["addresses"])),
+        (len(общие), sorted(общие & set(ф["groups"]["log_only"]["addresses"]))[:5]))
+    chk("все адреса списка 543 есть в файле (молча не резали)",
+        not (set(а for а, _ in адреса_543())
+             - set(ф["groups"]["log_only"]["addresses"]) - торг
+             - set(ф["groups"]["off"]["addresses"])),
+        len(set(а for а, _ in адреса_543())
+            - set(ф["groups"]["log_only"]["addresses"]) - торг
+            - set(ф["groups"]["off"]["addresses"])))
     chk("off и log_only не торгуют полосой",
         not ф["groups"]["off"]["lane_trades"]
         and not ф["groups"]["log_only"]["lane_trades"], "")
