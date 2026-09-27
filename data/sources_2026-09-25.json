@@ -1,708 +1,639 @@
 {
+ "generated_utc": "2026-09-27T14:57:42Z",
+ "decision": "Финальный план живого теста, владелец 27.09. Четыре группы: leader, batch5, lane_s0 и off; Bloom не торгует ни по одной (bloom_trades=false), веер выключен (fanout=false), Jupiter в покупке не участвует ни на одной группе. Прежние группы speed_only, bloom_lane, lane_only и candidates упразднены.",
+ "groups": {
+  "leader": {
+   "lane_size": 0.2,
+   "lane_trades": true,
+   "bloom_trades": false,
+   "bloom_sol": null,
+   "fanout": false,
+   "min_target_sol": 15,
+   "max_slots_from_source": null,
+   "skip_flippers": false,
+   "allow_taxed_route": true,
+   "slippage": 0.25,
+   "min_pool_sol_reserve": null,
+   "lane_open_max": 3,
+   "stop_loss_sol": 0.3,
+   "hold_slots": 150,
+   "lane_pools": [
+    "pump_amm",
+    "cpmm",
+    "bonding",
+    "two_step"
+   ],
+   "note": "Лидер. Размер 0.2 SOL, порог источника 15 SOL-экв., налоговый маршрут берём и пишем налог в строку решения, наценка входа до 0.25, три открытых, стоп -0.30 за сутки, держим 150 слотов от s0. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и двухшаговый маршрут через котировочный токен (п.3). LaunchLab, CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), поэтому их в списке ПОКА НЕТ.",
+   "addresses": {
+    "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit": {
+     "name": "лидер",
+     "from": "названо владельцем"
+    }
+   }
+  },
+  "batch5": {
+   "lane_size": 0.05,
+   "lane_trades": true,
+   "bloom_trades": false,
+   "bloom_sol": null,
+   "fanout": false,
+   "min_target_sol": 2,
+   "max_slots_from_source": null,
+   "skip_flippers": false,
+   "allow_taxed_route": true,
+   "slippage": 0.4,
+   "min_pool_sol_reserve": 30,
+   "lane_open_max": 3,
+   "stop_loss_sol": 0.15,
+   "hold_slots": 72,
+   "lane_pools": [
+    "pump_amm",
+    "cpmm",
+    "bonding",
+    "two_step"
+   ],
+   "note": "Восемь названных кошельков BATCH-5. 0.05 SOL, порог 2 SOL-экв., наценка входа до 0.40, резерв пула не ниже 30 SOL-экв., три открытых, стоп -0.15, держим 72 слота от s0.",
+   "addresses": {
+    "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv": {
+     "name": "Omakase",
+     "from": "названо владельцем"
+    },
+    "H3en1XWQHfbNWjEDRnRFi6HKVkZG1P7twdAHTvnCnYE3": {
+     "name": "MaxHuh",
+     "from": "названо владельцем"
+    },
+    "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ": {
+     "name": "Theo",
+     "from": "названо владельцем"
+    },
+    "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv": {
+     "name": "RugDalio",
+     "from": "названо владельцем"
+    },
+    "HYh78tNpGBUcxoHgPU9v7VeP2wqSbkapuTzrfYHjfyLo": {
+     "name": "CardinalSaint",
+     "from": "названо владельцем"
+    },
+    "5opd5KBmodmoNuAThQ5cmXKbRxHbQDfomWGKAs3uEUP9": {
+     "name": "soby",
+     "from": "названо владельцем"
+    },
+    "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2": {
+     "name": "rasmr",
+     "from": "названо владельцем"
+    },
+    "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": {
+     "name": "dreamloader",
+     "from": "названо владельцем"
+    }
+   }
+  },
+  "lane_s0": {
+   "lane_size": 0.05,
+   "lane_trades": true,
+   "bloom_trades": false,
+   "bloom_sol": null,
+   "fanout": false,
+   "min_target_sol": 2,
+   "max_slots_from_source": 3,
+   "skip_flippers": true,
+   "allow_taxed_route": false,
+   "slippage": 0.35,
+   "min_pool_sol_reserve": 30,
+   "lane_open_max": 3,
+   "stop_loss_sol": 0.15,
+   "hold_slots": 72,
+   "lane_pools": [
+    "bonding"
+   ],
+   "note": "Десять кошельков с усечённым S+0. 0.05 SOL, порог 2 SOL-экв., не покупаем, если от слота источника прошло больше 3 слотов, помеченных перекупщиками пропускаем (сейчас не помечен ни один -- по таблице Code-2 все десять проходят), налоговый маршрут НЕ берём, наценка входа до 0.35, резерв пула не ниже 30 SOL-экв. ТОЛЬКО кривая pump.fun: список lane_pools здесь ПОЛНЫЙ, он же и запрещает Pump AMM с Raydium CPMM.",
+   "addresses": {
+    "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ": {
+     "name": "frank",
+     "from": "названо владельцем",
+     "flipper": false
+    },
+    "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB": {
+     "name": "Brez",
+     "from": "названо владельцем",
+     "flipper": false
+    },
+    "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb": {
+     "name": "Xk9onq",
+     "from": "названо владельцем",
+     "flipper": false
+    },
+    "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8": {
+     "name": "jg",
+     "from": "названо владельцем",
+     "flipper": false
+    },
+    "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm": {
+     "name": "Bitman",
+     "from": "названо владельцем",
+     "flipper": false
+    },
+    "8RCEq8RrBJ1G6eji9vZqjtjQgkDjUHMysPtynZENWo7S": {
+     "name": "Avocado",
+     "from": "названо владельцем",
+     "flipper": false
+    },
+    "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS": {
+     "name": "5pHeNs",
+     "from": "названо владельцем",
+     "flipper": false
+    },
+    "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk": {
+     "name": "B8m6fDRc",
+     "from": "префикс B8m6fDRc",
+     "flipper": false
+    },
+    "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr": {
+     "name": "7JVQMwRj",
+     "from": "префикс 7JVQMwRj",
+     "flipper": false
+    },
+    "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy": {
+     "name": "3Um4qsYQ",
+     "from": "префикс 3Um4qsYQ",
+     "flipper": false
+    }
+   }
+  },
+  "off": {
+   "lane_size": null,
+   "lane_trades": false,
+   "bloom_trades": false,
+   "bloom_sol": null,
+   "fanout": false,
+   "note": "Выключены прямым словом владельца 27.09. Подписка и лог остаются, денег не тратим.",
+   "addresses": {
+    "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y": {
+     "name": "fomopumpguy",
+     "from": "названо владельцем"
+    },
+    "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc": {
+     "name": "earn",
+     "from": "названо владельцем"
+    },
+    "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn": {
+     "name": "gginvestments",
+     "from": "названо владельцем"
+    },
+    "6F91X5t8af1yRHALkwf8EStEn6mKYvsW8zpLiVpfYr38": {
+     "name": "Pyro",
+     "from": "названо владельцем"
+    },
+    "FjUJgFT3YFxnVMFDm24k1C31jV6VJCfSpviz2kPWPLMH": {
+     "name": "FjUJgFT3",
+     "from": "префикс FjUJgFT3"
+    },
+    "D1wfmvGq5B4mG7bKeFMHnKetUaSe2XU41jZ5oyEdkpNS": {
+     "name": "D1wfmvGq",
+     "from": "префикс D1wfmvGq"
+    },
+    "DijCeWfMjfSC6DcK8foDF2GTaahcTunk27hVGEhuKf6g": {
+     "name": "DijCeWfM",
+     "from": "префикс DijCeWfM"
+    },
+    "J2QQwDNYHZtW5HvYS2UPRAo4JjAU2HfLmHNocfHLE7Ru": {
+     "name": "J2QQwDNY",
+     "from": "префикс J2QQwDNY"
+    },
+    "4vgKuiktnNfXsoa9YTCUz9fRpfYDpDko4cBG15nkqazo": {
+     "name": "4vgKuikt",
+     "from": "префикс 4vgKuikt"
+    }
+   }
+  },
+  "log_only": {
+   "lane_size": null,
+   "lane_trades": false,
+   "bloom_trades": false,
+   "bloom_sol": null,
+   "fanout": false,
+   "note": "Все прочие адреса, на которые служба подписана. Слово владельца: lane_trades=false, только лог сигналов со всеми полями. Из файла их убирать нельзя -- пропала бы подписка, а с ней и лог.",
+   "addresses": {
+    "2heJbC32Tpfcb3nbUb5ER61K11FGZVfVGtVnDm6LDogF": {
+     "from": "прежний файл: lane_only"
+    },
+    "HDixbrzwwLXczhDBk1JVrurPQsuLE8FUKnW2pucSXN3o": {
+     "from": "прежний файл: lane_only"
+    },
+    "5FGoPPj1nL8LCnfVnpTmreqQtqLuMXXAwuS1uahMrp8V": {
+     "from": "прежний файл: lane_only"
+    },
+    "4ugDhHJ8XDXAeABmrNmGffFaLbJb9BkPyiFGVSV9ocwo": {
+     "from": "прежний файл: lane_only"
+    },
+    "2yXwy5Dsa1XtEXcsrkFVRJeyuWD3qKkMN3pP3p5VTW3V": {
+     "from": "прежний файл: lane_only"
+    },
+    "H2QSGECp13sFLJgdTsDtayX3dk18Dm6sQMSQKcew7Xzk": {
+     "from": "прежний файл: lane_only"
+    },
+    "jrbGz3zoBJfptXF967xp6h5TBRV55ArvGeWxTQVs5Ux": {
+     "from": "прежний файл: lane_only"
+    },
+    "2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8": {
+     "from": "прежний файл: lane_only"
+    },
+    "J9WiAZKf8JnCkHFL8fLCCXdEgdoLjLRqU2EGsDjdqYga": {
+     "from": "прежний файл: lane_only"
+    },
+    "8f39XhhZoRD8sYb6K5K9N7iSHXkL7BDmFFQNDF3TtsEr": {
+     "from": "прежний файл: lane_only"
+    },
+    "F5hkYsi8JxjyA2JHN5CA7MbnnhWubkXB2ZQB7Gkaxqs6": {
+     "from": "прежний файл: lane_only"
+    },
+    "DCeH3aCsstGUSxQqS72VBZwTydoor1nQ6dWaxrgGQk39": {
+     "from": "прежний файл: lane_only"
+    },
+    "GFRjGNXY8JrGSPC46inqrH4XPdUFMDLkE1oNm1nXiPsJ": {
+     "from": "прежний файл: lane_only"
+    },
+    "7iPPqPyrqcmfenRs4xZ72ab4pyuUofXB5YaQB83WJmT9": {
+     "from": "прежний файл: lane_only"
+    },
+    "7sQJttJLutWjHkxbusTgE4GpSj5z4fegouv2USHDFN2H": {
+     "from": "прежний файл: lane_only"
+    },
+    "5dB6rj9CoXMLQCAymoC5UXCb1LtFjbM5rbut3MNuj9Q": {
+     "from": "прежний файл: lane_only"
+    },
+    "33vFB2rtG9FDpJReNaJrBF4RZgri5HTVo5gSxP1XfVCr": {
+     "from": "прежний файл: lane_only"
+    },
+    "EURKJdQmbP2GqSBssKuhgLKz2XEwhUXnHL2oYd4eejMm": {
+     "from": "прежний файл: lane_only"
+    },
+    "9mLaswxfkdjWcbfmotYRfBVSEfUddmbfebKEaNggfsSR": {
+     "from": "прежний файл: lane_only"
+    },
+    "29omQei1ywcRzHMYXx3iEEgfZ7ccqB7TpwL3q4s3RWe3": {
+     "from": "прежний файл: lane_only"
+    },
+    "5eiXSFxmZKKo8V6qTw72SBskCZa7ok8jyqutsvtCuE1i": {
+     "from": "прежний файл: lane_only"
+    },
+    "5VRgqb2qbVqaWVGsM2k1b2bnPJk7up2xYbn4ziEjFgNt": {
+     "from": "прежний файл: lane_only"
+    },
+    "FWSPXhQAD57hXJBNsWRkYupwQ4grQrr75JiWM6CqzHva": {
+     "from": "прежний файл: lane_only"
+    },
+    "FF6vsaUcp4s95Q5NNm7VZ7deZU6gBU2vZmaiyQ36Ymrc": {
+     "from": "прежний файл: lane_only"
+    },
+    "6MwHc79vgWXeMVyZwgQ13bqqudRNCYkvjmgQzc294g8M": {
+     "from": "прежний файл: lane_only"
+    },
+    "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact": {
+     "from": "прежний файл: lane_only"
+    },
+    "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ": {
+     "from": "прежний файл: lane_only"
+    },
+    "AUYLj5kLGUadmhn8kM91KnTJYfHiXGzcQ7TViP8uLLQv": {
+     "from": "прежний файл: lane_only"
+    },
+    "DPAghrNgkW4m5HMBL3kVsiCm9ywhrBtCutc6tSSvicx8": {
+     "from": "прежний файл: lane_only"
+    },
+    "Dw3LY8NnG3BB1EEXCNJwAKtVoEE7faEYiygYNHfFPNb1": {
+     "from": "прежний файл: lane_only"
+    },
+    "BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN": {
+     "from": "прежний файл: lane_only"
+    },
+    "AMcHYqUj4HPUdkDkEatguugNSmKaQTdvxzexzqsXDU4r": {
+     "from": "прежний файл: lane_only"
+    },
+    "B6e9vDURyhMsnHDVZQTDLDz1cvW298SpET5LeaLcA9sn": {
+     "from": "прежний файл: lane_only"
+    },
+    "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc": {
+     "from": "прежний файл: speed_only/by_signal"
+    },
+    "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "58ZGdqxCnHSALS1Pa2JP3Vr2KsoAZ3HTv6szfoZBuwy1": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "Gi5DyNkCLVQkcjykXVWUheM1EzCg8XjUPdcf7E8Gj2eh": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "5YdQpAHXACbxMpNvSa7KuXmCjm5sDjeupKCr78A218sP": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "C8KsrrGXQ2bXkhGYfxQnnDtCp1c9XTKPoGb9wafWJKEp": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "HAJZFnZ9M89qxAsEeifSpaa1UcgN9cW9cs3bSSHCG56q": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "9ABCPb1YwRSv5d543skgg1nGTgWN5u1jcVBVDy81vNcB": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "GZi5tmvZePF3rqWyGJf3wtNaninFKbCWanYjAr736xU3": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "B5RLgxWXWoQbZL2znRoU9TgznSxwLD9iQcHw3sGAFFT7": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "HPiAxtK5UGhaNTjNPqDn9WijfQhZ6YEqgHc5MeLZUiba": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "HBZB1948Uj543GHimHx2pfjFP4uchRxQnR3nGF1ZPhRs": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "4bkq7rLkyVYCdGozmnYKq931qPXXsUrV6LdXnFqZuLQ9": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "6Ka3hMVvY3LXtKqvFoT3rrxiFw9ponrZLcBBdTUGwtdB": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "BtUgRpMLXPNPiBUZXnsfxZ8MdVPqWe5YRXeLj6mhQtd2": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "7txcAXw9t7jRiW93tt6mbJ7cDA5EUSiVSRRfPyzH1DMa": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "5shjncQujYtwC6exTGNFqAV3jNkSmsWcw7xtV9YJzsXw": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "7BsVR8tuCzQzwctHbaDurMzXn8CitCSfm9yCQiuHEuFm": {
+     "from": "прежний файл: speed_only/snipers"
+    },
+    "CkUZV387xnoGpF7wC2moMa6mPmAgCvTT4pWgzq4M9fCD": {
+     "from": "прежний файл: speed_only/snipers"
+    }
+   }
+  }
+ },
+ "prefixes_resolved": {
+  "B8m6fDRc": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
+  "7JVQMwRj": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+  "3Um4qsYQ": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+  "FjUJgFT3": "FjUJgFT3YFxnVMFDm24k1C31jV6VJCfSpviz2kPWPLMH",
+  "D1wfmvGq": "D1wfmvGq5B4mG7bKeFMHnKetUaSe2XU41jZ5oyEdkpNS",
+  "DijCeWfM": "DijCeWfMjfSC6DcK8foDF2GTaahcTunk27hVGEhuKf6g",
+  "J2QQwDNY": "J2QQwDNYHZtW5HvYS2UPRAo4JjAU2HfLmHNocfHLE7Ru",
+  "4vgKuikt": "4vgKuiktnNfXsoa9YTCUz9fRpfYDpDko4cBG15nkqazo"
+ },
+ "disputed_prefixes": [],
+ "archive_2026_09_25": {
   "generated_utc": "2026-09-25",
   "decision": "Сводный промпт владельца 25.09 15:45 Madrid, пункты 1.1 и 1.2. Полоса слушает всех; Bloom торгует ТОЛЬКО по BATCH-3/5, которые приходят из DBot живьём и в этот файл не вписаны нарочно: два списка разошлись бы молча.",
   "sources_s0_data": "data/solana_entry_log_offsets_cache.json (block_buyers: ключ slot:mint входа источника, значит его покупатели -- ровно S+0); служебные адреса исключены по data/solana_fast_buyers_services.json",
-  "groups": {
-    "bloom_lane": {
-      "lane_sol": 0.05,
-      "bloom_trades": true,
-      "bloom_sol": 0.05,
-      "fanout": true,
-      "note": "BATCH-3/5 плюс лидер: полоса 0.05 SOL (пункты 2 и 3). Bloom по этой группе тоже 0.05 SOL -- решение владельца 26.09 (пункт 9): было 0.2, пары Bloom против полосы сохраняются, а ночной расход площадки режется вчетверо. Адресов здесь нет нарочно -- они приходят из DBot живьём; это группа по умолчанию для всякого источника, которого нет в других группах.",
-      "addresses": {}
-    },
-    "lane_only": {
-      "lane_sol": 0.05,
-      "bloom_trades": true,
-      "bloom_sol": 0.05,
-      "fanout": true,
-      "note": "Пункт 1.1: 38 активных кошельков реестра, которых детектор ещё не слушал. Полоса мерит слот, место и кто довёз; в деньги входят с меткой группы.",
-      "credits_rule": "потолок детектора 1 000 000 кредитов в сутки (решение владельца 25.09, поднят с 300 000). Сторож расхода батчи НОЧЬЮ НЕ РЕЖЕТ -- прежнее правило про снятие BATCH-1 и BATCH-4 при 70 % отменено тем же решением",
-      "addresses": {
-        "2heJbC32Tpfcb3nbUb5ER61K11FGZVfVGtVnDm6LDogF": "BATCH-1",
-        "HDixbrzwwLXczhDBk1JVrurPQsuLE8FUKnW2pucSXN3o": "BATCH-1",
-        "5FGoPPj1nL8LCnfVnpTmreqQtqLuMXXAwuS1uahMrp8V": "BATCH-1",
-        "4ugDhHJ8XDXAeABmrNmGffFaLbJb9BkPyiFGVSV9ocwo": "BATCH-1",
-        "2yXwy5Dsa1XtEXcsrkFVRJeyuWD3qKkMN3pP3p5VTW3V": "BATCH-1",
-        "H2QSGECp13sFLJgdTsDtayX3dk18Dm6sQMSQKcew7Xzk": "BATCH-1",
-        "jrbGz3zoBJfptXF967xp6h5TBRV55ArvGeWxTQVs5Ux": "BATCH-1",
-        "2xUbYAVq1oJGj45d6JjnaYHAke3NQecUcqWvvVbwmYw8": "BATCH-1",
-        "J9WiAZKf8JnCkHFL8fLCCXdEgdoLjLRqU2EGsDjdqYga": "BATCH-1",
-        "8f39XhhZoRD8sYb6K5K9N7iSHXkL7BDmFFQNDF3TtsEr": "BATCH-1",
-        "F5hkYsi8JxjyA2JHN5CA7MbnnhWubkXB2ZQB7Gkaxqs6": "BATCH-2",
-        "DCeH3aCsstGUSxQqS72VBZwTydoor1nQ6dWaxrgGQk39": "BATCH-2",
-        "GFRjGNXY8JrGSPC46inqrH4XPdUFMDLkE1oNm1nXiPsJ": "BATCH-2",
-        "7iPPqPyrqcmfenRs4xZ72ab4pyuUofXB5YaQB83WJmT9": "BATCH-2",
-        "7sQJttJLutWjHkxbusTgE4GpSj5z4fegouv2USHDFN2H": "BATCH-2",
-        "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2": "BATCH-2",
-        "8RCEq8RrBJ1G6eji9vZqjtjQgkDjUHMysPtynZENWo7S": "BATCH-2",
-        "5dB6rj9CoXMLQCAymoC5UXCb1LtFjbM5rbut3MNuj9Q": "BATCH-2",
-        "33vFB2rtG9FDpJReNaJrBF4RZgri5HTVo5gSxP1XfVCr": "BATCH-2",
-        "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb": "BATCH-4",
-        "EURKJdQmbP2GqSBssKuhgLKz2XEwhUXnHL2oYd4eejMm": "BATCH-4",
-        "9mLaswxfkdjWcbfmotYRfBVSEfUddmbfebKEaNggfsSR": "BATCH-4",
-        "29omQei1ywcRzHMYXx3iEEgfZ7ccqB7TpwL3q4s3RWe3": "BATCH-4",
-        "5eiXSFxmZKKo8V6qTw72SBskCZa7ok8jyqutsvtCuE1i": "BATCH-4",
-        "5VRgqb2qbVqaWVGsM2k1b2bnPJk7up2xYbn4ziEjFgNt": "BATCH-6",
-        "FWSPXhQAD57hXJBNsWRkYupwQ4grQrr75JiWM6CqzHva": "BATCH-6",
-        "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS": "BATCH-6",
-        "FF6vsaUcp4s95Q5NNm7VZ7deZU6gBU2vZmaiyQ36Ymrc": "BATCH-6",
-        "6MwHc79vgWXeMVyZwgQ13bqqudRNCYkvjmgQzc294g8M": "BATCH-6",
-        "ChgLZt4oJsgT1JEde8vmT2EcSJSqF38aB9PzYNtNDact": "BATCH-6",
-        "9djgawmgpGrzt7DQoJ6tA2YW4gQyt3yH19uVZ3e2T3JJ": "BATCH-7",
-        "AUYLj5kLGUadmhn8kM91KnTJYfHiXGzcQ7TViP8uLLQv": "BATCH-7",
-        "DPAghrNgkW4m5HMBL3kVsiCm9ywhrBtCutc6tSSvicx8": "BATCH-7",
-        "Dw3LY8NnG3BB1EEXCNJwAKtVoEE7faEYiygYNHfFPNb1": "BATCH-7",
-        "BBcvxEyptYWSxgse7ESKWRxMRkpp9uE7wpCxUm6YqEhN": "BATCH-7",
-        "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": "BATCH-7",
-        "AMcHYqUj4HPUdkDkEatguugNSmKaQTdvxzexzqsXDU4r": "BATCH-7",
-        "B6e9vDURyhMsnHDVZQTDLDz1cvW298SpET5LeaLcA9sn": "BATCH-7"
-      }
-    },
-    "speed_only": {
-      "lane_sol": 0.01,
-      "bloom_trades": true,
-      "bloom_sol": 0.01,
-      "fanout": false,
-      "day_cap_sol": 3.0,
-      "stop_loss_sol": 0.5,
-      "min_target_sol": 0.5,
-      "note": "Пункт 1.2: только для скорости, через пул БЕЗ веера, в деньги не входит. Потолок 3 SOL в сутки (покупки плюс чаевые; было 1 -- решение владельца 26.09, оборот упёрся в 1.020627 к 14:03Z), стоп при -0.5 SOL. Цель -- 30+ покупок в час.",
-      "credits_rule": "30 адресов с наибольшим числом попаданий в S+0 (только подписанты, не наши) по слову владельца 25.09 вечером; расход детектора после снятия двух авторити пулов ~5 150 кредитов в час, прогноз ~124 000 в сутки против потолка 1 000 000",
-      "by_signal": [
-        {
-          "address": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 10
-        },
-        {
-          "address": "BXLEfLN8bHsQCn81rFZebcavP1JSory1XbSDoeYQxJPc",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 9
-        }
-      ],
-      "snipers": [
-        {
-          "address": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
-          "s0_hits": 49,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "58ZGdqxCnHSALS1Pa2JP3Vr2KsoAZ3HTv6szfoZBuwy1",
-          "s0_hits": 44,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "4vgKuiktnNfXsoa9YTCUz9fRpfYDpDko4cBG15nkqazo",
-          "s0_hits": 30,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "Gi5DyNkCLVQkcjykXVWUheM1EzCg8XjUPdcf7E8Gj2eh",
-          "s0_hits": 25,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "5YdQpAHXACbxMpNvSa7KuXmCjm5sDjeupKCr78A218sP",
-          "s0_hits": 24,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
-          "s0_hits": 23,
-          "why": "назван владельцем прямо"
-        },
-        {
-          "address": "C8KsrrGXQ2bXkhGYfxQnnDtCp1c9XTKPoGb9wafWJKEp",
-          "s0_hits": 21,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
-          "s0_hits": 20,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
-          "s0_hits": 20,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "HAJZFnZ9M89qxAsEeifSpaa1UcgN9cW9cs3bSSHCG56q",
-          "s0_hits": 20,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "9ABCPb1YwRSv5d543skgg1nGTgWN5u1jcVBVDy81vNcB",
-          "s0_hits": 19,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "D1wfmvGq5B4mG7bKeFMHnKetUaSe2XU41jZ5oyEdkpNS",
-          "s0_hits": 19,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "GZi5tmvZePF3rqWyGJf3wtNaninFKbCWanYjAr736xU3",
-          "s0_hits": 19,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "B5RLgxWXWoQbZL2znRoU9TgznSxwLD9iQcHw3sGAFFT7",
-          "s0_hits": 18,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "FjUJgFT3YFxnVMFDm24k1C31jV6VJCfSpviz2kPWPLMH",
-          "s0_hits": 18,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "HPiAxtK5UGhaNTjNPqDn9WijfQhZ6YEqgHc5MeLZUiba",
-          "s0_hits": 16,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "HBZB1948Uj543GHimHx2pfjFP4uchRxQnR3nGF1ZPhRs",
-          "s0_hits": 15,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8",
-          "s0_hits": 14,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "4bkq7rLkyVYCdGozmnYKq931qPXXsUrV6LdXnFqZuLQ9",
-          "s0_hits": 13,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "6Ka3hMVvY3LXtKqvFoT3rrxiFw9ponrZLcBBdTUGwtdB",
-          "s0_hits": 13,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "BtUgRpMLXPNPiBUZXnsfxZ8MdVPqWe5YRXeLj6mhQtd2",
-          "s0_hits": 13,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "J2QQwDNYHZtW5HvYS2UPRAo4JjAU2HfLmHNocfHLE7Ru",
-          "s0_hits": 13,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "7txcAXw9t7jRiW93tt6mbJ7cDA5EUSiVSRRfPyzH1DMa",
-          "s0_hits": 12,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
-          "s0_hits": 12,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "5shjncQujYtwC6exTGNFqAV3jNkSmsWcw7xtV9YJzsXw",
-          "s0_hits": 11,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "7BsVR8tuCzQzwctHbaDurMzXn8CitCSfm9yCQiuHEuFm",
-          "s0_hits": 11,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
-          "s0_hits": 11,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "CkUZV387xnoGpF7wC2moMa6mPmAgCvTT4pWgzq4M9fCD",
-          "s0_hits": 10,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        }
-      ],
-      "dropped_by_credits": [
-        {
-          "address": "HEWMZfYQhaoVqfiWjwMafQ9QZNjSXNMmSzHhYyFDBE4T",
-          "s0_hits": 9,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "23pV3a97bH3pKczjipwKiekzXg2Qt4vtebbYmUtBQ2vm",
-          "s0_hits": 8,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "2CQgjcdNEo7WtbQLpJTAVcC3Ga61pNvRDTgP5grzctFG",
-          "s0_hits": 8,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "2UVpJNXzpRhbuiRy1URAufVi7d3T9oULzXMB781EzvRG",
-          "s0_hits": 8,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "7PFdKg9HgcjXh9fodFp6BCSGxqXcDSHAizotW6umE7aN",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 8
-        },
-        {
-          "address": "8bFgY633V5ajtEsQSUrbNBvzzdyq7hU8QLG2mDS5h7Nn",
-          "s0_hits": 8,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "DkjAAsupnGvcW8d7X3W1dkJd3z6jZbWfDcJSdZLsCMAS",
-          "s0_hits": 8,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "EmgYnyQh4pVD7hN1x6rLzVwxYqZBFktUTqoQF3Wbmqib",
-          "s0_hits": 8,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "GJ9DCuNZHpeevsZbaJYUCioz2SJbssoWCzSaLu3mgg8C",
-          "s0_hits": 8,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "6GXvS2Rg7WzKMdxEKb6q4wJUjmdpTbyHmjTf2Z5xftAj",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "92MDrZqegrdMmpsrBBREeEWa6Es7ZF3nhdCCtsJeSA4b",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "9AjgLrVdiMe9tjhXKJun7MZiP4fYY2EB7sXYTS5jqnwg",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "ABNaeejNKoKa6Vd5SYyP8wgX8kkMYKtc7HGNWdFVi1PP",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 7
-        },
-        {
-          "address": "AUt8xSEq4FcFLL9ksAyu2RNoeMQLZzRsLjR8cNDXoKq5",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "D8pBNrTqzgr6FNWg5umqXcG32UkiBYr5vR71GTRMfujZ",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "DLRHqWeY4YXBVzHZCfvKbhBueNi65B9tz4W5jdMV6mZu",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "DijCeWfMjfSC6DcK8foDF2GTaahcTunk27hVGEhuKf6g",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "E5bJMgr1on8o7AQ96g419pWHXsTYyXaW6o864yge6FHZ",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "FgBLLBjtosuHQTbK2fnEfMHR82vmMeD63ga9wW5HAyrH",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "Ft5ydGUTNLK7tvCbXr6sTpQDYSHP9mUPXKgV2CXyvJhq",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "H6W8xzyeCHvy5iUn6hx3YaYqKKH3gUsspNYLLjQuKYu5",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "HZow7oewntFwaEU741jEkAGeedD9yzdKddgwgqRXxpqq",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "HtuYE3nYd7y9vxqiUjZdjTscGiFKt5JCcjD41vFwuebT",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 7
-        },
-        {
-          "address": "XyKoe6LFwGHqb79yD3WmdZs8o9kAbxNvsi65V95D1ce",
-          "s0_hits": 7,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "2PEiPSv7CuhCYXTsVYDP6xP5L1DJN3YFQkh8xem6y6KN",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "3p1icgC7VUBak5ygYvAbAH7UTxr7dh2mY3ddRN7q7AZL",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "5yv2wLZQVQXQeMhNcYA7WFEWqNCQLGRuQhZJoMbUdiMm",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "61XtN5uz3isP9roMuRexTDAQrhhya2fD966B77VGrRY5",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "65nLueCtRkZb8SZgM4RmGDRFbYymWsDaqjxVN9Urdpr1",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "7xPDo97sb5Ueb7zuR1k4A7PBW5hLwhPGsPzj1nA8J7PQ",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 6
-        },
-        {
-          "address": "9dSdnmzURP3q2mAH9yUcuj6Qw3rFbAvTzXpRnWstdmaG",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "AL9QWtUeWTw1mvFmxtwk5mVCzjhKWyH8VBgKK7TXFGVz",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "AWWw36mNfwQQTxsEqHhqzrHa7963jCjHLrVCsUyiKPwn",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "AtEgWr4VRRRT4AYKwHLvSPxAL27DVJTinwQSwf4iHjqt",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "BqjYFq61KLHuDv8uXdUkyohZRxjbu2rPCWnWfYiuUzG1",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "Cn362o4GxMmnv7sZ3tARftDCLfxfUzz62e3K31vscuH5",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "CniQFXs6XUsaJm6KJYo7oKVhxqzv5ikpRwTibaTbJ3GU",
-          "s0_hits": 6,
-          "why": "из сохранённых данных З1: попаданий в S+0"
-        },
-        {
-          "address": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 5
-        },
-        {
-          "address": "7XFo82igqSfBjb6SXJigbkhdFGFmVrh46zj3rvCPBK9n",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 5
-        },
-        {
-          "address": "57aiHCweKvWmAspN26FVV6kKLY8opJGYgw5iN3nPESk9",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 4
-        },
-        {
-          "address": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 3
-        },
-        {
-          "address": "Bra5EH8vqm5bmGupdEHWcwNepetuvSuW2z4excQR5yNs",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 2
-        },
-        {
-          "address": "CbtBvpGhqX7kJ6eXkNWcy7ES9B7xK2HTfbpMqLojCRd5",
-          "why": "снят по сигналу, не за налог",
-          "s0_hits": 1
-        },
-        {
-          "address": "GUiSJYdAs5nyPcTkyZbnnEsL4R6VJKzemcUQgnHWBCgq",
-          "s0_hits": 1,
-          "why": "назван владельцем прямо"
-        }
-      ]
-    },
-    "candidates": {
-      "lane_sol": 0.01,
-      "bloom_trades": false,
-      "bloom_sol": null,
-      "fanout": false,
-      "day_cap_sol": 1.0,
-      "stop_loss_sol": 0.2,
-      "min_target_sol": 2.0,
-      "note": "Кандидаты из подбивки чужих кошельков (решение владельца 26.09): полоса 0.01 SOL, Bloom по ним НЕ торгует, порог покупки источника 2 SOL, потолок оборота 1 SOL в сутки, стоп -0.2 SOL. Список адресов приходит от второй сессии (десять лучших по чистому S+1/72 при не менее пяти покупках и доле \"источник продал в окне\" ниже 30 %); пока список пуст, группа ничего не меняет -- её адресов просто нет.",
-      "addresses": {}
-    }
-  },
   "not_added": [
-    {
-      "prefix": "Et9jbvxv",
-      "why": "налоговый маршрут (слово владельца)"
-    },
-    {
-      "prefix": "BMgsHTvc",
-      "why": "налоговый маршрут (слово владельца)"
-    },
-    {
-      "prefix": "DmopudSG",
-      "why": "налоговый маршрут (слово владельца)"
-    },
-    {
-      "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
-      "why": "кошелёк нашей задачи BATCH-8"
-    },
-    {
-      "address": "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv",
-      "why": "кошелёк нашей задачи BATCH-5"
-    },
-    {
-      "address": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
-      "why": "кошелёк нашей задачи BATCH-3"
-    },
-    {
-      "address": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
-      "why": "кошелёк нашей задачи BATCH-7"
-    },
-    {
-      "address": "DE5yR9S8qBkh8n4rYVvc6iGDF3rqrEPZX2aHBsDWJ79n",
-      "why": "кошелёк нашей задачи BATCH-6"
-    },
-    {
-      "address": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
-      "why": "кошелёк нашей задачи pointfarmcap"
-    },
-    {
-      "address": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
-      "why": "кошелёк нашей задачи BATCH-4"
-    },
-    {
-      "address": "GYPzYfSP3htyfRCti5Wp6XTnUQh7zkwqTv6j7r4kUFrq",
-      "why": "кошелёк нашей задачи BATCH-1"
-    },
-    {
-      "address": "HMQG8xXoVBWZTkEqNye5WcfttvdZwVb522EggFD5AWZ6",
-      "why": "кошелёк нашей задачи BATCH-2"
-    },
-    {
-      "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
-      "s0_hits": 138,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "FPpjNRw94TZZ5MkisGHnwt5v53ozjJMSiWTXyievfFR3",
-      "s0_hits": 5,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "ACmqtirA2BKYRRtPYLfpDma6La44QLYf3oXYC3yrhWXs",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "9BsfHGVT28SqDdj5KgQscV7kciu7992x9fFQQqRu5oWF",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "8WormohZAE1UHyEX65Y5njDzwgEiCPXskr5QhJRdk68d",
-      "s0_hits": 7,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC",
-      "s0_hits": 25,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "HyGDqJAD7Yod35XT5KiCQvsUatLRE4eHZMtLJQHfQFtK",
-      "s0_hits": 4,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "4cAPjMcbGEN6xkw2LcHTG3TrC2EYjNAmDbiYH5X98rv5",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "9L4odcNHBffgS43suSASQN8i3MgPk8f8As6J8tjT5SgW",
-      "s0_hits": 9,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "EyTL6ovdNrrnfyuvfsEkFDAmGk8nbt2dkxG6AdubaXC4",
-      "s0_hits": 5,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "2uY7yB73B4d7Cjf8qz8zXMXrSfF7wMxUYo827PZiqjWa",
-      "s0_hits": 5,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "Ak7oAUqQ9jYu5YvfmDrtDC3WHi7BcN5Y4k8Bh3yk4B5e",
-      "s0_hits": 7,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "CKdWdZ7bAWw84h5WKEpKkQmFFoqXQgn5YCP56vPhTiXq",
-      "s0_hits": 6,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "Fh92cv8gJVRbJaSXJZjXSnDMrVpzSfkL5bd2FvLzYqLx",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "A1C4ZhBwhsjaPZifov37aepf9cv2RvEs7Gqgj8HZgzGd",
-      "s0_hits": 4,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "3BgcWHyE17S1CUo1yzZUkUVhJCDTrPpV8yuTHo7D9gNL",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "CycQvMMzg9YS8LQ52vGyeSy2H1bVBtW26NL8tznRQU8X",
-      "s0_hits": 7,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "Bgf45Fjqeobgd5viMX8P8AfhiydRewEFKPd7nmcFNQRb",
-      "s0_hits": 11,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "J2TSxhVQofzzhpigvwwk2daW8nYziyriqGPx3q7NCXBd",
-      "s0_hits": 12,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "CJDuTRzy4p4Wz8ZfwuyvDAjGJawJJ4n66snzZTa4PvmB",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "6yKySLgF92unCqhnQTTFbEcv1MQzAGsH6ywdumTCv5tz",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "EJ6EqRmwKoXWurfrQkhyoETMWPZDw4tRRYoA6rpyTkbZ",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "4R8CiMnJWDNoes3fQi1ccPFJygPXazaHaWpHrN3rZeNj",
-      "s0_hits": 11,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "5jYdJBnSrtFTmE6C2nVHmPxKjgSdGTAWw4LodTHUbE74",
-      "s0_hits": 5,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "8qwgwpdfbBMNhdG76bDmtvLeSqtG9cEwuGGy6wGKhTB9",
-      "s0_hits": 9,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh",
-      "s0_hits": 5,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "AjobmNq3maGBLWronsoCcoBBe7GBSFFShhnRUG8GRua6",
-      "s0_hits": 4,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "6Hqd8wspmgRXaoKNwRF2a23QioEsz1V2UNDBhhsMgcXq",
-      "s0_hits": 5,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "F6H5zJeZEUDnYPtcXM3LwQkkcsg1XHLvEJGpB9Mizu1E",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "9skwAP585Et2bs6TS9KJ6SrAzXgSjxPgs8xDLes2uWHS",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "HP6q5ZQuYjM5LQJaR2CETd5uoiPS82HUDxHxH2vZhh6F",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "FdYPSUq2Zrw9vJXkA8uZFVNhNcCvUUuAcSWWVk6MZZhU",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
-      "s0_hits": 5,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "7LkLGUUwAASDy85V3YEogtkwdzDKEYFhADp41MXr6wZ",
-      "s0_hits": 7,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "5HnznetbszrgMyN7fgyhaCQZKje4QmTpLookbqPiES7Y",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "JAZxSdHDR6vqg54cSC7i6cmTSaTfiHH42aoJ5Ds4bTv9",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "BfDKyqvmwF7zi9pRVc7iKJDxCgxub44a6aEnEb4sst62",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "9h1Yf7uTzK5vf5JEn7vznsAKBDmkQxXS4v53jviDm4pk",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    },
-    {
-      "address": "GtmPDVPVepVJjENBNharAsBRLwifdD9PktYVj5f1VCWe",
-      "s0_hits": 3,
-      "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
-    }
+   {
+    "prefix": "Et9jbvxv",
+    "why": "налоговый маршрут (слово владельца)"
+   },
+   {
+    "prefix": "BMgsHTvc",
+    "why": "налоговый маршрут (слово владельца)"
+   },
+   {
+    "prefix": "DmopudSG",
+    "why": "налоговый маршрут (слово владельца)"
+   },
+   {
+    "address": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+    "why": "кошелёк нашей задачи BATCH-8"
+   },
+   {
+    "address": "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv",
+    "why": "кошелёк нашей задачи BATCH-5"
+   },
+   {
+    "address": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
+    "why": "кошелёк нашей задачи BATCH-3"
+   },
+   {
+    "address": "CqoAZUaTHxVYgTuDz5AoEZU4VYmfFPDEmTTcJAJoAWER",
+    "why": "кошелёк нашей задачи BATCH-7"
+   },
+   {
+    "address": "DE5yR9S8qBkh8n4rYVvc6iGDF3rqrEPZX2aHBsDWJ79n",
+    "why": "кошелёк нашей задачи BATCH-6"
+   },
+   {
+    "address": "E1qAJBmrJDhBvm2sV8kfMXFAmgzHuSRNRosPEgMkKiWS",
+    "why": "кошелёк нашей задачи pointfarmcap"
+   },
+   {
+    "address": "EjeXrxabRKmwLxvfQdXYN3oD3d3uWe2fuqqA5Qda2p8N",
+    "why": "кошелёк нашей задачи BATCH-4"
+   },
+   {
+    "address": "GYPzYfSP3htyfRCti5Wp6XTnUQh7zkwqTv6j7r4kUFrq",
+    "why": "кошелёк нашей задачи BATCH-1"
+   },
+   {
+    "address": "HMQG8xXoVBWZTkEqNye5WcfttvdZwVb522EggFD5AWZ6",
+    "why": "кошелёк нашей задачи BATCH-2"
+   },
+   {
+    "address": "GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL",
+    "s0_hits": 138,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "FPpjNRw94TZZ5MkisGHnwt5v53ozjJMSiWTXyievfFR3",
+    "s0_hits": 5,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "ACmqtirA2BKYRRtPYLfpDma6La44QLYf3oXYC3yrhWXs",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "9BsfHGVT28SqDdj5KgQscV7kciu7992x9fFQQqRu5oWF",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "8WormohZAE1UHyEX65Y5njDzwgEiCPXskr5QhJRdk68d",
+    "s0_hits": 7,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC",
+    "s0_hits": 25,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "HyGDqJAD7Yod35XT5KiCQvsUatLRE4eHZMtLJQHfQFtK",
+    "s0_hits": 4,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "4cAPjMcbGEN6xkw2LcHTG3TrC2EYjNAmDbiYH5X98rv5",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "9L4odcNHBffgS43suSASQN8i3MgPk8f8As6J8tjT5SgW",
+    "s0_hits": 9,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "EyTL6ovdNrrnfyuvfsEkFDAmGk8nbt2dkxG6AdubaXC4",
+    "s0_hits": 5,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "2uY7yB73B4d7Cjf8qz8zXMXrSfF7wMxUYo827PZiqjWa",
+    "s0_hits": 5,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "Ak7oAUqQ9jYu5YvfmDrtDC3WHi7BcN5Y4k8Bh3yk4B5e",
+    "s0_hits": 7,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "CKdWdZ7bAWw84h5WKEpKkQmFFoqXQgn5YCP56vPhTiXq",
+    "s0_hits": 6,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "Fh92cv8gJVRbJaSXJZjXSnDMrVpzSfkL5bd2FvLzYqLx",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "A1C4ZhBwhsjaPZifov37aepf9cv2RvEs7Gqgj8HZgzGd",
+    "s0_hits": 4,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "3BgcWHyE17S1CUo1yzZUkUVhJCDTrPpV8yuTHo7D9gNL",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "CycQvMMzg9YS8LQ52vGyeSy2H1bVBtW26NL8tznRQU8X",
+    "s0_hits": 7,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "Bgf45Fjqeobgd5viMX8P8AfhiydRewEFKPd7nmcFNQRb",
+    "s0_hits": 11,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "J2TSxhVQofzzhpigvwwk2daW8nYziyriqGPx3q7NCXBd",
+    "s0_hits": 12,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "CJDuTRzy4p4Wz8ZfwuyvDAjGJawJJ4n66snzZTa4PvmB",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "6yKySLgF92unCqhnQTTFbEcv1MQzAGsH6ywdumTCv5tz",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "EJ6EqRmwKoXWurfrQkhyoETMWPZDw4tRRYoA6rpyTkbZ",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "4R8CiMnJWDNoes3fQi1ccPFJygPXazaHaWpHrN3rZeNj",
+    "s0_hits": 11,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "5jYdJBnSrtFTmE6C2nVHmPxKjgSdGTAWw4LodTHUbE74",
+    "s0_hits": 5,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "8qwgwpdfbBMNhdG76bDmtvLeSqtG9cEwuGGy6wGKhTB9",
+    "s0_hits": 9,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh",
+    "s0_hits": 5,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "AjobmNq3maGBLWronsoCcoBBe7GBSFFShhnRUG8GRua6",
+    "s0_hits": 4,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "6Hqd8wspmgRXaoKNwRF2a23QioEsz1V2UNDBhhsMgcXq",
+    "s0_hits": 5,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "F6H5zJeZEUDnYPtcXM3LwQkkcsg1XHLvEJGpB9Mizu1E",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "9skwAP585Et2bs6TS9KJ6SrAzXgSjxPgs8xDLes2uWHS",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "HP6q5ZQuYjM5LQJaR2CETd5uoiPS82HUDxHxH2vZhh6F",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "FdYPSUq2Zrw9vJXkA8uZFVNhNcCvUUuAcSWWVk6MZZhU",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+    "s0_hits": 5,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "7LkLGUUwAASDy85V3YEogtkwdzDKEYFhADp41MXr6wZ",
+    "s0_hits": 7,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "5HnznetbszrgMyN7fgyhaCQZKje4QmTpLookbqPiES7Y",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "JAZxSdHDR6vqg54cSC7i6cmTSaTfiHH42aoJ5Ds4bTv9",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "BfDKyqvmwF7zi9pRVc7iKJDxCgxub44a6aEnEb4sst62",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "9h1Yf7uTzK5vf5JEn7vznsAKBDmkQxXS4v53jviDm4pk",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   },
+   {
+    "address": "GtmPDVPVepVJjENBNharAsBRLwifdD9PktYVj5f1VCWe",
+    "s0_hits": 3,
+    "why": "не на кривой ed25519: программный адрес, подписывать не может -- это авторити/хранилище, а не трейдер"
+   }
   ],
   "our_task_wallets_excluded": 9,
   "not_signers_excluded": 39
+ }
 }

@@ -26,6 +26,7 @@ import json
 import os
 import random
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -3688,6 +3689,24 @@ def self_test() -> int:
         else:
             print(f"  [ПЛОХО] {имя} -- {факт}")
 
+    # ГРУППЫ ДЛЯ ПРОВЕРОК -- СВОИ, А НЕ БОЕВЫЕ. Проверки денежного пути не
+    # должны зависеть от того, что владелец написал в файле групп сегодня:
+    # 27.09 одиннадцать проверок упали ровно потому, что опирались на боевые
+    # группы (speed_only, lane_only), а финальный план их упразднил. Сам боевой
+    # файл проверяется своей самопроверкой -- bloom_source_groups.self_test.
+    _кат_групп = tempfile.mkdtemp(prefix="own_send_groups_")
+    _было_файл_групп = os.environ.get("BLOOM_SOURCE_GROUPS")
+
+    def _группы_для_проверки(группы: dict) -> None:
+        import bloom_source_groups as SG_т  # noqa: PLC0415
+
+        путь = Path(_кат_групп) / "groups.json"
+        путь.write_text(json.dumps({"groups": группы}, ensure_ascii=False),
+                         encoding="utf-8")
+        os.environ["BLOOM_SOURCE_GROUPS"] = str(путь)
+        # Кэш снимается руками: две записи в одну наносекунду метку не изменят.
+        SG_т._КЭШ = SG_т._МЕТКА = SG_т._ПОСЛЕДНИЙ_ХОРОШИЙ = None
+
     # --- числа из документации, а не из головы
     chk("tip-аккаунтов ровно десять, как на странице Sender Max",
         len(TIP_ACCOUNTS) == 10 and len(set(TIP_ACCOUNTS)) == 10, len(TIP_ACCOUNTS))
@@ -3899,6 +3918,10 @@ def self_test() -> int:
         C_ж, PP_ж, SB_ж, B_ж = _модули()
     except Exception:  # noqa: BLE001
         C_ж = None
+    # ТИПЫ ПУЛОВ ПРОВЕРЯЮТСЯ БЕЗ ГРУПП: здесь проверяются ФЛАГИ окружения, и
+    # боевой файл (где у групп свой список lane_pools) в этих проверках только
+    # мешал бы -- источники образцов числятся в боевых группах.
+    _группы_для_проверки({})
     обр_кр = []
     if C_ж is not None:
         файл_кр = (Path(__file__).resolve().parent.parent / "data" / "c2_pool_samples"
@@ -3962,10 +3985,10 @@ def self_test() -> int:
             чужая = собрать(tx_источника=образец_кр["tx"], источник=образец_кр["source"],
                              минт=образец_кр["mint"], наш_кошелёк=кошелёк_полосы(),
                              лампорты=ЛАМП_КР)
-            chk("кривая только для speed_only: по источнику bloom_lane -- отказ, "
+            chk("кривая только для одной группы: по источнику вне файла -- отказ, "
                 "хотя общий флаг стоит",
                 чужая["ok"] is False and "вне полосы" in (чужая["why_not"] or "")
-                and чужая.get("lane_group") == "bloom_lane", чужая)
+                and чужая.get("lane_group") == "off", чужая)
             os.environ.pop("LANE_BONDING_CURVE_GROUPS", None)
         finally:
             globals()["_модули"] = было_м
@@ -5641,9 +5664,16 @@ def self_test() -> int:
                 else:
                     os.environ[имя_н] = знач_н
 
-        # --- ГРУППЫ ИСТОЧНИКОВ: РАЗМЕР, ПОТОЛОК И ВЕЕР (сводный промпт
-        # владельца 25.09 15:45, пункты 1.1, 1.2 и 3). Проверяем то, что стоит
-        # денег: сколько покупаем, из какого бюджета и идёт ли веер.
+        # --- ГРУППЫ ИСТОЧНИКОВ: РАЗМЕР, ПОТОЛОК И ВЕЕР. Проверяется МЕХАНИЗМ
+        # (размер по группе, веер по группе, потолок по группе), поэтому группы
+        # описаны здесь же, во временном файле, а не взяты из боевого.
+        _группы_для_проверки({
+            "lane_only": {"lane_size": 0.05, "fanout": True, "lane_trades": True,
+                           "addresses": {}},
+            "speed_only": {"lane_size": 0.01, "fanout": False, "lane_trades": True,
+                            "day_cap_sol": 3.0, "stop_loss_sol": 0.5,
+                            "addresses": {}},
+        })
         chk("размер полосной группы 0.05 SOL, группы скорости 0.01 SOL",
             размер_sol("lane_only") == 0.05 and размер_sol("speed_only") == 0.01,
             (размер_sol("lane_only"), размер_sol("speed_only")))

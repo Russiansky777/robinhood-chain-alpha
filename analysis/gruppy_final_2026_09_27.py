@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""Сборка файла групп по финальному плану живого теста (владелец, 27.09).
+
+ЗАЧЕМ ОТДЕЛЬНЫЙ СБОРЩИК, А НЕ ПРАВКА ФАЙЛА РУКАМИ. Файл групп -- это деньги:
+он решает, чей сигнал покупается, каким размером и с какими пределами. Руками
+такой файл не собирают: каждый адрес должен иметь проверяемое происхождение.
+Здесь оно записано кодом -- полный адрес назван владельцем или разрешён по
+префиксу в прежнем файле, и совпадение должно быть РОВНО ОДНО.
+
+ЧТО СТРОИТСЯ. Четыре группы плана вместо прежних четырёх:
+  leader   -- лидер, 0.2 SOL, порог источника 15 SOL-экв.;
+  batch5   -- восемь названных кошельков BATCH-5, 0.05;
+  lane_s0  -- десять кошельков с усечённым S+0, 0.05, только кривая pump.fun;
+  off      -- девять адресов, которые владелец велел выключить.
+Плюс log_only: все прочие адреса, на которые служба подписана СЕЙЧАС. Они не
+торгуются (lane_trades=false, bloom_trades=false), но подписка и полный лог
+сигналов остаются -- слово владельца: "все остальные известные адреса:
+lane_trades=false, только лог сигналов". Убрать их из файла было бы НЕ то же
+самое: адреса, которого в файле нет, политика по умолчанию тоже не торгует, но
+и подписки на него не будет, а значит не будет и лога.
+
+Bloom не торгует НИ ПО ОДНОЙ группе (bloom_trades=false везде) и веер выключен
+(fanout=false): слово владельца в том же плане.
+
+Запись -- атомарная, через bloom_source_groups.записать (tmp -> rename).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import bloom_source_groups as SG  # noqa: E402
+
+НАШИ_КОШЕЛЬКИ = ("4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+                  "21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w",
+                  "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x")
+
+# ---- адреса, названные владельцем ПОЛНОСТЬЮ (финальный план 27.09, п.2) ----
+ЛИДЕР = {"Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit": "лидер"}
+BATCH5 = {
+    "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv": "Omakase",
+    "H3en1XWQHfbNWjEDRnRFi6HKVkZG1P7twdAHTvnCnYE3": "MaxHuh",
+    "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ": "Theo",
+    "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv": "RugDalio",
+    "HYh78tNpGBUcxoHgPU9v7VeP2wqSbkapuTzrfYHjfyLo": "CardinalSaint",
+    "5opd5KBmodmoNuAThQ5cmXKbRxHbQDfomWGKAs3uEUP9": "soby",
+    "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2": "rasmr",
+    "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": "dreamloader",
+}
+LANE_S0_ПОЛНЫЕ = {
+    "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ": "frank",
+    "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB": "Brez",
+    "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb": "Xk9onq",
+    "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8": "jg",
+    "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm": "Bitman",
+    "8RCEq8RrBJ1G6eji9vZqjtjQgkDjUHMysPtynZENWo7S": "Avocado",
+    "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS": "5pHeNs",
+}
+LANE_S0_ПРЕФИКСЫ = ("B8m6fDRc", "7JVQMwRj", "3Um4qsYQ")
+OFF_ПОЛНЫЕ = {
+    "DAejzMs5cUeCCENNvapy9KWFwzwegh7LvcgNkZ6hnf1y": "fomopumpguy",
+    "DYbZngFdHcaEEo4iLpjtAXKgXCECftbAhZeampomtCQc": "earn",
+    "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn": "gginvestments",
+    "6F91X5t8af1yRHALkwf8EStEn6mKYvsW8zpLiVpfYr38": "Pyro",
+}
+OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuikt")
+
+# ---- политики групп: числа владельца, слово в слово из плана ----
+ПОЛИТИКИ = {
+    "leader": {
+        "lane_size": 0.2, "lane_trades": True, "bloom_trades": False,
+        "bloom_sol": None, "fanout": False,
+        "min_target_sol": 15, "max_slots_from_source": None,
+        "skip_flippers": False, "allow_taxed_route": True,
+        "slippage": 0.25, "min_pool_sol_reserve": None,
+        "lane_open_max": 3, "stop_loss_sol": 0.30, "hold_slots": 150,
+        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
+        "note": ("Лидер. Размер 0.2 SOL, порог источника 15 SOL-экв., налоговый "
+                  "маршрут берём и пишем налог в строку решения, наценка входа до "
+                  "0.25, три открытых, стоп -0.30 за сутки, держим 150 слотов от "
+                  "s0. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и "
+                  "двухшаговый маршрут через котировочный токен (п.3). LaunchLab, "
+                  "CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), "
+                  "поэтому их в списке ПОКА НЕТ."),
+    },
+    "batch5": {
+        "lane_size": 0.05, "lane_trades": True, "bloom_trades": False,
+        "bloom_sol": None, "fanout": False,
+        "min_target_sol": 2, "max_slots_from_source": None,
+        "skip_flippers": False, "allow_taxed_route": True,
+        "slippage": 0.40, "min_pool_sol_reserve": 30,
+        "lane_open_max": 3, "stop_loss_sol": 0.15, "hold_slots": 72,
+        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
+        "note": ("Восемь названных кошельков BATCH-5. 0.05 SOL, порог 2 SOL-экв., "
+                  "наценка входа до 0.40, резерв пула не ниже 30 SOL-экв., три "
+                  "открытых, стоп -0.15, держим 72 слота от s0."),
+    },
+    "lane_s0": {
+        "lane_size": 0.05, "lane_trades": True, "bloom_trades": False,
+        "bloom_sol": None, "fanout": False,
+        "min_target_sol": 2, "max_slots_from_source": 3,
+        "skip_flippers": True, "allow_taxed_route": False,
+        "slippage": 0.35, "min_pool_sol_reserve": 30,
+        "lane_open_max": 3, "stop_loss_sol": 0.15, "hold_slots": 72,
+        "lane_pools": ["bonding"],
+        "note": ("Десять кошельков с усечённым S+0. 0.05 SOL, порог 2 SOL-экв., "
+                  "не покупаем, если от слота источника прошло больше 3 слотов, "
+                  "помеченных перекупщиками пропускаем (сейчас не помечен ни "
+                  "один -- по таблице Code-2 все десять проходят), налоговый "
+                  "маршрут НЕ берём, наценка входа до 0.35, резерв пула не ниже "
+                  "30 SOL-экв. ТОЛЬКО кривая pump.fun: список lane_pools здесь "
+                  "ПОЛНЫЙ, он же и запрещает Pump AMM с Raydium CPMM."),
+    },
+    "off": {
+        "lane_size": None, "lane_trades": False, "bloom_trades": False,
+        "bloom_sol": None, "fanout": False,
+        "note": ("Выключены прямым словом владельца 27.09. Подписка и лог "
+                  "остаются, денег не тратим."),
+    },
+    "log_only": {
+        "lane_size": None, "lane_trades": False, "bloom_trades": False,
+        "bloom_sol": None, "fanout": False,
+        "note": ("Все прочие адреса, на которые служба подписана. Слово "
+                  "владельца: lane_trades=false, только лог сигналов со всеми "
+                  "полями. Из файла их убирать нельзя -- пропала бы подписка, а "
+                  "с ней и лог."),
+    },
+}
+
+
+def разрешить_префиксы(префиксы: tuple, все: set) -> dict:
+    """Префикс -> полный адрес. Совпадений не ровно одно -- отказ со словами."""
+    из_, беда = {}, []
+    for п in префиксы:
+        нашлись = sorted(а for а in все if а.startswith(п))
+        if len(нашлись) == 1:
+            из_[п] = нашлись[0]
+        else:
+            беда.append((п, нашлись))
+    return {"адреса": из_, "спорные": беда}
+
+
+def адреса_прежнего(д: dict) -> list:
+    """Адреса, на которые служба подписана СЕЙЧАС: из групп прежнего файла."""
+    из_ = []
+    for имя, г in (д.get("groups") or {}).items():
+        ад = г.get("addresses")
+        if isinstance(ад, dict):
+            из_ += [(а, имя) for а in ад]
+        elif isinstance(ад, list):
+            из_ += [((з.get("address") if isinstance(з, dict) else з), имя)
+                    for з in ад]
+        for поле in ("by_signal", "snipers"):
+            из_ += [((з.get("address") if isinstance(з, dict) else з),
+                      f"{имя}/{поле}") for з in (г.get(поле) or [])]
+    return [(а, г) for а, г in из_ if а]
+
+
+def собрать(путь_прежнего: str) -> dict:
+    прежний = json.loads(Path(путь_прежнего).read_text(encoding="utf-8"))
+    все_в_файле = set(re.findall(r'"([1-9A-HJ-NP-Za-km-z]{32,44})"',
+                                  Path(путь_прежнего).read_text(encoding="utf-8")))
+    s0 = разрешить_префиксы(LANE_S0_ПРЕФИКСЫ, все_в_файле)
+    off = разрешить_префиксы(OFF_ПРЕФИКСЫ, все_в_файле)
+    спорные = s0["спорные"] + off["спорные"]
+
+    группы = {}
+    for имя, пол in ПОЛИТИКИ.items():
+        группы[имя] = dict(пол)
+        группы[имя]["addresses"] = {}
+    for а, имя in ЛИДЕР.items():
+        группы["leader"]["addresses"][а] = {"name": имя, "from": "названо владельцем"}
+    for а, имя in BATCH5.items():
+        группы["batch5"]["addresses"][а] = {"name": имя, "from": "названо владельцем"}
+    for а, имя in LANE_S0_ПОЛНЫЕ.items():
+        группы["lane_s0"]["addresses"][а] = {"name": имя, "from": "названо владельцем",
+                                              "flipper": False}
+    for п, а in s0["адреса"].items():
+        группы["lane_s0"]["addresses"][а] = {"name": п, "from": f"префикс {п}",
+                                             "flipper": False}
+    for а, имя in OFF_ПОЛНЫЕ.items():
+        группы["off"]["addresses"][а] = {"name": имя, "from": "названо владельцем"}
+    for п, а in off["адреса"].items():
+        группы["off"]["addresses"][а] = {"name": п, "from": f"префикс {п}"}
+
+    названные = set()
+    for имя in ("leader", "batch5", "lane_s0", "off"):
+        названные |= set(группы[имя]["addresses"])
+    for а, откуда in адреса_прежнего(прежний):
+        if а in названные or а in НАШИ_КОШЕЛЬКИ:
+            continue
+        группы["log_only"]["addresses"][а] = {"from": f"прежний файл: {откуда}"}
+
+    новый = {
+        "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "decision": ("Финальный план живого теста, владелец 27.09. Четыре группы: "
+                      "leader, batch5, lane_s0 и off; Bloom не торгует ни по одной "
+                      "(bloom_trades=false), веер выключен (fanout=false), Jupiter "
+                      "в покупке не участвует ни на одной группе. Прежние группы "
+                      "speed_only, bloom_lane, lane_only и candidates упразднены."),
+        "groups": группы,
+        "prefixes_resolved": {**s0["адреса"], **off["адреса"]},
+        "disputed_prefixes": спорные,
+        "archive_2026_09_25": {k: прежний.get(k) for k in
+                                ("generated_utc", "decision", "sources_s0_data",
+                                 "not_added", "our_task_wallets_excluded",
+                                 "not_signers_excluded") if k in прежний},
+    }
+    return {"файл": новый, "спорные": спорные,
+            "торгующих": sum(len(группы[и]["addresses"])
+                             for и in ("leader", "batch5", "lane_s0")),
+            "в_логе": len(группы["log_only"]["addresses"]),
+            "выключенных": len(группы["off"]["addresses"])}
+
+
+def self_test() -> int:
+    проверки = []
+
+    def chk(имя, ок, факт=""):
+        проверки.append((имя, bool(ок), факт))
+
+    с = собрать(SG.ФАЙЛ_ПО_УМОЛЧАНИЮ)
+    ф = с["файл"]
+    chk("спорных префиксов нет", not с["спорные"], с["спорные"])
+    chk("торгующих адресов ровно 19 (слово владельца)", с["торгующих"] == 19,
+        с["торгующих"])
+    chk("в leader один адрес", len(ф["groups"]["leader"]["addresses"]) == 1,
+        len(ф["groups"]["leader"]["addresses"]))
+    chk("в batch5 восемь", len(ф["groups"]["batch5"]["addresses"]) == 8,
+        len(ф["groups"]["batch5"]["addresses"]))
+    chk("в lane_s0 десять", len(ф["groups"]["lane_s0"]["addresses"]) == 10,
+        len(ф["groups"]["lane_s0"]["addresses"]))
+    chk("в off девять", len(ф["groups"]["off"]["addresses"]) == 9,
+        len(ф["groups"]["off"]["addresses"]))
+    все = []
+    for имя, г in ф["groups"].items():
+        все += list(г["addresses"])
+    chk("ни один адрес не попал в две группы", len(все) == len(set(все)),
+        [а for а in set(все) if все.count(а) > 1])
+    chk("наших кошельков в источниках нет",
+        not (set(НАШИ_КОШЕЛЬКИ) & set(все)), set(НАШИ_КОШЕЛЬКИ) & set(все))
+    # ДЕНЬГИ: размеры и стопы -- те, что назвал владелец.
+    chk("размер лидера 0.2, стоп -0.30, порог 15",
+        ф["groups"]["leader"]["lane_size"] == 0.2
+        and ф["groups"]["leader"]["stop_loss_sol"] == 0.30
+        and ф["groups"]["leader"]["min_target_sol"] == 15, ф["groups"]["leader"])
+    chk("batch5 0.05, стоп -0.15, резерв 30, наценка 0.40",
+        ф["groups"]["batch5"]["lane_size"] == 0.05
+        and ф["groups"]["batch5"]["stop_loss_sol"] == 0.15
+        and ф["groups"]["batch5"]["min_pool_sol_reserve"] == 30
+        and ф["groups"]["batch5"]["slippage"] == 0.40, ф["groups"]["batch5"])
+    chk("lane_s0 0.05, три слота от s0, только кривая, налог не берём",
+        ф["groups"]["lane_s0"]["lane_size"] == 0.05
+        and ф["groups"]["lane_s0"]["max_slots_from_source"] == 3
+        and ф["groups"]["lane_s0"]["lane_pools"] == ["bonding"]
+        and ф["groups"]["lane_s0"]["allow_taxed_route"] is False,
+        ф["groups"]["lane_s0"])
+    chk("Bloom не торгует ни по одной группе",
+        not any(г.get("bloom_trades") for г in ф["groups"].values()),
+        [и for и, г in ф["groups"].items() if г.get("bloom_trades")])
+    chk("веер выключен везде",
+        not any(г.get("fanout") for г in ф["groups"].values()),
+        [и for и, г in ф["groups"].items() if г.get("fanout")])
+    chk("off и log_only не торгуют полосой",
+        not ф["groups"]["off"]["lane_trades"]
+        and not ф["groups"]["log_only"]["lane_trades"], "")
+    chk("Jupiter в покупке не включён ни на одной группе",
+        not any(г.get("lane_route") for г in ф["groups"].values()),
+        [и for и, г in ф["groups"].items() if г.get("lane_route")])
+
+    плохо = [(и, ф_) for и, ок, ф_ in проверки if not ок]
+    for имя, ок, факт in проверки:
+        print(f"  [{'ok  ' if ок else 'СБОЙ'}] {имя}"
+              + ("" if ок else f" -- факт: {факт}"))
+    print(f"самопроверка сборки групп: {len(проверки) - len(плохо)}/"
+          f"{len(проверки)} пройдено")
+    return 1 if плохо else 0
+
+
+def main() -> int:
+    р = argparse.ArgumentParser()
+    р.add_argument("--self-test", action="store_true")
+    р.add_argument("--iz", default=SG.ФАЙЛ_ПО_УМОЛЧАНИЮ,
+                   help="прежний файл групп (источник префиксов и лог-группы)")
+    р.add_argument("--zapisat", default="",
+                   help="куда записать новый файл (пусто -- только показать)")
+    а = р.parse_args()
+    if а.self_test:
+        return self_test()
+    с = собрать(а.iz)
+    print(f"торгующих {с['торгующих']}, в логе {с['в_логе']}, "
+          f"выключенных {с['выключенных']}, спорных префиксов {len(с['спорные'])}")
+    if с["спорные"]:
+        print("СПОРНЫЕ ПРЕФИКСЫ (в файл не добавлены):")
+        for п, нашлись in с["спорные"]:
+            print(f"  {п}: {нашлись or 'совпадений 0'}")
+    if а.zapisat:
+        итог = SG.записать(с["файл"], а.zapisat)
+        print(json.dumps(итог, ensure_ascii=False))
+        return 0 if итог.get("ok") else 1
+    print(json.dumps(с["файл"], ensure_ascii=False, indent=1)[:2000])
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
