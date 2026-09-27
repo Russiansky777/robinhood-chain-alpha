@@ -83,6 +83,13 @@ def main() -> int:
     с_ = метка(а.s)
     по_cid: dict = {}
     просмотрено = 0
+    # ДВА ПРОХОДА, И ЭТО НЕ ЛИШНЕЕ. Дописки позиции (state=closed,
+    # closed_sol_net, итог продажи) приходят ОТДЕЛЬНЫМИ строками, и в них нет
+    # ни метки полосы, ни ts_intent -- только client_order_id и изменённые поля.
+    # Один проход с фильтром по метке отбрасывал их, и в выгрузке 27.09 у всех
+    # 152 сделок итог вышел пустым, хотя в журнале он есть. Первый проход
+    # собирает cid наших сделок окна, второй -- все их поля.
+    свои_cid: set = set()
     for путь in файлы(а.state_dir):
         for с in строки(путь):
             просмотрено += 1
@@ -95,11 +102,21 @@ def main() -> int:
             т = з.get("ts_intent") or з.get("ts_sent")
             if not isinstance(т, (int, float)) or float(т) < с_:
                 continue
-            cid = з.get("client_order_id")
-            if not cid:
+            if з.get("client_order_id"):
+                свои_cid.add(з["client_order_id"])
+    for путь in файлы(а.state_dir):
+        for с in строки(путь):
+            try:
+                з = json.loads(с)
+            except ValueError:
                 continue
-            # Позиция дописывается много раз: берём последнюю запись по cid и
-            # накапливаем поля, а не заменяем -- часть полей приходит позже.
+            if not isinstance(з, dict):
+                continue
+            cid = з.get("client_order_id")
+            if not cid or cid not in свои_cid:
+                continue
+            # Позиция дописывается много раз: накапливаем поля, а не заменяем --
+            # часть полей приходит позже.
             в = по_cid.setdefault(cid, {})
             for к, зн in з.items():
                 if зн is not None:
