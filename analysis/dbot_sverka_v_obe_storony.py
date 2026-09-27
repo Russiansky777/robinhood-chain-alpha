@@ -345,7 +345,10 @@ def main() -> int:
     р.add_argument("--po", required=True, help="конец окна UTC")
     р.add_argument("--zadachi", default=",".join(ЗАДАЧИ_ПО_УМОЛЧАНИЮ))
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
-    р.add_argument("--predel-na-koshelek", type=int, default=120)
+    # 400, А НЕ 120. На первом полном прогоне 26.09 активные кошельки уперлись
+    # в предел, а упёршийся кошелёк -- это часть суток, которую сверка не
+    # посмотрела: 1388 подписей на 18 кошельков при пределе 120.
+    р.add_argument("--predel-na-koshelek", type=int, default=400)
     р.add_argument("--out", default=None)
     а = р.parse_args()
 
