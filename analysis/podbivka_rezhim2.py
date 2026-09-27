@@ -251,11 +251,13 @@ def main() -> int:
     р.add_argument("--s", type=int, default=0)
     р.add_argument("--po", type=int, default=0)
     р.add_argument("--push", action="store_true")
+    р.add_argument("--spisok", default="rezhim2_spisok.json")
+    р.add_argument("--prefiks", default="")
     а = р.parse_args()
     import podbivka_run as R  # noqa: PLC0415
-    спис = json.loads((КОРЕНЬ / "data" / "podbivka" / "rezhim2_spisok.json").read_text(encoding="utf-8"))["покупки"]
+    спис = json.loads((КОРЕНЬ / "data" / "podbivka" / а.spisok).read_text(encoding="utf-8"))["покупки"]
     спис = спис[а.s:(а.po or None)]
-    out = КОРЕНЬ / "data" / "podbivka" / "rezhim2" / f"{а.s}_{а.po or 'end'}.jsonl"
+    out = КОРЕНЬ / "data" / "podbivka" / "rezhim2" / f"{а.prefiks}{а.s}_{а.po or 'end'}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
     готово = set()
     if out.exists():
