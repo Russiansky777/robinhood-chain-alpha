@@ -51,6 +51,14 @@ def main() -> int:
                         for к in ("enabled", "live", "sent", "by_stage", "wallet",
                                    "balance_sol", "limits", "last",
                                    "balance_day_threshold", "lane_daily_stop")},
+            # РУБИЛЬНИК И БАЛАНС ИСПОЛНИТЕЛЯ -- их спрашивает получасовая
+            # проверка владельца ("стоп стоит/снят, балансы X / Y, позиций N").
+            # Без них строку приходилось отдавать с прочерками, хотя служба эти
+            # числа пишет.
+            "рубильник": d.get("kill_active"),
+            "рубильник_почему": d.get("kill_note"),
+            "баланс_исполнителя_sol": d.get("balance_sol"),
+            "рубильник_площадки": d.get("kill_bloom_active"),
             "кэш_ног": d.get("leg_cache"),
             "двухшаговый": d.get("two_step"),
             "площадка_торгует": bool((d.get("own_send") or {}).get("bloom_trades")),
