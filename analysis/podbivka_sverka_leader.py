@@ -1,0 +1,323 @@
+#!/usr/bin/env python3
+"""Подбивка: сверка живых сделок группы leader с моделью режима 2 (аналог A3 для
+нашей полосы). Только чтение цепи.
+
+Вход -- строки сделок: наш_кошелёк, источник, mint, buy_sig, [sell_sig],
+[src_sig], группа, [buy_ts]. Источник строк:
+  --vhod a3            -- data/podbivka/a3_sdelki.json (пилот DBot 18–19.09 и
+                          круги BATCH-5 25–27.09) -- проверка заготовки;
+  --vhod <путь.json>   -- позиции Code-1 (ключи wallet/source/mint/buy_sig/
+                          sell_sig/source_sig; side = lane, группа leader).
+По каждой сделке:
+ 1. место посадки в слоте лидера: «сразу за ним» (0–1 своп пула между его и
+    нашей сделкой) / «середина» / «конец слота» (после нас в слоте s0 свопов
+    пула нет) / «слот s0+k»; фактическая наценка -- наш котировочный, ушедший в
+    пул / токены, отданные пулом, к спот-цене пула сразу после лидера;
+ 2. модель на том же месте (состояние пула прямо перед нашей покупкой в цепи),
+    нашим фактическим размером (SOL в свопе покупки); выход -- (а) через 150
+    слотов от s0, (б) в фактическом слоте нашей продажи (состояние перед ней);
+ 3. факт по цепи (SOL в свопах покупки и продажи, обе ноги через котировочный,
+    все переводы и налоги -- как есть в цепи) против модели (б);
+ 4. сдвиг курса котировочного к SOL за удержание: исполненный курс ноги
+    q↔SOL в нашей продаже к курсу в нашей покупке (плечи в самих сделках) и его
+    вклад в расхождение (модель держит курс постоянным).
+Модель -- A3 (прогон 6): f по хранилищам сделки лидера (< 0.95 -- по ближайшей
+покупке пула до нас), g по продажам пула (нет -- 0.985), продажа x·g·t/(y+t),
+налог котировочного на двух переводах в каждую сторону, налог токена на
+получении и продаже; курс котировочного -- из сделки лидера.
+Выход: data/podbivka/sverka_leader[_<метка>].json и docs/podbivka_sverka_leader[_<метка>].md.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import statistics
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import c2_common as C  # noqa: E402
+import podbivka as P  # noqa: E402
+import podbivka_a3 as A3  # noqa: E402
+import podbivka_sim as S  # noqa: E402
+
+КОРЕНЬ = Path(__file__).resolve().parent.parent
+SOLы = (C.WSOL, C.NATIVE_QUOTE)
+ГОРИЗОНТ = 150
+
+
+def место(сп: list, ib: int, s0: int, слот_нашей: int) -> dict:
+    между = ib                                   # успешные свопы пула после лидера и до нас
+    if слот_нашей > s0:
+        return {"место": f"слот s0+{слот_нашей - s0}", "свопов_между": между}
+    после_в_слоте = sum(1 for з in сп[ib + 1:] if з["slot"] == s0)
+    if между <= 1:
+        м = "сразу за ним"
+    elif после_в_слоте == 0:
+        м = "конец слота"
+    else:
+        м = "середина"
+    return {"место": м, "свопов_между": между, "свопов_после_в_слоте": после_в_слоте}
+
+
+def одна(уз: S.Узел, с: dict) -> dict:
+    import podbivka_lider_kotirovka as LK  # noqa: PLC0415
+    из_ = {к: с.get(к) for к in ("группа", "mint", "buy_sig", "источник")}
+    tb = уз.tx(с["buy_sig"])
+    if not tb:
+        return {**из_, "why_not": "узел не отдал нашу покупку"}
+    наш = с["наш_кошелёк"]
+    sell = с.get("sell_sig")
+    if not sell:
+        for з in reversed(уз.подписи(наш, limit=1000)):
+            if (з.get("slot") or 0) <= tb["slot"] or з.get("err") is not None:
+                continue
+            т = уз.tx(з["signature"])
+            if т and A3.наши_токены(т, наш, с["mint"]) < 0:
+                sell = з["signature"]
+                break
+    ts = уз.tx(sell) if sell else None
+    if not ts:
+        return {**из_, "why_not": "продажа не найдена"}
+    из_["sell_sig"] = sell
+    пул = C.identify_pool(tb, наш, с["mint"])
+    q = пул.get("quote_mint")
+    из_.update(quote_mint=q, pool_vault=пул.get("pool_vault"), slot_buy=tb["slot"], slot_sell=ts["slot"],
+               split=bool(пул.get("split")))
+    if not пул.get("pool_vault") or not пул.get("quote_vault"):
+        return {**из_, "why_not": "пул токена не опознан в нашей покупке"}
+    if q == C.NATIVE_QUOTE:
+        return {**из_, "why_not": "кривая pump.fun -- вне режима 2"}
+    import c2_pool_programs as PP  # noqa: PLC0415
+    прог = PP.pool_program(tb, пул["pool_vault"], PP.labels()).get("pool_program")
+    из_["program"] = прог
+    if прог not in (S.SB.CPMM, S.SB.PUMP_AMM, "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"):
+        return {**из_, "why_not": f"программа пула {прог}: вне x*y=k по хранилищам"}
+    src = с.get("src_sig")
+    if not src:
+        сп0 = [з for з in уз.подписи(с["mint"], до=с["buy_sig"], limit=1000)
+               if з.get("err") is None and (з.get("slot") or 0) >= tb["slot"] - 600]
+        for i in range(0, len(сп0), 25):
+            пачка = уз.пакет([з["signature"] for з in сп0[i:i + 25]])
+            for з in сп0[i:i + 25]:
+                т = пачка.get(з["signature"])
+                if т and с["источник"] in C.signers(т) and A3.наши_токены(т, с["источник"], с["mint"]) > 0:
+                    src = з["signature"]
+                    break
+            if src:
+                break
+    tsrc = уз.tx(src) if src else None
+    if not tsrc:
+        return {**из_, "why_not": "сделка лидера не найдена"}
+    s0 = tsrc["slot"]
+    из_.update(src_sig=src, s0=s0, сдвиг_слотов=tb["slot"] - s0)
+    # ФАКТ
+    вход, выход = A3.своп_sol(tb, "buy"), A3.своп_sol(ts, "sell")
+    т_факт = A3.наши_токены(tb, наш, с["mint"])
+    т_прод = -A3.наши_токены(ts, наш, с["mint"])
+    кв_b, тв_b = A3.дельта_счёта(tb, пул["quote_vault"]), A3.дельта_счёта(tb, пул["pool_vault"])
+    кв_s = A3.дельта_счёта(ts, пул["quote_vault"])
+    q_в_пул = (кв_b[1] - кв_b[0]) if кв_b else None
+    т_из_пула = (тв_b[0] - тв_b[1]) if тв_b else None
+    q_из_пула = (кв_s[0] - кв_s[1]) if кв_s else None
+    из_.update(факт_вход_sol=вход / 1e9 if вход else None, факт_выход_sol=выход / 1e9 if выход else None,
+               факт_пп=round((выход - вход) / вход * 100, 3) if вход else None)
+    if not вход or not q_в_пул or not т_из_пула:
+        return {**из_, "why_not": "факт покупки по хранилищам не читается"}
+    нал_т = S.налог_минта(уз, с["mint"])
+    нал_q = S.налог_минта(уз, q) if q not in SOLы else {"bps": 0}
+    for чей, нал in (("токена", нал_т), ("котировочного", нал_q)):
+        if нал.get("why_not"):
+            return {**из_, "why_not": f"налог {чей} не прочитан"}
+    из_.update(налог_токена_bps=нал_т.get("bps"), налог_q_bps=нал_q.get("bps"))
+    до = max(ts["slot"], s0 + ГОРИЗОНТ)
+    ист = S.история_пула(уз, пул["pool_vault"], src, s0,
+                         опора=(S.подпись_после_слота(уз, до + 1) if уз.текущий == "helius" else None),
+                         до_слота=до)
+    if ист["why_not"] or ист["предел"]:
+        return {**из_, "why_not": f"история пула: {ист['why_not'] or 'предел страниц'}"}
+    сп = [з for з in ист["подписи"] if з["ok"]]
+    ib = next((i for i, з in enumerate(сп) if з["signature"] == с["buy_sig"]), None)
+    is_ = next((i for i, з in enumerate(сп) if з["signature"] == sell), None)
+    if ib is None or is_ is None:
+        return {**из_, "why_not": "наши сделки не найдены в истории пула"}
+    ст0 = S.состояние(tsrc, "xyk", пул, с["mint"])
+    if not ст0:
+        return {**из_, "why_not": "состояние после лидера не читается"}
+    кэш: dict = {}
+
+    def txi(i):
+        if i not in кэш:
+            try:
+                кэш[i] = уз.tx(сп[i]["signature"])
+            except RuntimeError:
+                кэш[i] = None
+        return кэш[i]
+
+    def ст(i):
+        for j in range(i, max(-1, i - S.ШАГОВ_НАЗАД - 1), -1):
+            с_ = S.состояние(txi(j), "xyk", пул, с["mint"])
+            if с_:
+                return с_
+        return None
+    # 1. место и фактическая наценка
+    из_.update(место(сп, ib, s0, tb["slot"]))
+    p0 = ст0["x"] / ст0["y"]
+    из_["наценка_факт_пп"] = round((q_в_пул / т_из_пула / p0 - 1) * 100, 3)
+    # калибровки
+    f = A3.f_по_хранилищам(tsrc, пул)
+    из_["f_лидера"] = round(f, 5) if f else None
+    if not f or not (0.95 <= f <= 1.0):
+        f = None
+        for i in range(ib - 1, max(-1, ib - 30), -1):
+            ff = A3.f_по_хранилищам(txi(i), пул)
+            if ff and 0.5 <= ff <= 1.0:
+                f = ff
+                break
+    if not f:
+        return {**из_, "why_not": "доля траты не калибруется"}
+    из_["f"] = round(f, 5)
+    доли = []
+    for i in range(ib + 1, min(len(сп), ib + 80)):
+        if i == is_:
+            continue
+        т = txi(i)
+        кв, тв = A3.дельта_счёта(т, пул["quote_vault"]), A3.дельта_счёта(т, пул["pool_vault"])
+        if кв and тв and тв[1] > тв[0] and кв[1] < кв[0] and кв[0] > 0:
+            dy, dx = тв[1] - тв[0], кв[0] - кв[1]
+            g_ = dx * (тв[0] + dy) / (кв[0] * dy)
+            if 0.5 <= g_ <= 1.0:
+                доли.append(g_)
+        if len(доли) >= 6:
+            break
+    g = statistics.median(доли) if доли else A3.G_БЕЗ_ПРОДАЖ
+    из_["g"], из_["g_продаж"] = round(g, 5), len(доли)
+    # курс котировочного: модель -- из сделки лидера; факт -- плечи наших сделок
+    if q in SOLы:
+        цена_q, r_in, r_out = 1.0, 1.0, 1.0
+    else:
+        цена_q, откуда = LK.цена_q_в_sol(tsrc, q, tsrc.get("blockTime"))
+        if not цена_q:
+            return {**из_, "why_not": f"курс котировочного: {откуда}"}
+        r_in = LK.цена_q_в_sol(tb, q, tb.get("blockTime"))[0]
+        r_out = LK.цена_q_в_sol(ts, q, ts.get("blockTime"))[0]
+    из_.update(курс_q_модель=цена_q, курс_q_покупка=r_in, курс_q_продажа=r_out)
+    # 2. модель на том же месте
+    ст_вход = ст(ib - 1) if ib > 0 else ст0
+    if not ст_вход:
+        return {**из_, "why_not": "состояние перед нашей покупкой не читается"}
+    q_raw = int(вход / цена_q)
+    q_raw -= S.удержано(q_raw, нал_q)
+    q_raw -= S.удержано(q_raw, нал_q)
+    x, y = ст_вход["x"], ст_вход["y"]
+    т_бр = int(y * f * q_raw / (x + f * q_raw))
+    т_м = т_бр - S.удержано(т_бр, нал_т)
+    в_пул = т_м - S.удержано(т_м, нал_т)
+    из_["токены_модель_к_факту_пп"] = round((т_м / т_факт - 1) * 100, 3) if т_факт else None
+
+    def в_sol(q_out):
+        q_out -= S.удержано(q_out, нал_q)
+        q_out -= S.удержано(q_out, нал_q)
+        return int(q_out * цена_q)
+
+    def продать(ст_, вставить):
+        X, Y = ст_["x"], ст_["y"]
+        if вставить:
+            X, Y = X + q_в_пул, Y - т_из_пула
+        return int(X * g * в_пул / (Y + в_пул)) if Y > 0 else None
+    # (а) выход через 150 слотов от s0: состояние после последней сделки со слотом <= s0+149;
+    # до нашей продажи наш след в нём уже есть, после -- вставляем нашу покупку обратно
+    канд = [i for i, з in enumerate(сп) if з["slot"] <= s0 + ГОРИЗОНТ - 1]
+    i150 = канд[-1] if канд else None
+    ст150 = ст(i150) if i150 is not None else ст0
+    q150 = продать(ст150, вставить=(i150 is None or i150 >= is_ or i150 < ib)) if ст150 else None
+    из_["модель_150_пп"] = round((в_sol(q150) - вход) / вход * 100, 3) if q150 else None
+    # (б) выход в фактическом слоте продажи: состояние перед нашей продажей
+    ст_пп = ст(is_ - 1)
+    qf = продать(ст_пп, вставить=False) if ст_пп else None
+    if not qf:
+        return {**из_, "why_not": "состояние перед нашей продажей не читается"}
+    из_["модель_пп"] = round((в_sol(qf) - вход) / вход * 100, 3)
+    из_["расхождение_пп"] = round(из_["факт_пп"] - из_["модель_пп"], 3)
+    # 4. сдвиг курса котировочного за удержание
+    if q not in SOLы and r_in and r_out:
+        сдвиг = r_out / r_in - 1
+        из_["сдвиг_курса_q_пп"] = round(сдвиг * 100, 3)
+        из_["из_них_курс_пп"] = round((1 + из_["модель_пп"] / 100) * сдвиг * 100, 3)
+        из_["расхождение_без_курса_пп"] = round(из_["расхождение_пп"] - из_["из_них_курс_пп"], 3)
+    return из_
+
+
+def строки_входа(вход: str) -> list:
+    if вход == "a3":
+        д = json.loads((КОРЕНЬ / "data" / "podbivka" / "a3_sdelki.json").read_text(encoding="utf-8"))["сделки"]
+        return д
+    д = json.loads(Path(вход).read_text(encoding="utf-8"))
+    if isinstance(д, dict):
+        д = д.get("sdelki") or д.get("позиции") or []
+    из_ = []
+    for x in д:
+        из_.append({"группа": x.get("group_effective") or x.get("group") or "leader", "наш_кошелёк": x["wallet"],
+                    "источник": x["source"], "mint": x["mint"], "buy_sig": x["buy_sig"], "sell_sig": x.get("sell_sig"),
+                    "src_sig": x.get("source_sig"), "buy_ts": x.get("buy_ts")})
+    return из_
+
+
+def md_таблица(ряды: list) -> str:
+    def ф(v, z="+.2f"):
+        return "—" if v is None else format(v, z)
+    с = [р for р in ряды if р.get("расхождение_пп") is not None]
+    м = sorted(abs(р["расхождение_пп"]) for р in с)
+    мк = sorted(abs(р["расхождение_без_курса_пп"]) for р in с if р.get("расхождение_без_курса_пп") is not None)
+    строки = [f"Сделок: {len(ряды)}, с числом: {len(с)}. Медиана модуля расхождения факт − модель: "
+              f"{statistics.median(м):.2f} п.п. (p90 {м[min(len(м) - 1, int(0.9 * len(м)))]:.2f}); "
+              f"без вклада курса котировочного: {statistics.median(мк):.2f} п.п." if с else "Сделок с числом нет.", "",
+              "| сделка | группа | котировка | место (свопов между) | наценка факт, % | модель +150, п.п. | модель в слоте продажи | "
+              "факт, п.п. | расхождение | из них курс q | без курса | причина без числа |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for р in ряды:
+        строки.append(f"| {(р.get('buy_sig') or '')[:10]} | {р.get('группа')} | {(р.get('quote_mint') or '—')[:6]} | "
+                      f"{р.get('место', '—')} ({р.get('свопов_между', '—')}) | {ф(р.get('наценка_факт_пп'))} | "
+                      f"{ф(р.get('модель_150_пп'))} | {ф(р.get('модель_пп'))} | {ф(р.get('факт_пп'))} | "
+                      f"{ф(р.get('расхождение_пп'))} | {ф(р.get('из_них_курс_пп'))} | {ф(р.get('расхождение_без_курса_пп'))} | "
+                      f"{(р.get('why_not') or '')[:50]} |")
+    return "\n".join(строки)
+
+
+def main() -> int:
+    р = argparse.ArgumentParser()
+    р.add_argument("--vhod", default="a3")
+    р.add_argument("--metka", default="")
+    а = р.parse_args()
+    import calendar  # noqa: PLC0415
+    import time  # noqa: PLC0415
+    уз = S.Узел()
+    рез = []
+    for x in строки_входа(а.vhod):
+        bt = x.get("buy_ts")
+        if isinstance(bt, str):
+            bt = calendar.timegm(time.strptime(bt[:19], "%Y-%m-%dT%H:%M:%S"))
+        with уз.на(S.узел_по_времени(bt) if bt else "shyft"):
+            try:
+                рр = одна(уз, x)
+            except Exception as exc:  # noqa: BLE001
+                рр = {"группа": x.get("группа"), "buy_sig": x.get("buy_sig"),
+                      "why_not": S.чисто(f"{type(exc).__name__}: {exc}")[:200]}
+        уз._кэш.clear()  # noqa: SLF001
+        рез.append(рр)
+        print(рр.get("группа"), (рр.get("buy_sig") or "")[:10], рр.get("место"), рр.get("факт_пп"), рр.get("модель_пп"),
+              рр.get("why_not"), flush=True)
+    суф = f"_{а.metka}" if а.metka else ""
+    out = КОРЕНЬ / "data" / "podbivka" / f"sverka_leader{суф}.json"
+    out.write_text(json.dumps({"ряды": рез, "расход": уз.расход()}, ensure_ascii=False, indent=1), encoding="utf-8")
+    (КОРЕНЬ / "docs" / f"podbivka_sverka_leader{суф}.md").write_text(
+        "# Сверка сделок группы leader с моделью режима 2\n\n" + md_таблица(рез) + "\n", encoding="utf-8")
+    import podbivka_run as R  # noqa: PLC0415
+    R.записано(out)
+    R.записано(КОРЕНЬ / "docs" / f"podbivka_sverka_leader{суф}.md")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
