@@ -138,6 +138,11 @@ def main() -> int:
     р.add_argument("--limit", type=int, default=0, help="0 -- все сделки")
     р.add_argument("--credit-budget", type=int, default=250_000,
                    help="потолок кредитов Helius на прогон")
+    # СВОИ КОШЕЛЬКИ -- СПИСКОМ, А НЕ ИЗ ПОЗИЦИИ. В позиции полосы поля
+    # lane_wallet может не быть (первый прогон 27.09: наш кошелёк полосы попал
+    # в "толпу" 148 раз из 152 и завысил числа s0 и s1).
+    р.add_argument("--svoi", default="",
+                   help="наши кошельки через запятую -- исключаются из толпы")
     а = р.parse_args()
 
     from solana_crowd_scan import Rpc, helius_key  # noqa: PLC0415
@@ -158,6 +163,9 @@ def main() -> int:
     for r in ряды:
         if r.get("wallet"):
             свои_общие.add(r["wallet"])
+    for адрес in (а.svoi or "").replace(";", ",").split(","):
+        if адрес.strip():
+            свои_общие.add(адрес.strip())
     print(f"ключ Helius из {откуда}; сделок к разбору: {len(ряды)}; "
           f"своих кошельков: {len(свои_общие)}")
 
