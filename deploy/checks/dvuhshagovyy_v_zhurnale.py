@@ -94,12 +94,19 @@ def main() -> int:
             if ст:
                 стадии[ст] += 1
             if искомые:
+                # ПОДПИСЬ ИСТОЧНИКА ЛЕЖИТ В ДВУХ ПОЛЯХ. В строке решения это
+                # signature, а в строке ПОЛОСЫ -- source_sig: поле signature
+                # там перезаписано НАШЕЙ подписью (или None до отправки).
+                # Пока смотрели только signature, стадии полосы по сигналу
+                # были невидимы, и выходило "полосу не звали".
                 п_ = str(з.get("signature") or "")
+                ист_ = str(з.get("source_sig") or "")
                 for иск in искомые:
-                    if п_.startswith(иск):
+                    if п_.startswith(иск) or ист_.startswith(иск):
                         по_подписям.setdefault(иск, []).append(
                             {к: v for к, v in з.items()
                              if к in ("ts_utc", "stage", "ok", "action", "code",
+                                       "source_sig", "size_sol", "lamports",
                                        "reason", "why_not", "group", "lane",
                                        "lane_allowed", "mint", "source",
                                        "spend_sol_eq", "dokupka", "dokupka_why",
