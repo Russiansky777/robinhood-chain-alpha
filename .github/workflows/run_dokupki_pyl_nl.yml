@@ -1,0 +1,96 @@
+name: "Докупки источников: сколько из них пыль (только чтение)"
+
+# ЗАЧЕМ (владелец 27.09, вечер, п.2): "Определение докупки в детекторе -- «у
+# источника есть любой остаток токена» или «источник покупал этот токен в
+# последние N часов»? Если первое -- сколько из 137 сегодняшних докупок были с
+# остатком меньше 1 % от размера покупки (пыль). Только число".
+#
+# В КОДЕ -- ПЕРВОЕ: first_entry = not in_pre or pre_raw == 0, то есть ЛЮБОЙ
+# остаток. Прогон считает долю "остаток до покупки / прирост за покупку" по
+# meta самой сделки источника и даёт число докупок с долей ниже 1 %.
+#
+# Только чтение: журнал решений потоком, транзакции -- getTransaction. Ни одной
+# отправки в цепь, задачи DBot не трогаются.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "с какого времени считать (пусто -- полночь UTC сегодня)"
+        required: false
+        default: ""
+      predel:
+        description: "сколько подписей смотреть (защита от лишних кредитов)"
+        required: false
+        default: "400"
+
+concurrency:
+  group: dokupki-pyl
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  TARGET_HOST: 127.0.0.1
+  OUT: data/dokupki_pyl.json
+
+jobs:
+  zamer:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается"
+        run: python3 -m py_compile deploy/checks/dokupki_pyl.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить замер и посчитать"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pyl"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pyl/dokupki_pyl.py" < deploy/checks/dokupki_pyl.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            $PYBIN /tmp/pyl/dokupki_pyl.py --state-dir '$STATE_DIR' \
+              --predel '${{ inputs.predel }}' \
+              ${{ inputs.since_utc != '' && format('--since-utc ''{0}''', inputs.since_utc) || '' }} \
+              --out /tmp/pyl/out.json" | tail -40
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pyl/out.json" > "$OUT"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/pyl"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Dokupki istochnikov: skolko iz nih pyl [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
