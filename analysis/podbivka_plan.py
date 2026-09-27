@@ -28,6 +28,9 @@ def длина_списка(имя: str) -> int:
     if имя == "nashi":
         return len(json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki.json")
                               .read_text(encoding="utf-8"))["источники"])
+    if имя in ("vtoroy", "dosschitat"):
+        д = json.loads((КОРЕНЬ / "data" / "podbivka" / "spiski_vtoroy.json").read_text(encoding="utf-8"))
+        return len(д["верхние_100" if имя == "vtoroy" else "досчитать"])
     raise SystemExit(f"неизвестный список {имя}")
 
 

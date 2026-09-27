@@ -44,6 +44,9 @@ def список(имя: str) -> list:
         д = json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki.json").read_text(encoding="utf-8"))
         return [{"address": з["address"], "group": з["группа_п5"], "tasks": з["задачи"],
                  "снят": з["снят"]} for з in д["источники"]]
+    if имя in ("vtoroy", "dosschitat"):
+        д = json.loads((КОРЕНЬ / "data" / "podbivka" / "spiski_vtoroy.json").read_text(encoding="utf-8"))
+        return д["верхние_100" if имя == "vtoroy" else "досчитать"]
     raise SystemExit(f"неизвестный список {имя}")
 
 
@@ -230,7 +233,7 @@ def кошелёк(уз: S.Узел, курс, строка: dict, с_ts: int, �
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--zadacha", required=True, help="каталог в data/podbivka/")
-    р.add_argument("--spisok", required=True, choices=("wallets_csv", "nashi"))
+    р.add_argument("--spisok", required=True, choices=("wallets_csv", "nashi", "vtoroy", "dosschitat"))
     р.add_argument("--s", type=int, default=0, help="с какого номера в списке")
     р.add_argument("--po", type=int, default=0, help="по какой номер (не включая), 0 -- до конца")
     р.add_argument("--do-utc", required=True, help="конец окна (одинаков у всех пакетов)")
