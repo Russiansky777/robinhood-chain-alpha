@@ -50,7 +50,7 @@ def main() -> int:
             "полоса": {к: (d.get("own_send") or {}).get(к)
                         for к in ("enabled", "live", "sent", "by_stage", "wallet",
                                    "balance_sol", "limits", "last",
-                                   "balance_day_threshold")},
+                                   "balance_day_threshold", "lane_daily_stop")},
             "площадка_торгует": bool((d.get("own_send") or {}).get("bloom_trades")),
             "телеграм": {к: (d.get("telegram") or {}).get(к)
                           for к in ("enabled", "format2", "format3", "sent",
