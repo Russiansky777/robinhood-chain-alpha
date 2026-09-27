@@ -35,6 +35,9 @@ def длина_списка(имя: str) -> int:
 
 
 def пакеты(м: dict) -> list:
+    if м.get("zapuski"):
+        return [{"skript": м["skript"], "args": " ".join(a), "name": f"{м['skript'][:-3]}_{н}",
+                 "_rps": м.get("helius_rps_na_paket")} for н, a in enumerate(м["zapuski"])]
     if м.get("skript", "podbivka_run.py") != "podbivka_run.py":
         return [{"skript": м["skript"], "args": " ".join(м.get("args") or []), "name": м["skript"],
                  "helius_rps": "10", "_rps": м.get("helius_rps_na_paket")}]
