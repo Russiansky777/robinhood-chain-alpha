@@ -1,0 +1,120 @@
+name: "Шреды: остановить службу слушателя (код остаётся)"
+
+# ЗАЧЕМ (владелец 27.09, пункт 6 утреннего задания): "Шреды: службу слушателя
+# остановить (CPU), код оставить; поток не продлевать".
+#
+# ЧТО ДЕЛАЕТ. systemctl stop и disable ровно одной службы shred-listener. Код,
+# юнит и данные НЕ удаляются: включить обратно можно тем же деплоем с
+# enable_service=yes. Ни одной правки окружения, ни одной отправки в цепь.
+#
+# ПОЧЕМУ ОТДЕЛЬНЫМ ПРОГОНОМ. У деплоя слушателя есть только включение
+# (enable_service), выключения у него нет вовсе, а останавливать службу руками
+# по ssh нельзя -- доступ к хосту только прогонами.
+on:
+  workflow_dispatch:
+    inputs:
+      chto:
+        description: "'status' -- только посмотреть; 'stop' -- остановить и выключить автозапуск"
+        required: true
+        default: "status"
+
+concurrency:
+  group: shred-listener-stop
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  SLUZHBA: shred-listener
+  OUT: data/shred_listener_stop.txt
+
+jobs:
+  stop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Гейт: только status или stop"
+        run: |
+          set -e
+          case "${{ inputs.chto }}" in
+            status|stop) echo "режим ${{ inputs.chto }}" ;;
+            *) echo "СБОЙ: chto должно быть status или stop"; exit 1 ;;
+          esac
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "До: состояние службы и расход CPU"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            echo '--- до ---'
+            systemctl is-active $SLUZHBA || true
+            systemctl is-enabled $SLUZHBA || true
+            systemctl show $SLUZHBA -p CPUUsageNSec -p ActiveEnterTimestamp -p MainPID || true
+            ps -o pid,pcpu,etime,comm -p \$(systemctl show -p MainPID --value $SLUZHBA 2>/dev/null || echo 1) 2>/dev/null || true
+            echo '--- нагрузка хоста ---'
+            cat /proc/loadavg" | tee "$OUT"
+
+      - name: "Остановить и выключить автозапуск"
+        if: ${{ inputs.chto == 'stop' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            systemctl stop $SLUZHBA
+            systemctl disable $SLUZHBA 2>&1 || true
+            echo '--- после ---'
+            systemctl is-active $SLUZHBA || true
+            systemctl is-enabled $SLUZHBA || true
+            echo '--- файлы на месте ---'
+            ls -l /etc/systemd/system/$SLUZHBA.service 2>/dev/null || echo 'юнита нет'
+            ls -l /home/bot/bloom_executor/shred_listener.py 2>/dev/null || echo 'модуля по этому пути нет'
+            echo '--- нагрузка хоста после ---'
+            cat /proc/loadavg" | tee -a "$OUT"
+
+      - name: "Боевые службы не задеты"
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            for s in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
+              printf '%s: ' \$s; systemctl is-active \$s
+            done" | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Shredy: sostoyanie sluzhby slushatelya [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
