@@ -178,6 +178,8 @@ def главное() -> int:
                     help="начала подписей, которые назвал владелец")
     р.add_argument("--okno-slotov", type=int, default=40)
     р.add_argument("--predel-podpisey", type=int, default=200)
+    р.add_argument("--stranic", type=int, default=12,
+                    help="сколько страниц по 1000 подписей листать назад")
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--gruppy", default="/home/bot/data/sources_2026-09-25.json")
     р.add_argument("--out", default="/tmp/istoriya_pula.json")
@@ -209,15 +211,35 @@ def главное() -> int:
     except Exception as exc:  # noqa: BLE001
         итог["почему_нет_имён"] = f"файл групп не прочитан: {type(exc).__name__}"
 
-    подписи = rpc("getSignaturesForAddress",
-                   [а.mint, {"limit": а.predel_podpisey}])
-    if not isinstance(подписи, list):
+    # ЛИСТАЕМ НАЗАД. Один вызов отдаёт последние подписи минта, а нужное окно
+    # лежит В ПРОШЛОМ: у живого токена 200 последних подписей кончаются позже
+    # нашего слота, и окно выходило пустым. Листаем курсором before, пока не
+    # уйдём НИЖЕ окна или пока не кончатся страницы.
+    подписи, до_подписи, страниц = [], None, 0
+    низ = наш_слот - а.okno_slotov
+    while страниц < а.stranic:
+        парам = {"limit": 1000}
+        if до_подписи:
+            парам["before"] = до_подписи
+        пачка = rpc("getSignaturesForAddress", [а.mint, парам])
+        if not isinstance(пачка, list) or not пачка:
+            break
+        страниц += 1
+        подписи.extend(пачка)
+        до_подписи = пачка[-1].get("signature")
+        последний = пачка[-1].get("slot")
+        if isinstance(последний, int) and последний < низ:
+            break
+        if len(пачка) < 1000:
+            break
+    if not подписи:
         итог["почему_нет"] = "подписи по минту узел не отдал"
         print(json.dumps(итог, ensure_ascii=False, indent=1))
         return 1
     в_окне = [з for з in подписи
               if isinstance(з.get("slot"), int)
               and abs(з["slot"] - наш_слот) <= а.okno_slotov]
+    итог["страниц_подписей"] = страниц
     итог["подписей_по_минту"] = len(подписи)
     итог["в_окне"] = len(в_окне)
     искомые = tuple(x.strip() for x in (а.podpisi or "").split(",") if x.strip())
