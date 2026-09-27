@@ -47,7 +47,9 @@ def main() -> int:
                                         if п.get("bloom_trades"))
     свод["политики_торгующих"] = {и: {к: (д["политики"][и] or {}).get(к)
                                        for к in ("lane_size", "min_target_sol",
-                                                  "slippage", "min_pool_sol_reserve",
+                                                  "slippage", "slippage_thin_pool",
+                                                  "thin_pool_below_sol",
+                                                  "min_pool_sol_reserve",
                                                   "max_slots_from_source",
                                                   "skip_flippers", "allow_taxed_route",
                                                   "lane_open_max", "stop_loss_sol",
