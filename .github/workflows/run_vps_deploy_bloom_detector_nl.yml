@@ -103,6 +103,26 @@ on:
         description: "'1' -- БОЕВОЙ ПУЛ шаг 1: одна подписанная покупка уходит ВСЕМИ подключёнными сервисами, чаевые всем <= 0.005 SOL на сделку (включено по решению владельца 25.09)"
         required: false
         default: "1"
+      close_on_sell:
+        description: "'1' -- закрывать токен-счёт при продаже (возврат ренты); 0 -- нет"
+        required: false
+        default: "0"
+      tg_format:
+        description: "'2' -- формат Telegram 2 с полями строки BUY; пусто -- прежний"
+        required: false
+        default: ""
+      region_send:
+        description: "'1' -- региональная отправка; по умолчанию ВЫКЛЮЧЕНА"
+        required: false
+        default: "0"
+      lane_max_pool_fee:
+        description: "потолок комиссии пула для полосы, доля (0.05 = 5 %)"
+        required: false
+        default: "0.05"
+      copiers_file:
+        description: "файл списка копировщиков (каталог состояния, не каталог кода)"
+        required: false
+        default: "/home/bot/bloom_executor_live_data/kopirovshchiki.json"
 
 concurrency:
   group: bloom-detector-deploy
@@ -234,7 +254,7 @@ jobs:
           # Без них полоса не подписывает, а без самого модуля детектор
           # честно пишет ModuleNotFoundError в признак жизни -- ровно это и
           # случилось в прогоне 36080386872.
-          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py; do
+          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py bloom_close_on_sell.py bloom_region_send.py bloom_token_name.py bloom_slot_peers.py bloom_copiers.py c2_cl_quote.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
@@ -448,6 +468,21 @@ jobs:
             sed -i '/^BLOOM_BUY_SOL=/d' $ENV_DIR/env
             echo 'BLOOM_BUY_SOL=${{ inputs.buy_sol }}' >> $ENV_DIR/env
             sed -i '/^BLOOM_LIVE_TEST=/d' $ENV_DIR/env
+            # НОЧНОЙ КОД 27.09, пункт 2 владельца. Пять строк окружения, все
+            # переписываются каждым деплоем -- значение не должно зависеть от
+            # того, что кто-то помнит, каким оно было.
+            #   BLOOM_CLOSE_ON_SELL  -- закрытие токен-счёта при продаже;
+            #   BLOOM_TG_FORMAT      -- формат строки в Telegram;
+            #   BLOOM_REGION_SEND    -- региональная отправка, по умолчанию 0;
+            #   BLOOM_LANE_MAX_POOL_FEE -- потолок комиссии пула на денежном пути;
+            #   BLOOM_COPIERS_FILE   -- список копировщиков в каталоге состояния.
+            # НИ КАВЫЧЕК, НИ АПОСТРОФОВ В ЭТОМ КОММЕНТАРИИ: он внутри ssh.
+            sed -i '/^BLOOM_CLOSE_ON_SELL=/d; /^BLOOM_TG_FORMAT=/d; /^BLOOM_REGION_SEND=/d; /^BLOOM_LANE_MAX_POOL_FEE=/d; /^BLOOM_COPIERS_FILE=/d' $ENV_DIR/env
+            echo 'BLOOM_CLOSE_ON_SELL=${{ inputs.close_on_sell }}' >> $ENV_DIR/env
+            echo 'BLOOM_TG_FORMAT=${{ inputs.tg_format }}' >> $ENV_DIR/env
+            echo 'BLOOM_REGION_SEND=${{ inputs.region_send }}' >> $ENV_DIR/env
+            echo 'BLOOM_LANE_MAX_POOL_FEE=${{ inputs.lane_max_pool_fee }}' >> $ENV_DIR/env
+            echo 'BLOOM_COPIERS_FILE=${{ inputs.copiers_file }}' >> $ENV_DIR/env
             chown root:root $ENV_DIR/env && chmod 600 $ENV_DIR/env
             ls -l $ENV_DIR/env
           "
