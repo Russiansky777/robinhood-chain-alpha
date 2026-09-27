@@ -1,0 +1,72 @@
+name: "Признак жизни: файл групп, подписка, полоса, Telegram (только чтение)"
+
+# ЗАЧЕМ. Вечером 27.09 нужно смотреть на живую службу часто: хэш файла групп,
+# сколько адресов подписано (585 в файле -- новый предел), рвётся ли подписка,
+# что делает полоса и идут ли строки в Telegram. Деплой и замена файла для этого
+# слишком тяжёлые, а таблица полосы отвечает только про сделки.
+#
+# ТОЛЬКО ЧТЕНИЕ одного файла состояния на хосте. Ни записи, ни отправки.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: priznak-zhizni
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: data/priznak_zhizni.txt
+
+jobs:
+  priznak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Признак жизни"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/gruppy_v_priznake.py" < deploy/checks/gruppy_v_priznake.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            $PYBIN /tmp/gruppy_v_priznake.py --status $STATE_DIR/detector_status.json
+            rm -f /tmp/gruppy_v_priznake.py" | tee "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Priznak zhizni sluzhby [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
