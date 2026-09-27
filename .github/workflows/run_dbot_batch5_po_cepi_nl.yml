@@ -1,0 +1,114 @@
+name: "DBot BATCH-5 по цепи: круги по суткам + решения по ночным минтам (чтение)"
+
+# ЗАЧЕМ (задание владельца 27.09): (1) по кошельку BATCH-5 по ЦЕПИ -- круги,
+# свопы, чаевые, приоритет и итог по суткам Мадрида; (2) по минтам, которые он
+# купил в заданное окно, -- что решал наш детектор (источник, размер, группа,
+# причина отказа) по журналу решений на хосте.
+#
+# Цепь -- у Helius, журнал -- потоком на хосте. Ничего не отправляется.
+on:
+  workflow_dispatch:
+    inputs:
+      wallet:
+        description: "кошелёк DBot"
+        required: false
+        default: "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv"
+      s:
+        description: "начало окна UTC (25.09 по Мадриду = 2026-09-24T22:00:00Z)"
+        required: false
+        default: "2026-09-24T22:00:00Z"
+      okno_s:
+        description: "ночное окно, начало UTC (00:00 Мадрида 27.09 = 2026-09-26T22:00:00Z)"
+        required: false
+        default: "2026-09-26T22:00:00Z"
+      okno_po:
+        description: "ночное окно, конец UTC (03:00 Мадрида = 2026-09-27T01:00:00Z)"
+        required: false
+        default: "2026-09-27T01:00:00Z"
+
+concurrency:
+  group: dbot-batch5-po-cepi
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/dbot_batch5_po_cepi.json
+  NASHI: data/nochnye_minty_nashi.json
+
+jobs:
+  cep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/db_venv"
+          "$RUNNER_TEMP/db_venv/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/db_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Кошелёк по цепи: круги по суткам и покупки ночного окна"
+        env:
+          HELIUS_API: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          $PY deploy/checks/dbot_batch5_po_cepi.py --wallet '${{ inputs.wallet }}' \
+            --s '${{ inputs.s }}' --okno-s '${{ inputs.okno_s }}' \
+            --okno-po '${{ inputs.okno_po }}' --out "$OUT"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Что решал наш детектор по этим минтам (хост, потоком)"
+        run: |
+          set -e
+          set -o pipefail
+          MINTY=$($PY -c "import json;d=json.load(open('$OUT'));print(','.join(x['mint'] for x in d.get('покупки_окна') or []))")
+          echo "минтов ночного окна: $(echo "$MINTY" | tr ',' '\n' | grep -c . || true)"
+          if [ -z "$MINTY" ]; then echo "минтов нет -- решения смотреть не по чему"; exit 0; fi
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/dve_stroki_k_22.py" < deploy/checks/dve_stroki_k_22.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -o pipefail
+            nice -n 15 python3 /tmp/dve_stroki_k_22.py --state-dir '$STATE_DIR' \
+              --minty '$MINTY' --out /tmp/nochnye.json | tail -n 40
+            rc=\$?; rm -f /tmp/dve_stroki_k_22.py; exit \$rc"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/nochnye.json" > "$NASHI"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/nochnye.json"
+
+      - name: "Ключей в отчётах быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" "$NASHI" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT" "$NASHI"; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "DBot BATCH-5 po cepi i resheniya po nochnym mintam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
