@@ -712,6 +712,12 @@ class Seller:
         # Путь через Jupiter -- отдельным выключателем: он требует ключа
         # кошелька в окружении, и включать его молча нельзя.
         self.jupiter_включён = (os.environ.get("BLOOM_SELL_VIA_JUPITER", "0").strip() == "1")
+        # ЗЕРКАЛЬНАЯ ДВУХШАГОВАЯ ПРОДАЖА -- по умолчанию ВЫКЛЮЧЕНА. Сборщик
+        # проверен самопроверками (52/52) и сверен с живой раскладкой CPMM, но
+        # боем не проверен ни разу: включает его слово владельца, а не деплой.
+        # Пока выключена, продаёт Jupiter -- как и сейчас (правило 4).
+        self.двухшаговая_продажа_включена = (
+            os.environ.get("LANE_SELL_TWO_STEP", "0").strip() == "1")
         # Сверка кошелька один раз при старте -- чтобы несовпадение было
         # видно в признаке жизни сразу, а не только в момент продажи.
         self.jupiter_ключ = ({"ok": False, "why_not": "путь выключен"}
@@ -1424,6 +1430,24 @@ class Seller:
                                f"{now - float(последняя):.0f} с из "
                                f"{self.retry_every_s:.0f}")
             return итог
+        # СВОЙ СТРОИТЕЛЬ -- ПЕРВЫМ, Jupiter -- ЗАПАСНЫМ (правило 4 и п.3 плана
+        # владельца 27.09: "продажа зеркально одной транзакцией токен ->
+        # котировка -> SOL по таймеру hold_slots"). Путь по умолчанию выключен,
+        # и пока он выключен, эта ветка молча пропускается: ничего не меняется.
+        # Любой отказ своего пути -- не потеря позиции: остаток продаст Jupiter,
+        # а причина уже лежит в позиции и в журнале словами.
+        if self.двухшаговая_продажа_включена and pos.get("lane_two_step"):
+            своя = self.продать_своим_двухшаговым(pos, bal=bal, now=now,
+                                                   количество_raw=количество)
+            итог["two_step_sell"] = своя
+            if своя.get("ok"):
+                self.state.update_position(cid, state="selling",
+                                            ts_last_sell_attempt=now,
+                                            sell_address_kind="two_step")
+                итог["action"] = "продажа полосы отправлена своим двухшаговым"
+                return итог
+            итог["two_step_sell_why_not"] = своя.get("why_not")
+
         if JUP is None or not self.jupiter_включён:
             итог.update(action="полосе продавать нечем: путь Jupiter выключен",
                          why_not=("BLOOM_SELL_VIA_JUPITER не равен 1"
@@ -1486,6 +1510,164 @@ class Seller:
         итог.update(action="UNSOLD полосы -- ждём владельца", why_not=причина)
         return итог
 
+
+    def продать_своим_двухшаговым(self, pos: dict, *, bal: dict, now: float,
+                                   количество_raw: int | None = None) -> dict:
+        """Зеркальная продажа токен -> котировка -> SOL одной транзакцией.
+
+        КОГДА ЗОВЁТСЯ. Только для позиции, КУПЛЕННОЙ двухшаговым путём (метку
+        lane_two_step ставит отправка покупки) и только по флагу
+        LANE_SELL_TWO_STEP=1. По умолчанию путь ВЫКЛЮЧЕН: деплой его не
+        включает, включает слово владельца.
+
+        ПОЧЕМУ КЭШ НОГИ ЗДЕСЬ СВОЙ, А НЕ ИЗ ДЕТЕКТОРА. Кэш шаблонов живёт в
+        процессе детектора, куда его кормит подписка; сторож продаж -- другой
+        процесс. Тянуть его через диск значило бы возить транзакции пула туда и
+        обратно, а шаблон годен всего 30 с. Продажа НЕ гонка (она уходит по
+        таймеру hold_slots, через 30-60 с после покупки), поэтому здесь шаблон
+        одной ноги берётся опросом: два вызова сети на продажу мы себе
+        позволяем, в отличие от покупки.
+
+        ЛЮБОЙ ОТКАЗ -- НЕ ПОТЕРЯ ПОЗИЦИИ. Вернули ok=False, и вызывающий идёт
+        дальше на Jupiter (правило 4): остаток продаётся, а причина ложится в
+        позицию и в журнал словами.
+        """
+        cid = pos.get("client_order_id")
+        из_ = {"ok": False, "why_not": None, "signature": None, "route": "two_step_sell"}
+        if not self.двухшаговая_продажа_включена:
+            из_["why_not"] = "путь выключен (LANE_SELL_TWO_STEP не равен 1)"
+            return из_
+        if OSW is None:
+            из_["why_not"] = "модуль полосы не загружен"
+            return из_
+        if not pos.get("lane_two_step"):
+            из_["why_not"] = ("позиция куплена НЕ двухшаговым путём -- зеркальная "
+                               "продажа к ней не относится")
+            return из_
+        подпись_и = pos.get("source_sig") or pos.get("source_signature")
+        if not подпись_и:
+            из_["why_not"] = "подписи сделки источника в позиции нет -- шаблон брать негде"
+            return из_
+        остаток = int(bal.get("raw") or 0)
+        сколько = остаток if количество_raw is None else min(int(количество_raw), остаток)
+        if сколько <= 0:
+            из_["why_not"] = f"продавать нечего: остаток {остаток}"
+            return из_
+        try:
+            import bloom_lane_two_step as TS  # noqa: PLC0415
+            import c2_shadow_build as SB  # noqa: PLC0415
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"модули двухшаговой продажи не загружены: {type(exc).__name__}"
+            return из_
+        # СДЕЛКА ИСТОЧНИКА -- из цепи по подписи из позиции. Из неё берётся
+        # шаблон пула токена: тот же, по которому мы покупали.
+        try:
+            tx_и = rpc_call("getTransaction",
+                             [подпись_и, {"encoding": "jsonParsed",
+                                           "maxSupportedTransactionVersion": 0}])
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"сделка источника не прочитана: {type(exc).__name__}"
+            return из_
+        if not tx_и:
+            из_["why_not"] = f"сделки источника {str(подпись_и)[:10]} в цепи не нашли"
+            return из_
+        # КЭШ ОДНОЙ НОГИ: только та котировка, которой куплена позиция.
+        котировка = pos.get("lane_two_step_quote_mint")
+        try:
+            все_пулы = SB.load_leg_pools_all() or SB.load_leg_pools()
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"список пулов котировок не прочитан: {type(exc).__name__}"
+            return из_
+        пул_ноги = (все_пулы or {}).get(котировка)
+        if пул_ноги is None:
+            из_["why_not"] = (f"пула SOL/{str(котировка)[:8]} в списке нет -- "
+                               "ногу продажи собирать не из чего")
+            return из_
+        try:
+            кэш = SB.LegCache({котировка: пул_ноги}, rpc_call, allow_polling=True)
+            кэш.refresh_all()
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"шаблон ноги не обновился: {type(exc).__name__}"
+            return из_
+        сб = TS.собрать_продажу(
+            tx_источника=tx_и, источник=pos.get("source") or "",
+            минт=pos.get("mint") or "", наш_кошелёк=кошелёк_позиции(pos),
+            токенов=сколько, проскальзывание=self.проскальзывание_продажи(pos),
+            rpc_call=rpc_call, кэш_ног=кэш)
+        из_.update({к: сб.get(к) for к in
+                     ("why_not", "pool_program", "leg2_pool_program", "quote_mint",
+                      "min_out", "expected_out", "min_out_sol", "expected_out_sol",
+                      "quote_fee_bps", "size", "build_ms", "closed_accounts",
+                      "pool_fee_share", "leg2_fee_share", "reserves_live")})
+        if not сб.get("ok"):
+            self.state.update_position(cid, two_step_sell_why_not=str(сб.get("why_not"))[:300],
+                                        ts_two_step_sell_try=now)
+            self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                       "action": "своя двухшаговая продажа не собралась",
+                       "why_not": сб.get("why_not"), "two_step_sell": из_})
+            return из_
+        if not self.live:
+            из_["why_not"] = "собрано, но живые продажи выключены (dry-run)"
+            из_["assembled"] = True
+            self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                       "action": "своя двухшаговая продажа собрана (dry-run)",
+                       "two_step_sell": из_})
+            return из_
+        # BLOCKHASH -- СВЕЖИЙ. Сборщик компилирует сообщение с пустым, и
+        # подписать такое значит потратить чаевые на транзакцию, которую сеть
+        # не примет: OSW.подписать это и проверяет.
+        try:
+            от = rpc_call("getLatestBlockhash", [{"commitment": "confirmed"}]) or {}
+            bh = ((от.get("value") or {}).get("blockhash")
+                  if isinstance(от.get("value"), dict) else от.get("blockhash"))
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"blockhash не получен: {type(exc).__name__}"
+            return из_
+        if not bh:
+            из_["why_not"] = "blockhash в ответе сети пуст"
+            return из_
+        под = OSW.подписать(сб["tx_base64"], blockhash=bh,
+                            ожидаемый_кошелёк=кошелёк_позиции(pos),
+                            секрет=ключ_позиции(pos))
+        if not под.get("ok"):
+            из_["why_not"] = f"подпись: {под.get('why_not')}"
+            self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                       "action": "своя двухшаговая продажа не подписана",
+                       "why_not": под.get("why_not")})
+            return из_
+        отпр = OSW.отправить(под["tx_base64"], состояние=self.state,
+                             ключ_операции=f"two-step-sell-{cid}")
+        из_["signature"] = отпр.get("result") or отпр.get("signature")
+        из_["ok"] = bool(отпр.get("ok"))
+        из_["why_not"] = из_["why_not"] or отпр.get("why_not")
+        поля = {"ts_two_step_sell_try": now,
+                 "two_step_sell_min_out": сб.get("min_out"),
+                 "two_step_sell_expected_sol": сб.get("expected_out_sol"),
+                 "two_step_sell_closed": сб.get("closed_accounts"),
+                 "two_step_sell_why_not": (None if из_["ok"]
+                                            else str(из_["why_not"])[:300])}
+        if из_["signature"]:
+            поля.update({"two_step_sell_signature": из_["signature"],
+                          "last_sell_signatures": [из_["signature"]],
+                          "sell_address_kind": "two_step"})
+        self.state.update_position(cid, **поля)
+        self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                   "action": ("своя двухшаговая продажа отправлена" if из_["ok"]
+                               else "своя двухшаговая продажа не ушла"),
+                   "why_not": из_["why_not"], "two_step_sell": из_})
+        return из_
+
+    def проскальзывание_продажи(self, pos: dict) -> float:
+        """Проскальзывание минимума выхода продажи -- то же число группы, что
+        у покупки (наценка входа и минимум выхода у владельца одно поле)."""
+        if OSW is None:
+            return 0.35
+        знач = OSW.проскальзывание_группы(pos.get("lane_group"))
+        try:
+            з = float(знач)
+        except (TypeError, ValueError):
+            return 0.35
+        return з if 0.0 < з < 1.0 else 0.35
 
     def продать_через_jupiter(self, pos: dict, *, bal: dict, now: float,
                                количество_raw: int | None = None) -> dict:
@@ -2193,6 +2375,54 @@ def self_test() -> None:
             bal3["ok"] is False and "не прочитан" in bal3["why_not"], bal3)
     finally:
         глоб["rpc_call"] = старый_rpc
+
+    # --- ЗЕРКАЛЬНАЯ ДВУХШАГОВАЯ ПРОДАЖА: отказы и то, что позиция не теряется.
+    st.write_intent(client_order_id="d2", mint="MINTD", source_sig="SD", source_slot=11,
+                     sol_in=0.01, pool=None, program=None, taxed=None, tax_bps=None,
+                     mode="dry-run", sell_after_s=28.8)
+    было_д2 = os.environ.get("LANE_SELL_TWO_STEP")
+    try:
+        os.environ.pop("LANE_SELL_TWO_STEP", None)
+        s_выкл = Seller(state=st, live=False, api=api)
+        chk("двухшаговая продажа по умолчанию ВЫКЛЮЧЕНА",
+            s_выкл.двухшаговая_продажа_включена is False)
+        поз_д = dict(st.positions().get("d2") or {}, lane=МЕТКА_ПОЛОСЫ,
+                      lane_two_step=True, lane_group="batch5",
+                      lane_two_step_quote_mint="QQQ")
+        о = s_выкл.продать_своим_двухшаговым(поз_д, bal={"raw": 1000}, now=time.time())
+        chk("выключенный путь отказывает СЛОВАМИ про флаг, ничего не собирая",
+            о["ok"] is False and "LANE_SELL_TWO_STEP" in (о.get("why_not") or ""),
+            о.get("why_not"))
+        os.environ["LANE_SELL_TWO_STEP"] = "1"
+        s_вкл = Seller(state=st, live=False, api=api)
+        chk("флаг двухшаговой продажи прочитан",
+            s_вкл.двухшаговая_продажа_включена is True)
+        о_нед = s_вкл.продать_своим_двухшаговым(
+            dict(поз_д, lane_two_step=False), bal={"raw": 1000}, now=time.time())
+        chk("позиция куплена НЕ двухшаговым -- зеркальная продажа к ней не лезет",
+            о_нед["ok"] is False and "НЕ двухшаговым" in (о_нед.get("why_not") or ""),
+            о_нед.get("why_not"))
+        о_бп = s_вкл.продать_своим_двухшаговым(
+            {к: v for к, v in поз_д.items() if к != "source_sig"},
+            bal={"raw": 1000}, now=time.time())
+        chk("без подписи сделки источника -- отказ, шаблон брать негде",
+            о_бп["ok"] is False and "источника" in (о_бп.get("why_not") or ""),
+            о_бп.get("why_not"))
+        о_ноль = s_вкл.продать_своим_двухшаговым(поз_д, bal={"raw": 0},
+                                                  now=time.time())
+        chk("нулевой остаток -- отказ до всякой сети",
+            о_ноль["ok"] is False and "нечего" in (о_ноль.get("why_not") or ""),
+            о_ноль.get("why_not"))
+        chk("проскальзывание продажи -- число группы, а без него 0.35",
+            0.0 < s_вкл.проскальзывание_продажи(поз_д) < 1.0
+            and s_вкл.проскальзывание_продажи({}) == 0.35,
+            (s_вкл.проскальзывание_продажи(поз_д),
+             s_вкл.проскальзывание_продажи({})))
+    finally:
+        if было_д2 is None:
+            os.environ.pop("LANE_SELL_TWO_STEP", None)
+        else:
+            os.environ["LANE_SELL_TWO_STEP"] = было_д2
 
     # --- путь через Jupiter: после двух неудач Bloom, до UNSOLD
     st.write_intent(client_order_id="pj", mint="MINTJ", source_sig="SJ", source_slot=9,
