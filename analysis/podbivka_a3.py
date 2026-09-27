@@ -38,6 +38,7 @@ import podbivka_sim as S  # noqa: E402
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 SOLы = (C.WSOL, C.NATIVE_QUOTE)
+G_БЕЗ_ПРОДАЖ = 0.985
 
 
 def строки(tx):
@@ -189,6 +190,11 @@ def одна(уз: S.Узел, с: dict) -> dict:
     is_ = next((i for i, з in enumerate(сп) if з["signature"] == sell), None)
     if ib is None or is_ is None:
         return {**из_, "why_not": "наши сделки не найдены в истории пула"}
+    if f and f < 0.95:
+        # прогон 5: доля ниже 0.95 по сделке источника (или по его кошельку) --
+        # сверка с ближайшими покупками в пуле по хранилищам
+        из_["f_источника_отброшена"] = round(f, 5)
+        f = None
     if not f:
         for i in range(ib - 1, max(-1, ib - 30), -1):
             f = f_по_хранилищам(уз.tx(сп[i]["signature"]), пул)
@@ -211,8 +217,10 @@ def одна(уз: S.Узел, с: dict) -> dict:
                 доли.append(g_)
         if len(доли) >= 6:
             break
-    g = statistics.median(доли) if доли else f
-    из_["g"], из_["g_откуда"] = round(g, 5), (f"продажи пула ({len(доли)})" if доли else "продаж нет: g = f")
+    # продаж в окне нет -- медиана долей продажи по продажам пулов прогона 4
+    # (15 пулов, 0.978–0.9999, медиана 0.9855), флаг
+    g = statistics.median(доли) if доли else G_БЕЗ_ПРОДАЖ
+    из_["g"], из_["g_откуда"] = round(g, 5), (f"продажи пула ({len(доли)})" if доли else f"продаж нет: g = {G_БЕЗ_ПРОДАЖ} (медиана прогона 4)")
 
     def ст_после(i):
         return S.состояние(уз.tx(сп[i]["signature"]), "xyk", пул, с["mint"]) if i is not None and i >= 0 else None
