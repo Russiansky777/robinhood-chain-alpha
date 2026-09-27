@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-09-27T17:36:38Z",
+ "generated_utc": "2026-09-27T19:57:00Z",
  "decision": "Финальный план живого теста, владелец 27.09. Четыре группы: leader, batch5, lane_s0 и off; Bloom не торгует ни по одной (bloom_trades=false), веер выключен (fanout=false), Jupiter в покупке не участвует ни на одной группе. Прежние группы speed_only, bloom_lane, lane_only и candidates упразднены.",
  "groups": {
   "leader": {
@@ -12,8 +12,10 @@
    "max_slots_from_source": null,
    "skip_flippers": false,
    "allow_taxed_route": true,
-   "slippage": 0.25,
+   "slippage": 0.2,
    "min_pool_sol_reserve": null,
+   "slippage_thin_pool": 0.5,
+   "thin_pool_below_sol": 30,
    "lane_open_max": 3,
    "stop_loss_sol": 0.75,
    "hold_slots": 150,
@@ -23,7 +25,7 @@
     "bonding",
     "two_step"
    ],
-   "note": "Лидер. Размер 0.5 SOL, порог источника 10 SOL-экв., налоговый маршрут берём и пишем налог в строку решения, наценка входа до 0.25, три открытых, стоп -0.75 за сутки, держим 150 слотов от s0. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и двухшаговый маршрут через котировочный токен (п.3). LaunchLab, CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), поэтому их в списке ПОКА НЕТ.",
+   "note": "Лидер. Размер 0.5 SOL, порог источника 10 SOL-экв., налоговый маршрут берём и пишем налог в строку решения, наценка входа до 0.2 (min-out 80 %, наценка 25 %), а на пуле с резервом ниже 30 SOL-экв. -- 0.5 (наценка до 100 %); три открытых, стоп -0.75 за сутки, держим 150 слотов от s0. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и двухшаговый маршрут через котировочный токен (п.3). LaunchLab, CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), поэтому их в списке ПОКА НЕТ.",
    "addresses": {
     "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit": {
      "name": "лидер",
@@ -2425,7 +2427,7 @@
  },
  "disputed_prefixes": [],
  "archive_2026_09_25": {
-  "generated_utc": "2026-09-27T15:45:04Z",
+  "generated_utc": "2026-09-27T17:36:38Z",
   "decision": "Финальный план живого теста, владелец 27.09. Четыре группы: leader, batch5, lane_s0 и off; Bloom не торгует ни по одной (bloom_trades=false), веер выключен (fanout=false), Jupiter в покупке не участвует ни на одной группе. Прежние группы speed_only, bloom_lane, lane_only и candidates упразднены."
  }
 }

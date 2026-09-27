@@ -79,12 +79,20 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
         "bloom_sol": None, "fanout": False,
         "min_target_sol": 10, "max_slots_from_source": None,
         "skip_flippers": False, "allow_taxed_route": True,
-        "slippage": 0.25, "min_pool_sol_reserve": None,
+        # НАЦЕНКА ЛИДЕРА -- ЧИСЛА ВЛАДЕЛЬЦА 27.09 вечером. 0.2 значит min-out
+        # 80 % ожидания, то есть допустимая наценка входа 25 % (по данным
+        # Code-2); прежние 0.25 давали наценку 33 %. На ТОНКОМ пуле (резерв
+        # котировочной стороны ниже 30 SOL-экв. по meta сделки источника)
+        # наценка до 100 %, то есть min-out 50 % ожидания.
+        "slippage": 0.2, "min_pool_sol_reserve": None,
+        "slippage_thin_pool": 0.5, "thin_pool_below_sol": 30,
         "lane_open_max": 3, "stop_loss_sol": 0.75, "hold_slots": 150,
         "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
         "note": ("Лидер. Размер 0.5 SOL, порог источника 10 SOL-экв., налоговый "
                   "маршрут берём и пишем налог в строку решения, наценка входа до "
-                  "0.25, три открытых, стоп -0.75 за сутки, держим 150 слотов от "
+                  "0.2 (min-out 80 %, наценка 25 %), а на пуле с резервом ниже "
+                  "30 SOL-экв. -- 0.5 (наценка до 100 %); три открытых, стоп "
+                  "-0.75 за сутки, держим 150 слотов от "
                   "s0. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и "
                   "двухшаговый маршрут через котировочный токен (п.3). LaunchLab, "
                   "CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), "
@@ -299,10 +307,14 @@ def self_test() -> int:
     chk("наших кошельков в источниках нет",
         not (set(НАШИ_КОШЕЛЬКИ) & set(все)), set(НАШИ_КОШЕЛЬКИ) & set(все))
     # ДЕНЬГИ: размеры и стопы -- те, что назвал владелец.
-    chk("размер лидера 0.5, стоп -0.75, порог 10",
+    chk("лидер: 0.5, стоп -0.75, порог 10, наценка 0.2 и 0.5 на тонком пуле",
         ф["groups"]["leader"]["lane_size"] == 0.5
         and ф["groups"]["leader"]["stop_loss_sol"] == 0.75
-        and ф["groups"]["leader"]["min_target_sol"] == 10, ф["groups"]["leader"])
+        and ф["groups"]["leader"]["min_target_sol"] == 10
+        and ф["groups"]["leader"]["slippage"] == 0.2
+        and ф["groups"]["leader"]["slippage_thin_pool"] == 0.5
+        and ф["groups"]["leader"]["thin_pool_below_sol"] == 30,
+        ф["groups"]["leader"])
     chk("batch5 0.3, стоп -0.45, предела резерва нет, наценка 0.40",
         ф["groups"]["batch5"]["lane_size"] == 0.3
         and ф["groups"]["batch5"]["stop_loss_sol"] == 0.45
