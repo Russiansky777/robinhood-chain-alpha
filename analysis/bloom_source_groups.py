@@ -136,6 +136,14 @@ HOLD_SLOTS_ПО_УМОЛЧАНИЮ = 72
                           # то, и другое. Выше -- min-out не пропускает, повтор
                           # не делается.
                           "slippage": None,
+                          # НАЦЕНКА НА ТОНКОМ ПУЛЕ (слово владельца 27.09
+                          # вечером, только leader): когда резерв котировочной
+                          # стороны пула НИЖЕ порога, наценка берётся эта, а не
+                          # обычная. Порог -- в SOL-эквиваленте, из meta сделки
+                          # источника. Оба поля пустые -- правила нет, наценка
+                          # всегда обычная.
+                          "slippage_thin_pool": None,
+                          "thin_pool_below_sol": None,
                           # НИЖНИЙ ПРЕДЕЛ РЕЗЕРВА ПУЛА в SOL-эквиваленте на
                           # момент входа. None -- предела нет.
                           "min_pool_sol_reserve": None,
@@ -300,6 +308,8 @@ def загрузить(путь: str | None = None, *, заново: bool = Fals
             "skip_flippers": bool(г.get("skip_flippers")),
             "allow_taxed_route": г.get("allow_taxed_route"),
             "slippage": г.get("slippage"),
+            "slippage_thin_pool": г.get("slippage_thin_pool"),
+            "thin_pool_below_sol": г.get("thin_pool_below_sol"),
             "min_pool_sol_reserve": г.get("min_pool_sol_reserve"),
             # hold_slots: поля нет -- 72 (слово владельца). Ноль и минус
             # значили бы "продать немедленно", поэтому не принимаются.

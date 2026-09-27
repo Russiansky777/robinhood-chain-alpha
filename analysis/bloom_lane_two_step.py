@@ -140,14 +140,19 @@ def собрать(*, tx_источника: dict, источник: str, мин
             чаевые_адрес: str | None = None, семя: str | None = None,
             нонс: tuple | None = None, rpc_call=None, кэш_ног=None,
             налог_котировки_bps=None, налог_минта=None,
-            потолок_комиссии: float | None = None) -> dict:
+            потолок_комиссии: float | None = None,
+            проскальзывание_тонкого: float | None = None,
+            порог_тонкого_sol: float | None = None) -> dict:
     """Одна транзакция: SOL -> котировочный -> токен. Без подписи и отправки."""
     из_ = {"ok": False, "why_not": None, "route": "two_step", "steps": 2,
             "pool_program": None, "leg1_pool_program": None, "quote_mint": None,
             "min_out": None, "expected_out": None, "leg1_min_out": None,
             "leg2_amount_in": None, "quote_fee_bps": None,
             "tx_base64": None, "size": None, "build_ms": None,
-            "tip_account": None, "tips": None, "tips_total_lamports": None}
+            "tip_account": None, "tips": None, "tips_total_lamports": None,
+            "slippage_thin": None, "slippage_used": проскальзывание,
+            "slippage_why": None, "pool_reserve_sol_eq": None,
+            "min_out_floor_absent": None}
     t0 = time.perf_counter()
     if not isinstance(лампорты, int) or лампорты <= 0:
         из_["why_not"] = f"размер не положительное целое: {лампорты!r}"
@@ -254,6 +259,37 @@ def собрать(*, tx_источника: dict, источник: str, мин
         из_["leg2_to_pool"] = дойдёт_до_пула2
         мо = B.min_out_from_reserves(tpl2, tx_источника, дойдёт_до_пула2,
                                      проскальзывание)
+        # НАЦЕНКА НА ТОНКОМ ПУЛЕ (слово владельца 27.09 вечером, leader).
+        # РЕЗЕРВ ЗДЕСЬ НЕ В SOL: котировка второго шага -- НЕ SOL, и
+        # reserves_after[0] выражен в единицах котировочного токена. Чтобы
+        # сравнивать с порогом в SOL-эквиваленте, переводим ценой ноги:
+        # price_sol -- это SOL за ЦЕЛЫЙ котировочный токен (та же величина, по
+        # которой выше считалось ожидание первого шага). Спутать сырые единицы
+        # с SOL значило бы считать тонким любой пул с шестью знаками после
+        # запятой.
+        if мо.get("ok") and проскальзывание_тонкого and порог_тонкого_sol:
+            рез_т = мо.get("reserves_after") or мо.get("virtual_reserves_after")
+            резерв_sol_экв = None
+            if isinstance(рез_т, (list, tuple)) and рез_т:
+                try:
+                    резерв_sol_экв = float(
+                        D(int(рез_т[0])) / D(10) ** int(e["q_dec"]) * e["price_sol"])
+                except (TypeError, ValueError, ZeroDivisionError):
+                    резерв_sol_экв = None
+            из_["pool_reserve_sol_eq"] = резерв_sol_экв
+            if (резерв_sol_экв is not None
+                    and резерв_sol_экв < float(порог_тонкого_sol)):
+                проскальзывание = float(проскальзывание_тонкого)
+                из_["slippage_thin"] = True
+                из_["slippage_used"] = проскальзывание
+                из_["slippage_why"] = (
+                    f"резерв котировочной стороны {резерв_sol_экв:.3f} SOL-экв. "
+                    f"ниже {порог_тонкого_sol} -- наценка {проскальзывание}")
+                мо = B.min_out_from_reserves(tpl2, tx_источника, дойдёт_до_пула2,
+                                             проскальзывание)
+            else:
+                из_["slippage_thin"] = False
+                из_["slippage_used"] = проскальзывание
         if not мо.get("ok"):
             из_["why_not"] = f"минимум шага 2 не выдаётся: {мо.get('why_not')}"
             return из_
