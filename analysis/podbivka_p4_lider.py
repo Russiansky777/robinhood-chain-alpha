@@ -50,9 +50,15 @@ def main() -> int:
     имена = json.loads((КОРЕНЬ / "data" / "podbivka" / "imena_istochnikov.json").read_text(encoding="utf-8"))["имена"]
     ряды = []   # {группа, источник, sol_экв, режим, вход -> {H -> {потолок, дно}}, наценка, путь}
     отказы: dict = {}
+    по_подписи: dict = {}
     for f in sorted(glob.glob(str(КОРЕНЬ / "data" / "podbivka" / "rezhim2" / "*.jsonl"))):
         for l in open(f, encoding="utf-8"):
             р = json.loads(l)
+            пред = по_подписи.get(р["signature"])
+            if пред is None or (пред.get("why_not") and not р.get("why_not")):
+                по_подписи[р["signature"]] = р   # повтор (povtor_*) заменяет отказ
+    for р in по_подписи.values():
+        if True:
             гр = "лидер" if р.get("wallet") == ЛИДЕР else "BATCH-5"
             if р.get("why_not"):
                 ключ = (гр, р["why_not"].split(":")[0][:60])
