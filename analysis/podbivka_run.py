@@ -270,6 +270,7 @@ def main() -> int:
     р.add_argument("--predel-na-porog", type=int, default=0)
     р.add_argument("--predel-podpisey", type=int, default=0)
     р.add_argument("--sverka", type=int, default=0, help="у первых N кошельков -- прямой разбор")
+    р.add_argument("--propusk", action="store_true", help="пропускать кошельки с готовым файлом")
     р.add_argument("--push", action="store_true")
     р.add_argument("--fakt", action="store_true", help="п.2а: наши сделки DBot/Bloom/полосы")
     р.add_argument("--tolko-shyft", action="store_true",
@@ -291,6 +292,13 @@ def main() -> int:
     факт = Факт(с_ts, до_ts, а.host_sdelki) if а.fakt else None
     for н, строка in enumerate(строки):
         путь = каталог / f"{строка['address']}.json"
+        if а.propusk and путь.exists():
+            try:
+                if not json.loads(путь.read_text(encoding="utf-8")).get("why_not"):
+                    итог["готово"] += 1
+                    continue
+            except ValueError:
+                pass
         try:
             рез = кошелёк(уз, курс, строка, с_ts, до_ts,
                           предел_на_порог=а.predel_na_porog or None,

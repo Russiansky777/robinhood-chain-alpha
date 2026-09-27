@@ -56,6 +56,8 @@ def пакеты(м: dict) -> list:
             арг.append("--fakt")
         if м.get("tolko_shyft"):
             арг.append("--tolko-shyft")
+        if м.get("propusk"):
+            арг.append("--propusk")
         из_.append({"skript": "podbivka_run.py", "args": " ".join(арг), "name": f"{м['zadacha']}_{н}_{до}"})
     # Предел Helius 10 запросов/с -- на все одновременные пакеты (max-parallel 12).
     доля = round(10.0 / min(12, max(1, len(из_))), 3)
