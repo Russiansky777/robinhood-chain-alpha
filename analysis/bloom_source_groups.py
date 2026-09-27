@@ -417,21 +417,24 @@ def self_test() -> int:
     chk("в log_only адреса есть -- подписка и лог сохранены",
         (с["by_group"].get("log_only") or 0) >= 40, с["by_group"])
     л = политика("leader")
-    chk("лидер: 0.2 SOL, порог 15, стоп -0.30, 150 слотов, наценка 0.25",
-        л["lane_size"] == 0.2 and л["lane_sol"] == 0.2
-        and л["min_target_sol"] == 15 and л["stop_loss_sol"] == 0.30
+    # ЧИСЛА ВЛАДЕЛЬЦА от 27.09 (дополнение): размеры и стопы подняты, порог
+    # лидера опущен до 10 SOL-экв., у batch5 предела резерва пула больше нет.
+    chk("лидер: 0.5 SOL, порог 10, стоп -0.75, 150 слотов, наценка 0.25",
+        л["lane_size"] == 0.5 and л["lane_sol"] == 0.5
+        and л["min_target_sol"] == 10 and л["stop_loss_sol"] == 0.75
         and л["hold_slots"] == 150 and л["slippage"] == 0.25, л)
     chk("лидер: налоговый маршрут берём, предел открытых 3",
         л["allow_taxed_route"] is True and л["lane_open_max"] == 3, л)
     б = политика("batch5")
-    chk("batch5: 0.05 SOL, порог 2, стоп -0.15, 72 слота, наценка 0.40, резерв 30",
-        б["lane_size"] == 0.05 and б["min_target_sol"] == 2
-        and б["stop_loss_sol"] == 0.15 and б["hold_slots"] == 72
-        and б["slippage"] == 0.40 and б["min_pool_sol_reserve"] == 30, б)
+    chk("batch5: 0.3 SOL, порог 2, стоп -0.45, 72 слота, наценка 0.40, "
+        "предела резерва пула НЕТ",
+        б["lane_size"] == 0.3 and б["min_target_sol"] == 2
+        and б["stop_loss_sol"] == 0.45 and б["hold_slots"] == 72
+        and б["slippage"] == 0.40 and б["min_pool_sol_reserve"] is None, б)
     s = политика("lane_s0")
-    chk("lane_s0: 0.05 SOL, три слота от s0, перекупщиков пропускаем",
-        s["lane_size"] == 0.05 and s["max_slots_from_source"] == 3
-        and s["skip_flippers"] is True, s)
+    chk("lane_s0: 0.3 SOL, стоп -0.45, три слота от s0, перекупщиков пропускаем",
+        s["lane_size"] == 0.3 and s["max_slots_from_source"] == 3
+        and s["stop_loss_sol"] == 0.45 and s["skip_flippers"] is True, s)
     chk("lane_s0: налоговый маршрут НЕ берём, только кривая pump.fun",
         s["allow_taxed_route"] is False and s["lane_pools"] == ["bonding"], s)
     chk("Bloom не торгует ни по одной группе файла",
