@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import argparse
+import calendar
 import glob
 import gzip
 import json
@@ -77,10 +78,15 @@ def кванти(значения: list, доля: float):
 
 
 def разобрать_время(текст: str):
+    # ПОЧЕМУ timegm, А НЕ mktime. mktime читает разбор как МЕСТНОЕ время, и
+    # "- time.timezone" снимает только зимнее смещение: на хосте в летнем
+    # времени (NL, CEST) окно уезжало ровно на час -- отчёт от 28.09 00:21Z
+    # считался с 27.09 23:21Z. calendar.timegm читает разбор как UTC, чем оно
+    # и является по букве Z.
     if not текст:
         return None
     try:
-        return time.mktime(time.strptime(текст, "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
+        return float(calendar.timegm(time.strptime(текст, "%Y-%m-%dT%H:%M:%SZ")))
     except Exception:  # noqa: BLE001
         return None
 
@@ -370,6 +376,10 @@ def self_test() -> int:
     chk("p90 десяти", abs(кванти(list(range(1, 11)), 0.9) - 9.1) < 1e-9,
         кванти(list(range(1, 11)), 0.9))
     chk("время разбирается", разобрать_время("2026-09-27T20:00:00Z") is not None)
+    # Окно должно читаться как UTC при любом часовом поясе хоста.
+    chk("время читается как UTC, а не как местное",
+        разобрать_время("2026-09-28T00:21:00Z") == 1790554860.0,
+        str(разобрать_время("2026-09-28T00:21:00Z")))
     # МЕТКА ПОЛОСЫ: сравнение с "lane" давало ноль сделок при живых сделках.
     import tempfile  # noqa: PLC0415
 
