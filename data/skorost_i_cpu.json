@@ -1,0 +1,97 @@
+{
+ "с": "2026-09-28T00:21:00Z",
+ "граница": "2026-09-28T18:00:00Z",
+ "по": "2026-09-28T21:20:31Z",
+ "позиций_в_журнале": 641,
+ "до_границы": {
+  "сделок": 31,
+  "увидели": {
+   "n": 31,
+   "p50": 105.0,
+   "p90": 232.0,
+   "min": 6.0,
+   "max": 313.0
+  },
+  "решили": {
+   "n": 31,
+   "p50": 38.0,
+   "p90": 62.7,
+   "min": 23.4,
+   "max": 71.5
+  },
+  "собрали": {
+   "n": 31,
+   "p50": -22.8,
+   "p90": -17.9,
+   "min": -36.0,
+   "max": -15.4
+  }
+ },
+ "после_границы": {
+  "сделок": 14,
+  "увидели": {
+   "n": 14,
+   "p50": 192.0,
+   "p90": 458.0,
+   "min": 14.0,
+   "max": 562.4
+  },
+  "решили": {
+   "n": 14,
+   "p50": 52.0,
+   "p90": 76.7,
+   "min": 36.9,
+   "max": 357.1
+  },
+  "собрали": {
+   "n": 14,
+   "p50": -34.5,
+   "p90": -27.0,
+   "min": -63.9,
+   "max": -26.6
+  }
+ },
+ "процессор": {
+  "секунд": 300.0,
+  "ядер": 2,
+  "процессы": [
+   {
+    "pid": 1205685,
+    "имя": "bloom_detector.py",
+    "команда": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_detector.py --serve --config /home/bot/bloom_executor/konfig_snapshot.json",
+    "проц_одного_ядра": 2.8,
+    "проц_всей_машины": 1.4
+   },
+   {
+    "pid": 1181220,
+    "имя": "bloom_seller.py",
+    "команда": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py",
+    "проц_одного_ядра": 0.8,
+    "проц_всей_машины": 0.4
+   },
+   {
+    "pid": 1185052,
+    "имя": "triton_preconfs_probe.py",
+    "команда": "/home/bot/triton_venv/bin/python /home/bot/triton_zond/triton_preconfs_probe.py --feed bam --region ams --accounts-file /home/bot/triton_zond/accounts.txt --sig",
+    "проц_одного_ядра": 0.1,
+    "проц_всей_машины": 0.1
+   },
+   {
+    "pid": 1185163,
+    "имя": "triton_preconfs_probe.py",
+    "команда": "/home/bot/triton_venv/bin/python /home/bot/triton_zond/triton_preconfs_probe.py --feed harmonic --region ams --accounts-file /home/bot/triton_zond/accounts.txt ",
+    "проц_одного_ядра": 0.1,
+    "проц_всей_машины": 0.1
+   }
+  ],
+  "машина": {
+   "занято_проц": 8.9,
+   "простой_проц": 91.1
+  },
+  "load_avg": [
+   0.1,
+   0.16,
+   0.16
+  ]
+ }
+}
