@@ -1,4 +1,4 @@
-name: "ПЕРЕСБОРКА: закрытые сделки полосы новым докладчиком (п.6)"
+name: "Закрытые сделки полосы окончательным форматом (BUY и SELL)"
 
 # ЗАЧЕМ (слово владельца 27.09, вечер, п.6): "по сегодняшним сделкам полосы
 # прислать полные строки покупка+продажа новой функцией с пометкой ПЕРЕСБОРКА".
@@ -19,10 +19,10 @@ on:
         description: "с какого времени брать сделки полосы"
         required: false
         default: "2026-09-27T22:00:00Z"
-      pometka:
-        description: "пометка первой строкой"
+      podpisi:
+        description: "подписи сделок через запятую (источника, покупки или продажи; можно начало)"
         required: false
-        default: "ПЕРЕСБОРКА"
+        default: ""
       otpravit:
         description: "'yes' -- послать в Telegram; иначе только напечатать"
         required: false
@@ -81,7 +81,7 @@ jobs:
             PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $PYBIN /tmp/peresborka_sdelok.py \
               --state-dir '$STATE_DIR' --cid '${{ inputs.cid }}' \
               --since-utc '${{ inputs.since_utc }}' \
-              --pometka '${{ inputs.pometka }}' --out /tmp/peresborka.json" | tail -60
+              --podpisi '${{ inputs.podpisi }}' --out /tmp/peresborka.json" | tail -60
 
       - name: "Отправка тем же отправителем (только по otpravit=yes)"
         if: ${{ inputs.otpravit == 'yes' }}
@@ -93,7 +93,7 @@ jobs:
             PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $PYBIN /tmp/peresborka_sdelok.py \
               --state-dir '$STATE_DIR' --cid '${{ inputs.cid }}' \
               --since-utc '${{ inputs.since_utc }}' \
-              --pometka '${{ inputs.pometka }}' --otpravit \
+              --podpisi '${{ inputs.podpisi }}' --otpravit \
               --out /tmp/peresborka.json" | tail -20
 
       - name: "Отчёт с хоста"
