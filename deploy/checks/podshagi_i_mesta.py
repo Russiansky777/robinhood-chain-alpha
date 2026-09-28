@@ -27,6 +27,52 @@ import time
 МЕТКА_ПОЛОСЫ = "own_send"
 
 
+# Имена, которые этому прогону разрешено прочитать из окружения службы. Список
+# закрытый: он нужен, чтобы ответить "включена ли симуляция своей продажи" по
+# факту, а не по памяти. Вторая, независимая проверка ниже отвергает всё, что
+# похоже на ключ, даже если имя попало сюда по ошибке.
+ФЛАГИ_КОТОРЫЕ_МОЖНО = (
+    "BLOOM_SELL_OWN_SIMULATE",
+    "BLOOM_SELL_VIA_JUPITER",
+    "BLOOM_SELL_MIN_OUT_ZAPAS",
+    "LANE_SELL_TWO_STEP",
+    "BLOOM_LANE_CU_BONDING_V2",
+    "BLOOM_SOURCE_BLOCK_TRIES",
+    "BLOOM_NE_SELA_POSLE_S",
+)
+ЗАПРЕЩЁННЫЕ_ЧАСТИ = ("KEY", "TOKEN", "SECRET", "AUTH", "PASS", "PRIVATE")
+
+
+def это_коммент(строка: str) -> bool:
+    return строка.lstrip().startswith("#")
+
+
+def флаги(env_file: str) -> dict:
+    """Значения разрешённых флагов из файла окружения службы.
+
+    Секретов тут быть не может по построению: читаются только имена из
+    закрытого списка, и любое имя с KEY/TOKEN/SECRET/AUTH/PASS/PRIVATE
+    отбрасывается второй проверкой, независимой от списка.
+    """
+    можно = tuple(и for и in ФЛАГИ_КОТОРЫЕ_МОЖНО
+                   if not any(ч in и.upper() for ч in ЗАПРЕЩЁННЫЕ_ЧАСТИ))
+    из_ = {"файл": env_file, "почему_нет": None,
+            "значения": {и: None for и in можно}}
+    try:
+        with open(env_file, encoding="utf-8", errors="replace") as ф:
+            for стр in ф:
+                стр = стр.strip()
+                if not стр or это_коммент(стр) or "=" not in стр:
+                    continue
+                имя, _, зн = стр.partition("=")
+                имя = имя.strip().removeprefix("export ").strip()
+                if имя in можно:
+                    из_["значения"][имя] = зн.strip().strip('"').strip("'")
+    except Exception as exc:  # noqa: BLE001
+        из_["почему_нет"] = f"{type(exc).__name__}"
+    return из_
+
+
 def разобрать_время(строка: str):
     if not строка:
         return None
@@ -196,6 +242,8 @@ def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--s", default="", help="с какого времени (пусто -- за 2 часа)")
+    р.add_argument("--env-file", default="/etc/bloom-executor/env",
+                    help="файл окружения службы: читаются только флаги из списка")
     р.add_argument("--out", default="")
     а = р.parse_args()
     с = разобрать_время(а.s) if а.s else (time.time() - 7200)
@@ -204,7 +252,8 @@ def main() -> int:
              "по": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "подшаги": подшаги(а.state_dir, с=с),
              "места": места(а.state_dir, с=с),
-             "симуляции": симуляции(а.state_dir, с=с)}
+             "симуляции": симуляции(а.state_dir, с=с),
+             "флаги": флаги(а.env_file)}
 
     п = итог["подшаги"]
     print(f"ПОДШАГИ РЕШЕНИЯ: записей {п['записей']}, всего p50 {п['всего']['p50']} мс, "
@@ -229,6 +278,10 @@ def main() -> int:
         print(f"   поз: {json.dumps(з, ensure_ascii=False)[:220]}")
     for з in с_["журнал"][:10]:
         print(f"   журнал: {json.dumps(з, ensure_ascii=False)[:300]}")
+    ф_ = итог["флаги"]
+    print(f"ФЛАГИ СЛУЖБЫ ({ф_['файл']}) {ф_.get('почему_нет') or ''}:")
+    for имя, зн in ф_["значения"].items():
+        print(f"   {имя} = {зн if зн is not None else 'в файле нет'}")
     if а.out:
         with open(а.out, "w", encoding="utf-8") as ф:
             json.dump(итог, ф, ensure_ascii=False, indent=1)
