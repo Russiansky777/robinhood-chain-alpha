@@ -23,6 +23,10 @@ on:
         description: "'yes' -- без цепи: (г) и (п.5) останутся без чисел"
         required: false
         default: "no"
+      podpisi:
+        description: "только проверить эти подписи (слот, села, преконф был/не был)"
+        required: false
+        default: ""
       ostanovit_zond:
         description: "'yes' -- после отчёта погасить службы зонда"
         required: false
@@ -83,7 +87,15 @@ jobs:
           ZH=$(ssh -n $SSH_OPTS root@$TARGET_HOST "ls $ZOND_DIR/preconfs_*.jsonl 2>/dev/null | tr '\n' ',' | sed 's/,$//'")
           echo "zhurnaly zonda: $ZH"
           [ -n "$ZH" ] || { echo "SBOY: zhurnalov zonda net -- snachala run_triton_zond_24h_nl.yml"; exit 1; }
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR TRITON_STATE_DIR=$ZOND_DIR python3 $ZOND_DIR/triton_preconfs_otchet.py --zhurnaly '$ZH' --resheniya $STATE_DIR --katalog $ZOND_DIR --chasov '${{ inputs.chasov }}' --predel-razbora '${{ inputs.predel_razbora }}' $BEZ --out $ZOND_DIR/otchet.json" | tail -120
+          PODP=""
+          if [ -n "${{ inputs.podpisi }}" ]; then
+            PODP="--podpisi ${{ inputs.podpisi }}"
+            # Проверка подписей -- НЕ отчёт: пишем её своим файлом, чтобы не
+            # затереть утренний отчёт коротким ответом на три подписи.
+            echo "OUT_FILE=data/triton/podpisi_proverka.json" >> "$GITHUB_ENV"
+            OUT_FILE=data/triton/podpisi_proverka.json
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR TRITON_STATE_DIR=$ZOND_DIR python3 $ZOND_DIR/triton_preconfs_otchet.py $PODP --zhurnaly '$ZH' --resheniya $STATE_DIR --katalog $ZOND_DIR --chasov '${{ inputs.chasov }}' --predel-razbora '${{ inputs.predel_razbora }}' $BEZ --out $ZOND_DIR/otchet.json" | tail -120
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $ZOND_DIR/otchet.json 2>/dev/null || true" > /tmp/prekonf_otchet.json || true
           if python3 -c "import json; json.load(open('/tmp/prekonf_otchet.json'))" 2>/dev/null; then
             install -d -m 755 data/triton
@@ -117,7 +129,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
-          git commit -m "Triton: utrennij otchyot po prekonfam [automated]"
+          git commit -m "Triton: otchyot po prekonfam [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
             git pull --rebase -X theirs origin claude/nifty-sagan-r0polg

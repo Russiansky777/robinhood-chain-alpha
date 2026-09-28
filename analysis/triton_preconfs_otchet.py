@@ -375,9 +375,37 @@ def main() -> int:
     р.add_argument("--chasov", type=float, default=24.0)
     р.add_argument("--predel-razbora", type=int, default=ПРЕДЕЛ_РАЗБОРА_КЛЮЧЕЙ)
     р.add_argument("--bez-seti", action="store_true")
+    р.add_argument("--podpisi", default="",
+                    help=("только проверить эти подписи по цепи: слот, села или "
+                          "нет и был ли по ней преконф в журнале зонда"))
     р.add_argument("--out", default="")
     а = р.parse_args()
     сейчас = time.time()
+    # ТРИ ПОДПИСИ СО СЛОТОМ И ОТМЕТКОЙ ПРЕКОНФА -- просьба владельца для письма
+    # Triton. Отдельный короткий путь: полный отчёт для этого не нужен.
+    if а.podpisi:
+        подписи = [с.strip() for с in а.podpisi.split(",") if с.strip()]
+        журналы_ = [ж.strip() for ж in (а.zhurnaly or "").split(",") if ж.strip()]
+        пре_ = преконфы_из_журнала(журналы_)["preconfs"] if журналы_ else {}
+        ст_ = сели_ли(подписи)
+        строки_ = []
+        for п in подписи:
+            зн = (ст_["landed"] or {}).get(п)
+            строки_.append({"signature": п,
+                             "slot": (зн or {}).get("slot"),
+                             "sela": зн is not None,
+                             "err": (зн or {}).get("err"),
+                             "prekonf": ("был" if п in пре_ else "не был"),
+                             "prekonf_t_recv": (пре_.get(п) or {}).get("t_recv"),
+                             "prekonf_feed": (пре_.get(п) or {}).get("feed")})
+        итог_ = {"podpisi": строки_, "zhurnalov": len(журналы_),
+                  "prekonfov_v_zhurnalah": len(пре_),
+                  "why_not": ст_["why_not"]}
+        текст_ = json.dumps(итог_, ensure_ascii=False, indent=1)
+        if а.out:
+            Path(а.out).write_text(текст_, encoding="utf-8")
+        print(текст_)
+        return 0
     с_ts = сейчас - а.chasov * 3600.0
     сн = TV.прочитать(а.katalog) or {}
     расп = None
