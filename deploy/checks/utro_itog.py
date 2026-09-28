@@ -158,6 +158,28 @@ def строители(группа: str | None) -> dict:
     return из_
 
 
+def метрики_сторожа(state_dir: str) -> dict:
+    """Метрики сторожа продаж из его признака жизни (слово владельца 28.09).
+
+    Читается ГОТОВОЕ число, а не считается второе своё: сторож уже считает эти
+    метрики каждую минуту по всем позициям суток, и вторая формула рядом
+    разъехалась бы с первой на округлении.
+    """
+    п = Path(state_dir) / "seller_heartbeat.json"
+    if not п.exists():
+        return {"why_not": f"признака жизни сторожа нет: {п}"}
+    try:
+        д = json.loads(п.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"why_not": f"{type(exc).__name__}: {str(exc)[:120]}"}
+    м = д.get("metrics")
+    if not isinstance(м, dict):
+        return {"why_not": "в признаке жизни сторожа нет блока metrics"}
+    м = dict(м)
+    м["метка_признака"] = д.get("updated_utc")
+    return м
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
@@ -171,6 +193,7 @@ def main() -> int:
     о = итог(а.state_dir, since_ts)
     гр_список = [x.strip() for x in а.gruppy.split(",") if x.strip()] or [None]
     о["строители"] = {(г or "по окружению"): строители(г) for г in гр_список}
+    о["метрики_сторожа"] = метрики_сторожа(а.state_dir)
     о["окно_с"] = а.since_utc or None
     о["порог_слотов"] = ПОРОГ_СЛОТОВ
     отст = о.pop("отставание")
