@@ -128,7 +128,7 @@ def main() -> int:
         строка = dict(r)
         try:
             tx = rpc.call("getTransaction", [r["signature"], {
-                "encoding": "jsonParsed", "maxSupportedTransactionVersion": 0,
+                "encoding": "jsonParsed", "maxSupportedTransactionVersion": 1,
                 "commitment": "confirmed"}])
         except Exception as exc:  # noqa: BLE001
             строка["why_not"] = f"узел не отдал сделку источника: {type(exc).__name__}"

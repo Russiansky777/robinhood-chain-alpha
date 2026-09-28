@@ -171,7 +171,7 @@ async def слушать_один(замер: Замер, ключ: str, мет�
                                           "transactionDetails": "full",
                                           "encoding": "jsonParsed",
                                           "showRewards": False,
-                                          "maxSupportedTransactionVersion": 0}]}
+                                          "maxSupportedTransactionVersion": 1}]}
                 else:
                     тело = {"jsonrpc": "2.0", "id": i, "method": "logsSubscribe",
                              "params": [{"mentions": [a]}, {"commitment": "processed"}]}

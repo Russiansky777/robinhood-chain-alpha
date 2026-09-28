@@ -197,7 +197,7 @@ def main() -> int:
     for сг in список:
         try:
             tx = rpc("getTransaction", [сг, {"encoding": "jsonParsed",
-                                              "maxSupportedTransactionVersion": 0,
+                                              "maxSupportedTransactionVersion": 1,
                                               "commitment": "confirmed"}])
         except Exception as exc:  # noqa: BLE001
             print(f"{сг[:10]}: не прочитана ({type(exc).__name__})")

@@ -34,7 +34,7 @@ def остаток(кошелёк: str, минт: str) -> dict:
 
 def tx_по_подписи(подпись: str):
     от = SL.rpc_call("getTransaction", [подпись, {"encoding": "jsonParsed",
-                                                  "maxSupportedTransactionVersion": 0,
+                                                  "maxSupportedTransactionVersion": 1,
                                                   "commitment": "confirmed"}])
     return (от or {}).get("result") if isinstance(от, dict) else None
 

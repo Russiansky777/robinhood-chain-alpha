@@ -216,7 +216,7 @@ def main() -> int:
     for з in подписи:
         tx = rpc("getTransaction", [з["signature"],
                                      {"encoding": "jsonParsed",
-                                      "maxSupportedTransactionVersion": 0}])
+                                      "maxSupportedTransactionVersion": 1}])
         if not tx:
             иное.append({"подпись": з["signature"], "почему": "узел не отдал транзакцию"})
             continue

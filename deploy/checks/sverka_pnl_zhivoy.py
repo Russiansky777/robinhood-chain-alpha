@@ -48,7 +48,7 @@ class Цепь:
             return self.кэш[подпись]
         тело = {"jsonrpc": "2.0", "id": 1, "method": "getTransaction",
                 "params": [подпись, {"encoding": "jsonParsed",
-                                      "maxSupportedTransactionVersion": 0,
+                                      "maxSupportedTransactionVersion": 1,
                                       "commitment": "confirmed"}]}
         for попытка in range(4):
             self.вызовов += 1

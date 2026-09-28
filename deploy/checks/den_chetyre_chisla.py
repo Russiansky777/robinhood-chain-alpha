@@ -320,7 +320,7 @@ def режим_цепи(а) -> int:
         куски = подписи[н:н + ПАКЕТ]
         запросы = [{"jsonrpc": "2.0", "id": и, "method": "getTransaction",
                     "params": [с, {"encoding": "jsonParsed",
-                                   "maxSupportedTransactionVersion": 0}]}
+                                   "maxSupportedTransactionVersion": 1}]}
                    for и, с in enumerate(куски)]
         for о in узел.пакет(запросы):
             и = о.get("id")
@@ -368,7 +368,7 @@ def режим_цепи(а) -> int:
         куски = подписи_б[н:н + ПАКЕТ]
         запросы = [{"jsonrpc": "2.0", "id": и, "method": "getTransaction",
                     "params": [с, {"encoding": "jsonParsed",
-                                   "maxSupportedTransactionVersion": 0}]}
+                                   "maxSupportedTransactionVersion": 1}]}
                    for и, с in enumerate(куски)]
         for о in узел.пакет(запросы):
             и = о.get("id")

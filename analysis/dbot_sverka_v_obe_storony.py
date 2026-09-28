@@ -343,7 +343,7 @@ def названные_подписи(подписи: tuple, сторона_dbot
             continue
         зап["подпись_dbot"] = п
         tx = rpc("getTransaction", [п, {"encoding": "jsonParsed",
-                                         "maxSupportedTransactionVersion": 0}])
+                                         "maxSupportedTransactionVersion": 1}])
         if not isinstance(tx, dict) or not tx.get("meta"):
             зап["почему_нет"] = "транзакция по подписи не пришла"
             из_.append(зап)

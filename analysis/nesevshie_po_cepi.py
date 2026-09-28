@@ -25,7 +25,7 @@ from pathlib import Path
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0,
+ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1,
             "commitment": "confirmed"}
 ЛАМПОРТОВ = 1_000_000_000
 РАЗМЕР_ПАКЕТА = 25

@@ -29,7 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 КРИВАЯ = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0,
+ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1,
             "commitment": "finalized"}
 
 

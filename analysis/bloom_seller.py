@@ -1886,9 +1886,13 @@ class Seller:
         # СДЕЛКА ИСТОЧНИКА -- из цепи по подписи из позиции. Из неё берётся
         # шаблон пула токена: тот же, по которому мы покупали.
         try:
+            # ПОТОЛОК ВЕРСИИ -- ТОТ ЖЕ, ЧТО У ДЕТЕКТОРА. Здесь стоял 0, а в
+            # блоках есть транзакции версии 1: такую сделку источника узел не
+            # отдаёт вовсе, и двухшаговая продажа отказывала на пустом месте.
             tx_и = rpc_call("getTransaction",
                              [подпись_и, {"encoding": "jsonParsed",
-                                           "maxSupportedTransactionVersion": 0}])
+                                           "maxSupportedTransactionVersion":
+                                               env_int("BLOOM_MAX_TX_VERSION", 1)}])
         except Exception as exc:  # noqa: BLE001
             из_["why_not"] = f"сделка источника не прочитана: {type(exc).__name__}"
             return из_

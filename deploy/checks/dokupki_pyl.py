@@ -153,7 +153,7 @@ def главное() -> int:
     доли, пыль, без_данных, без_прироста, примеры = [], 0, 0, 0, []
     for п, з in list(подписи.items())[: а.predel]:
         tx = rpc("getTransaction", [п, {"encoding": "jsonParsed",
-                                         "maxSupportedTransactionVersion": 0}])
+                                         "maxSupportedTransactionVersion": 1}])
         if not isinstance(tx, dict) or tx.get("__почему_нет") or not tx.get("meta"):
             без_данных += 1
             continue

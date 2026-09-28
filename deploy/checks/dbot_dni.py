@@ -235,7 +235,7 @@ def главное() -> int:
                 куски = подписи[н:н + ПАКЕТ]
                 зап = [{"jsonrpc": "2.0", "id": и, "method": "getTransaction",
                         "params": [сг, {"encoding": "jsonParsed",
-                                        "maxSupportedTransactionVersion": 0}]}
+                                        "maxSupportedTransactionVersion": 1}]}
                        for и, сг in enumerate(куски)]
                 for о in узел.пакет(зап):
                     и = о.get("id")
