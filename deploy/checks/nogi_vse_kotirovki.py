@@ -339,7 +339,24 @@ def main() -> int:
     # по живым сделкам (1000, 2500, 10000, 40000 миллионных), прочитанный
     # trade_fee_rate обязан совпасть с решённым числом.
     if а.konfigi_clmm:
-        import c2_cl_quote as CL  # noqa: PLC0415
+        # МОДУЛЬ ЦЕНЫ -- ПО ПРЯМОМУ ПУТИ, А НЕ ПО ПОРЯДКУ ПОИСКА. Обычный
+        # import на хосте 28.09 в 07:03 взял РАЗВЁРНУТУЮ версию (в ней нет
+        # СХЕМА_КОНФИГА_CLMM) несмотря на свой каталог первым в sys.path, и
+        # прогон упал. Загрузка по пути не оставляет места для догадок: нет
+        # файла рядом -- честная ошибка, а не проверка старого кода.
+        import importlib.util  # noqa: PLC0415
+        путь_цены = Path(__file__).resolve().parent / "c2_cl_quote.py"
+        if not путь_цены.exists():
+            print(f"SBOY: ryadom s progonom net {путь_цены}")
+            return 1
+        _спец = importlib.util.spec_from_file_location("c2_cl_quote_svezhiy",
+                                                       путь_цены)
+        CL = importlib.util.module_from_spec(_спец)
+        _спец.loader.exec_module(CL)
+        if not hasattr(CL, "СХЕМА_КОНФИГА_CLMM"):
+            print(f"SBOY: v {путь_цены} net SHEMA_KONFIGA_CLMM")
+            return 1
+        print(f"modul ceny: {путь_цены} ({путь_цены.stat().st_size} bayt)")
         список_к = [x.strip() for x in а.konfigi_clmm.split(",") if x.strip()]
         из_к = {"снято_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                  "зачем": ("ставка комиссии и шаг тика пулов Raydium CLMM из "
