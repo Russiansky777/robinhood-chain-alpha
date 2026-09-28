@@ -286,7 +286,7 @@ def main() -> int:
     р.add_argument("--podpisey-na-kotirovku", type=int, default=15)
     р.add_argument("--glavnyh", type=int, default=10,
                    help="сколько котировок по частоте считать главными (плюс USDC, USDT, GP)")
-    р.add_argument("--podpisey-na-obrazec", type=int, default=25,
+    р.add_argument("--podpisey-na-obrazec", type=int, default=60,
                    help="сколько сделок канонического пула перебрать в поисках образца шаблона")
     р.add_argument("--glubokiy-poisk", type=int, default=200,
                    help="для главных котировок без пула с постоянным произведением -- "
@@ -421,7 +421,7 @@ def main() -> int:
                     "pools": [п.get("pool") for п in чз.get("pools") or []],
                     "labels": [п.get("label") for п in чз.get("pools") or []]}
                 for п_ in (чз.get("pools") or []):
-                    for прог_, qv_, wv_, q2_ in образцы_пула(п_["pool"], 12, C, B,
+                    for прог_, qv_, wv_, q2_ in образцы_пула(п_["pool"], 40, C, B,
                                                               программы):
                         if q2_ == q and (прог_, qv_, wv_) not in найдено:
                             найдено.append((прог_, qv_, wv_))
