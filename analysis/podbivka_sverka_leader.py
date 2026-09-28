@@ -44,6 +44,7 @@ import podbivka_sim as S  # noqa: E402
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 SOLы = (C.WSOL, C.NATIVE_QUOTE)
+МАКС_ОКНА = 150                                  # v5: чтений окна на сделку не больше
 G_ВЕРХ = 1.6                                     # v5: было 1.05 -- отбрасывало продажи пулов с E
 ГОРИЗОНТ = 150
 
@@ -181,7 +182,7 @@ def одна(уз: S.Узел, с: dict) -> dict:
         return {**из_, "why_not": "доля траты не калибруется"}
     из_["f"] = round(f, 5)
     доли, f_окна = [], []
-    for i in range(0, len(сп)):                   # все продажи пула в окне (кроме нашей)
+    for i in range(0, min(len(сп), МАКС_ОКНА)):   # продажи и покупки пула в окне (кроме наших)
         if i in (is_, ib):
             continue
         т = txi(i)
