@@ -1,0 +1,124 @@
+name: "ПЕРЕСБОРКА: закрытые сделки полосы новым докладчиком (п.6)"
+
+# ЗАЧЕМ (слово владельца 27.09, вечер, п.6): "по сегодняшним сделкам полосы
+# прислать полные строки покупка+продажа новой функцией с пометкой ПЕРЕСБОРКА".
+# Строки рисует ТОТ ЖЕ bloom_doklad, которым теперь докладывают живые сделки, и
+# по тем же записям позиций на хосте -- поэтому образец показывает ровно то, что
+# придёт по следующей живой сделке.
+#
+# Отправка идёт bloom_notify.Оповещатель НА ХОСТЕ, из окружения службы: токен
+# бота живёт только там, в прогон не передаётся и в вывод не печатается.
+on:
+  workflow_dispatch:
+    inputs:
+      cid:
+        description: "client_order_id через запятую (пусто -- все сделки полосы позже since_utc)"
+        required: false
+        default: ""
+      since_utc:
+        description: "с какого времени брать сделки полосы"
+        required: false
+        default: "2026-09-27T22:00:00Z"
+      pometka:
+        description: "пометка первой строкой"
+        required: false
+        default: "ПЕРЕСБОРКА"
+      otpravit:
+        description: "'yes' -- послать в Telegram; иначе только напечатать"
+        required: false
+        default: "no"
+
+concurrency:
+  group: peresborka-sdelok
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ENV_FILE: /etc/bloom-executor/env
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: data/peresborka_sdelok.json
+
+jobs:
+  peresborka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Докладчик: самопроверка до всякой отправки"
+        run: |
+          set -e
+          cd analysis
+          python3 bloom_doklad.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить пересборку на хост"
+        run: |
+          set -e
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/peresborka_sdelok.py" < deploy/checks/peresborka_sdelok.py
+
+      - name: "Печать строк на хосте (без отправки)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $PYBIN /tmp/peresborka_sdelok.py \
+              --state-dir '$STATE_DIR' --cid '${{ inputs.cid }}' \
+              --since-utc '${{ inputs.since_utc }}' \
+              --pometka '${{ inputs.pometka }}' --out /tmp/peresborka.json" | tail -60
+
+      - name: "Отправка тем же отправителем (только по otpravit=yes)"
+        if: ${{ inputs.otpravit == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -a; . $ENV_FILE; set +a
+            PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $PYBIN /tmp/peresborka_sdelok.py \
+              --state-dir '$STATE_DIR' --cid '${{ inputs.cid }}' \
+              --since-utc '${{ inputs.since_utc }}' \
+              --pometka '${{ inputs.pometka }}' --otpravit \
+              --out /tmp/peresborka.json" | tail -20
+
+      - name: "Отчёт с хоста"
+        if: always()
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/peresborka.json" > "$OUT" || true
+          [ -f "$OUT" ] || { mkdir -p data; printf '{\n "otcheta net": true\n}\n' > "$OUT"; }
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Peresborka sdelok polosy novym dokladchikom [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
