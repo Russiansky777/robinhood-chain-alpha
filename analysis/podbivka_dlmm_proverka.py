@@ -60,6 +60,8 @@ def _разбор_события(b: bytes) -> dict | None:
     import struct  # noqa: PLC0415
     if b[:8] == DISC_SWAP:
         d = b[8:]
+        if len(d) < 129:              # обрезанный лог
+            return None
         lb, fr = Q._pk(d[0:32]), Q._pk(d[32:64])
         start, end = struct.unpack_from("<ii", d, 64)
         a_in, a_out = struct.unpack_from("<QQ", d, 72)
@@ -70,6 +72,8 @@ def _разбор_события(b: bytes) -> dict | None:
                 "swap_for_y": sfy, "fee": fee, "protocol_fee": prot, "host_fee": host}
     if b[:8] == DISC_SWAP2:
         d = b[8:]
+        if len(d) < 147:
+            return None
         lb, fr = Q._pk(d[0:32]), Q._pk(d[32:64])
         start, end = struct.unpack_from("<ii", d, 64)
         sfy = d[72] != 0
@@ -217,6 +221,13 @@ def main() -> int:
     кошельки = sorted(set(сп["группы_code1"]) | set(сп["кандидаты"]))
     уз = S.Узел()
     итог, отказы = [], {}
+    out = КОРЕНЬ / "data" / "podbivka" / f"dlmm_proverka_{а.metka}.json"
+    import podbivka_run as R  # noqa: PLC0415
+
+    def записать():
+        out.write_text(json.dumps({"итог": итог, "отказы": отказы, "расход": уз.расход()}, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
+        R.записано(out)
     with уз.на("helius"):
         пулы = пулы_источников(уз, кошельки, а.chasov)
         print("пулов DLMM у источников:", len(пулы), flush=True)
@@ -259,6 +270,7 @@ def main() -> int:
                                         f"{abs(e['end'] - e['start']) + 1} корзин)", пулы)
                             if x:
                                 итог.append(x)
+                                записать()
                                 print("ИСТ", x["пул"][:8], x["корзин_факт"], x["расхождение_пп"], flush=True)
             # 2. поток: пул по кругу
             if not очередь:
@@ -274,12 +286,9 @@ def main() -> int:
             x = сверить(уз, пул, ст, "поток", пулы)
             if x and (x["корзин_факт"] >= 2 or not any(y["пул"] == пул for y in итог)):
                 итог.append(x)
+                записать()
                 print(x["пул"][:8], x["корзин_факт"], x["расхождение_пп"], flush=True)
-    out = КОРЕНЬ / "data" / "podbivka" / f"dlmm_proverka_{а.metka}.json"
-    out.write_text(json.dumps({"итог": итог, "отказы": отказы, "пулов": len(пулы), "расход": уз.расход()},
-                              ensure_ascii=False, indent=1), encoding="utf-8")
-    import podbivka_run as R  # noqa: PLC0415
-    R.записано(out)
+    записать()
     return 0
 
 
