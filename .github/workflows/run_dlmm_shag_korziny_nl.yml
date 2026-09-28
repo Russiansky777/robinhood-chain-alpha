@@ -1,0 +1,112 @@
+name: "Шаг корзины Meteora DLMM: вывести по цепи (только чтение)"
+
+# ЗАЧЕМ. Строителю N4 (DLMM) нужна цена корзины. Она равна
+# (1 + bin_step/10000)^bin в сырых единицах -- это проверено по цепи
+# (docs/dlmm_sobytie_i_cena.md). Сам bin_step лежит в счёте пула, раскладка
+# которого нам неизвестна, и брать смещение по памяти на денежном пути нельзя.
+# Прогон перебирает ВСЕ смещения u16 в счетах пулов и оставляет только те, где
+# одно и то же место у ВСЕХ пулов даёт цены корзин, между которыми ложится
+# средняя цена сделки источника. Один и тот же приём вывел раскладку amm_config
+# у CLMM.
+#
+# Только чтение: getTransaction по подписям сделок источников и
+# getMultipleAccounts по счетам пулов. Ни подписи, ни отправки, ни ордера.
+on:
+  workflow_dispatch:
+    inputs:
+      podpisi:
+        description: "подписи сделок источников по DLMM через запятую (пусто -- взять из журнала решений)"
+        required: false
+        default: ""
+      chasov:
+        description: "за сколько часов брать подписи из журнала"
+        required: false
+        default: "24"
+      skolko:
+        description: "сколько подписей брать из журнала (getTransaction на каждую)"
+        required: false
+        default: "40"
+
+concurrency:
+  group: dlmm-shag-korziny
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+  OUT_FILE: data/dlmm_shag_korziny.json
+
+jobs:
+  vyvod:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается и самопроверка счёта"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/dlmm_shag_korziny.py
+          python3 deploy/checks/dlmm_shag_korziny.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить прогон и вывести смещение"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/dlmm"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/dlmm/dlmm_shag_korziny.py" < deploy/checks/dlmm_shag_korziny.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            python3 /tmp/dlmm/dlmm_shag_korziny.py \
+              --podpisi '${{ inputs.podpisi }}' \
+              --zhurnal $STATE_DIR/decisions.jsonl \
+              --chasov '${{ inputs.chasov }}' \
+              --skolko '${{ inputs.skolko }}' \
+              --out /tmp/dlmm/itog.json" | tail -40
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/dlmm/itog.json 2>/dev/null || true" > /tmp/dlmm_itog.json || true
+          if python3 -c "import json; json.load(open('/tmp/dlmm_itog.json'))" 2>/dev/null; then
+            cp /tmp/dlmm_itog.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: progon ne napisal itog"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/dlmm"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Shag korziny DLMM: vyvod po cepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
