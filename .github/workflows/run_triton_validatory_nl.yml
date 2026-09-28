@@ -1,0 +1,115 @@
+name: "Triton: валидаторы BAM/Harmonic и доля слотов (только чтение)"
+
+# ЗАЧЕМ (владелец 28.09, дополнение по преконфам, п.2): "getClusterNodes ->
+# строка версии -> пометить BAM / Harmonic / прочие; x getVoteAccounts (стейк)
+# x расписание лидеров текущей эпохи -> доля слотов BAM, Harmonic, всего".
+# Ответ Triton: списка валидаторов они не дают.
+#
+# Только чтение цепи: getClusterNodes, getVoteAccounts, getEpochInfo и
+# getLeaderSchedule (последнее -- один раз на эпоху, дальше из файла). Ни
+# подписи, ни отправки, ни правки на хосте: скрипт кладётся в /tmp.
+#
+# ПОМЕТКА НЕ ПРИДУМАНА: подстроки версий задаются входами versii_bam и
+# versii_harmonic (пусто -- все узлы в "прочие", а в ответе живая таблица
+# по_версиям, по которой правило и ставится).
+on:
+  workflow_dispatch:
+    inputs:
+      versii_bam:
+        description: "подстроки версий BAM через запятую (пусто -- пометки нет)"
+        required: false
+        default: ""
+      versii_harmonic:
+        description: "подстроки версий Harmonic через запятую"
+        required: false
+        default: ""
+      obnovit_raspisanie:
+        description: "'yes' -- перечитать расписание лидеров, даже если файл свежий"
+        required: false
+        default: "no"
+
+concurrency:
+  group: triton-validatory
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  TRITON_STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT_FILE: data/triton/validatory.json
+
+jobs:
+  spisok:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка счёта ДО любой сети"
+        run: |
+          set -e
+          python3 -m py_compile analysis/triton_validators.py
+          python3 analysis/triton_validators.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Снимок валидаторов на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/tval"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/tval/triton_validators.py" < analysis/triton_validators.py
+          if [ "${{ inputs.obnovit_raspisanie }}" = "yes" ]; then
+            ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f $TRITON_STATE_DIR/triton_leader_schedule.json"
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            export TRITON_VERSII_BAM='${{ inputs.versii_bam }}'
+            export TRITON_VERSII_HARMONIC='${{ inputs.versii_harmonic }}'
+            export TRITON_STATE_DIR=$TRITON_STATE_DIR
+            python3 /tmp/tval/triton_validators.py --katalog $TRITON_STATE_DIR --out /tmp/tval/out.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/tval/out.json 2>/dev/null || true" > /tmp/tval_out.json || true
+          if python3 -c "import json; json.load(open('/tmp/tval_out.json'))" 2>/dev/null; then
+            install -d -m 755 data/triton
+            cp /tmp/tval_out.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: snimok ne sobran"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/tval"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Triton: snimok validatorov [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
