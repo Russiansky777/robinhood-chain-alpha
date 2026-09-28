@@ -57,6 +57,8 @@ jobs:
           python3 -m py_compile deploy/checks/vecher_itog.py
           python3 -m py_compile deploy/checks/utro_itog.py
           python3 -m py_compile deploy/checks/cu_po_stroitelyam.py
+          python3 -m py_compile deploy/checks/signaly_stroitelej.py
+          python3 deploy/checks/signaly_stroitelej.py --self-test
           python3 deploy/checks/cu_po_stroitelyam.py --self-test
           python3 deploy/checks/utro_itog.py --self-test
           python3 deploy/checks/vecher_itog.py --self-test
@@ -79,7 +81,7 @@ jobs:
           BEZ=""
           [ "${{ inputs.bez_seti }}" = "yes" ] && BEZ="--bez-seti"
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/vech"
-          for M in vecher_itog utro_itog cu_po_stroitelyam; do
+          for M in vecher_itog utro_itog cu_po_stroitelyam signaly_stroitelej; do
             ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vech/$M.py" < "deploy/checks/$M.py"
           done
           ssh -n $SSH_OPTS root@$TARGET_HOST "
