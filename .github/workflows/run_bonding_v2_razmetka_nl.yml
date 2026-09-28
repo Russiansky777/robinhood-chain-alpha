@@ -80,7 +80,7 @@ jobs:
           set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/bonding_v2_razmetka.py" < analysis/bonding_v2_razmetka.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; $PY_HOSTA $RABOTA/bonding_v2_razmetka.py --podpis '${{ inputs.podpis }}' --mint '${{ inputs.mint }}' --koshelek '${{ inputs.koshelek }}' --istochnik '${{ inputs.istochnik }}' --dali '${{ inputs.dali }}' --zhdali '${{ inputs.zhdali }}' --out $RABOTA/out.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; $PY_HOSTA $RABOTA/bonding_v2_razmetka.py --podpis '${{ inputs.podpis }}' --mint '${{ inputs.mint }}' --koshelek '${{ inputs.koshelek }}' --istochnik '${{ inputs.istochnik }}' --dali '${{ inputs.dali }}' --zhdali '${{ inputs.zhdali }}' --vladelcy --schet '${{ inputs.dali }}' --schet '${{ inputs.zhdali }}' --out $RABOTA/out.json" | tail -120
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/bonding_v2.json || true
           if python3 -c "import json; json.load(open('/tmp/bonding_v2.json'))" 2>/dev/null; then
             cp /tmp/bonding_v2.json "$OUT_FILE"
