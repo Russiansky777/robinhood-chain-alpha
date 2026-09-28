@@ -191,6 +191,50 @@ def место_в_блоке_заполнено(state_dir: str, с_ts: float | N
     return из_
 
 
+def длина_слота_замер(*, окно_с: float = 30.0) -> dict:
+    """Сколько секунд в слоте ПО ФАКТУ. Два getSlot с известным промежутком.
+
+    ЗАЧЕМ. Удержание группы задано в СЛОТАХ (hold_slots), а таймер продажи
+    считается в секундах через константу ДЛИНА_СЛОТА_S = 0.4 -- она зашита в
+    коде и никогда не измерялась. Если настоящая длина слота другая, все
+    удержания врут пропорционально: у leader при hold_slots 150 это разница
+    между 60 с и, скажем, 40 с.
+
+    Часы -- monotonic: системное время может подвинуть NTP прямо в окне замера.
+    Два вызова на весь замер, оба только чтение.
+    """
+    из_ = {"окно_с": окно_с, "константа_в_коде_с": 0.4, "измерено_с": None,
+            "слотов": None, "why_not": None}
+    ключ = os.environ.get("HELIUS_API_KEY") or ""
+    if not ключ:
+        из_["why_not"] = "HELIUS_API_KEY не задан"
+        return из_
+    if CU is None:
+        из_["why_not"] = "модуль узла не загружен"
+        return из_
+    узел = CU.Узел(f"https://mainnet.helius-rpc.com/?api-key={ключ}")
+    try:
+        т0 = time.monotonic()
+        с0 = узел.зов("getSlot", [{"commitment": "confirmed"}])
+        time.sleep(max(1.0, float(окно_с)))
+        т1 = time.monotonic()
+        с1 = узел.зов("getSlot", [{"commitment": "confirmed"}])
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        return из_
+    if not isinstance(с0, int) or not isinstance(с1, int) or с1 <= с0:
+        из_["why_not"] = f"узел отдал не пару слотов: {с0!r} -> {с1!r}"
+        return из_
+    из_.update(слотов=с1 - с0, секунд=round(т1 - т0, 3),
+                измерено_с=round((т1 - т0) / (с1 - с0), 4))
+    # Что это значит для удержания: то же число слотов в секундах по замеру.
+    из_["удержание_150_слотов_с"] = round(150 * из_["измерено_с"], 2)
+    из_["удержание_150_по_константе_с"] = round(150 * 0.4, 2)
+    из_["расхождение_с_константой_pct"] = round(
+        (из_["измерено_с"] / 0.4 - 1.0) * 100.0, 1)
+    return из_
+
+
 def cu_по_строителям(state_dir: str, с_ts: float, предел: int) -> dict:
     """CU по строителям: p50/p99 и падения по лимиту. Тем же модулем, что прогон."""
     if CU is None:
@@ -257,6 +301,8 @@ def main() -> int:
                     default=int(os.environ.get("BLOOM_LANE_CU_LIMIT") or 140000))
     р.add_argument("--bez-seti", action="store_true",
                     help="не спрашивать цепь: CU останутся без чисел")
+    р.add_argument("--slot-okno", dest="slot_okno", type=float, default=30.0,
+                    help="окно замера длины слота, с (два getSlot)")
     р.add_argument("--out", default="/tmp/vecher_itog.json")
     а = р.parse_args()
     if UI is None:
@@ -294,6 +340,7 @@ def main() -> int:
         "лишних_вызовов_сети": 0,
     }
     if not а.bez_seti:
+        о["длина_слота"] = длина_слота_замер(окно_с=а.slot_okno)
         о["cu_по_строителям"] = cu_по_строителям(
             а.state_dir, since_ts or (time.time() - 86400), а.predel_cu)
     else:
@@ -319,7 +366,7 @@ def main() -> int:
     краткое = {к: о.get(к) for к in
                 ("окно_с", "сделки_полосы", "метрики_сторожа", "cu_по_строителям",
                  "место_в_блоке", "отказы_по_комиссии_пула", "кредиты_по_дням",
-                 "freeze_authority", "сигналы_по_строителям")}
+                 "freeze_authority", "сигналы_по_строителям", "длина_слота")}
     print(json.dumps(краткое, ensure_ascii=False, indent=1)[:6000])
     return 0
 
@@ -340,6 +387,9 @@ def self_test() -> int:
     chk("утренний модуль подключён", UI is not None)
     chk("модуль CU подключён", CU is not None)
     chk("модуль счёта сигналов по строителям подключён", SS is not None)
+    # Замер длины слота без сети не идёт, но его арифметика проверяема.
+    бз = длина_слота_замер.__doc__ or ""
+    chk("замер длины слота описан и назван в коде", "getSlot" in бз, бз[:40])
     import tempfile  # noqa: PLC0415
 
     with tempfile.TemporaryDirectory() as d:
