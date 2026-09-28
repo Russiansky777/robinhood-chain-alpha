@@ -271,6 +271,38 @@ def план_путей() -> dict:
     return {"plan": ["ultra"], "why": почему_нет_ключа or "ключа V2 нет"}
 
 
+def подписанты_транзакции(tx_b64: str) -> dict:
+    """Сколько подписей требует транзакция Jupiter и кто подписанты.
+
+    ЗАЧЕМ. Живой отказ 28.09: подпись продажи Ai66LHZG9M упала с SignerError, и
+    по журналу нельзя было сказать, ПОЧЕМУ -- имени подписанта в нём не было.
+    Отличие той транзакции от успешной было одно: 704 байта против 637, то есть
+    другой маршрут. solders поднимает SignerError, когда сообщению нужно не
+    столько подписей, сколько мы подаём (мы подаём ровно одну -- кошелька
+    позиции). Поэтому перед подписью читаем ФАКТ: число требуемых подписей и
+    адреса подписантов. Ни одного секрета здесь нет: это открытые поля
+    сообщения.
+    """
+    из_ = {"известно": False, "требуется_подписей": None, "подписанты": [],
+            "why_not": None}
+    try:
+        import base64 as _b64  # noqa: PLC0415
+
+        from solders.transaction import VersionedTransaction  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"solders нет ({type(exc).__name__})"
+        return из_
+    try:
+        tx = VersionedTransaction.from_bytes(_b64.b64decode(tx_b64))
+        сообщение = tx.message
+        нужно = int(сообщение.header.num_required_signatures)
+        ключи = [str(к) for к in list(сообщение.account_keys)[:max(0, нужно)]]
+        из_.update(известно=True, требуется_подписей=нужно, подписанты=ключи)
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"сообщение не разобралось ({type(exc).__name__})"
+    return из_
+
+
 def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: float | None,
              живьём: bool, ордер_фн=None, исполнить_фн=None,
              подписать_фн=None, секрет: str | None = None,
@@ -352,80 +384,102 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
                 tx_b64, load_rescue_keypair(секрет if секрет is not None
                                              else ключ_сырой()))
 
-    if пути:
-        order = None
-        отказы: list = []
-        пробовали: list = []
-        for имя, о_фн, и_фн in пути:
-            пробовали.append(имя)
-            order = о_фн(mint, int(amount_raw), taker, slippage_bps=пол_bps())
-            шаги.append({"step": "order", "api": имя,
-                          "ok": not order.get("ошибка"),
-                          "why_not": order.get("ошибка"),
-                          "out_amount": order.get("outAmount"),
-                          "threshold": order.get("otherAmountThreshold"),
-                          "router": order.get("router")})
-            if not order.get("ошибка"):
-                итог["api_used"] = имя
-                исполнить_фн = и_фн
-                break
-            отказы.append(f"{имя}: {order['ошибка']}")
-        else:
-            # Ни один путь не дал заказ. Имя пути в причине обязательно:
-            # прежний текст всегда говорил "Ultra", каким бы путь ни был, и
-            # по журналу было не понять, что вообще пробовали.
-            итог["why_not"] = "заказ не дал ни один путь: " + "; ".join(отказы)
-            итог["api_tried"] = list(пробовали)
-            return итог
-        итог["api_tried"] = list(пробовали)
-        if итог["api_used"] != итог["api"]:
-            шаги.append({"step": "api_fallback", "ok": True,
-                          "api": итог["api_used"],
-                          "why_not": "; ".join(отказы)})
-    else:
-        order = ордер_фн(mint, int(amount_raw), taker, slippage_bps=пол_bps())
-        шаги.append({"step": "order", "ok": not order.get("ошибка"),
+    # ПО КАЖДОМУ ПУТИ -- ПОЛНАЯ ПОПЫТКА: заказ, пол, подписанты, подпись,
+    # отправка. Раньше запасной путь пробовался ТОЛЬКО при отказе на заказе, а
+    # отказ на подписи заканчивал попытку целиком -- и следующая приходила
+    # через паузу сторожа (45 с). Живой отказ 28.09 по Ai66LHZG9M: маршрут
+    # swap-v2 вернул транзакцию на 704 байта, подпись упала (SignerError), и
+    # позиция провисела 74.8 с вместо 28.8. Слово владельца: "отказ Jupiter ->
+    # свой путь сразу, не ждать цикла; одна попытка по ним обоим внутри 3 с".
+    #
+    # ПОЛ -- ЖЁСТКИЙ УПОР, А НЕ ПОВОД ПРОБОВАТЬ ДАЛЬШЕ: он про цену, и вторая
+    # попытка по другому пути ничего в цене не исправит, а лишний ордер стоит
+    # времени. Поэтому на отказе пола выходим сразу, как и раньше.
+    попытки_путей = (пути if пути
+                     else [(итог.get("api") or "аргументы", ордер_фн, исполнить_фн)])
+    отказы_заказа: list = []
+    отказы_подписи: list = []
+    пробовали_путей: list = []
+    for имя_пути, о_фн_п, и_фн_п in попытки_путей:
+        пробовали_путей.append(имя_пути)
+        итог["api_tried"] = list(пробовали_путей)
+        order = о_фн_п(mint, int(amount_raw), taker, slippage_bps=пол_bps())
+        шаги.append({"step": "order", "api": имя_пути,
+                      "ok": not order.get("ошибка"),
                       "why_not": order.get("ошибка"),
                       "out_amount": order.get("outAmount"),
                       "threshold": order.get("otherAmountThreshold"),
                       "router": order.get("router")})
         if order.get("ошибка"):
-            итог["why_not"] = f"заказ не вышел: {order['ошибка']}"
+            отказы_заказа.append(f"{имя_пути}: {order['ошибка']}")
+            continue
+        итог["api_used"] = имя_пути
+        if итог.get("api") and итог["api_used"] != итог["api"]:
+            шаги.append({"step": "api_fallback", "ok": True,
+                          "api": итог["api_used"],
+                          "why_not": "; ".join(отказы_заказа + отказы_подписи)})
+        проверка = проверить_пол(
+            order, вход_sol=вход_sol,
+            **({} if мин_доля_от_входа is None
+                else {"мин_доля_от_входа": float(мин_доля_от_входа)}))
+        шаги.append({"step": "floor", **проверка})
+        итог["floor"] = проверка
+        if not проверка.get("ok"):
+            итог["why_not"] = проверка.get("why_not")
+            итог["unsold"] = bool(проверка.get("unsold"))
             return итог
-
-    проверка = проверить_пол(
-        order, вход_sol=вход_sol,
-        **({} if мин_доля_от_входа is None
-            else {"мин_доля_от_входа": float(мин_доля_от_входа)}))
-    шаги.append({"step": "floor", **проверка})
-    итог["floor"] = проверка
-    if not проверка.get("ok"):
-        итог["why_not"] = проверка.get("why_not")
-        итог["unsold"] = bool(проверка.get("unsold"))
+        if not живьём:
+            итог.update(ok=True, dry_run=True,
+                         reason="проверка пройдена, отправка выключена (не живьём)")
+            шаги.append({"step": "execute", "skipped": True, "why_not": "не живьём"})
+            return итог
+        # ПОДПИСАНТЫ -- ФАКТОМ ДО ПОДПИСИ. Мы подаём ровно одну подпись
+        # (кошелёк позиции); если сообщению нужно другое число или другой
+        # подписант, solders поднимает SignerError, и без этих двух чисел
+        # причина оставалась догадкой.
+        кто = подписанты_транзакции(order.get("transaction") or "")
+        ждут_не_нас = bool(
+            кто.get("известно")
+            and (int(кто.get("требуется_подписей") or 0) != 1
+                 or (кто.get("подписанты") or [None])[0] != taker))
+        шаги.append({"step": "signers", "api": имя_пути,
+                      "ok": not ждут_не_нас,
+                      "требуется_подписей": кто.get("требуется_подписей"),
+                      "подписанты": кто.get("подписанты"),
+                      "taker": taker, "why_not": кто.get("why_not")})
+        итог["signers"] = кто
+        if ждут_не_нас:
+            отказы_подписи.append(
+                f"{имя_пути}: ждёт {кто.get('требуется_подписей')} подписи "
+                f"({', '.join(кто.get('подписанты') or []) or 'нет'})")
+            continue
+        try:
+            подписанная = подписать_фн(order["transaction"])
+        except Exception as exc:  # noqa: BLE001
+            шаги.append({"step": "sign", "api": имя_пути, "ok": False,
+                          "why_not": f"подпись не удалась: {type(exc).__name__}",
+                          "требуется_подписей": кто.get("требуется_подписей"),
+                          "подписанты": кто.get("подписанты")})
+            отказы_подписи.append(f"{имя_пути}: {type(exc).__name__}")
+            continue
+        шаги.append({"step": "sign", "api": имя_пути, "ok": True})
+        ответ = и_фн_п(подписанная, order["requestId"])
+        шаги.append({"step": "execute", "api": имя_пути,
+                      "ok": not ответ.get("ошибка"),
+                      "status": ответ.get("status"),
+                      "signature": ответ.get("signature"),
+                      "why_not": ответ.get("ошибка")})
+        итог.update(ok=not ответ.get("ошибка"), signature=ответ.get("signature"),
+                     status=ответ.get("status"), why_not=ответ.get("ошибка"))
         return итог
-
-    if not живьём:
-        итог.update(ok=True, dry_run=True,
-                     reason="проверка пройдена, отправка выключена (не живьём)")
-        шаги.append({"step": "execute", "skipped": True, "why_not": "не живьём"})
-        return итог
-
-    try:
-        подписанная = подписать_фн(order["transaction"])
-    except Exception as exc:  # noqa: BLE001
-        итог["why_not"] = f"подпись не удалась: {type(exc).__name__}"
-        шаги.append({"step": "sign", "ok": False, "why_not": итог["why_not"]})
-        return итог
-    шаги.append({"step": "sign", "ok": True})
-
-    ответ = исполнить_фн(подписанная, order["requestId"])
-    шаги.append({"step": "execute", "ok": not ответ.get("ошибка"),
-                  "status": ответ.get("status"), "signature": ответ.get("signature"),
-                  "why_not": ответ.get("ошибка")})
-    итог.update(ok=not ответ.get("ошибка"), signature=ответ.get("signature"),
-                 status=ответ.get("status"), why_not=ответ.get("ошибка"))
+    # НИ ОДИН ПУТЬ НЕ ДОШЁЛ ДО ОТПРАВКИ. Причина называется по месту отказа:
+    # заказ и подпись -- разные поломки, и лечатся они по-разному.
+    if отказы_подписи:
+        итог["why_not"] = ("подпись не прошла ни одним путём: "
+                           + "; ".join(отказы_подписи + отказы_заказа))
+    else:
+        итог["why_not"] = "заказ не дал ни один путь: " + "; ".join(отказы_заказа)
     return итог
-
 
 def self_test() -> int:
     проверки = []
@@ -773,6 +827,58 @@ def self_test() -> int:
         "секрет if секрет is not None" in тело)
     chk("секрет ключа в текст ошибок не подставляется",
         "type(exc).__name__" in тело.split("def публичный_ключ")[1].split("def ")[0])
+    # ОТКАЗ ПОДПИСИ ПРОБУЕТ ВТОРОЙ ПУТЬ В ТОЙ ЖЕ ПОПЫТКЕ (слово владельца 28.09:
+    # "отказ Jupiter -> свой путь сразу, не ждать цикла; одна попытка по ним
+    # обоим внутри 3 с"). Живой отказ 28.09: swap-v2 вернул транзакцию, подпись
+    # упала SignerError, и следующая попытка пришла через 45 с.
+    зовы_путей: list = []
+
+    def ордер_по_пути(имя):
+        def о(mint_, amount_, taker_, slippage_bps=None):
+            зовы_путей.append(имя)
+            return {"outAmount": "1000000", "otherAmountThreshold": "700000",
+                     "swapMode": "ExactIn", "slippageBps": 3000,
+                     "router": имя, "transaction": f"ТХ_{имя}",
+                     "requestId": f"ЗАПРОС_{имя}"}
+        return о
+
+    def падающая_подпись(tx_b64):
+        if tx_b64 == "ТХ_swap-v2":
+            raise RuntimeError("SignerError")
+        return "ПОДПИСАНО"
+
+    было_план = os.environ.get("BLOOM_JUP_API")
+    os.environ["BLOOM_JUP_API"] = "v2"
+    import dbot_rescue as DR_  # noqa: PLC0415
+
+    было_фн = (DR_.swap_v2_order, DR_.ultra_order,
+               DR_.swap_v2_execute, DR_.ultra_execute)
+    DR_.swap_v2_order = ордер_по_пути("swap-v2")
+    DR_.ultra_order = ордер_по_пути("ultra")
+    DR_.swap_v2_execute = lambda tx, rid: {"status": "Success",
+                                            "signature": "ПОДПИСЬ_V2"}
+    DR_.ultra_execute = lambda tx, rid: {"status": "Success",
+                                          "signature": "ПОДПИСЬ_ULTRA"}
+    try:
+        r_два = продать(mint="M", amount_raw=1000, taker="W", вход_sol=0.001,
+                         живьём=True, подписать_фн=падающая_подпись,
+                         мин_доля_от_входа=0.0)
+    finally:
+        (DR_.swap_v2_order, DR_.ultra_order,
+         DR_.swap_v2_execute, DR_.ultra_execute) = было_фн
+        if было_план is None:
+            os.environ.pop("BLOOM_JUP_API", None)
+        else:
+            os.environ["BLOOM_JUP_API"] = было_план
+    chk(f"отказ подписи на первом пути пробует второй В ТОЙ ЖЕ попытке: "
+        f"пробовали {зовы_путей}",
+        зовы_путей[:1] == ["swap-v2"] and "ultra" in зовы_путей, зовы_путей)
+    подписи = [ш for ш in (r_два.get("steps") or []) if ш.get("step") == "sign"]
+    chk(f"в шагах видно, на каком пути подпись упала: "
+        f"{[(ш.get('api'), ш.get('ok')) for ш in подписи]}",
+        any(ш.get("api") == "swap-v2" and ш.get("ok") is False for ш in подписи),
+        подписи)
+
     chk("подпись строго после проверки пола",
         тело.index("проверить_пол(order") < тело.index("подписать_фн(order"))
 
