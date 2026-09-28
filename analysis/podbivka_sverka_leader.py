@@ -67,7 +67,7 @@ def одна(уз: S.Узел, с: dict) -> dict:
     tb = уз.tx(с["buy_sig"])
     if not tb:
         return {**из_, "why_not": "узел не отдал нашу покупку"}
-    наш = с["наш_кошелёк"]
+    наш = с.get("наш_кошелёк") or (C.account_keys(tb) or [None])[0]   # плательщик нашей покупки
     sell = с.get("sell_sig")
     if not sell:
         for з in reversed(уз.подписи(наш, limit=1000)):
@@ -88,7 +88,7 @@ def одна(уз: S.Узел, с: dict) -> dict:
     if not пул.get("pool_vault") or not пул.get("quote_vault"):
         return {**из_, "why_not": "пул токена не опознан в нашей покупке"}
     if q == C.NATIVE_QUOTE:
-        return {**из_, "why_not": "кривая pump.fun -- вне режима 2"}
+        return кривая(уз, с, из_, tb, ts, наш, пул)
     import c2_pool_programs as PP  # noqa: PLC0415
     прог = PP.pool_program(tb, пул["pool_vault"], PP.labels()).get("pool_program")
     из_["program"] = прог
@@ -260,6 +260,85 @@ def одна(уз: S.Узел, с: dict) -> dict:
     return из_
 
 
+def кривая(уз, с: dict, из_: dict, tb: dict, ts: dict, наш: str, пул: dict) -> dict:
+    """Сверка на кривой pump.fun (модель режима 1: состояние из события сделки,
+    комиссии кривой -- из события сделки источника).
+    Факт: вход -- лампорты, вошедшие в кривую в нашей покупке, плюс комиссии кривой
+    (из события нашей покупки); выход -- лампорты, ушедшие из кривой в нашей
+    продаже, минус комиссии кривой. Модель: покупка той же тратой в состоянии
+    перед нашей покупкой, продажа наших фактических токенов в состоянии перед
+    нашей продажей."""
+    из_["program"] = S.SB.PUMP_CURVE if hasattr(S.SB, "PUMP_CURVE") else "pump.fun кривая"
+    src = с.get("src_sig")
+    tsrc = уз.tx(src) if src else None
+    if not tsrc:
+        return {**из_, "why_not": "сделка источника не найдена"}
+    s0 = tsrc["slot"]
+    из_.update(src_sig=src, s0=s0, сдвиг_слотов=tb["slot"] - s0)
+    ев0 = S.SB.pump_trade_event(tsrc, с["mint"])
+    ев_b = S.SB.pump_trade_event(tb, с["mint"])
+    if not ев0 or not ев_b:
+        return {**из_, "why_not": "кривая: нет события сделки источника или нашей покупки"}
+    bps = (int(ев0["fee_bps"]), int(ев0["creator_fee_bps"]))
+    вход = int(ев_b["sol_amount"]) + int(ев_b.get("fee") or 0) + int(ев_b.get("creator_fee") or 0)
+    т_факт = A3.наши_токены(tb, наш, с["mint"])
+    т_прод = -A3.наши_токены(ts, наш, с["mint"])
+    из_кривой = -(C.lamport_delta(ts, пул["quote_vault"]) or 0)
+    выход = из_кривой - (-(-из_кривой * bps[0] // 10_000)) - (-(-из_кривой * bps[1] // 10_000)) if из_кривой > 0 else 0
+    из_.update(факт_вход_sol=вход / 1e9, факт_выход_sol=выход / 1e9 if выход else None,
+               факт_пп=round((выход - вход) / вход * 100, 3) if вход and выход else None,
+               продано_токенов_доля=round(т_прод / т_факт, 4) if т_факт else None)
+    if not выход:
+        return {**из_, "why_not": "кривая: выход нашей продажи не читается (миграция или другой пул)"}
+    до = max(ts["slot"], s0 + ГОРИЗОНТ)
+    ист = S.история_пула(уз, пул["pool_vault"], src, s0,
+                         опора=(S.подпись_после_слота(уз, до + 1) if уз.текущий == "helius" else None),
+                         до_слота=до)
+    if ист["why_not"] or ист["предел"]:
+        return {**из_, "why_not": f"история пула: {ист['why_not'] or 'предел страниц'}"}
+    сп = [з for з in ист["подписи"] if з["ok"]]
+    ib = next((i for i, з in enumerate(сп) if з["signature"] == с["buy_sig"]), None)
+    is_ = next((i for i, з in enumerate(сп) if з["signature"] == из_["sell_sig"]), None)
+    if ib is None or is_ is None:
+        return {**из_, "why_not": "наши сделки не найдены в истории пула"}
+    из_.update(место(сп, ib, s0, tb["slot"]))
+
+    def ст(i):
+        for j in range(i, max(-1, i - S.ШАГОВ_НАЗАД - 1), -1):
+            try:
+                с_ = S.состояние(уз.tx(сп[j]["signature"]), "curve", пул, с["mint"])
+            except RuntimeError:
+                с_ = None
+            if с_:
+                return с_
+        return None
+    ст0 = S.состояние(tsrc, "curve", пул, с["mint"])
+    ст_вход = ст(ib - 1) if ib > 0 else ст0
+    ст_пп = ст(is_ - 1)
+    if not ст0 or not ст_вход or not ст_пп:
+        return {**из_, "why_not": "кривая: состояние не читается"}
+    p0 = ст0["vs"] / ст0["vt"]
+    из_["наценка_факт_пп"] = round((int(ев_b["sol_amount"]) / int(ев_b["token_amount"]) / p0 - 1) * 100, 3)
+    пок = S.наша_покупка("curve", ст_вход, f=None, кривая_bps=bps, размер=вход)
+    if not пок.get("ok"):
+        return {**из_, "why_not": f"кривая: модель покупки -- {пок.get('why_not')}"}
+    из_["токены_модель_к_факту_пп"] = round((пок["tokens"] / т_факт - 1) * 100, 3) if т_факт else None
+    пр = S.наша_продажа("curve", ст_пп, {"в_пул": 0, "tokens": 0}, т_прод, f=None, кривая_bps=bps)
+    if not пр.get("ok"):
+        return {**из_, "why_not": f"кривая: модель продажи -- {пр.get('why_not')}"}
+    из_["модель_пп"] = round((пр["lamports"] - вход) / вход * 100, 3)
+    из_["расхождение_пп"] = round(из_["факт_пп"] - из_["модель_пп"], 3)
+    канд = [i for i, з in enumerate(сп) if з["slot"] <= s0 + ГОРИЗОНТ - 1]
+    ст150 = ст(канд[-1]) if канд else ст0
+    if ст150:
+        вст = {"в_пул": пок["в_пул"], "tokens": пок["tokens"]} if (канд and (канд[-1] < ib or канд[-1] >= is_)) else {"в_пул": 0, "tokens": 0}
+        п150 = S.наша_продажа("curve", ст150, вст, пок["tokens"], f=None, кривая_bps=bps)
+        if п150.get("ok"):
+            из_["модель_150_пп"] = round((п150["lamports"] - вход) / вход * 100, 3)
+    из_["quote_mint"] = "SOL (кривая)"
+    return из_
+
+
 def строки_входа(вход: str) -> list:
     if вход == "a3":
         д = json.loads((КОРЕНЬ / "data" / "podbivka" / "a3_sdelki.json").read_text(encoding="utf-8"))["сделки"]
@@ -269,6 +348,13 @@ def строки_входа(вход: str) -> list:
         д = д.get("sdelki") or д.get("позиции") or []
     из_ = []
     for x in д:
+        if "polya" in x:                       # отчёт Code-1 data/peresborka_sdelok.json
+            п = x["polya"]
+            из_.append({"группа": п.get("группа"), "наш_кошелёк": None, "источник": п.get("имя_источника"),
+                        "mint": п.get("минт"), "buy_sig": п.get("подпись_покупки"), "sell_sig": п.get("подпись_продажи"),
+                        "src_sig": п.get("подпись_источника"), "buy_ts": None,   # в отчёте только ЧЧ:ММ:СС; сутки -- Shyft
+                        "code1_итог_процент": п.get("итог_процент"), "code1_s_n": п.get("s_n")})
+            continue
         из_.append({"группа": x.get("group_effective") or x.get("group") or "leader", "наш_кошелёк": x["wallet"],
                     "источник": x["source"], "mint": x["mint"], "buy_sig": x["buy_sig"], "sell_sig": x.get("sell_sig"),
                     "src_sig": x.get("source_sig"), "buy_ts": x.get("buy_ts")})
@@ -308,7 +394,7 @@ def пересобрать(метка: str) -> int:
             р["курс_q_примечание"] = "маршрут дробился: вклад курса не считается"
     п.write_text(json.dumps(д, ensure_ascii=False, indent=1), encoding="utf-8")
     (КОРЕНЬ / "docs" / f"podbivka_sverka_leader{суф}.md").write_text(
-        "# Сверка сделок группы leader с моделью режима 2\n\n" + md_таблица(д["ряды"]) + "\n", encoding="utf-8")
+        "# Сверка сделок полосы с моделью (режим 2 на x*y=k, режим 1 на кривой pump.fun)\n\n" + md_таблица(д["ряды"]) + "\n", encoding="utf-8")
     return 0
 
 
@@ -339,7 +425,7 @@ def main() -> int:
     out = КОРЕНЬ / "data" / "podbivka" / f"sverka_leader{суф}.json"
     out.write_text(json.dumps({"ряды": рез, "расход": уз.расход()}, ensure_ascii=False, indent=1), encoding="utf-8")
     (КОРЕНЬ / "docs" / f"podbivka_sverka_leader{суф}.md").write_text(
-        "# Сверка сделок группы leader с моделью режима 2\n\n" + md_таблица(рез) + "\n", encoding="utf-8")
+        "# Сверка сделок полосы с моделью (режим 2 на x*y=k, режим 1 на кривой pump.fun)\n\n" + md_таблица(рез) + "\n", encoding="utf-8")
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
     R.записано(КОРЕНЬ / "docs" / f"podbivka_sverka_leader{суф}.md")
