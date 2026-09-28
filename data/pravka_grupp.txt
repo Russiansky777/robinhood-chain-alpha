@@ -1,77 +1,28 @@
-{
- "leader": {
-  "адресов": 1,
-  "lane_size": 0.5,
-  "lane_trades": true,
-  "bloom_trades": false,
-  "bloom_sol": null,
-  "fanout": false,
-  "min_target_sol": 3,
-  "max_slots_from_source": null,
-  "skip_flippers": false,
-  "allow_taxed_route": true,
-  "slippage": 0.2,
-  "min_pool_sol_reserve": null,
-  "slippage_thin_pool": 0.5,
-  "thin_pool_below_sol": 30,
-  "lane_open_max": 3,
-  "stop_loss_sol": 0.75,
-  "hold_slots": 150,
-  "note": "Лидер. Размер 0.5 SOL, порог источника 3 SOL-экв., налоговый маршрут берём и пишем налог в строку решения, наценка входа до 0.2 (min-out 80 %, наценка 25 %), а на пуле с резервом ниже 30 SOL-экв. -- 0.5 (наценка до 100 %); три открытых, стоп -0.75 за сутки, держим 36 слотов от s0 при покупке 150 слотов от s0 при любом размере покупки источника. Пулы: Pump AMM, Raydium CPMM, кривая pump.fun и двухшаговый маршрут через котировочный токен (п.3). LaunchLab, CLMM, DAMM v2 и DBC -- следующим шагом по одному (п.4), поэтому их в списке ПОКА НЕТ."
- },
- "batch5": {
-  "адресов": 12,
-  "lane_size": 0.3,
-  "lane_trades": true,
-  "bloom_trades": false,
-  "bloom_sol": null,
-  "fanout": false,
-  "min_target_sol": 2,
-  "max_slots_from_source": null,
-  "skip_flippers": false,
-  "allow_taxed_route": true,
-  "slippage": 0.4,
-  "min_pool_sol_reserve": null,
-  "lane_open_max": 3,
-  "stop_loss_sol": 0.45,
-  "hold_slots": 72,
-  "note": "Восемь названных кошельков BATCH-5. 0.3 SOL, порог 2 SOL-экв., наценка входа до 0.40, предела резерва пула НЕТ (резерв только пишется в строку позиции), три открытых, стоп -0.45, держим 72 слота от s0."
- },
- "lane_s0": {
-  "адресов": 10,
-  "lane_size": 0.3,
-  "lane_trades": true,
-  "bloom_trades": false,
-  "bloom_sol": null,
-  "fanout": false,
-  "min_target_sol": 2,
-  "max_slots_from_source": 3,
-  "skip_flippers": true,
-  "allow_taxed_route": true,
-  "slippage": 0.4,
-  "min_pool_sol_reserve": null,
-  "lane_open_max": 3,
-  "stop_loss_sol": 0.45,
-  "hold_slots": 72,
-  "note": "Десять кошельков с усечённым S+0. Правила как у batch5 (слово владельца 27.09, вечер): 0.3 SOL, порог 2 SOL-экв., наценка входа до 0.40, налоговый маршрут берём, предела резерва пула нет (резерв только пишется в строку позиции), все типы пулов вместе с двухшаговым маршрутом. Своё у группы одно: не покупаем, если от слота источника прошло больше 3 слотов, и помеченных перекупщиками пропускаем (сейчас не помечен ни один)."
- },
- "off": {
-  "адресов": 9,
-  "lane_size": null,
-  "lane_trades": false,
-  "bloom_trades": false,
-  "bloom_sol": null,
-  "fanout": false,
-  "note": "Выключены прямым словом владельца 27.09. Подписка и лог остаются, денег не тратим."
- },
- "log_only": {
-  "адресов": 591,
-  "lane_size": null,
-  "lane_trades": false,
-  "bloom_trades": false,
-  "bloom_sol": null,
-  "fanout": false,
-  "note": "Все прочие адреса, на которые служба подписана. Слово владельца: lane_trades=false, только лог сигналов со всеми полями. Из файла их убирать нельзя -- пропала бы подписка, а с ней и лог."
- }
-}
--rw-r--r-- 1 bot bot 127613 Sep 28 05:03 /home/bot/data/sources_2026-09-25.json
+создана группа sniper_src: {"lane_size": 0.3, "lane_trades": true, "bloom_trades": false, "min_target_sol": 2, "max_slots_from_source": 1, "slippage": 0.2, "hold_slots": 12, "lane_open_max": 3, "stop_loss_sol": 0.45, "note": "Три снайпера из docs/podbivka_2026-09-28_snaipery.md (Code-2). Решение владельца 28.09: размер 0.3, порог входа 2 SOL, только первая покупка на пару источник+минт, не дальше S+1, проскальзывание 0.2, удержание 12 слотов, до 3 открытых, стоп 0.45."}
+создана группа kandidaty: {"lane_trades": false, "bloom_trades": false, "note": "Кандидаты под наблюдением: подписка живая, денег не тратим. Слово владельца 28.09: подписаны только торгующие группы и кандидаты."}
+убран из log_only (1 мест)
+6qudAN2k: ['log_only'] -> sniper_src
+убран из log_only (1 мест)
+BCrTEXmW: ['log_only'] -> sniper_src
+убран из log_only (1 мест)
+DAEdBmTP: ['log_only'] -> sniper_src
+убран из log_only (1 мест)
+BMgsHTvc: ['log_only'] -> kandidaty
+убран из log_only (1 мест)
+CzU8MaRc: ['log_only'] -> kandidaty
+убран из log_only (1 мест)
+2L17Sw85: ['log_only'] -> kandidaty
+убран из log_only (1 мест)
+5VRgqb2q: ['log_only'] -> kandidaty
+убран из log_only (1 мест)
+GZi5tmvZ: ['log_only'] -> kandidaty
+убран из log_only (1 мест)
+7txcAXw9: ['log_only'] -> kandidaty
+log_only.subscribe: было None, стало False
+lane_s0.lane_pools: было ['pump_amm', 'cpmm', 'bonding', 'two_step', 'damm2', 'dbc'], стало ['pump_amm', 'cpmm', 'bonding', 'two_step', 'damm2', 'dbc', 'clmm']
+batch5.lane_pools: было ['pump_amm', 'cpmm', 'bonding', 'two_step', 'damm2', 'dbc'], стало ['pump_amm', 'cpmm', 'bonding', 'two_step', 'damm2', 'dbc', 'clmm']
+поле sniper_src.note политика не читает -- не сверяю
+поле kandidaty.note политика не читает -- не сверяю
+поле log_only.subscribe политика не читает -- не сверяю
+самопроверка денежного пути пройдена; копия /home/bot/data/sources_2026-09-25.json.bak-20260928T101943Z
+-rw-r--r-- 1 bot bot 139092 Sep 28 12:19 /home/bot/data/sources_2026-09-25.json
