@@ -84,9 +84,14 @@ def место_по_подписям(helius, слот: int, подпись: str)
         из_["why_not"] = "подпись не задана"
         return из_
     try:
+        # ТАЙМАУТ -- СВОЙ, БОЛЬШОЙ. Умолчание вызова 10 с: блок в 1200-1900
+        # подписей узел отдаёт дольше, и 28.09 место источника не заполнилось
+        # НИ У ОДНОЙ из 15 вечерних сделок -- при том что тот же запрос вручную
+        # с таймаутом 120 с отвечает. Дешевле подождать, чем терять поле.
         блок = helius.call("getBlock", [слот, {
             "encoding": "json", "transactionDetails": "signatures",
-            "rewards": False, "maxSupportedTransactionVersion": BD.ПОТОЛОК_ВЕРСИИ_TX}])
+            "rewards": False, "maxSupportedTransactionVersion": BD.ПОТОЛОК_ВЕРСИИ_TX}],
+            таймаут=45.0)
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"getBlock не отдался: {type(exc).__name__}: {str(exc)[:120]}"
         return из_
