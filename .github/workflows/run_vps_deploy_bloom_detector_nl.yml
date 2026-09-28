@@ -280,6 +280,11 @@ jobs:
           # он на хост не попал бы вовсе.
           DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json $(ls -1 data/c2_leg_pools_2*.json | tr '\n' ' ') data/c2_pool_samples data/senders.json"
           [ -f data/nogi_shablony.json ] && DATA_FILES="$DATA_FILES data/nogi_shablony.json"
+          # СТАВКИ КОМИССИИ ПУЛОВ CLMM. Файл -- ЗАСЕВ кэша: без него служба
+          # после перезапуска отказывает на первом же сигнале CLMM, пока
+          # фоновое чтение не доберёт конфиг с цепи. Деплой 28.09 в 10:07Z это
+          # и показал: clmm_fee_rates в признаке жизни вышел пустым.
+          [ -f data/clmm_konfigi.json ] && DATA_FILES="$DATA_FILES data/clmm_konfigi.json"
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
@@ -300,6 +305,7 @@ jobs:
             ls /home/bot/data/c2_pool_samples | wc -l
             ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
             ls -l /home/bot/data/senders.json
+            ls -l /home/bot/data/clmm_konfigi.json 2>/dev/null || echo 'clmm_konfigi.json ne dostavlen' 
             echo 'fayl grupp deploy ne trogal, pokazyvaem ego vremya kak est:'
             ls -l /home/bot/data/sources_2026-09-25.json
           "
