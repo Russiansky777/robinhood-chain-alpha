@@ -33,6 +33,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import struct
 import sys
 import time
@@ -104,6 +105,9 @@ BONDING_DISCS = {
         "spec": {"n_accounts": 27, "user": [13],
                   "user_ata": [(14, 1, 3), (15, 2, 4)],
                   "pda": [(20, [b"user_volume_accumulator", "USER"])],
+                  # место 21 -- связанный накопитель: ключ не выводится
+                  # семенами, берётся из состояния (см. assoc_uva).
+                  "assoc_uva": (21, 2),
                   "base_mint": 1, "quote_mint": 2, "base_vault": 11,
                   "quote_vault": 12, "native_quote": False},
     },
@@ -137,6 +141,25 @@ def b58decode(s: str) -> bytes:
     return b"\x00" * (len(s) - len(s.lstrip("1"))) + b
 
 
+def b58encode(b: bytes) -> str:
+    """Адрес из 32 байт. Своим кодером: сторонней base58 в окружении службы нет.
+
+    Нужен там, где адрес приходит СЫРЫМИ БАЙТАМИ -- например, пул внутри
+    события свопа CLMM, которое лежит в логах.
+    """
+    n = int.from_bytes(b, "big")
+    s = ""
+    while n:
+        n, r = divmod(n, 58)
+        s = B58[r] + s
+    ведущие = 0
+    for x in b:
+        if x != 0:
+            break
+        ведущие += 1
+    return "1" * ведущие + s
+
+
 def disc(name: str) -> bytes:
     return hashlib.sha256(f"global:{name}".encode()).digest()[:8]
 
@@ -145,7 +168,16 @@ def disc(name: str) -> bytes:
 # индекс счёта минта, индекс счёта программы токена); pda -- счета,
 # выводимые из пользователя.
 SPECS = {
-    PUMP_AMM: {"label": "Pump AMM", "ix": "buy_exact_quote_in", "alt": ["buy"], "n_accounts": 26,
+    # СЧЕТОВ У PUMP AMM БЫВАЕТ 25 ИЛИ 26. Замер 28.09 по пулу USDC/SOL
+    # (nML7msD1MiJHxFvhv4po1u6C4KpWr64ugKqc75DMuD2): девять покупок той же
+    # инструкцией buy_exact_quote_in идут с 25 счетами, и раскладка совпадает с
+    # 26-счётной ПОЗИЦИЯ В ПОЗИЦИЮ на индексах 0..24 -- у длинной просто есть
+    # 26-й счёт в хвосте. Все роли, которые мы подставляем (подписант 1, наши
+    # ATA 5 и 6, PDA 20, минты 3 и 4, хранилища 7 и 8), лежат в этих 25, а
+    # хвост переносится из настоящей сделки как есть. Пока предел стоял ровно
+    # 26, шаблон первой ноги SOL -> USDC не извлекался вовсе.
+    PUMP_AMM: {"label": "Pump AMM", "ix": "buy_exact_quote_in", "alt": ["buy"],
+               "n_accounts": None, "min_accounts": 25, "max_accounts": 26,
                "user": [1], "user_ata": [(5, 3, 11), (6, 4, 12)],
                "pda": [(20, [b"user_volume_accumulator", "USER"])],
                "base_mint": 3, "quote_mint": 4, "base_vault": 7, "quote_vault": 8},
@@ -199,6 +231,27 @@ SPECS = {
 }
 
 
+# РАСКЛАДКА ПРОДАЖИ. Пока здесь только Pump AMM: у него продажа -- ДРУГАЯ
+# инструкция (sell, дискриминатор 33e685a4017f83ad), а не та же с обратными
+# счетами. Раскладка выведена по НАШЕЙ СОБСТВЕННОЙ продаже 22:21:42Z
+# (teg1M4QY..., 24 счёта, продажа 6XnC2Y -> SOL через Jupiter, внутри которой
+# лежит настоящая инструкция пула):
+#   0 пул, 1 наш кошелёк (подписант), 2 общая настройка, 3 минт токена,
+#   4 минт котировки (WSOL), 5 НАШ счёт токена, 6 НАШ счёт WSOL,
+#   7 хранилище токена пула, 8 хранилище котировки пула, 9 получатель комиссии,
+#   10 его счёт WSOL, 11 программа токена базы, 12 программа токена котировки,
+#   13 системная, 14 программа ATA, 15 event_authority, 16 сама программа,
+#   17..23 счета создателя и комиссий -- переносятся как есть.
+# ОТ ПОКУПКИ ОТЛИЧАЕТСЯ отсутствием user_volume_accumulator (он только у
+# покупки) -- поэтому счетов 24, а не 26, и pda здесь пустой.
+SPECS_ПРОДАЖИ = {
+    PUMP_AMM: {"label": "Pump AMM продажа", "ix": "sell", "alt": [],
+               "n_accounts": None, "min_accounts": 23, "max_accounts": 24,
+               "user": [1], "user_ata": [(5, 3, 11), (6, 4, 12)], "pda": [],
+               "base_mint": 3, "quote_mint": 4, "base_vault": 7, "quote_vault": 8},
+}
+
+
 def spec_of(tpl: dict) -> dict:
     """Раскладка счетов для ЭТОГО шаблона: у кривой она зависит от разновидности.
 
@@ -206,6 +259,8 @@ def spec_of(tpl: dict) -> dict:
     отдельный минт котировки; спутать её с 18-счётной значило бы подставить наш
     кошелёк не туда, то есть подписать покупку с чужими счетами.
     """
+    if tpl.get("продажа"):
+        return dict(SPECS_ПРОДАЖИ[tpl["program"]])
     s = dict(SPECS[tpl["program"]])
     if tpl.get("program") == BONDING:
         вар = BONDING_DISCS.get(tpl.get("ix")) or {}
@@ -238,11 +293,20 @@ def pda(seeds: list, user: str, program: str) -> str:
     return str(Pubkey.find_program_address(raw, Pubkey.from_string(program))[0])
 
 
-def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
-    """Инструкция пула в транзакции источника: счета, данные, аргументы."""
-    spec = SPECS.get(program)
+def extract_template(tx: dict, program: str, pool_vault: str, *,
+                     продажа: bool = False) -> dict:
+    """Инструкция пула в транзакции: счета, данные, аргументы.
+
+    продажа=True берёт раскладку ПРОДАЖИ (SPECS_ПРОДАЖИ): у Pump AMM это другая
+    инструкция, и путать её с покупкой нельзя -- аргументы стоят на тех же
+    местах, но смысл обратный (сколько токена отдаём и сколько котировки хотим
+    минимум).
+    """
+    spec = (SPECS_ПРОДАЖИ if продажа else SPECS).get(program)
     if spec is None:
-        return {"ok": False, "why_not": "тип пула не покрыт"}
+        return {"ok": False,
+                "why_not": ("продажа этого типа пула не покрыта" if продажа
+                             else "тип пула не покрыт")}
     want = disc(spec["ix"])
     for ix in all_instructions(tx):
         if ix.get("programId") != program or pool_vault not in ix["accounts"]:
@@ -265,8 +329,9 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
             return {"ok": True, "program": program, "ix": ключ, "accounts": list(ix["accounts"]),
                     "data": data, "arg0": a0_, "arg1": a1_, "writable": writable_map(tx),
                     "signers": sorted(C.signers(tx)), "exact_out": bool(вид["exact_out"])}
-        name = next((n for n in (spec["ix"], "buy", "swap2", "swap_base_output", "swap")
-                     if data[:8] == disc(n)), data[:8].hex())
+        кандидаты = [spec["ix"], *list(spec.get("alt") or []),
+                     "swap2", "swap_base_output", "swap"]
+        name = next((n for n in кандидаты if data[:8] == disc(n)), data[:8].hex())
         if data[:8] != want and name not in spec["alt"]:
             return {"ok": False, "why_not": f"у источника инструкция {name}, не {spec['ix']}"}
         ждём = spec["n_accounts"]
@@ -289,7 +354,7 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
             return {"ok": False, "why_not": "у источника CLMM не «точный вход без лимита цены»"}
         return {"ok": True, "program": program, "ix": name, "accounts": list(ix["accounts"]),
                 "data": data, "arg0": a0, "arg1": a1, "writable": writable_map(tx),
-                "signers": sorted(C.signers(tx))}
+                "signers": sorted(C.signers(tx)), "продажа": bool(продажа)}
     return {"ok": False, "why_not": "инструкция пула с этим хранилищем не найдена"}
 
 
@@ -331,6 +396,100 @@ def flip_template(tpl: dict, in_mint: str) -> dict:
     return t
 
 
+# ------------------------------------- СВЯЗАННЫЙ НАКОПИТЕЛЬ 27-счётной кривой
+#
+# 28.09 семь наших копий источника 6qudAN2k сели с ошибкой: программа кривой
+# сказала прямо --
+#   AnchorError caused by account: associated_user_volume_accumulator.
+#   Error Code: ConstraintSeeds. Error Number: 2006.
+# Место 20 (наш user_volume_accumulator) мы подставляли верно, а место 21 --
+# СВЯЗАННЫЙ накопитель -- переносили из сделки источника, то есть отдавали
+# программе ЧУЖОЙ счёт.
+#
+# ОТКУДА БЕРЁМ ПРАВИЛЬНЫЙ КЛЮЧ, не выдумывая семена. IDL программы на цепи не
+# выложен (счёт IDL пуст), а перебор строковых семян по трём фактам цепи
+# (кошелёк+котировка -> ключ) не дал ни одного совпадения. Зато сама программа
+# печатает ожидаемый адрес в ошибке, и по фактам он зависит ТОЛЬКО от
+# пользователя и минта котировки: у нас один и тот же ключ на семи разных
+# базовых минтах, а у источника ключ меняется вместе с котировкой (WSOL против
+# XsCPL9dN...). Поэтому ключи живут в состоянии службы, а не в коде: файл
+# заполняется тем, что назвала цепь.
+#
+# ЕСЛИ КЛЮЧА НЕТ -- сборка ОТКАЗЫВАЕТ. Отправить чужой накопитель значит
+# заранее сжечь комиссию: именно так ушло 0.007035 SOL за 28.09.
+ASSOC_UVA_ПО_УМОЛЧАНИЮ = "/home/bot/bloom_executor_live_data/bonding_v2_assoc.json"
+_ASSOC_UVA_КЭШ: dict = {}
+
+
+def assoc_uva_файл() -> str:
+    return os.environ.get("BLOOM_ASSOC_UVA_FILE") or ASSOC_UVA_ПО_УМОЛЧАНИЮ
+
+
+def assoc_uva_забыть() -> None:
+    """Сбросить память процесса о файле (нужно самопроверке и после правки)."""
+    _ASSOC_UVA_КЭШ.clear()
+
+
+def assoc_uva_все() -> dict:
+    путь = assoc_uva_файл()
+    if путь in _ASSOC_UVA_КЭШ:
+        return _ASSOC_UVA_КЭШ[путь]
+    try:
+        with open(путь, encoding="utf-8") as ф:
+            зн = json.load(ф)
+        если = зн if isinstance(зн, dict) else {}
+    except Exception:  # noqa: BLE001
+        если = {}
+    _ASSOC_UVA_КЭШ[путь] = если
+    return если
+
+
+def assoc_uva(пользователь: str, минт_котировки: str) -> str | None:
+    """Ключ связанного накопителя для этой пары -- только из состояния."""
+    по_кошельку = (assoc_uva_все().get(пользователь) or {})
+    зн = по_кошельку.get(минт_котировки)
+    return зн if isinstance(зн, str) and зн else None
+
+
+def assoc_uva_запомнить(пользователь: str, минт_котировки: str, ключ: str,
+                         *, путь: str | None = None) -> dict:
+    """Записать ключ, названный цепью. Пишем атомарно и без потери чужих пар."""
+    путь = путь or assoc_uva_файл()
+    все = {}
+    try:
+        with open(путь, encoding="utf-8") as ф:
+            зн = json.load(ф)
+        все = зн if isinstance(зн, dict) else {}
+    except Exception:  # noqa: BLE001
+        все = {}
+    все.setdefault(пользователь, {})[минт_котировки] = ключ
+    врем = f"{путь}.tmp"
+    with open(врем, "w", encoding="utf-8") as ф:
+        json.dump(все, ф, ensure_ascii=False, indent=1)
+    os.replace(врем, путь)
+    _ASSOC_UVA_КЭШ[путь] = все
+    return все
+
+
+def assoc_uva_из_логов(логи) -> str | None:
+    """Ожидаемый адрес связанного накопителя из ошибки программы.
+
+    Anchor печатает: строку с именем счёта и Error Code: ConstraintSeeds,
+    затем "Left:" (что дали) и "Right:" (что ждали). Берём Right и только
+    для нашего счёта -- чужие ошибки сюда не относятся.
+    """
+    строки = [str(л) for л in (логи or [])]
+    for i, л in enumerate(строки):
+        if ("associated_user_volume_accumulator" not in л
+                or "ConstraintSeeds" not in л):
+            continue
+        for j in range(i, min(i + 8, len(строки))):
+            if строки[j].strip().endswith("Right:") and j + 1 < len(строки):
+                хвост = строки[j + 1].split()
+                return хвост[-1] if хвост else None
+    return None
+
+
 def user_accounts(tpl: dict, tx: dict, user: str) -> dict:
     """{индекс: адрес} для пользовательских счетов шаблона при данном user."""
     spec = spec_of(tpl)
@@ -347,6 +506,19 @@ def user_accounts(tpl: dict, tx: dict, user: str) -> dict:
             out[i] = ata(user, acc[mi], acc[pi])
     for i, seeds in spec["pda"]:
         out[i] = pda(seeds, user, tpl["program"])
+    ас = spec.get("assoc_uva")
+    if ас:
+        место, место_котировки = ас
+        # ПЕРЕСБОРКА СДЕЛКИ САМОГО ИСТОЧНИКА: на месте 21 уже стоит ЕГО
+        # накопитель, и подставлять туда ничего не надо -- иначе самопроверка
+        # "восстанови инструкцию источника точно" стала бы ложной.
+        свой = acc[spec["user"][0]] == user if spec.get("user") else False
+        ключ = acc[место] if свой else assoc_uva(user, acc[место_котировки])
+        if not ключ:
+            # ЧЕСТНЫЙ ОТКАЗ. Чужой накопитель программа не примет, и покупка
+            # сгорит на комиссии. Пусть лучше сделка не соберётся.
+            return {}
+        out[место] = ключ
     return out
 
 
@@ -621,6 +793,303 @@ def dbc_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     return из_
 
 
+# ------------------------------------------- ставки комиссии пулов Raydium CLMM
+# ЗАЧЕМ ЗДЕСЬ СЛОВАРЬ. Ставка комиссии пула CLMM лежит в счёте amm_config, а не
+# в сделке: прочитать её -- сетевой запрос, а на горячем пути (решение ->
+# отправка) сетевых запросов нет и быть не может. Поэтому ставки живут в
+# памяти: словарь наполняет ФОНОВОЕ чтение (детектор), а горячий путь только
+# смотрит в него. Нет ставки -- честный отказ, и адрес конфига кладётся в
+# НУЖНЫ_КОНФИГИ_CLMM, чтобы фон прочитал его к следующему сигналу.
+#
+# ПОЧЕМУ МОЖНО КЭШИРОВАТЬ НАВСЕГДА. amm_config -- счёт НАСТРОЕК уровня комиссии
+# (их у Raydium единицы на всю программу), а не состояние пула: ставка и шаг
+# тика в нём не меняются от сделок. Обновление раз в час фоном -- с запасом.
+СТАВКИ_CLMM: dict = {}
+НУЖНЫ_КОНФИГИ_CLMM: set = set()
+# Конфиги, про которые узел ОТВЕТИЛ, а ставка не разобралась (счёта нет, длина
+# не та). Второй раз их не спрашиваем: это поломка кода или адреса, а не
+# сетевая помеха, и кредит на неё каждые двадцать секунд тратить незачем.
+КОНФИГИ_БЕЗ_СТАВКИ: set = set()
+ФАЙЛ_КОНФИГОВ_CLMM = "clmm_konfigi.json"
+
+
+def загрузить_ставки_clmm(файл=None) -> int:
+    """Ставки из файла прогона чтения счетов amm_config. Вернёт сколько взято."""
+    п = Path(файл) if файл else (C.DATA / ФАЙЛ_КОНФИГОВ_CLMM)
+    if not п.exists():
+        return 0
+    try:
+        д = json.loads(п.read_text(encoding="utf-8")).get("конфиги") or {}
+    except Exception:  # noqa: BLE001
+        return 0
+    взято = 0
+    for адрес, з in д.items():
+        р = (з or {}).get("разбор") or {}
+        if р.get("ставка_1e6") and р.get("шаг_тика"):
+            СТАВКИ_CLMM[адрес] = {"ставка_1e6": int(р["ставка_1e6"]),
+                                  "шаг_тика": int(р["шаг_тика"])}
+            взято += 1
+    return взято
+
+
+def clmm_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float,
+                  ставка_1e6: int | None = None,
+                  шаг_тика: int | None = None) -> dict:
+    """Минимум выхода в Raydium CLMM: L и цена -- из события свопа в ЛОГАХ.
+
+    Отличие от DAMM v2: событие CLMM отдаёт ликвидность L прямо, поэтому кривая
+    не решается из пары "вход/выход", а ПРОВЕРЯЕТСЯ -- сделка источника обязана
+    воспроизвестись при ставке комиссии пула. Не воспроизвелась -- сделка
+    источника перешла границу диапазона ликвидности, и наша L неизвестна.
+
+    ставка_1e6 -- ставка комиссии пула в миллионных долях, из счёта amm_config
+    (он стоит в самой инструкции свопа под индексом 1). Её НЕЛЬЗЯ решить по
+    одной сделке: у сделки, перешедшей границу диапазона, решённая доля уходит
+    на проценты в сторону (измерено: у одной живой сделки конфига с 0.25 %
+    решается 10 %). Поэтому без ставки -- отказ, а не догадка.
+    """
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        return {"ok": False, "why_not": "минты и хранилища не восстановились"}
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
+    if not qv or not bv:
+        return {"ok": False, "why_not": "хранилищ пула нет в балансах транзакции"}
+    вход = qv["post"] - qv["pre"]
+    выход = bv["pre"] - bv["post"]
+    if вход <= 0 or выход <= 0:
+        return {"ok": False,
+                "why_not": "сделка источника не покупка по этим хранилищам"}
+    try:
+        import c2_cl_quote as CL  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"нет модуля цены ({type(exc).__name__})"}
+    пул = (tpl["accounts"][CL.СМ_ПУЛ_В_ИНСТРУКЦИИ_CLMM]
+           if len(tpl["accounts"]) > CL.СМ_ПУЛ_В_ИНСТРУКЦИИ_CLMM else None)
+    if not пул:
+        return {"ok": False, "why_not": "в инструкции CLMM нет счёта пула"}
+    тела = CL.тела_событий_clmm(tx)
+    тело = b""
+    for т_ in тела:
+        if b58encode(CL.событие_clmm(т_)["пул"]) == пул:
+            тело = т_
+            break
+    конфиг = tpl["accounts"][1] if len(tpl["accounts"]) > 1 else None
+    if ставка_1e6 is None and конфиг:
+        из_кэша = СТАВКИ_CLMM.get(конфиг)
+        if из_кэша:
+            ставка_1e6 = из_кэша["ставка_1e6"]
+            if шаг_тика is None:
+                шаг_тика = из_кэша["шаг_тика"]
+        else:
+            # Фону -- задание на следующий сигнал; этот отказывается честно.
+            if конфиг not in КОНФИГИ_БЕЗ_СТАВКИ:
+                НУЖНЫ_КОНФИГИ_CLMM.add(конфиг)
+            return {"ok": False,
+                    "why_not": f"ставка комиссии пула CLMM неизвестна: конфиг "
+                               f"{конфиг} ещё не прочитан",
+                    "amm_config": конфиг}
+    из_ = CL.минимум_clmm(тело=тело, вход_источника=вход, выход_источника=выход,
+                           аргумент_входа=tpl.get("arg0") or 0,
+                           наш_вход=amount_in, проскальзывание=slippage,
+                           ставка_1e6=ставка_1e6, шаг_тика=шаг_тика)
+    if из_.get("ok"):
+        из_["source_in"] = вход
+        из_["source_out"] = выход
+        из_["pool"] = пул
+        # Счёт amm_config -- чтобы вызывающий знал, чью ставку кэшировать.
+        из_["amm_config"] = конфиг
+    return из_
+
+
+# ---------------------------------------------------------- Meteora DLMM
+# ЦЕНА У DLMM ЖИВЁТ В КОРЗИНАХ, а не в хранилищах: у каждой корзины своя цена, и
+# по остаткам хранилищ активную корзину не увидеть. Найдено 28.09 по девяти
+# живым сделкам (docs/dlmm_sobytie_i_cena.md, разбор analysis/c2_dlmm_recon.py):
+#   * события DLMM НЕТ в "Program data:" вовсе -- оно уходит по CPI, внутренней
+#     инструкцией к самой программе DLMM с дискриминатором Anchor
+#     e445a52e51cb9a1d, дальше дискриминатор события и тело;
+#   * раскладка тела подтверждена фактом: lb_pair совпал со счётом 0 вызова
+#     свопа 12 из 12 шагов, amount_in и amount_out -- с переводами того же
+#     вызова 12 из 12;
+#   * цена корзины в СЫРЫХ единицах равна (1 + bin_step/10000)^bin: проверено
+#     двумя независимыми способами (отношением цен двух сделок одного пула и
+#     шагом корзины из счёта пула).
+DLMM_CPI_ДИСК = bytes.fromhex("e445a52e51cb9a1d")
+DLMM_СВОП_ДИСК = bytes.fromhex("516ce3becdd00ac4")
+DLMM_ДЛИНА_СВОПА = 145
+# Шаг корзины лежит в счёте пула (смещения 73 и 80, согласны у 11 пулов из 11),
+# и его читает отдельный прогон -- в горячем пути счетов не спрашиваем. Пул без
+# прочитанного шага -- ОТКАЗ, как у CLMM отказ без ставки комиссии.
+СТУПЕНИ_DLMM: dict = {}
+НУЖНЫ_ПУЛЫ_DLMM: set = set()
+ПУЛЫ_БЕЗ_СТУПЕНИ: set = set()
+ФАЙЛ_СТУПЕНЕЙ_DLMM = "dlmm_shag_korziny.json"
+# Запас на одну корзину с каждой стороны при проверке модели: цена сделки
+# считается по целым лампортам, а границы -- точные степени.
+ЗАПАС_КОРЗИН_DLMM = 1
+
+
+def загрузить_ступени_dlmm(файл=None) -> int:
+    """Шаги корзин из файла прогона вывода. Вернёт, сколько пулов взято."""
+    п = Path(файл) if файл else (C.DATA / ФАЙЛ_СТУПЕНЕЙ_DLMM)
+    if not п.exists():
+        return 0
+    try:
+        д = json.loads(п.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return 0
+    по_пулам = д.get("шаг_корзины_по_пулам") or {}
+    if not по_пулам:
+        # Старый вид отчёта: согласие смещений там ещё не сведено в одно поле.
+        годные = д.get("годные_смещения") or []
+        if годные and all(г.get("шаги_корзин") == годные[0].get("шаги_корзин")
+                          for г in годные):
+            по_пулам = годные[0].get("шаги_корзин") or {}
+    взято = 0
+    for пул, шк in по_пулам.items():
+        try:
+            шк = int(шк)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= шк <= 2000:
+            СТУПЕНИ_DLMM[пул] = шк
+            взято += 1
+    return взято
+
+
+# СМЕЩЕНИЯ ШАГА КОРЗИНЫ В СЧЁТЕ ПУЛА. Выведены прогоном по цепи на 11 пулах:
+# уцелели ровно два места, и они дали у каждого пула одно и то же число (у
+# lbPair шаг лежит числом и байтами семени PDA). Читаем ОБА и требуем согласия:
+# если места спорят, значит счёт не тот или раскладка изменилась, и брать
+# нельзя. Длина счёта у всех одиннадцати -- 904 байта.
+СМ_ШАГА_КОРЗИНЫ_DLMM = (73, 80)
+ДЛИНА_СЧЁТА_ПУЛА_DLMM = 904
+
+
+def шаг_корзины_из_счёта(данные: bytes):
+    """Шаг корзины из счёта пула DLMM. None -- счёт не тот или места спорят."""
+    if not данные or len(данные) < max(СМ_ШАГА_КОРЗИНЫ_DLMM) + 2:
+        return None
+    значения = {struct.unpack_from("<H", данные, см)[0]
+                for см in СМ_ШАГА_КОРЗИНЫ_DLMM}
+    if len(значения) != 1:
+        return None
+    шк = значения.pop()
+    return шк if 1 <= шк <= 2000 else None
+
+
+def событие_dlmm(данные: bytes) -> dict | None:
+    """Событие свопа DLMM из данных внутренней инструкции или None."""
+    if (len(данные) != DLMM_ДЛИНА_СВОПА or данные[:8] != DLMM_CPI_ДИСК
+            or данные[8:16] != DLMM_СВОП_ДИСК):
+        return None
+    т = данные[16:]
+    начало, конец = struct.unpack_from("<ii", т, 64)
+    вошло, вышло = struct.unpack_from("<QQ", т, 72)
+    комиссия, протокол = struct.unpack_from("<QQ", т, 89)
+    return {"пул": b58encode(т[0:32]), "start_bin_id": начало,
+            "end_bin_id": конец, "amount_in": вошло, "amount_out": вышло,
+            "swap_for_y": т[88], "fee": комиссия, "protocol_fee": протокол}
+
+
+def события_dlmm(tx: dict) -> list:
+    """Все события свопа DLMM транзакции. Роутер трогает по нескольку пулов."""
+    из_ = []
+    for группа in ((tx or {}).get("meta") or {}).get("innerInstructions") or []:
+        for их in группа.get("instructions") or []:
+            if (их.get("programId") or их.get("program")) != DLMM:
+                continue
+            с_ = событие_dlmm(b58decode(их.get("data") or ""))
+            if с_ is not None:
+                из_.append(с_)
+    return из_
+
+
+def цена_корзины_dlmm(шаг_корзины: int, корзина: int) -> D:
+    """Цена корзины в СЫРЫХ единицах: (1 + bin_step/10000)^bin."""
+    return (D(1) + D(int(шаг_корзины)) / D(10000)) ** int(корзина)
+
+
+def dlmm_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float,
+                  шаг_корзины: int | None = None) -> dict:
+    """Минимум выхода в Meteora DLMM: цена -- по КОНЕЧНОЙ корзине сделки.
+
+    Наша покупка идёт сразу после сделки источника, то есть с той корзины, на
+    которой он остановился. Цена конечной корзины -- худшая из тех, что получил
+    он, и именно она наша. Кончится корзина -- минимум выхода не выполнится и
+    цепь откажет: это промах, а не потеря.
+
+    БЕЗ ШАГА КОРЗИНЫ -- ОТКАЗ. Он лежит в счёте пула и читается отдельным
+    прогоном; догадка о нём означала бы минимум ниже настоящего.
+    """
+    пул = tpl["accounts"][0] if (tpl.get("accounts") or []) else None
+    if not пул:
+        return {"ok": False, "why_not": "в инструкции DLMM нет счёта пула"}
+    события = [с for с in события_dlmm(tx) if с["пул"] == пул]
+    if not события:
+        return {"ok": False, "why_not": "нет события свопа DLMM по нашему пулу"}
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        return {"ok": False, "why_not": "минты и хранилища не восстановились"}
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
+    if not qv or not bv:
+        return {"ok": False, "why_not": "хранилищ пула нет в балансах транзакции"}
+    вход = qv["post"] - qv["pre"]
+    выход = bv["pre"] - bv["post"]
+    if вход <= 0 or выход <= 0:
+        return {"ok": False,
+                "why_not": "сделка источника не покупка по этим хранилищам"}
+    # СОБЫТИЕ ОБЯЗАНО ОБЪЯСНЯТЬ ХРАНИЛИЩА. Роутер заходит в один пул и дважды;
+    # тогда движение хранилищ -- сумма двух шагов, и к одному событию не
+    # относится. Такую сделку не считаем вовсе.
+    событие = next((с for с in события
+                    if с["amount_in"] == вход and с["amount_out"] == выход), None)
+    if событие is None:
+        return {"ok": False,
+                "why_not": "событие DLMM не сходится с хранилищами: сделка "
+                           "источника прошла этот пул не один раз"}
+    if шаг_корзины is None:
+        шаг_корзины = СТУПЕНИ_DLMM.get(пул)
+    if not шаг_корзины:
+        if пул not in ПУЛЫ_БЕЗ_СТУПЕНИ:
+            НУЖНЫ_ПУЛЫ_DLMM.add(пул)
+        return {"ok": False,
+                "why_not": f"шаг корзины DLMM неизвестен: пул {пул} ещё не "
+                           f"прочитан", "pool": пул}
+    низ_к = min(событие["start_bin_id"], событие["end_bin_id"])
+    верх_к = max(событие["start_bin_id"], событие["end_bin_id"])
+    ставка = (D(событие["fee"]) / D(событие["amount_in"])
+              if событие["amount_in"] else D(0))
+    if not (D(0) <= ставка < D(1)):
+        return {"ok": False, "why_not": "доля комиссии из события вне смысла"}
+    средняя = D(событие["amount_in"] - событие["fee"]) / D(событие["amount_out"])
+    низ = цена_корзины_dlmm(шаг_корзины, низ_к - ЗАПАС_КОРЗИН_DLMM)
+    верх = цена_корзины_dlmm(шаг_корзины, верх_к + ЗАПАС_КОРЗИН_DLMM)
+    # МОДЕЛЬ ОБЯЗАНА ВОСПРОИЗВЕСТИ СДЕЛКУ ИСТОЧНИКА. Средняя цена сделки лежит
+    # между ценами первой и последней корзины -- иначе прочитан не тот шаг или
+    # не то событие, и считать нашу цену нечем.
+    if not (низ <= средняя <= верх):
+        return {"ok": False,
+                "why_not": f"модель корзин не воспроизвела сделку источника "
+                           f"(шаг {шаг_корзины}, корзины {низ_к}..{верх_к})",
+                "pool": пул}
+    цена_нам = цена_корзины_dlmm(шаг_корзины, верх_к)
+    if цена_нам <= 0:
+        return {"ok": False, "why_not": "цена конечной корзины не считается"}
+    ожидаем = D(amount_in) * (D(1) - ставка) / цена_нам
+    минимум = int(ожидаем * (D(1) - D(str(slippage))))
+    if минимум <= 0:
+        return {"ok": False, "why_not": "минимум выхода вышел нулевым"}
+    return {"ok": True, "pool": пул, "bin_step": int(шаг_корзины),
+            "start_bin_id": событие["start_bin_id"],
+            "end_bin_id": событие["end_bin_id"],
+            "fee_share": float(ставка), "source_in": вход, "source_out": выход,
+            "bin_price": float(цена_нам), "expected_out": int(ожидаем),
+            "min_out": минимум}
+
+
 def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     """Минимум токенов по резервам ПОСЛЕ сделки источника, x*y=k.
 
@@ -632,8 +1101,15 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
         return damm2_min_out(tpl, tx, amount_in, slippage)
     if tpl["program"] == DBC:
         return dbc_min_out(tpl, tx, amount_in, slippage)
-    if tpl["program"] in (DLMM, CLMM):
-        return {"ok": False, "why_not": "сосредоточенная ликвидность: резервы цену не дают"}
+    if tpl["program"] == CLMM:
+        # Кривая CLMM считается, но ставка комиссии живёт в amm_config:
+        # пока её не передали, денежный путь честно отказывает.
+        return clmm_min_out(tpl, tx, amount_in, slippage)
+    if tpl["program"] == DLMM:
+        # Цена корзины, а не резервы: у DLMM резервы цену действительно не
+        # дают, и раньше здесь стоял честный отказ. Теперь считается по
+        # событию свопа и шагу корзины из счёта пула.
+        return dlmm_min_out(tpl, tx, amount_in, slippage)
     if tpl["program"] == LAUNCHLAB:
         return launchlab_min_out(tx, amount_in, slippage)
     if tpl["program"] == BONDING:
@@ -891,6 +1367,272 @@ def rebuild_check(s: dict, program: str) -> dict:
 
 def self_test() -> int:
     checks = []
+    # СОСТОЯНИЕ СЛУЖБЫ САМОПРОВЕРКА НЕ ТРОГАЕТ: связанные накопители пишем в
+    # временный файл, а не в файл хоста.
+    import tempfile as _tfm  # noqa: PLC0415
+    _проб_файл = os.path.join(_tfm.mkdtemp(), "assoc.json")
+    _env_было = os.environ.get("BLOOM_ASSOC_UVA_FILE")
+    os.environ["BLOOM_ASSOC_UVA_FILE"] = _проб_файл
+    assoc_uva_забыть()
+    # --- CLMM: СОБЫТИЕ СВОПА ИЗ ЛОГОВ, сверенное с самой сделкой. Это первый
+    # шаг строителя Raydium CLMM (очередь владельца, второй номер): без события
+    # минимума выхода у сосредоточенной ликвидности не посчитать, а угадывать
+    # раскладку на деньгах нельзя.
+    try:
+        import c2_cl_quote as _CL  # noqa: PLC0415
+        обр_clmm = load_samples(CLMM)
+    except Exception:  # noqa: BLE001
+        обр_clmm = []
+    if обр_clmm:
+        нашлось = сошлось = с_налогом = 0
+        for x in обр_clmm:
+            tx_ = x.get("tx") or {}
+            пул_ = None
+            for ix in all_instructions(tx_):
+                if (ix.get("programId") == CLMM
+                        and x.get("pool_vault") in (ix.get("accounts") or [])):
+                    сч = ix["accounts"]
+                    if len(сч) > _CL.СМ_ПУЛ_В_ИНСТРУКЦИИ_CLMM:
+                        пул_ = сч[_CL.СМ_ПУЛ_В_ИНСТРУКЦИИ_CLMM]
+                    break
+            if not пул_:
+                continue
+            с_ = _CL.событие_пула_clmm(tx_, пул_, b58encode)
+            if not с_:
+                continue
+            нашлось += 1
+            # СВЕРКА С САМОЙ СДЕЛКОЙ: одна из двух сумм события обязана совпасть
+            # с движением хранилища пула по цепи. Не совпало -- раскладка не та.
+            строки_ = {r["account"]: r for r in C.token_rows(tx_).values()}
+            r_ = строки_.get(x.get("pool_vault"))
+            if not r_:
+                continue
+            # post/pre у token_rows -- СЫРЫЕ числа: умножать их на знаки ещё раз
+            # значит сравнивать событие с числом в миллион раз больше.
+            дельта = abs(int(r_["post"]) - int(r_["pre"]))
+            # НАЛОГ ПЕРЕВОДА (Token-2022) событие называет отдельно, а хранилище
+            # видит сумму ПОСЛЕ него: поэтому сходиться может и amount, и
+            # amount ± налог. Считаем и то, сколько сошлось только с налогом --
+            # это число говорит, что поле налога прочитано верно.
+            свои = {с_["amount_0"], с_["amount_1"],
+                    с_["amount_0"] - с_["fee_0"], с_["amount_0"] + с_["fee_0"],
+                    с_["amount_1"] - с_["fee_1"], с_["amount_1"] + с_["fee_1"]}
+            если_сошлось = дельта in свои
+            сошлось += int(если_сошлось)
+            if если_сошлось and дельта not in (с_["amount_0"], с_["amount_1"]):
+                с_налогом += 1
+        checks.append((f"CLMM: событие свопа найдено у {нашлось} из {len(обр_clmm)} "
+                       f"образцов, и у {сошлось} из {нашлось} сумма события сошлась "
+                       f"с движением хранилища пула по цепи (из них {с_налогом} -- "
+                       f"только с учётом налога перевода из того же события)",
+                       нашлось >= 4 and сошлось >= нашлось - 1))
+        for x in обр_clmm[:1]:
+            tx_ = x.get("tx") or {}
+            тела_ = _CL.тела_событий_clmm(tx_)
+            if тела_:
+                с1 = _CL.событие_clmm(тела_[0])
+                checks.append((f"CLMM: у события есть ликвидность ({с1['ликвидность']}) "
+                               f"и цена после сделки ({с1['цена_после']}) -- решать L "
+                               f"из входа и выхода, как у DAMM v2, не нужно",
+                               с1["ликвидность"] > 0 and с1["цена_после"] > 0))
+
+        # --- ТИК CLMM: номер тика из события против номера, посчитанного из
+        # цены того же события. Это проверка тик-математики на ЦЕПИ, а не на
+        # придуманных числах: своих констант из чужого кода здесь нет.
+        сошлось_тик = всего_тик = 0
+        for x in обр_clmm:
+            tx_ = x.get("tx") or {}
+            for т_ in _CL.тела_событий_clmm(tx_):
+                с_ = _CL.событие_clmm(т_)
+                if с_["цена_после"] <= 0:
+                    continue
+                всего_тик += 1
+                сошлось_тик += int(_CL.цена_по_тику(с_["тик"]) <= с_["цена_после"]
+                                   < _CL.цена_по_тику(с_["тик"] + 1)
+                                   and _CL.тик_по_цене(с_["цена_после"]) == с_["тик"])
+        checks.append((f"CLMM: номер тика из цены сошёлся с номером из события у "
+                       f"{сошлось_тик} из {всего_тик} событий",
+                       всего_тик >= 30 and сошлось_тик == всего_тик))
+
+        # --- МИНИМУМ ВЫХОДА CLMM. Ставка комиссии пула ПРОЧИТАНА ИЗ ЦЕПИ:
+        # файл data/clmm_konfigi.json -- это счета amm_config всех конфигов
+        # наших образцов, снятые прогоном deploy/checks/nogi_vse_kotirovki.py
+        # (getMultipleAccounts, только чтение). Раскладка счёта подтверждена, а
+        # не заявлена: у четырёх конфигов ставка была независимо решена по живым
+        # сделкам (1000, 2500, 10000, 40000 миллионных) и прочитанный
+        # trade_fee_rate совпал с решённым числом у всех четырёх, а ещё у трёх
+        # (500, 2000, 1500) совпала ставка отдельных сделок. Шаг тика вышел
+        # согласованным с уровнем комиссии (0.05 % -- 1, 0.1..0.2 % -- 10,
+        # 0.25..0.4 % -- 60, 1..4 % -- 120), что подделать смещением нельзя.
+        ф_кон = C.DATA / "clmm_konfigi.json"
+        ставки_цепи = {}
+        if ф_кон.exists():
+            try:
+                _д = json.loads(ф_кон.read_text(encoding="utf-8"))["конфиги"]
+                ставки_цепи = {а: (з.get("разбор") or {}) for а, з in _д.items()
+                               if (з.get("разбор") or {}).get("ставка_1e6")}
+            except Exception as exc:  # noqa: BLE001
+                checks.append((f"файл счетов amm_config не читается: "
+                                f"{type(exc).__name__}", False))
+        checks.append((f"CLMM: ставок комиссии, прочитанных из цепи: "
+                       f"{len(ставки_цепи)} ({sorted(з['ставка_1e6'] for з in ставки_цепи.values())} "
+                       f"миллионных, шаги тика "
+                       f"{sorted({з['шаг_тика'] for з in ставки_цепи.values()})})",
+                       len(ставки_цепи) >= 4))
+        сошлось_ = отказ_границы_ = прочий_отказ_ = отказ_края_ = 0
+        худшее_ = 0.0
+        двигаем_ = []
+        пара_для_кривой = None
+        for x in обр_clmm:
+            tx_ = x.get("tx") or {}
+            tpl_ = extract_template(tx_, CLMM, x.get("pool_vault"))
+            if not tpl_.get("ok") or len(tpl_["accounts"]) < 3:
+                continue
+            к_ = ставки_цепи.get(tpl_["accounts"][1])
+            if not к_:
+                continue
+            р = clmm_min_out(tpl_, tx_, 10_000_000, 0.02,
+                             ставка_1e6=к_["ставка_1e6"], шаг_тика=к_["шаг_тика"])
+            if р.get("ok"):
+                сошлось_ += 1
+                худшее_ = max(худшее_, р["model_error"])
+                двигаем_.append((р["ticks_we_move"], р["ticks_to_array_edge"]))
+                if пара_для_кривой is None:
+                    м2 = clmm_min_out(tpl_, tx_, 20_000_000, 0.02,
+                                      ставка_1e6=к_["ставка_1e6"])
+                    if м2.get("ok"):
+                        пара_для_кривой = (р, м2, tpl_, tx_, к_["ставка_1e6"])
+            elif "перешла границу диапазона" in (р.get("why_not") or ""):
+                отказ_границы_ += 1
+            elif "за край массива тиков" in (р.get("why_not") or ""):
+                отказ_края_ += 1
+            else:
+                прочий_отказ_ += 1
+        if ставки_цепи:
+            checks.append((f"CLMM: минимум выхода посчитан у {сошлось_} живых сделок "
+                           f"по ставке ИЗ ЦЕПИ (наибольшее расхождение модели "
+                           f"{худшее_:.2e}), отказ «перешла границу диапазона» у "
+                           f"{отказ_границы_}, отказ «за край массива тиков» у "
+                           f"{отказ_края_}, прочих отказов {прочий_отказ_}",
+                           сошлось_ >= 15 and прочий_отказ_ == 0
+                           and худшее_ < float(_CL.ПРЕДЕЛ_РАСХОЖДЕНИЯ_CLMM)))
+            # НАШ РАЗМЕР ЦЕНУ ПОЧТИ НЕ ДВИГАЕТ -- значит риск тик-массивов у
+            # сделки 0.01 SOL не теоретический, а измеренный: если бы наша
+            # покупка перескакивала границу массива, её нужного массива могло
+            # не быть в счетах источника, и сделка бы не села.
+            if двигаем_:
+                нули = [т_ for т_, _ in двигаем_ if т_ == 0]
+                края = [к for _, к in двигаем_ if к is not None]
+                checks.append((f"CLMM: наш вход 0.01 SOL двигает цену на 0 тиков у "
+                               f"{len(нули)} из {len(двигаем_)} сделок, больше всего "
+                               f"{max(т_ or 0 for т_, _ in двигаем_)} тиков, и ни одна "
+                               f"принятая покупка не выходит за край массива "
+                               f"(наименьший запас {min(края) if края else None}, "
+                               f"отказов по краю {отказ_края_})",
+                               bool(края) and min(края) >= 0 and отказ_края_ >= 1))
+        if пара_для_кривой:
+            м1, м2, tpl_, tx_, ст_ = пара_для_кривой
+            checks.append((f"CLMM: вдвое больший вход даёт больший выход "
+                           f"({м1['expected_out']} -> {м2['expected_out']}), "
+                           f"минимум ниже ожидания на проскальзывание "
+                           f"({м1['min_out']} < {м1['expected_out']})",
+                           м2["expected_out"] > м1["expected_out"]
+                           and м1["min_out"] < м1["expected_out"]
+                           and м1["min_out"] >= int(м1["expected_out"] * 0.97)))
+            checks.append((f"CLMM: без ставки комиссии -- отказ, а не догадка: "
+                           f"{clmm_min_out(tpl_, tx_, 10_000_000, 0.02).get('why_not')}",
+                           clmm_min_out(tpl_, tx_, 10_000_000, 0.02).get("ok")
+                           is False))
+            checks.append((f"CLMM: нелепая ставка комиссии -- отказ: "
+                           f"{clmm_min_out(tpl_, tx_, 10_000_000, 0.02, ставка_1e6=900_000).get('why_not')}",
+                           clmm_min_out(tpl_, tx_, 10_000_000, 0.02,
+                                        ставка_1e6=900_000).get("ok") is False))
+        # Раскладка amm_config: разбор обязан отвергать мусор.
+        checks.append(("CLMM: разбор amm_config отвергает пустой счёт и короткий",
+                       _CL.конфиг_clmm(bytes(57)) == {}
+                       and _CL.конфиг_clmm(b"\x00" * 10) == {}))
+        # КЭШ СТАВОК: горячий путь смотрит в словарь, а незнакомый конфиг
+        # кладёт заданием фону -- и отказывает, а не покупает по догадке.
+        СТАВКИ_CLMM.clear()
+        НУЖНЫ_КОНФИГИ_CLMM.clear()
+        взято_ = загрузить_ставки_clmm()
+        checks.append((f"CLMM: ставок в кэш из файла загружено {взято_}",
+                       взято_ >= 4))
+        если_кэш = None
+        for x in обр_clmm:
+            tx_ = x.get("tx") or {}
+            tpl_ = extract_template(tx_, CLMM, x.get("pool_vault"))
+            if not tpl_.get("ok") or len(tpl_["accounts"]) < 3:
+                continue
+            if tpl_["accounts"][1] in СТАВКИ_CLMM:
+                если_кэш = (tpl_, tx_, tpl_["accounts"][1])
+                break
+        if если_кэш:
+            tpl_, tx_, конфиг_ = если_кэш
+            без_ = clmm_min_out(tpl_, tx_, 10_000_000, 0.02)
+            ст_ = СТАВКИ_CLMM.pop(конфиг_)
+            после_ = clmm_min_out(tpl_, tx_, 10_000_000, 0.02)
+            checks.append((f"CLMM: со ставкой в кэше минимум считается "
+                           f"({без_.get('ok')}, ставка {без_.get('fee_rate_1e6')}), "
+                           f"без неё -- отказ ({после_.get('why_not')})",
+                           без_.get("ok") is True
+                           and без_.get("fee_rate_1e6") == ст_["ставка_1e6"]
+                           and после_.get("ok") is False))
+            checks.append((f"CLMM: незнакомый конфиг попал заданием фону: "
+                           f"{конфиг_ in НУЖНЫ_КОНФИГИ_CLMM}",
+                           конфиг_ in НУЖНЫ_КОНФИГИ_CLMM))
+            СТАВКИ_CLMM[конфиг_] = ст_
+            НУЖНЫ_КОНФИГИ_CLMM.discard(конфиг_)
+        _д2 = bytearray(60)
+        _д2[47:51] = (2500).to_bytes(4, "little")
+        _д2[51:53] = (60).to_bytes(2, "little")
+        checks.append((f"CLMM: разбор amm_config даёт ставку и шаг тика "
+                       f"{_CL.конфиг_clmm(bytes(_д2))}",
+                       _CL.конфиг_clmm(bytes(_д2)).get("ставка_1e6") == 2500
+                       and _CL.конфиг_clmm(bytes(_д2)).get("шаг_тика") == 60))
+
+    # --- ПРОДАЖА PUMP AMM: раскладка выведена по НАШЕЙ СОБСТВЕННОЙ продаже.
+    # Файл образцов собирает прогон deploy/checks/nogi_vse_kotirovki.py по
+    # подписям наших продаж: внутри транзакции Jupiter лежит настоящая
+    # инструкция пула, и именно её раскладку мы обязаны воспроизвести.
+    ф_прод = C.DATA / "obrazcy_vidov_instrukciy.json"
+    if ф_прод.exists():
+        try:
+            обр_прод = json.loads(ф_прод.read_text(encoding="utf-8"))["obrazcy"]
+        except Exception as exc:  # noqa: BLE001
+            обр_прод = {}
+            checks.append((f"файл образцов видов инструкций не читается: "
+                            f"{type(exc).__name__}", False))
+        продажи = [x for x in обр_прод.values()
+                   if x.get("program") == PUMP_AMM and x.get("disc") == disc("sell").hex()]
+        checks.append((f"настоящих продаж Pump AMM в образцах: {len(продажи)}",
+                       len(продажи) >= 1))
+        for з in продажи:
+            tpl = extract_template(з["tx"], PUMP_AMM, з["accounts"][7], продажа=True)
+            checks.append((f"продажа Pump AMM разбирается как шаблон: {tpl.get('ok')} "
+                           f"({tpl.get('ix')}, счетов {len(tpl.get('accounts') or [])})",
+                           bool(tpl.get("ok")) and tpl.get("ix") == "sell"))
+            if not tpl.get("ok"):
+                continue
+            mv = mints_and_vaults(tpl, з["tx"])
+            checks.append((f"у продажи роли на своих местах: база {str(mv.get('base_mint'))[:6]}, "
+                           f"котировка {str(mv.get('quote_mint'))[:6]}, хранилища "
+                           f"{str(mv.get('base_vault'))[:6]} / {str(mv.get('quote_vault'))[:6]}",
+                           mv.get("quote_mint") == C.WSOL
+                           and mv.get("base_mint") not in (None, C.WSOL)
+                           and mv.get("base_vault") == з["accounts"][7]
+                           and mv.get("quote_vault") == з["accounts"][8]))
+            checks.append((f"аргументы продажи: отдаём {tpl['arg0']} сырых токена, "
+                           f"минимум котировки {tpl['arg1']}",
+                           isinstance(tpl["arg0"], int) and tpl["arg0"] > 0))
+            как_покупка = extract_template(з["tx"], PUMP_AMM, з["accounts"][7])
+            checks.append(("та же транзакция как ПОКУПКА не разбирается (инструкции "
+                           "не путаются): " + str(как_покупка.get("why_not"))[:60],
+                           как_покупка.get("ok") is False))
+    else:
+        checks.append(("файла образцов видов инструкций нет -- продажу Pump AMM "
+                        "проверять нечем (соберётся прогоном по подписям продаж)",
+                        True))
     for program, spec in SPECS.items():
         sm = load_samples(program)
         res = [rebuild_check(s, program) for s in sm]
@@ -917,6 +1659,14 @@ def self_test() -> int:
             if not tpl["ok"]:
                 continue
             kp = Keypair()
+            # У 27-счётной кривой место 21 -- связанный накопитель, и для
+            # случайного кошелька его знать неоткуда: для проверки СБОРКИ
+            # кладём в временное состояние ключ из шаблона. Отказ при
+            # неизвестном ключе проверяется отдельно, ниже.
+            ас_ = spec_of(tpl).get("assoc_uva")
+            if ас_:
+                assoc_uva_запомнить(str(kp.pubkey()), tpl["accounts"][ас_[1]],
+                                     tpl["accounts"][ас_[0]], путь=_проб_файл)
             b = build_buy(tpl, s["tx"], user=str(kp.pubkey()), payer=s["source"] or str(kp.pubkey()), amount_in=10_000_000,
                           min_out=1, cu_price_micro=100_000, tip=None)
             n += 1
@@ -969,6 +1719,64 @@ def self_test() -> int:
                    len(ll) >= 10 and max(ll) < 1e-6))
     checks.append((f"формула x*y=k с калибровкой воспроизводит сделку источника ({len(errs)} сделок, "
                    f"макс. отклонение {max(errs) if errs else None})", errs and max(errs) < 1e-9))
+    # ---- MEТEORA DLMM: цена корзины (строитель N4). Проверяется ДЕНЕЖНОЕ:
+    # минимум считается, он НЕ оптимистичнее сделки источника (наша цена не
+    # лучше его средней, потому что мы идём следом), без шага корзины отказ,
+    # при неверном шаге отказ, и событие обязано сходиться с хранилищами.
+    взято_dlmm = загрузить_ступени_dlmm()
+    dl_ок = dl_хуже = 0
+    dl_отказы = []
+    for s in load_samples(DLMM):
+        t_ = extract_template(s["tx"], DLMM, s["pool_vault"])
+        if not t_.get("ok"):
+            continue
+        р = min_out_from_reserves(t_, s["tx"], 10_000_000, 0.35)
+        if not р.get("ok"):
+            dl_отказы.append(р.get("why_not"))
+            continue
+        dl_ок += 1
+        # Наша цена -- цена КОНЕЧНОЙ корзины, то есть не лучше средней цены
+        # источника: иначе минимум был бы выше настоящего.
+        средняя = (р["source_in"] * (1 - р["fee_share"])) / р["source_out"]
+        if р["bin_price"] >= средняя * 0.999999:
+            dl_хуже += 1
+    checks.append((f"DLMM: минимум выхода посчитан по {dl_ок} живым сделкам "
+                   f"(шагов корзин из файла {взято_dlmm}), отказов "
+                   f"{len(dl_отказы)} {sorted(set(dl_отказы))[:2]}",
+                   dl_ок >= 8 and взято_dlmm >= 8))
+    checks.append((f"DLMM: наша цена не оптимистичнее средней цены источника "
+                   f"({dl_хуже} из {dl_ок})", dl_ок and dl_хуже == dl_ок))
+    обр_dl = load_samples(DLMM)
+    if обр_dl:
+        s0 = обр_dl[0]
+        t0 = extract_template(s0["tx"], DLMM, s0["pool_vault"])
+        пул0 = t0["accounts"][0]
+        был = СТУПЕНИ_DLMM.pop(пул0, None)
+        НУЖНЫ_ПУЛЫ_DLMM.discard(пул0)
+        без_шага = min_out_from_reserves(t0, s0["tx"], 10_000_000, 0.35)
+        checks.append((f"DLMM без прочитанного шага корзины -- отказ: "
+                       f"{str(без_шага.get('why_not'))[:60]}",
+                       без_шага.get("ok") is False
+                       and пул0 in НУЖНЫ_ПУЛЫ_DLMM))
+        if был is not None:
+            СТУПЕНИ_DLMM[пул0] = был
+        НУЖНЫ_ПУЛЫ_DLMM.discard(пул0)
+        # НЕВЕРНЫЙ ШАГ КОРЗИНЫ модель обязана отвергнуть: средняя цена сделки
+        # источника перестаёт лежать между ценами его корзин.
+        неверный = dlmm_min_out(t0, s0["tx"], 10_000_000, 0.35, шаг_корзины=20)
+        checks.append((f"DLMM при неверном шаге корзины -- отказ: "
+                       f"{str(неверный.get('why_not'))[:60]}",
+                       неверный.get("ok") is False))
+        # Событие без совпадения с хранилищами -- отказ (роутер прошёл пул дважды).
+        tx_чужое = json.loads(json.dumps(s0["tx"]))
+        for г in ((tx_чужое.get("meta") or {}).get("innerInstructions") or []):
+            г["instructions"] = [их for их in (г.get("instructions") or [])
+                                 if событие_dlmm(b58decode(их.get("data") or ""))
+                                 is None]
+        нет_события = min_out_from_reserves(t0, tx_чужое, 10_000_000, 0.35)
+        checks.append((f"DLMM без события по нашему пулу -- отказ: "
+                       f"{str(нет_события.get('why_not'))[:60]}",
+                       нет_события.get("ok") is False))
     # ---- кривая pump.fun: только денежный путь (цена, минимум, предел траты)
     pf_n = pf_exact = 0
     pf_откл = []
@@ -1015,6 +1823,13 @@ def self_test() -> int:
             continue
         kp = Keypair()
         me = str(kp.pubkey())
+        # 27-счётная разновидность: связанный накопитель случайного кошелька
+        # знать неоткуда, для проверки СБОРКИ кладём ключ из шаблона в
+        # временное состояние (отказ при неизвестном ключе проверяется отдельно).
+        ас_п = spec_of(tpl).get("assoc_uva")
+        if ас_п:
+            assoc_uva_запомнить(me, tpl["accounts"][ас_п[1]],
+                                 tpl["accounts"][ас_п[0]], путь=_проб_файл)
         # Порядок аргументов -- по разновидности: "точный выход" это
         # (минимум токенов, предел траты), "точный вход" -- (трата, минимум).
         ожид = ((mo["min_out"], 10_000_000) if tpl.get("exact_out")
@@ -1191,6 +2006,65 @@ def self_test() -> int:
     checks.append((f"DBC: комиссия кривой 2 % (с округлением вверх) у обеих живых сделок "
                    f"({sum(dbc_ком)} из {len(dbc_ком)})",
                    len(dbc_ком) >= 2 and all(dbc_ком)))
+    # --- СВЯЗАННЫЙ НАКОПИТЕЛЬ 27-счётной кривой (28.09: семь сгоревших покупок).
+    # Проверяем три вещи: ключ из ошибки программы читается; при известном ключе
+    # он встаёт РОВНО на место 21; при неизвестной котировке сборка отказывает.
+    логи_обр = [
+        "Program log: Instruction: BuyExactQuoteInV2",
+        "Program log: AnchorError caused by account: associated_user_volume_accumulator."
+        " Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds"
+        " constraint was violated.",
+        "Program log: Left:",
+        "Program log: 6HX8mmdYYYZ79YMETXcLUydFq9Eef1Dy8SyRZx9Zu2Mh",
+        "Program log: Right:",
+        "Program log: FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2",
+    ]
+    checks.append(("кривая V2: ожидаемый накопитель читается из ошибки программы",
+                   assoc_uva_из_логов(логи_обр)
+                   == "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2"))
+    checks.append(("кривая V2: чужая ошибка ConstraintSeeds ключа не даёт",
+                   assoc_uva_из_логов([
+                       "Program log: AnchorError caused by account: creator_vault."
+                       " Error Code: ConstraintSeeds. Error Number: 2006.",
+                       "Program log: Left:", "Program log: 11111111111111111111111111111111",
+                       "Program log: Right:", "Program log: So11111111111111111111111111111111111111112",
+                   ]) is None))
+    # Шаблон 27 счетов: только места, которые нужны подстановке, реальные.
+    _наш = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+    _минт = "7ncdD1BiWSPG6U1SqtuopyLeRdyNSBwt4x18xnL69XMR"
+    _wsol = "So11111111111111111111111111111111111111112"
+    _счета = [SYSTEM] * 27
+    _счета[1], _счета[2] = _минт, _wsol
+    _счета[3], _счета[4] = TOKEN_PROGRAM, TOKEN_PROGRAM
+    _шаблон = {"program": BONDING, "ix": "c2ab1c46684d5b2f", "accounts": _счета,
+                "data": b"\x00" * 25, "writable": {}, "arg0": 1, "arg1": 1}
+    _файл = os.path.join(os.path.dirname(_проб_файл), "assoc_proba.json")
+    os.environ["BLOOM_ASSOC_UVA_FILE"] = _файл
+    assoc_uva_забыть()
+    checks.append(("кривая V2: без известного ключа сборка ОТКАЗЫВАЕТ "
+                   "(комиссия не горит)",
+                   user_accounts(_шаблон, {}, _наш) == {}))
+    assoc_uva_запомнить(_наш, _wsol, "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2",
+                         путь=_файл)
+    _роли = user_accounts(_шаблон, {}, _наш)
+    checks.append(("кривая V2: известный ключ встаёт на место 21, а место 20 "
+                   "остаётся нашим PDA",
+                   _роли.get(21) == "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2"
+                   and _роли.get(20) == pda([b"user_volume_accumulator", "USER"],
+                                             _наш, BONDING)
+                   and _роли.get(13) == _наш))
+    checks.append(("кривая V2: у другой котировки своего ключа нет -- отказ",
+                   (lambda: (
+                       _счета.__setitem__(2, "XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN"),
+                       user_accounts(dict(_шаблон, accounts=list(_счета)), {}, _наш) == {},
+                   )[1])()))
+    _счета[2] = _wsol
+    if _env_было is None:
+        os.environ.pop("BLOOM_ASSOC_UVA_FILE", None)
+    else:
+        os.environ["BLOOM_ASSOC_UVA_FILE"] = _env_было
+    assoc_uva_забыть()
+
     bad_n = 0
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
