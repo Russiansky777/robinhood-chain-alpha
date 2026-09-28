@@ -283,6 +283,16 @@ SG_ГРУППА_ПРИ_СБОЕ = "off"
 # которые DBot берёт на S+2 и на которых сегодня сделал x5 (пример --
 # Omakase 17:44:03Z, 8.211 SOL-экв., отстал на 5 слотов).
 МАКС_ОТСТАВАНИЕ_СЛОТОВ = ST.env_int("BLOOM_STALE_SLOTS", 10)
+
+
+def _предел_cu_покупки() -> int | None:
+    """Предел CU покупки полосы -- из модуля отправки, без него None."""
+    try:
+        import bloom_own_send as _OS  # noqa: PLC0415
+        return int(_OS.ПРЕДЕЛ_CU_ПОКУПКИ)
+    except Exception:  # noqa: BLE001
+        return None
+
 КУРС_TTL_S = ST.env_float("BLOOM_RATE_TTL_S", 60.0)
 
 # Тестовый источник -- кошелёк владельца для контролируемого стенда.
@@ -2465,6 +2475,13 @@ class Детектор:
                "test_source": TEST_SOURCE or None,
                "test_min_sol": TEST_MIN_SOL if TEST_SOURCES else None,
                "max_tx_version": ПОТОЛОК_ВЕРСИИ_TX,
+               # ПРЕДЕЛЫ ДЕНЕЖНОГО ПУТИ -- В ПРИЗНАК ЖИЗНИ. Оба задаются
+               # окружением и оба меняют деньги: отставание сигнала решает,
+               # берём ли мы сделку, предел CU -- сколько платим за приоритет.
+               # По отчётам их не было видно вовсе, то есть подмену в env
+               # никто бы не заметил.
+               "stale_slots": МАКС_ОТСТАВАНИЕ_СЛОТОВ,
+               "lane_cu_limit": _предел_cu_покупки(),
                "rate_source": self.курс.источник,
                "rate_usd_sol": self.курс.значение,
                "rate_fresh": self.курс.свежий(),
