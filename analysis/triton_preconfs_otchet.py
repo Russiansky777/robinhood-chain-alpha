@@ -275,8 +275,28 @@ def отчёт(*, журналы: list, каталог_решений: str, сн
         else:
             без_преконфа.append(п)
 
+    # РАЗРЕЗ ПО ФИДАМ. Спрос владельца: сколько совпавших транзакций у BAM и
+    # Harmonic ОТДЕЛЬНО и опережение по каждому -- общая медиана смешала бы два
+    # разных пути доставки.
+    по_фидам: dict = {}
+    for п in с_преконфом:
+        ф = (преконфы.get(п) or {}).get("feed") or "?"
+        гр = по_фидам.setdefault(ф, {"n": 0, "operezhenie_ms": []})
+        гр["n"] += 1
+        гр["operezhenie_ms"].append(
+            round((float(покупки[п]["t_recv"])
+                    - float(преконфы[п]["t_recv"])) * 1000.0, 2))
+    свод_по_фидам = {}
+    for ф, гр in sorted(по_фидам.items()):
+        ряд = гр["operezhenie_ms"]
+        свод_по_фидам[ф] = {
+            "sovpalo": гр["n"], "p50_ms": _медиана(ряд), "p90_ms": _p90(ряд),
+            "dolya_prekonf_ranshe": (round(len([м for м in ряд if м > 0])
+                                            / len(ряд), 4) if ряд else None)}
+
     из_: dict = {
         "okno": {"s": с_ts, "po": по_ts},
+        "po_fidam": свод_по_фидам,
         "a_pokupki_istochnikov": {
             "vsego": len(покупки),
             "strok_v_zhurnale": пок["rows"],
@@ -575,6 +595,20 @@ def main() -> int:
                                         int(з.get("harmonic_slots") or 0))
         расход["harmonic_seconds"] = max(float(расход["harmonic_seconds"]),
                                           float(з.get("harmonic_seconds") or 0.0))
+        расход["harmonic_billable_slots"] = max(
+            int(расход.get("harmonic_billable_slots") or 0),
+            int(з.get("harmonic_billable_slots") or 0))
+    if расход:
+        # ЦЕНЫ ИЗ ПАНЕЛИ (скрин владельца 25.09): BAM $50 за 1 млн сообщений,
+        # Harmonic $1 500 за 1 млн ОПЛАЧИВАЕМЫХ слотов. Рамки слотов не
+        # оплачиваются -- поэтому цена считается по billable, а рамки лежат
+        # рядом числом.
+        расход["cena_soobshcheniya_usd"] = 50.0 / 1_000_000
+        расход["cena_slota_usd"] = 1_500.0 / 1_000_000
+        расход["usd_po_paneli"] = round(
+            int(расход.get("bam_messages") or 0) * 50.0 / 1_000_000
+            + int(расход.get("harmonic_billable_slots") or 0) * 1_500.0 / 1_000_000,
+            4)
     журналы = [ж.strip() for ж in (а.zhurnaly or "").split(",") if ж.strip()]
     if а.lidery_fida:
         пре = преконфы_из_журнала(журналы)["preconfs"]
