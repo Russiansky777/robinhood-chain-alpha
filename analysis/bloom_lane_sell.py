@@ -280,13 +280,78 @@ def симулировать(tx_base64: str, *, урл: str) -> dict:
              "why_not": (None if зн.get("err") is None else str(зн.get("err"))[:200])}
 
 
+def открытая_позиция_полосы(state_dir: str, *, программа: str = SB.PUMP_AMM) -> dict:
+    """Открытая позиция полосы этого типа пула: её покупка и количество.
+
+    ЗАЧЕМ ЖДАТЬ ЖИВУЮ ПОЗИЦИЮ. Симулировать продажу закрытой позиции
+    бессмысленно: токенов на счёте нет, и узел ответит про деньги, а не про
+    раскладку счетов. Держание полосы -- около 29 секунд, поэтому прогон ждёт
+    открытую позицию на хосте и собирает продажу в её окне.
+    """
+    import glob as _gl  # noqa: PLC0415
+    import gzip as _gz  # noqa: PLC0415
+    import json as _js  # noqa: PLC0415
+
+    по_cid: dict = {}
+    for путь in sorted(_gl.glob(str(Path(state_dir) / "positions.jsonl*"))):
+        открыть = _gz.open if путь.endswith(".gz") else open
+        try:
+            ф = открыть(путь, "rt", encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            continue
+        with ф:
+            for строка in ф:
+                строка = строка.strip()
+                if not строка:
+                    continue
+                try:
+                    з = _js.loads(строка)
+                except ValueError:
+                    continue
+                cid = з.get("client_order_id")
+                if not cid:
+                    continue
+                в = по_cid.setdefault(cid, {})
+                for к, зн in з.items():
+                    if зн is not None:
+                        в[к] = зн
+    для_нас = []
+    for cid, п in по_cid.items():
+        if not п.get("lane"):
+            continue
+        if str(п.get("state") or "").lower() not in ("open", "selling"):
+            continue
+        if программа and п.get("pool_program") not in (None, программа):
+            continue
+        подпись = п.get("lane_landed_signature") or п.get("lane_signature")
+        if not подпись:
+            continue
+        для_нас.append({"cid": cid, "подпись": подпись,
+                         "минт": п.get("mint"),
+                         "куплено": п.get("lane_bought_raw"),
+                         "группа": п.get("lane_group"),
+                         "программа": п.get("pool_program"),
+                         "ts": п.get("ts_sent") or п.get("ts_intent") or 0})
+    для_нас.sort(key=lambda з: -float(з["ts"] or 0))
+    if not для_нас:
+        return {"ok": False, "why_not": "открытых позиций полосы этого типа нет"}
+    return {"ok": True, "позиция": для_нас[0], "открытых": len(для_нас),
+             "why_not": None}
+
+
 def main() -> int:
     import argparse  # noqa: PLC0415
     import json as _js  # noqa: PLC0415
 
     р = argparse.ArgumentParser(description=__doc__)
-    р.add_argument("--podpis", required=True,
+    р.add_argument("--podpis", default="",
                     help="подпись НАШЕЙ севшей покупки того же пула")
+    р.add_argument("--zhdat-s", dest="zhdat_s", type=float, default=0.0,
+                    help=("ждать ОТКРЫТУЮ позицию полосы столько секунд и взять "
+                          "её покупку: у закрытой позиции токенов нет, и узел "
+                          "ответит про деньги, а не про раскладку счетов"))
+    р.add_argument("--state-dir", dest="state_dir",
+                    default="/home/bot/bloom_executor_live_data")
     р.add_argument("--koshelek", default=os.environ.get("BLOOM_LANE_WALLET") or "")
     р.add_argument("--kolichestvo", type=int, default=0,
                     help="сколько базы продать (пусто -- весь остаток x доля)")
@@ -310,11 +375,34 @@ def main() -> int:
     if not кош:
         print("СБОЙ: кошелёк полосы не задан (BLOOM_LANE_WALLET)")
         return 1
+    подпись = а.podpis
+    ждал = None
+    if а.zhdat_s and а.zhdat_s > 0:
+        import time as _t  # noqa: PLC0415
+
+        до = _t.monotonic() + float(а.zhdat_s)
+        while _t.monotonic() < до:
+            п_ = открытая_позиция_полосы(а.state_dir)
+            if п_["ok"]:
+                подпись = п_["позиция"]["подпись"]
+                ждал = п_["позиция"]
+                break
+            _t.sleep(0.5)
+        if ждал is None:
+            print(_js.dumps({"ok": False,
+                              "why_not": (f"за {а.zhdat_s} с открытой позиции "
+                                           "полосы Pump AMM не появилось")},
+                             ensure_ascii=False))
+            return 1
+    if not подпись:
+        print("СБОЙ: нужна подпись покупки (--podpis) или ожидание (--zhdat-s)")
+        return 1
     сб = собрать_по_нашей_покупке(
-        подпись=а.podpis, урл=урл, наш_кошелёк=кош,
+        подпись=подпись, урл=урл, наш_кошелёк=кош,
         количество=(а.kolichestvo or None), доля=а.dolya, запас=а.zapas,
         cu_units=а.cu, cu_price_micro=а.cena_cu)
     итог = {к: зн for к, зн in сб.items() if к != "tx_base64"}
+    итог["ждал_позицию"] = ждал
     if сб.get("ok") and а.simulirovat == "yes":
         итог["симуляция"] = симулировать(сб["tx_base64"], урл=урл)
     текст = _js.dumps(итог, ensure_ascii=False, indent=1)
@@ -424,6 +512,40 @@ def self_test() -> int:
     chk("котировка не WSOL -- закрытия счёта нет",
         сб2["ok"] and сб2["закрыт_счёт_wsol"] is None
         and сб2["n_instructions"] == 2, сб2)
+    # ВЫБОР ЖИВОЙ ПОЗИЦИИ: закрытая не годится, берётся самая свежая открытая.
+    import json as _js2  # noqa: PLC0415
+    import tempfile as _tp  # noqa: PLC0415
+
+    with _tp.TemporaryDirectory() as д:
+        (Path(д) / "positions.jsonl").write_text("\n".join(
+            _js2.dumps(з, ensure_ascii=False) for з in [
+                {"client_order_id": "з1", "lane": "own_send", "state": "closed",
+                  "pool_program": SB.PUMP_AMM, "lane_landed_signature": "П1",
+                  "ts_sent": 100.0},
+                {"client_order_id": "з2", "lane": "own_send", "state": "open",
+                  "pool_program": SB.PUMP_AMM, "lane_landed_signature": "П2",
+                  "ts_sent": 200.0, "lane_bought_raw": 555},
+                {"client_order_id": "з3", "lane": "own_send", "state": "open",
+                  "pool_program": SB.BONDING, "lane_landed_signature": "П3",
+                  "ts_sent": 300.0},
+                {"client_order_id": "з4", "lane": None, "state": "open",
+                  "pool_program": SB.PUMP_AMM, "lane_landed_signature": "П4",
+                  "ts_sent": 400.0},
+            ]) + "\n", encoding="utf-8")
+        оп = открытая_позиция_полосы(д)
+        chk("взята открытая позиция полосы нужного типа, а не закрытая и не чужая",
+            оп["ok"] and оп["позиция"]["подпись"] == "П2"
+            and оп["позиция"]["куплено"] == 555 and оп["открытых"] == 1, оп)
+        chk("другой тип пула не берётся под Pump AMM",
+            открытая_позиция_полосы(д, программа=SB.BONDING)["позиция"]["подпись"]
+            == "П3")
+        (Path(д) / "positions.jsonl").write_text(
+            _js2.dumps({"client_order_id": "з5", "lane": "own_send",
+                         "state": "closed", "pool_program": SB.PUMP_AMM,
+                         "lane_landed_signature": "П5"}) + "\n",
+            encoding="utf-8")
+        chk("нет открытых -- отказ словами, а не пустая сборка",
+            открытая_позиция_полосы(д)["ok"] is False)
     print(f"самопроверка своей продажи: {пройдено}/{пройдено + провалено} пройдено")
     return 1 if провалено else 0
 

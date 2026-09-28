@@ -13,8 +13,13 @@ on:
   workflow_dispatch:
     inputs:
       podpis:
-        description: "подпись НАШЕЙ севшей покупки Pump AMM"
-        required: true
+        description: "подпись НАШЕЙ севшей покупки Pump AMM (пусто -- ждать живую позицию)"
+        required: false
+        default: ""
+      zhdat_s:
+        description: "ждать открытую позицию полосы столько секунд (0 -- не ждать)"
+        required: false
+        default: "600"
       dolya:
         description: "какую долю остатка базы продавать (1.0 -- весь)"
         required: false
@@ -46,7 +51,7 @@ env:
 jobs:
   simulyaciya:
     runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: write
     steps:
@@ -82,7 +87,9 @@ jobs:
           [ -n "${{ inputs.kolichestvo }}" ] && KOL="--kolichestvo ${{ inputs.kolichestvo }}"
           ZAP=""
           [ -n "${{ inputs.zapas }}" ] && ZAP="--zapas ${{ inputs.zapas }}"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA python3 $RABOTA/bloom_lane_sell.py --podpis '${{ inputs.podpis }}' --dolya '${{ inputs.dolya }}' $KOL $ZAP --cu '${{ inputs.cu }}' --simulirovat yes --out $RABOTA/out.json" | tail -80
+          PODP=""
+          [ -n "${{ inputs.podpis }}" ] && PODP="--podpis ${{ inputs.podpis }}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA timeout 900 python3 $RABOTA/bloom_lane_sell.py $PODP --zhdat-s '${{ inputs.zhdat_s }}' --dolya '${{ inputs.dolya }}' $KOL $ZAP --cu '${{ inputs.cu }}' --simulirovat yes --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/lane_sell_out.json || true
           if python3 -c "import json; json.load(open('/tmp/lane_sell_out.json'))" 2>/dev/null; then
             cp /tmp/lane_sell_out.json "$OUT_FILE"
