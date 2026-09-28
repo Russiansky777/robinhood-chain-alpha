@@ -80,8 +80,22 @@ def инструкция_покупки(tx: dict, *, программа: str = S
                         хранилище: str | None = None) -> dict:
     """Наша инструкция покупки в нашей же транзакции: счета и данные."""
     из_ = {"ok": False, "why_not": None}
+    ключи_сооб = [(к.get("pubkey") if isinstance(к, dict) else к)
+                   for к in ((((tx or {}).get("transaction") or {}).get("message")
+                               or {}).get("accountKeys") or [])]
+
+    def _программа(ix: dict) -> str | None:
+        """Программа инструкции при любом виде ответа узла."""
+        если = ix.get("programId")
+        if если:
+            return если
+        и_ = ix.get("programIdIndex")
+        if isinstance(и_, int) and 0 <= и_ < len(ключи_сооб):
+            return ключи_сооб[и_]
+        return None
+
     for ix in SB.all_instructions(tx):
-        if ix.get("programId") != программа:
+        if _программа(ix) != программа:
             continue
         if хранилище and хранилище not in ix["accounts"]:
             continue
@@ -229,8 +243,14 @@ def собрать_по_нашей_покупке(*, подпись: str, урл
                               cu_price_micro: int = 0) -> dict:
     """Всё вместе: покупка из цепи -> шаблон -> живые резервы -> сборка."""
     из_: dict = {"ok": False, "why_not": None, "подпись_покупки": подпись}
+    # РАЗОБРАННЫЙ ВИД ОБЯЗАТЕЛЕН. При encoding="json" у инструкций нет поля
+    # programId -- только programIdIndex, и поиск нашей инструкции по программе
+    # не находил НИЧЕГО: 28.09 за 23 продажи не запустилась ни одна симуляция
+    # своей продажи, отказ был "инструкции программы pAMMBay6 в нашей покупке
+    # нет" при том, что на цепи она есть. Версия до 1: наши покупки бывают v0.
     о = _зов("getTransaction",
-              [подпись, {"encoding": "json", "maxSupportedTransactionVersion": 0}],
+              [подпись, {"encoding": "jsonParsed",
+                          "maxSupportedTransactionVersion": 1}],
               урл=урл)
     if not о["ok"] or not о["result"]:
         из_["why_not"] = о.get("why_not") or "покупки по этой подписи в цепи нет"
@@ -525,6 +545,24 @@ def self_test() -> int:
                                    SB.disc("buy_exact_quote_in")
                                    + struct.pack("<QQ", 10_000_000, 1))}]}},
            "meta": {"innerInstructions": []}}
+    # ВИД ОТВЕТА УЗЛА. При encoding="json" у инструкции нет programId, только
+    # programIdIndex: 28.09 из-за этого своя продажа НИ РАЗУ не нашла нашу
+    # покупку за 23 продажи. Обе формы обязаны читаться одинаково.
+    tx_индексами = {"transaction": {"message": {
+            "accountKeys": list(счета),
+            "instructions": [{"programIdIndex": счета.index(SB.PUMP_AMM)
+                               if SB.PUMP_AMM in счета else 0,
+                               "accounts": list(range(26)),
+                               "data": SB.b58encode(
+                                   SB.disc("buy_exact_quote_in")
+                                   + struct.pack("<QQ", 10_000_000, 1))}]}},
+            "meta": {"innerInstructions": []}}
+    tx_индексами["transaction"]["message"]["accountKeys"] = list(счета) + [SB.PUMP_AMM]
+    tx_индексами["transaction"]["message"]["instructions"][0]["programIdIndex"] = 26
+    tx_индексами["transaction"]["message"]["instructions"][0]["accounts"] = list(счета)
+    и_инд = инструкция_покупки(tx_индексами, хранилище=счета[7])
+    chk("инструкция покупки находится и когда узел отдал programIdIndex",
+        и_инд.get("ok") and и_инд.get("program") == SB.PUMP_AMM, и_инд)
     шб = шаблон_продажи_из_покупки(tx, хранилище=счета[7])
     chk("шаблон продажи -- 24 счёта из 26",
         шб["ok"] and len(шб["accounts"]) == 24 and шб["счетов_покупки"] == 26, шб)
