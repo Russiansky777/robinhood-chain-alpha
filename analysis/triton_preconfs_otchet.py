@@ -365,6 +365,112 @@ def _счёт(ряд: list) -> dict:
     return из_
 
 
+def лидеры_фида(преконфы: dict, карта: dict, расписание_: dict,
+                 метки: dict | None = None) -> dict:
+    """Личности лидеров слотов, по которым фид отдал ХОТЬ ЧТО-ТО.
+
+    Спрос владельца 28.09 (после закрытия Harmonic): список личностей и их доля
+    слотов эпохи по расписанию. Это НИЖНЯЯ ГРАНИЦА множества лидеров фида: слот,
+    в котором под наш фильтр ничего не подошло, остаётся неразмеченным, и так и
+    сказано числом (слотов_без_лидера).
+    """
+    всего_слотов = sum(len(р or []) for р in (расписание_ or {}).values())
+    по_фидам: dict = {}
+    без_лидера = 0
+    for _, з in (преконфы or {}).items():
+        слот = з.get("slot")
+        if слот is None:
+            continue
+        лидер = карта.get(int(слот))
+        if not лидер:
+            без_лидера += 1
+            continue
+        ф = з.get("feed") or "?"
+        гр = по_фидам.setdefault(ф, {})
+        стр = гр.setdefault(лидер, {"identity": лидер, "soobshchenij": 0,
+                                      "slotov_fida": set(),
+                                      "slotov_epohi": len((расписание_ or {}).get(лидер) or []),
+                                      "metka_po_versii": (метки or {}).get(лидер)})
+        стр["soobshchenij"] += 1
+        стр["slotov_fida"].add(int(слот))
+    из_: dict = {"slotov_v_epohe": всего_слотов,
+                  "slotov_bez_lidera": без_лидера, "po_fidam": {}}
+    for ф, гр in sorted(по_фидам.items()):
+        ряд = []
+        for лидер, стр in гр.items():
+            ряд.append({"identity": лидер,
+                         "soobshchenij": стр["soobshchenij"],
+                         "slotov_fida": len(стр["slotov_fida"]),
+                         "slotov_epohi": стр["slotov_epohi"],
+                         "dolya_epohi": (round(стр["slotov_epohi"] / всего_слотов, 6)
+                                          if всего_слотов else None),
+                         "metka_po_versii": стр["metka_po_versii"]})
+        ряд.sort(key=lambda з: -з["slotov_epohi"])
+        сумма = sum(з["slotov_epohi"] for з in ряд)
+        из_["po_fidam"][ф] = {
+            "liderov": len(ряд),
+            "slotov_epohi_u_nih": сумма,
+            "dolya_epohi_vmeste": (round(сумма / всего_слотов, 6)
+                                    if всего_слотов else None),
+            "lidery": ряд}
+    return из_
+
+
+def проверка_фильтра(*, журналы: list, адреса: list, окно_s: float = 600.0,
+                      предел: int = 30, урл_=None) -> dict:
+    """Те ли это транзакции: есть ли НАШ адрес в первых сообщениях фида.
+
+    Решение владельца 28.09: "в первые 10 минут проверить, что сообщения --
+    транзакции наших 32 адресов (доля), если нет -- остановить и доложить".
+    Берётся выборка ПЕРВЫХ сообщений окна, по каждой подписи спрашивается
+    транзакция, и адрес ищется отдельно среди ПОДПИСАНТОВ, среди остальных
+    статических ключей и среди адресов из таблиц: по документации фильтры
+    смотрят только статические ключи, и различать эти три случая -- весь смысл
+    проверки.
+    """
+    наши = {а for а in (адреса or []) if а}
+    пре = преконфы_из_журнала(журналы)["preconfs"]
+    if not пре:
+        return {"n": 0, "why_not": "в журналах зонда нет транзакций"}
+    начало = min(float(з["t_recv"]) for з in пре.values())
+    в_окне = sorted(((п, з) for п, з in пре.items()
+                      if float(з["t_recv"]) <= начало + float(окно_s)),
+                     key=lambda т: float(т[1]["t_recv"]))
+    выборка = в_окне[:max(1, int(предел))]
+    строки = []
+    for п, з in выборка:
+        к = статические_ключи(п, урл_=урл_)
+        стат = list(к.get("static") or [])
+        alt = list(к.get("alt") or [])
+        подписантов = 0
+        # Подписанты -- первые num_required_signatures статических ключей; их
+        # число берём по числу подписей транзакции, если узел его дал.
+        наш_подписант = bool(наши & set(стат[:1]))
+        строки.append({
+            "signature": п, "slot": з.get("slot"), "feed": з.get("feed"),
+            "filters": з.get("filters"),
+            "nash_platelshchik": наш_подписант,
+            "nash_v_staticheskih": bool(наши & set(стат)),
+            "nash_v_tablice": bool(наши & set(alt)),
+            "staticheskih": len(стат), "iz_tablic": len(alt),
+            "version": к.get("version"), "why_not": к.get("why_not")})
+    прочитано = [с for с in строки if с["why_not"] is None]
+    наших = [с for с in прочитано if с["nash_v_staticheskih"] or с["nash_v_tablice"]]
+    return {"n_v_okne": len(в_окне), "razobrano": len(строки),
+             "prochitano": len(прочитано),
+             "nashih": len(наших),
+             "dolya_nashih": (round(len(наших) / len(прочитано), 4)
+                               if прочитано else None),
+             "nash_platelshchik": len([с for с in прочитано
+                                        if с["nash_platelshchik"]]),
+             "tolko_v_tablice": len([с for с in прочитано
+                                      if с["nash_v_tablice"]
+                                      and not с["nash_v_staticheskih"]]),
+             "po_filtram": _счёт([",".join(с.get("filters") or []) or "без имени"
+                                   for с in строки]),
+             "okno_s": окно_s, "rows": строки, "why_not": None}
+
+
 def main() -> int:
     import argparse  # noqa: PLC0415
 
@@ -382,6 +488,16 @@ def main() -> int:
     р.add_argument("--podpisi", default="",
                     help=("только проверить эти подписи по цепи: слот, села или "
                           "нет и был ли по ней преконф в журнале зонда"))
+    р.add_argument("--lidery-fida", action="store_true",
+                    help=("только список личностей лидеров слотов, по которым "
+                          "фид отдал хоть что-то, и их доля слотов эпохи"))
+    р.add_argument("--proverka-filtra", action="store_true",
+                    help=("только проверка первых сообщений: есть ли наш адрес "
+                          "среди статических ключей (доля)"))
+    р.add_argument("--adresa-fajl", default="",
+                    help="файл с нашими адресами для проверки фильтра")
+    р.add_argument("--okno-s", type=float, default=600.0)
+    р.add_argument("--vyborka", type=int, default=30)
     р.add_argument("--out", default="")
     а = р.parse_args()
     сейчас = time.time()
@@ -434,6 +550,35 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             расход = None
     журналы = [ж.strip() for ж in (а.zhurnaly or "").split(",") if ж.strip()]
+    if а.lidery_fida:
+        пре = преконфы_из_журнала(журналы)["preconfs"]
+        первый = сн.get("firstSlot")
+        карта = (TV.карта_слотов(расп, первый)
+                 if расп and первый is not None else {})
+        итог_ = лидеры_фида(пре, карта, расп or {}, сн.get("metki") or {})
+        итог_["epoch"] = сн.get("epoch")
+        итог_["prekonfov"] = len(пре)
+        текст_ = json.dumps(итог_, ensure_ascii=False, indent=1)
+        if а.out:
+            Path(а.out).write_text(текст_, encoding="utf-8")
+        print(текст_[:8000])
+        return 0
+    if а.proverka_filtra:
+        адреса = []
+        if а.adresa_fajl:
+            адреса = [с.strip() for с
+                       in Path(а.adresa_fajl).read_text(encoding="utf-8").split()
+                       if с.strip()]
+        итог_ = проверка_фильтра(журналы=журналы, адреса=адреса,
+                                  окно_s=а.okno_s, предел=а.vyborka)
+        итог_["adresov"] = len(адреса)
+        текст_ = json.dumps(итог_, ensure_ascii=False, indent=1)
+        if а.out:
+            Path(а.out).write_text(текст_, encoding="utf-8")
+        краткое_ = {к: зн for к, зн in итог_.items() if к != "rows"}
+        краткое_["primery"] = (итог_.get("rows") or [])[:5]
+        print(json.dumps(краткое_, ensure_ascii=False, indent=1)[:5000])
+        return 0
     о = отчёт(журналы=журналы, каталог_решений=а.resheniya, снимок=сн,
                расписание_=расп, с_ts=с_ts, по_ts=сейчас,
                предел_разбора=а.predel_razbora, без_сети=а.bez_seti,
@@ -537,6 +682,23 @@ def self_test() -> int:
         chk("слот без лидера в расписании не метится",
             наблюдённые_лидеры({"X": {"slot": 77, "feed": "bam"}},
                                 {})["slots_without_leader"] == 1)
+        # ЛИДЕРЫ ФИДА: личности и доля слотов эпохи (спрос владельца 28.09).
+        лид = лидеры_фида(пре["preconfs"], TV.карта_слотов(расп, 0), расп,
+                           снимок["metki"])
+        chk("лидеры фида: у bam один лидер и его доля слотов эпохи 0.5",
+            лид["po_fidam"]["bam"]["liderov"] == 1
+            and лид["po_fidam"]["bam"]["dolya_epohi_vmeste"] == 0.5,
+            лид["po_fidam"]["bam"])
+        chk("у harmonic свой лидер, и слоты эпохи у них не смешаны",
+            лид["po_fidam"]["harmonic"]["lidery"][0]["identity"] == "Л3"
+            and лид["po_fidam"]["harmonic"]["lidery"][0]["slotov_epohi"] == 1,
+            лид["po_fidam"]["harmonic"])
+        chk("сообщений у лидера сосчитано больше, чем слотов фида",
+            лид["po_fidam"]["bam"]["lidery"][0]["soobshchenij"] == 2
+            and лид["po_fidam"]["bam"]["lidery"][0]["slotov_fida"] == 1,
+            лид["po_fidam"]["bam"]["lidery"][0])
+        chk("проверка фильтра без журналов -- причина словами, а не ноль",
+            проверка_фильтра(журналы=[], адреса=["А"])["why_not"] is not None)
         chk("ложным считается ТОЛЬКО не севшее, а севшее с ошибкой -- отдельно",
             zn_not_landed(None) and not zn_not_landed({"slot": 1})
             and zn_landed_with_err({"slot": 1, "err": "X"})

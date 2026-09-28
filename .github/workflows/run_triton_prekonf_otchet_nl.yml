@@ -23,6 +23,22 @@ on:
         description: "'yes' -- без цепи: (г) и (п.5) останутся без чисел"
         required: false
         default: "no"
+      lidery_fida:
+        description: "'yes' -- только личности лидеров слотов фида и их доля слотов эпохи"
+        required: false
+        default: "no"
+      proverka_filtra:
+        description: "'yes' -- только проверка: наши ли адреса в первых сообщениях фида"
+        required: false
+        default: "no"
+      okno_s:
+        description: "окно проверки фильтра, секунд (600 = первые 10 минут)"
+        required: false
+        default: "600"
+      vyborka:
+        description: "сколько сообщений разобрать по цепи в проверке фильтра"
+        required: false
+        default: "30"
       podpisi:
         description: "только проверить эти подписи (слот, села, преконф был/не был)"
         required: false
@@ -87,6 +103,17 @@ jobs:
           ZH=$(ssh -n $SSH_OPTS root@$TARGET_HOST "ls $ZOND_DIR/preconfs_*.jsonl 2>/dev/null | tr '\n' ',' | sed 's/,$//'")
           echo "zhurnaly zonda: $ZH"
           [ -n "$ZH" ] || { echo "SBOY: zhurnalov zonda net -- snachala run_triton_zond_24h_nl.yml"; exit 1; }
+          REZH=""
+          if [ "${{ inputs.lidery_fida }}" = "yes" ]; then
+            REZH="--lidery-fida"
+            echo "OUT_FILE=data/triton/lidery_fida.json" >> "$GITHUB_ENV"
+            OUT_FILE=data/triton/lidery_fida.json
+          fi
+          if [ "${{ inputs.proverka_filtra }}" = "yes" ]; then
+            REZH="--proverka-filtra --adresa-fajl $ZOND_DIR/accounts.txt --okno-s ${{ inputs.okno_s }} --vyborka ${{ inputs.vyborka }}"
+            echo "OUT_FILE=data/triton/proverka_filtra.json" >> "$GITHUB_ENV"
+            OUT_FILE=data/triton/proverka_filtra.json
+          fi
           PODP=""
           if [ -n "${{ inputs.podpisi }}" ]; then
             PODP="--podpisi ${{ inputs.podpisi }}"
@@ -95,7 +122,7 @@ jobs:
             echo "OUT_FILE=data/triton/podpisi_proverka.json" >> "$GITHUB_ENV"
             OUT_FILE=data/triton/podpisi_proverka.json
           fi
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR TRITON_STATE_DIR=$ZOND_DIR python3 $ZOND_DIR/triton_preconfs_otchet.py $PODP --zhurnaly '$ZH' --resheniya $STATE_DIR --katalog $ZOND_DIR --katalog-validatorov $STATE_DIR --chasov '${{ inputs.chasov }}' --predel-razbora '${{ inputs.predel_razbora }}' $BEZ --out $ZOND_DIR/otchet.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR TRITON_STATE_DIR=$ZOND_DIR python3 $ZOND_DIR/triton_preconfs_otchet.py $REZH $PODP --zhurnaly '$ZH' --resheniya $STATE_DIR --katalog $ZOND_DIR --katalog-validatorov $STATE_DIR --chasov '${{ inputs.chasov }}' --predel-razbora '${{ inputs.predel_razbora }}' $BEZ --out $ZOND_DIR/otchet.json" | tail -120
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $ZOND_DIR/otchet.json 2>/dev/null || true" > /tmp/prekonf_otchet.json || true
           if python3 -c "import json; json.load(open('/tmp/prekonf_otchet.json'))" 2>/dev/null; then
             install -d -m 755 data/triton
