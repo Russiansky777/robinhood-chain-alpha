@@ -329,6 +329,40 @@ def найти_ключи_в_данных(данные_b64: str | None, канд
     return из_
 
 
+DISC_V2 = "c2ab1c46684d5b2f"
+
+
+def образцы_v2(адрес: str, *, предел: int = 300, сколько: int = 6,
+                disc: str = DISC_V2) -> dict:
+    """УСПЕШНЫЕ покупки этой разновидности у кошелька: подписант и его места.
+
+    Нужны именно успешные: в них место 21 стоит такое, какое программа
+    принимает, и вместе с подписантом даёт пару для вывода семян.
+    """
+    о = зов("getSignaturesForAddress", [адрес, {"limit": предел}])
+    if not о["ok"]:
+        return {"ok": False, "why_not": о["why_not"], "образцы": []}
+    из_ = []
+    for зап in о["result"] or []:
+        if len(из_) >= сколько:
+            break
+        if зап.get("err"):
+            continue
+        подпись = зап.get("signature")
+        if not подпись:
+            continue
+        р = разбор(подпись, кошелёк=адрес)
+        if not р.get("ok") or р.get("disc") != disc or р.get("ошибка"):
+            continue
+        места = {м["место"]: м["ключ"] for м in р["места"]}
+        из_.append({"подпись": подпись, "слот": р["слот"],
+                     "подписант": р["подписант"], "счетов": р["счетов"],
+                     "место_19": места.get(19), "место_20": места.get(20),
+                     "место_21": места.get(21), "место_22": места.get(22)})
+    return {"ok": bool(из_), "образцы": из_,
+             "why_not": None if из_ else f"успешных покупок disc {disc} не нашлось"}
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--podpis", action="append", default=[],
@@ -342,6 +376,8 @@ def main() -> int:
                     help="ключ, который ждала программа (из журнала ошибки)")
     р.add_argument("--dali", default="",
                     help="ключ, который дали мы (из журнала ошибки)")
+    р.add_argument("--obrazcy", default="",
+                    help="адрес: взять его УСПЕШНЫЕ покупки V2 как образцы")
     р.add_argument("--vladelcy", action="store_true",
                     help="спросить у цепи владельца и размер каждого счёта")
     р.add_argument("--schet", action="append", default=[],
@@ -442,6 +478,30 @@ def main() -> int:
                   f"лампортов {зн.get('лампортов')} есть {зн.get('есть')}")
             for н in внутри:
                 print(f"      внутри {н['имя']} на смещении {н['смещение']}")
+
+    # ОБРАЗЦЫ УСПЕШНЫХ V2: подписант и его место 21 -- пара для вывода семян.
+    if а.obrazcy:
+        об = образцы_v2(а.obrazcy)
+        из_["obrazcy"] = об
+        print("\nобразцы успешных V2:", об.get("why_not") or f"{len(об['образцы'])} шт")
+        пары = []
+        for о in об.get("образцы") or []:
+            своё_20 = пда([b"user_volume_accumulator",
+                            bytes(Pubkey.from_string(о["подписант"]))])
+            print(f"  {о['подпись'][:16]} слот {о['слот']} подписант {о['подписант']}")
+            print(f"     20 {о['место_20']} {'= PDA[user_volume_accumulator, он]' if о['место_20'] == своё_20 else '(не его PDA!)'}")
+            print(f"     21 {о['место_21']}")
+            if о["место_21"]:
+                пары.append((о["подписант"], о["место_21"]))
+        наш_ = а.koshelek or None
+        if а.zhdali and наш_:
+            пары.append((наш_, а.zhdali))
+        if пары:
+            годные = перебор_семян(
+                пары, программы=[BONDING, "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"])
+            из_["semena_po_obrazcam"] = {"пары": пары, "годные": годные}
+            print("\nсемена по образцам:", json.dumps(годные, ensure_ascii=False)
+                  if годные else "перебором не нашлось")
 
     if а.out:
         with open(а.out, "w", encoding="utf-8") as ф:
