@@ -145,7 +145,16 @@ def disc(name: str) -> bytes:
 # индекс счёта минта, индекс счёта программы токена); pda -- счета,
 # выводимые из пользователя.
 SPECS = {
-    PUMP_AMM: {"label": "Pump AMM", "ix": "buy_exact_quote_in", "alt": ["buy"], "n_accounts": 26,
+    # СЧЕТОВ У PUMP AMM БЫВАЕТ 25 ИЛИ 26. Замер 28.09 по пулу USDC/SOL
+    # (nML7msD1MiJHxFvhv4po1u6C4KpWr64ugKqc75DMuD2): девять покупок той же
+    # инструкцией buy_exact_quote_in идут с 25 счетами, и раскладка совпадает с
+    # 26-счётной ПОЗИЦИЯ В ПОЗИЦИЮ на индексах 0..24 -- у длинной просто есть
+    # 26-й счёт в хвосте. Все роли, которые мы подставляем (подписант 1, наши
+    # ATA 5 и 6, PDA 20, минты 3 и 4, хранилища 7 и 8), лежат в этих 25, а
+    # хвост переносится из настоящей сделки как есть. Пока предел стоял ровно
+    # 26, шаблон первой ноги SOL -> USDC не извлекался вовсе.
+    PUMP_AMM: {"label": "Pump AMM", "ix": "buy_exact_quote_in", "alt": ["buy"],
+               "n_accounts": None, "min_accounts": 25, "max_accounts": 26,
                "user": [1], "user_ata": [(5, 3, 11), (6, 4, 12)],
                "pda": [(20, [b"user_volume_accumulator", "USER"])],
                "base_mint": 3, "quote_mint": 4, "base_vault": 7, "quote_vault": 8},
