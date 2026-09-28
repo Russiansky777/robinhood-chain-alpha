@@ -1,0 +1,95 @@
+name: "Скорость до и после границы + процессор хоста (только чтение)"
+
+# ЗАЧЕМ (слово владельца 28.09): "«увидели» и «решили» p50/p90 по сделкам до
+# 18:00Z и после; загрузка CPU хоста и доля зонда преконфов и сторожа в ней
+# (top/pidstat за 5 минут). Если зонд стоит детектору > 10 мс -- остановить его
+# до утра и сказать".
+#
+# Замер идёт из /proc на двух точках, а не из top: так доля каждого процесса
+# считается от одного ядра и от всей машины, и число можно проверить.
+# Только чтение: журнал позиций потоком, сети нет.
+on:
+  workflow_dispatch:
+    inputs:
+      granica:
+        description: "граница окна (UTC)"
+        required: false
+        default: "2026-09-28T18:00:00Z"
+      s:
+        description: "начало окна (пусто -- за 18 ч до границы)"
+        required: false
+        default: ""
+      cpu_sekund:
+        description: "сколько секунд мерить процессор"
+        required: false
+        default: "300"
+
+concurrency:
+  group: skorost-i-cpu
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/skorost_cpu
+  OUT_FILE: data/skorost_i_cpu.json
+
+jobs:
+  zamer:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Сборка модуля"
+        run: python3 -m py_compile deploy/checks/skorost_i_cpu.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Замер на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/skorost_i_cpu.py" < deploy/checks/skorost_i_cpu.py
+          S=""
+          [ -n "${{ inputs.s }}" ] && S="--s ${{ inputs.s }}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $RABOTA/skorost_i_cpu.py --state-dir $STATE_DIR --granica '${{ inputs.granica }}' $S --cpu-sekund ${{ inputs.cpu_sekund }} --out $RABOTA/out.json" | tail -40
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/skorost_i_cpu.json || true
+          if python3 -c "import json; json.load(open('/tmp/skorost_i_cpu.json'))" 2>/dev/null; then
+            cp /tmp/skorost_i_cpu.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: zamer ne sobralsya"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Skorost i processor hosta [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
