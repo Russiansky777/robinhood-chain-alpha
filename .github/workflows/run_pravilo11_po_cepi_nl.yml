@@ -42,6 +42,9 @@ env:
   KOD_HOSTA: /home/bot/bloom_executor
   STATE_DIR: /home/bot/bloom_executor_live_data
   RABOTA: /tmp/pravilo11
+  # ПИТОН СЛУЖБЫ: для ATA минта нужен модуль сборки, а ему нужен solders --
+  # системный python3 на хосте без него.
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
   OUT_FILE: data/pravilo11_po_cepi.json
 
 jobs:
@@ -82,7 +85,7 @@ jobs:
           [ -n "${{ inputs.istochnik }}" ] && IST="--istochnik ${{ inputs.istochnik }}"
           PO=""
           [ -n "${{ inputs.po }}" ] && PO="--po ${{ inputs.po }}"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA python3 $RABOTA/pravilo11_po_cepi.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $IST --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/pravilo11_po_cepi.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $IST --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/pravilo11.json || true
           if python3 -c "import json; json.load(open('/tmp/pravilo11.json'))" 2>/dev/null; then
             cp /tmp/pravilo11.json "$OUT_FILE"
