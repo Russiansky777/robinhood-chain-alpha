@@ -65,11 +65,31 @@ def main() -> int:
     # счётом не выглядит; читателю (bloom_own_send.предел_открытых) всё равно,
     # но человек, открывший файл, обязан видеть 3, а не 3.0. Дробные поля
     # (bloom_sol 0.05) при этом остаются дробными.
-    try:
-        новое = int(а.set) if _целое(а.set) else float(а.set)
-    except ValueError:
-        print(f"СТОП: {а.set!r} не число -- поле числовое", file=sys.stderr)
-        return 4
+    # ДА/НЕТ -- ТОЖЕ ЗНАЧЕНИЕ. Поля lane_trades, bloom_trades, subscribe, fanout
+    # логические, и до 28.09 этот прогон их поставить НЕ МОГ вовсе: любое
+    # нечисло падало кодом 4 "поле числовое". Из-за этого попытка выключить
+    # торговлю группе sniper_src в 23:46:49Z прошла впустую -- прогон прочитал
+    # политику, упал и файл не тронул, а по отчёту это читалось как правка.
+    ЛОЖЬ = ("false", "нет", "no", "0", "off")
+    ИСТИНА = ("true", "да", "yes", "1", "on")
+    слово = а.set.strip().lower()
+    логическое = слово in ЛОЖЬ or слово in ИСТИНА
+    # "1" и "0" -- это числа, и числовым полям они нужны числами. Логическим
+    # значение пишется логическим: решает ТИП ТОГО, ЧТО В ФАЙЛЕ СЕЙЧАС.
+    if логическое and isinstance(было, bool):
+        новое = слово in ИСТИНА
+    elif слово == "null" or слово == "none":
+        новое = None
+    else:
+        try:
+            новое = int(а.set) if _целое(а.set) else float(а.set)
+        except ValueError:
+            if логическое:
+                print(f"СТОП: поле {а.field} в файле не логическое (сейчас "
+                       f"{было!r}), а {а.set!r} -- да/нет", file=sys.stderr)
+            else:
+                print(f"СТОП: {а.set!r} не число и не да/нет", file=sys.stderr)
+            return 4
     копия = путь.with_suffix(путь.suffix + f".bak-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}")
     shutil.copy2(путь, копия)
     политики[а.group][а.field] = новое
@@ -94,5 +114,58 @@ def полит_ок(политики, группа, поле, ожидали) ->
     return True
 
 
+def self_test() -> int:
+    """Тип значения не выдумывается: логическое пишется логическим, число числом."""
+    import tempfile  # noqa: PLC0415
+
+    пройдено = провалено = 0
+
+    def chk(что, ок, факт=None):
+        nonlocal пройдено, провалено
+        print(f"  [{'ok  ' if ок else 'ПРОВАЛ'}] {что}"
+              + (f" -> {факт!r}" if факт is not None and not ок else ""))
+        пройдено += bool(ок)
+        провалено += (not ок)
+
+    образец = {"groups": {"g": {"lane_trades": True, "lane_open_max": 3,
+                                 "bloom_sol": 0.05, "note": "строка"}}}
+    with tempfile.TemporaryDirectory() as вр:
+        ф = Path(вр) / "groups.json"
+
+        def прогон(поле, значение):
+            ф.write_text(json.dumps(образец, ensure_ascii=False), encoding="utf-8")
+            сохр = sys.argv
+            sys.argv = ["x", "--file", str(ф), "--group", "g",
+                         "--field", поле, "--set", значение]
+            try:
+                код = main()
+            finally:
+                sys.argv = сохр
+            свежее = json.loads(ф.read_text(encoding="utf-8"))
+            return код, свежее["groups"]["g"].get(поле)
+
+        код, стало = прогон("lane_trades", "false")
+        chk("lane_trades=false пишется ЛОЖЬЮ, а не нулём",
+            код == 0 and стало is False, (код, стало))
+        код, стало = прогон("lane_trades", "true")
+        chk("lane_trades=true пишется ИСТИНОЙ", код == 0 and стало is True, (код, стало))
+        код, стало = прогон("lane_open_max", "2")
+        chk("число остаётся числом, а не логическим",
+            код == 0 and стало == 2 and not isinstance(стало, bool), (код, стало))
+        код, стало = прогон("bloom_sol", "0.07")
+        chk("дробное остаётся дробным", код == 0 and стало == 0.07, (код, стало))
+        код, стало = прогон("lane_open_max", "да")
+        chk("«да» числовому полю -- отказ, файл не тронут",
+            код == 4 and стало == 3, (код, стало))
+        код, стало = прогон("note", "мусор")
+        chk("строковому полю отказ (тип не выдумывается)",
+            код == 4 and стало == "строка", (код, стало))
+
+    print(f"самопроверка политики группы: {пройдено}/{пройдено + провалено} пройдено")
+    return 0 if провалено == 0 else 1
+
+
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        raise SystemExit(self_test())
     raise SystemExit(main())
