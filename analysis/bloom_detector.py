@@ -8006,6 +8006,17 @@ def self_test() -> int:
     # ставка решает, какой минимум мы поставим, поэтому здесь и проверяется,
     # что число берётся из ПРОЧИТАННОГО счёта и что выдумать его нельзя.
     try:
+        # c2_swap_build тянет solders (адреса и PDA), а на раннике GitHub его
+        # нет: там эта проверка не про код, а про окружение. Отсутствие модуля
+        # называется словами и не считается провалом -- боевой хост его имеет,
+        # и деплой отдельно сверяет доставку модулей.
+        try:
+            import solders  # noqa: F401,PLC0415
+            _есть_solders = True
+        except Exception:  # noqa: BLE001
+            _есть_solders = False
+        if not _есть_solders:
+            raise ImportError("solders в этом окружении нет")
         import c2_swap_build as _Bт  # noqa: PLC0415
 
         _Bт.СТАВКИ_CLMM.clear()
@@ -8060,6 +8071,8 @@ def self_test() -> int:
         _Bт.СТАВКИ_CLMM.clear()
         _Bт.НУЖНЫ_КОНФИГИ_CLMM.clear()
         _Bт.КОНФИГИ_БЕЗ_СТАВКИ.clear()
+    except ImportError as exc:
+        chk(f"ставки CLMM в этом окружении не проверяются: {exc}", True)
     except Exception as exc:  # noqa: BLE001
         chk(f"проверка ставок CLMM не прошла: {type(exc).__name__}: {exc}", False)
 
@@ -9658,8 +9671,23 @@ def self_test() -> int:
                                mode=ST.MODE_LIVE, sell_after_s=28.8,
                                lane=ST.МЕТКА_ПОЛОСЫ, lane_group="lane_s0")
             поз_и = дет_и.имя_токена_в_запись("ин1", st_и.positions()["ин1"])
-            chk(f"имя токена спрошено и легло в запись: {поз_и.get('token_name')!r}",
-                поз_и.get("token_name") == "MOON", поз_и.get("token_name"))
+            # БЕЗ solders АДРЕС МЕТАДАННЫХ НЕ СЧИТАЕТСЯ, и имя честно не
+            # находится: это окружение, а не поломка. На раннике GitHub
+            # solders нет, на боевом хосте есть.
+            try:
+                import solders  # noqa: F401,PLC0415
+                _pda_есть = True
+            except Exception:  # noqa: BLE001
+                _pda_есть = False
+            if _pda_есть:
+                chk(f"имя токена спрошено и легло в запись: "
+                    f"{поз_и.get('token_name')!r}",
+                    поз_и.get("token_name") == "MOON", поз_и.get("token_name"))
+            else:
+                chk(f"без solders имя не находится и причина записана: "
+                    f"{str(поз_и.get('token_name_why_not'))[:40]}",
+                    поз_и.get("token_name") is None
+                    and bool(поз_и.get("token_name_why_not")), поз_и)
             было_вызовов = len(уи.спрошено)
             дет_и.имя_токена_в_запись("ин1", поз_и)
             chk("второй раз имя не спрашивается", len(уи.спрошено) == было_вызовов,
