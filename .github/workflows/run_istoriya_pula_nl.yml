@@ -44,6 +44,10 @@ on:
         description: "слот до (для режима по адресам)"
         required: false
         default: "0"
+      iskat_tip:
+        description: "'yes' -- искать tip-счета по окну (справочник для чужих транзакций)"
+        required: false
+        default: "no"
       sbor_podpisi:
         description: "подписи (или начала) для разбора комиссий, приоритета и чаевых"
         required: false
@@ -106,6 +110,7 @@ jobs:
               --podpisi '${{ inputs.podpisi }}' \
               --okno-slotov '${{ inputs.okno_slotov }}' \
               --sbor-podpisi '${{ inputs.sbor_podpisi }}' \
+              ${{ inputs.iskat_tip == 'yes' && '--iskat-tip' || '' }} \
               --adresa '${{ inputs.adresa }}' \
               --slot-ot '${{ inputs.slot_ot }}' --slot-do '${{ inputs.slot_do }}' \
               --senders /tmp/pyl/senders.json \
