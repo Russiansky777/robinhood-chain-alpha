@@ -86,9 +86,24 @@ def инструкция_покупки(tx: dict, *, программа: str = S
         if хранилище and хранилище not in ix["accounts"]:
             continue
         данные = SB.b58decode(ix["data"])
+        # ПРАВО ЗАПИСИ -- И ПО СТАТИЧЕСКИМ КЛЮЧАМ, И ПО АДРЕСАМ ИЗ ТАБЛИЦ. В
+        # ответе узла (encoding=json) message.accountKeys несёт только
+        # статические ключи, а адреса из таблиц лежат в meta.loadedAddresses.
+        # Наши покупки собираются без таблиц, но если покупка окажется с
+        # таблицей, счёт молча стал бы "только для чтения", и программа
+        # отказала бы уже на живой продаже.
+        права = dict(SB.writable_map(tx))
+        загруж = ((tx or {}).get("meta") or {}).get("loadedAddresses") or {}
+        for а_ in (загруж.get("writable") or []):
+            права[а_] = True
+        for а_ in (загруж.get("readonly") or []):
+            права.setdefault(а_, False)
         return {"ok": True, "program": программа, "accounts": list(ix["accounts"]),
                  "data": данные, "disc": данные[:8].hex(),
-                 "writable": SB.writable_map(tx), "why_not": None}
+                 "writable": права,
+                 "из_таблиц": len(загруж.get("writable") or [])
+                               + len(загруж.get("readonly") or []),
+                 "why_not": None}
     из_["why_not"] = (f"инструкции программы {программа[:8]} в нашей покупке нет"
                        if not хранилище else
                        f"инструкции с хранилищем {хранилище[:8]} в покупке нет")
@@ -115,7 +130,8 @@ def шаблон_продажи_из_покупки(tx_покупки: dict, *,
                               f"а у продажи их {СЧЕТОВ_ПРОДАЖИ}")}
     return {"ok": True, "program": программа, "accounts": продажа,
              "writable": пок["writable"], "disc_покупки": пок["disc"],
-             "счетов_покупки": len(счета), "why_not": None}
+             "счетов_покупки": len(счета),
+             "из_таблиц": пок.get("из_таблиц") or 0, "why_not": None}
 
 
 def инструкция_продажи(шаблон: dict, *, наш_кошелёк: str, база_в: int,
@@ -469,6 +485,23 @@ def self_test() -> int:
         шаблон_продажи_из_покупки({"transaction": {"message": {
             "accountKeys": [], "instructions": []}}, "meta": {}})["why_not"]
         is not None)
+
+    # ПРАВО ЗАПИСИ У АДРЕСА ИЗ ТАБЛИЦЫ. Иначе счёт молча стал бы "только для
+    # чтения", и отказала бы уже живая продажа.
+    tx_alt = {"transaction": {"message": {
+                "accountKeys": [{"pubkey": а, "writable": (и in (0, 5))}
+                                 for и, а in enumerate(счета[:24])],
+                "instructions": [{"programId": SB.PUMP_AMM, "accounts": счета,
+                                   "data": SB.b58encode(
+                                       SB.disc("buy_exact_quote_in")
+                                       + struct.pack("<QQ", 1, 1))}]}},
+               "meta": {"loadedAddresses": {"writable": [счета[7], счета[8]],
+                                             "readonly": [счета[25]]}}}
+    шб_alt = шаблон_продажи_из_покупки(tx_alt)
+    chk("права записи взяты и из таблиц адресов",
+        шб_alt["ok"] and шб_alt["writable"].get(счета[7]) is True
+        and шб_alt["writable"].get(счета[8]) is True
+        and шб_alt["из_таблиц"] == 3, шб_alt.get("из_таблиц"))
 
     # МИНИМУМ ВЫХОДА. Кривая без комиссии: 100 базы в пул с 1000 базы и 2000
     # котировки даёт 2000*100/1100 = 181; с запасом 0.25 пол = 135.
