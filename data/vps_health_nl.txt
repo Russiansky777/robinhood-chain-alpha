@@ -1,38 +1,38 @@
-=== NL-хост, живучесть служб, 2026-09-27T19:11:36Z ===
+=== NL-хост, живучесть служб, 2026-09-28T05:32:25Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
-bloom-seller: active=active enabled=enabled restarts=0 since=Sun 2026-09-27 20:57:11 CEST
-bloom-detector: active=active enabled=enabled restarts=0 since=Sun 2026-09-27 20:27:30 CEST
+bloom-seller: active=active enabled=enabled restarts=0 since=Mon 2026-09-28 04:58:43 CEST
+bloom-detector: active=active enabled=enabled restarts=0 since=Mon 2026-09-28 07:20:58 CEST
 grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-27T19:11:37Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-28T05:31:47Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-27T19:11:37Z",
-  "updated_ts": 1790536297.7680373,
-  "alive_since_utc": "2026-09-27T18:27:30Z",
+  "updated_utc": "2026-09-28T05:31:47Z",
+  "updated_ts": 1790573507.5230095,
+  "alive_since_utc": "2026-09-28T05:20:58Z",
   "mode": "live",
-  "sources": 589,
+  "sources": 625,
   "source_groups": {
     "file": "/home/bot/data/sources_2026-09-25.json",
     "why_not": null,
-    "hash": "6c68427d763f",
-    "mtime_utc": "2026-09-27T17:40:36Z",
+    "hash": "8bb585a0598d",
+    "mtime_utc": "2026-09-28T03:03:53Z",
     "alarm": null,
     "in_file": {
       "leader": 1,
-      "batch5": 8,
+      "batch5": 12,
       "lane_s0": 10,
       "off": 9,
-      "log_only": 557
+      "log_only": 591
     },
     "subscribed": {
-      "batch5": 8,
-      "off": 13,
+      "batch5": 12,
+      "off": 11,
       "leader": 1,
       "lane_s0": 10,
-      "log_only": 557
+      "log_only": 591
     },
     "policies": {
       "leader": {
@@ -43,22 +43,28 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
         "fanout": false,
         "day_cap_sol": null,
         "stop_loss_sol": 0.75,
-        "min_target_sol": 10,
+        "min_target_sol": 3,
         "lane_open_max": 3,
         "lane_pools": [
           "pump_amm",
           "cpmm",
           "bonding",
-          "two_step"
+          "two_step",
+          "damm2",
+          "dbc"
         ],
         "lane_route": null,
         "lane_route_tax_bps": null,
         "max_slots_from_source": null,
         "skip_flippers": false,
         "allow_taxed_route": true,
-        "slippage": 0.25,
+        "slippage": 0.2,
+        "slippage_thin_pool": 0.5,
+        "thin_pool_below_sol": 30,
         "min_pool_sol_reserve": null,
         "hold_slots": 150.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
         "lane_size": 0.5
       },
       "batch5": {
@@ -75,7 +81,9 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
           "pump_amm",
           "cpmm",
           "bonding",
-          "two_step"
+          "two_step",
+          "damm2",
+          "dbc"
         ],
         "lane_route": null,
         "lane_route_tax_bps": null,
@@ -83,8 +91,12 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
         "skip_flippers": false,
         "allow_taxed_route": true,
         "slippage": 0.4,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
         "min_pool_sol_reserve": null,
         "hold_slots": 72.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
         "lane_size": 0.3
       },
       "lane_s0": {
@@ -98,16 +110,25 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
         "min_target_sol": 2,
         "lane_open_max": 3,
         "lane_pools": [
-          "bonding"
+          "pump_amm",
+          "cpmm",
+          "bonding",
+          "two_step",
+          "damm2",
+          "dbc"
         ],
         "lane_route": null,
         "lane_route_tax_bps": null,
         "max_slots_from_source": 3,
         "skip_flippers": true,
-        "allow_taxed_route": false,
-        "slippage": 0.35,
-        "min_pool_sol_reserve": 30,
+        "allow_taxed_route": true,
+        "slippage": 0.4,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
         "hold_slots": 72.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
         "lane_size": 0.3
       },
       "off": {
@@ -127,8 +148,12 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
         "skip_flippers": false,
         "allow_taxed_route": null,
         "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
         "min_pool_sol_reserve": null,
         "hold_slots": 72,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
         "lane_size": null
       },
       "log_only": {
@@ -148,8 +173,12 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
         "skip_flippers": false,
         "allow_taxed_route": null,
         "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
         "min_pool_sol_reserve": null,
         "hold_slots": 72,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
         "lane_size": null
       }
     }
@@ -157,85 +186,83 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "sender_connections": {
     "by_sender": {
       "astralane": {
-        "age_s": 2635.8,
+        "age_s": 638.1,
         "last_use_s": null,
-        "last_ping_s": 0.2,
-        "pings_ok": 38,
+        "last_ping_s": 0.1,
+        "pings_ok": 10,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "blockrazor": {
-        "age_s": 2635.8,
+        "age_s": 638.0,
         "last_use_s": null,
-        "last_ping_s": 0.2,
-        "pings_ok": 38,
+        "last_ping_s": 0.1,
+        "pings_ok": 10,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "helius": {
-        "age_s": 2635.8,
+        "age_s": 638.0,
         "last_use_s": null,
-        "last_ping_s": 0.2,
-        "pings_ok": 38,
+        "last_ping_s": 0.1,
+        "pings_ok": 10,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "jito": {
-        "age_s": 2635.8,
+        "age_s": 638.0,
         "last_use_s": null,
-        "last_ping_s": 0.2,
-        "pings_ok": 38,
+        "last_ping_s": 0.1,
+        "pings_ok": 10,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "nozomi": {
-        "age_s": 2635.7,
+        "age_s": 638.0,
         "last_use_s": null,
-        "last_ping_s": 0.2,
-        "pings_ok": 38,
+        "last_ping_s": 0.0,
+        "pings_ok": 10,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "zeroslot": {
-        "age_s": 2635.7,
+        "age_s": 638.0,
         "last_use_s": null,
-        "last_ping_s": 0.2,
-        "pings_ok": 38,
+        "last_ping_s": 0.0,
+        "pings_ok": 10,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       }
     },
     "warm_period_s": 25.0,
-    "last_warm_s": 0.2,
+    "last_warm_s": 0.1,
     "last_warm": {
       "ok": 6,
       "failed": 0
     }
   },
   "bloom_skipped_by_group": 0,
-  "sources_from": "DBot живьём + групп источников: 569 + тестовых источников из окружения: 2",
+  "sources_from": "DBot живьём + групп источников: 605 + тестовых источников из окружения: 2",
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 14866,
+  "signals_seen": 8457,
   "to_buy": 0,
   "by_code": {
-    "NOT_A_BUY": 11793,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 1705,
-    "TOKEN_RECEIVED_NOT_BOUGHT": 840,
-    "THRESHOLD_EDGE": 26,
-    "INSUFFICIENT_BALANCE": 229,
-    "MAX_BUY_TIMES_PER_TOKEN_REACHED": 3,
-    "SKIP_TARGET_INCREASE_POSITION": 56,
-    "AMBIGUOUS_TX": 39,
-    "STALE": 167,
-    "SKIP_TAXED_ROUTE": 8
+    "NOT_A_BUY": 7928,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 290,
+    "TOKEN_RECEIVED_NOT_BOUGHT": 137,
+    "SKIP_TARGET_INCREASE_POSITION": 27,
+    "THRESHOLD_EDGE": 9,
+    "INSUFFICIENT_BALANCE": 26,
+    "AMBIGUOUS_TX": 3,
+    "STALE": 37
   },
   "by_code_test_source": {},
   "test_sources": [
@@ -246,9 +273,9 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 122.697993345122,
+  "rate_usd_sol": 119.24011965857872,
   "rate_fresh": true,
-  "rate_stale_used": 2425,
+  "rate_stale_used": 829,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
@@ -257,22 +284,22 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
   "kill_bloom_active": false,
   "kill_bloom_note": "",
-  "net_slot": 451087153,
-  "slot_notifications": 9865,
-  "net_slot_age_s": 0.06,
+  "net_slot": 451225703,
+  "slot_notifications": 2418,
+  "net_slot_age_s": 0.21,
   "balance_sol": 0.000810942,
-  "balance_age_s": 0.91,
-  "rpc_calls": 5138,
+  "balance_age_s": 5.41,
+  "rpc_calls": 1272,
   "rpc_by_method": {
-    "getMultipleAccounts": 473,
-    "getBalance": 528,
-    "getLatestBlockhash": 220,
-    "getAccountInfo": 220,
-    "getTransaction": 2294,
-    "simulateTransaction": 1395,
-    "getSignaturesForAddress": 8
+    "getMultipleAccounts": 215,
+    "getTransaction": 600,
+    "getBalance": 130,
+    "getLatestBlockhash": 54,
+    "getAccountInfo": 54,
+    "simulateTransaction": 217,
+    "getBlock": 2
   },
-  "session_credits": 72054,
+  "session_credits": 49108,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -318,82 +345,48 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "hour_seconds": 0.0,
     "on_fallback_now": false,
     "report_threshold_s": 30.0,
-    "silent_ticks": 1,
+    "silent_ticks": 2,
     "tick_s": 2.0,
     "breaks_by_reason": {}
   },
   "shadow": {
     "enabled": true,
-    "built": 2039,
+    "built": 352,
     "would_pass": 0,
     "over_cap": 0,
     "failed": 0,
     "module_loaded": true,
     "module_why_not": "",
     "passed_in_row_by_pool": {
-      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0,
       "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 0,
-      "ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch": 0,
-      "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0,
-      "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": 0,
-      "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 0,
-      "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms": 0,
-      "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN": 0,
-      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 0,
-      "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG": 0,
+      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0,
       "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 0,
-      "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH": 0
+      "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 0,
+      "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0,
+      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 0,
+      "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": 0
     },
     "hour": {
-      "since_ts": 1790533650.743344,
-      "since_utc": "2026-09-27T18:27:30Z",
-      "signals": 2039,
-      "built": 1395,
-      "sim_failed": 1395,
+      "since_ts": 1790572858.844936,
+      "since_utc": "2026-09-28T05:20:58Z",
+      "signals": 352,
+      "built": 217,
+      "sim_failed": 217,
       "not_built": {
-        "котировка не SOL: шаблона SOL -> Q в кэше нет": 219,
-        "тип пула не покрыт сборщиком: ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch": 1,
-        "пул: в транзакции нет хранилища минта с движением против трейдера": 36,
-        "шаблон: разновидность инструкции кривой не известна: b817ee6167c5d33d": 141,
-        "шаблон: счетов 28, ожидалось 27": 130,
-        "двухшаговая транзакция 1330 байт > 1232": 1,
-        "шаблон шага 1 старше 30 с (49 с)": 1,
-        "шаблон шага 1 старше 30 с (50 с)": 1,
-        "пул: неоднозначная котировка: 4 встречных счетов (3dUHMD, J1toso, So1111)": 2,
-        "пул: неоднозначная котировка: 4 встречных счетов (9BB6NF, J9t6qN, So1111)": 1,
-        "шаблон: у источника инструкция 9527de9bd37c981a, не buy_exact_in": 2,
-        "тип пула не покрыт сборщиком: MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms": 2,
-        "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2": 11,
-        "шаблон: у источника инструкция 33e685a4017f83ad, не buy_exact_quote_in": 13,
-        "шаблон: у источника инструкция swap2, не swap": 6,
-        "шаблон шага 1 старше 30 с (101 с)": 1,
-        "пул: неоднозначная котировка: 7 встречных счетов (EPjFWd, So1111, USD1tt)": 1,
-        "шаблон шага 1 старше 30 с (194 с)": 1,
-        "шаблон: счетов 25, ожидалось 26": 4,
-        "шаблон шага 1 старше 30 с (463 с)": 1,
-        "пул: неоднозначная котировка: 2 встречных счетов (So1111)": 6,
-        "пул: неоднозначная котировка: 2 встречных счетов (4N4DnN, So1111)": 7,
-        "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)": 1,
-        "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 38,
-        "пул: неоднозначная котировка: 4 встречных счетов (EPjFWd, So1111, cbbtcf)": 1,
-        "шаблон шага 1 старше 30 с (402 с)": 1,
-        "шаблон шага 1 старше 30 с (582 с)": 1,
-        "шаблон шага 1 старше 30 с (105 с)": 1,
-        "двухшаговая транзакция 1374 байт > 1232": 1,
-        "пул: неоднозначная котировка: 5 встречных счетов (4N4DnN, EPjFWd, So1111)": 1,
-        "пул: неоднозначная котировка: 4 встречных счетов (4N4DnN, EPjFWd, So1111)": 2,
-        "двухшаговая транзакция 1407 байт > 1232": 1,
-        "пул: неоднозначная котировка: 3 встречных счетов (4N4DnN, So1111)": 1,
-        "шаблон шага 1 старше 30 с (292 с)": 1,
-        "кривая: минимум не посчитан (нет события сделки кривой pump.fun в логах)": 2,
-        "тип пула не покрыт сборщиком: TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH": 2,
-        "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd, So1111)": 2
+        "котировка не SOL: шаблона SOL -> Q в кэше нет": 64,
+        "шаблон: счетов 28, ожидалось 27": 11,
+        "шаблон: у источника инструкция 33e685a4017f83ad, не buy_exact_quote_in": 22,
+        "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 1,
+        "шаблон: разновидность инструкции кривой не известна: b817ee6167c5d33d": 28,
+        "пул: в транзакции нет хранилища минта с движением против трейдера": 3,
+        "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2": 5,
+        "шаблон: у источника инструкция 9527de9bd37c981a, не buy_exact_in": 1
       },
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 8564,
+    "credits_day": 12043,
     "credits_write_why_not": "FileNotFoundError"
   },
   "route_tax_filter": {
@@ -402,7 +395,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "module_loaded": true,
     "module_why_not": "",
     "code": "SKIP_TAXED_ROUTE",
-    "skipped": 8,
+    "skipped": 0,
     "skipped_test": 0
   },
   "own_send": {
@@ -410,12 +403,12 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "live": true,
     "module_loaded": true,
     "module_why_not": "",
-    "paths": 229,
-    "starts": 229,
+    "paths": 26,
+    "starts": 26,
     "threads_alive": 0,
     "sent": 0,
     "by_stage": {
-      "gate": 229
+      "gate": 26
     },
     "bought_backfilled": 0,
     "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
@@ -426,30 +419,30 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "ok": true,
       "why_not": null
     },
-    "balance_sol": 6.07907666,
+    "balance_sol": 6.400687272,
     "balance_day_threshold": {
       "ok": true,
       "kill": false,
-      "why": "просадка от 00:00 -0.035366 SOL при пороге 0.5",
-      "threshold_sol": 0.5,
-      "day": "20260927",
-      "open_sol": 6.043711064,
-      "balance_sol": 6.07907666,
-      "drop_sol": -0.035365596
+      "why": "просадка от 00:00 -0.321611 SOL при пороге 2.0",
+      "threshold_sol": 2.0,
+      "day": "20260928",
+      "open_sol": 6.07907666,
+      "balance_sol": 6.400687272,
+      "drop_sol": -0.321610612
     },
     "lane_daily_stop": {
       "threshold_sol": 1.5,
-      "pnl_all_groups_sol": -0.089780738,
+      "pnl_all_groups_sol": 0.321610605,
       "stopped": false,
       "why_not": null
     },
-    "balance_age_s": 0.9,
+    "balance_age_s": 5.4,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 6.5,
-    "blockhash_updates": 220,
+    "blockhash_age_s": 10.3,
+    "blockhash_updates": 54,
     "blockhash_why_not": "",
     "last": {
       "stage": "gate",
@@ -457,7 +450,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "why_not": "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)",
       "signature": null,
       "pool_program": null,
-      "ts_utc": "2026-09-27T19:11:10Z"
+      "ts_utc": "2026-09-28T05:31:16Z"
     },
     "lane_kill": [
       false,
@@ -474,24 +467,25 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
         "off": 1
       },
       "size_sol": 0.05,
+      "ceiling_sol": 0.5,
       "stop_failed_in_row": 5,
       "stop_loss_sol": 0.3
     },
     "lane_state": {
       "open": 0,
       "stuck": 0,
-      "day": "20260927",
-      "day_start_ts": 1790460000.0,
+      "day": "20260928",
+      "day_start_ts": 1790546400.0,
       "day_how": "Europe/Madrid",
-      "pnl_all_groups_sol": -0.089780738,
-      "today_all_groups": 42,
-      "today": 42,
+      "pnl_all_groups_sol": 0.321610605,
+      "today_all_groups": 13,
+      "today": 13,
       "failed_in_row": 0,
-      "pnl_sol": -0.089780738,
-      "pnl_trade_sol": 0.079628382,
-      "spend_sol": 0.16940912,
-      "uncountable_today": 25,
-      "no_result_today": 1,
+      "pnl_sol": 0.321610605,
+      "pnl_trade_sol": 0.379179245,
+      "spend_sol": 0.05756864,
+      "uncountable_today": 7,
+      "no_result_today": 0,
       "uncountable_why": [
         "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
         "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
@@ -499,27 +493,27 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
         "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
         "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
       ],
-      "total": 145,
+      "total": 55,
       "group": "деньги (все группы кроме скорости)",
-      "day_turnover_sol": 0.50321,
-      "day_spend_sol": 0.16940912
+      "day_turnover_sol": 3.926065,
+      "day_spend_sol": 0.05756864
     },
     "lane_state_by_group": {
       "money": {
         "open": 0,
         "stuck": 0,
-        "day": "20260927",
-        "day_start_ts": 1790460000.0,
+        "day": "20260928",
+        "day_start_ts": 1790546400.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": -0.089780738,
-        "today_all_groups": 42,
-        "today": 42,
+        "pnl_all_groups_sol": 0.321610605,
+        "today_all_groups": 13,
+        "today": 13,
         "failed_in_row": 0,
-        "pnl_sol": -0.089780738,
-        "pnl_trade_sol": 0.079628382,
-        "spend_sol": 0.16940912,
-        "uncountable_today": 25,
-        "no_result_today": 1,
+        "pnl_sol": 0.321610605,
+        "pnl_trade_sol": 0.379179245,
+        "spend_sol": 0.05756864,
+        "uncountable_today": 7,
+        "no_result_today": 0,
         "uncountable_why": [
           "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
           "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
@@ -527,49 +521,43 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
           "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
           "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
         ],
-        "total": 145,
+        "total": 55,
         "group": "деньги (все группы кроме скорости)",
-        "day_turnover_sol": 0.50321,
-        "day_spend_sol": 0.16940912
+        "day_turnover_sol": 3.926065,
+        "day_spend_sol": 0.05756864
       },
       "speed_only": {
         "open": 0,
         "stuck": 0,
-        "day": "20260927",
-        "day_start_ts": 1790460000.0,
+        "day": "20260928",
+        "day_start_ts": 1790546400.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": -0.089780738,
-        "today_all_groups": 42,
-        "today": 31,
+        "pnl_all_groups_sol": 0.321610605,
+        "today_all_groups": 13,
+        "today": 0,
         "failed_in_row": 0,
-        "pnl_sol": -0.059494838,
-        "pnl_trade_sol": 0.055001842,
-        "spend_sol": 0.11449668,
-        "uncountable_today": 18,
-        "no_result_today": 1,
-        "uncountable_why": [
-          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
-          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
-          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
-          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
-          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
-        ],
-        "total": 129,
+        "pnl_sol": 0.0,
+        "pnl_trade_sol": 0.0,
+        "spend_sol": 0.0,
+        "uncountable_today": 0,
+        "no_result_today": 0,
+        "uncountable_why": [],
+        "total": 31,
         "group": "speed_only",
-        "day_turnover_sol": 0.371155,
-        "day_spend_sol": 0.11449668
+        "day_turnover_sol": 0,
+        "day_spend_sol": 0.0
       }
     },
     "control": {
       "enabled": false,
       "senders_seen": 0,
       "spent_today": {
-        "day": "20260927",
-        "n": 42,
-        "signals": 7,
-        "spent_lamports": 28917000,
+        "day": "20260928",
+        "n": 0,
+        "signals": 0,
+        "spent_lamports": 0,
         "why_not": null,
-        "spent_sol": 0.028917
+        "spent_sol": 0.0
       },
       "limits": {
         "signals_per_day": 20,
@@ -582,12 +570,11 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "enabled": true,
       "tip_cap_sol": 0.005,
       "winners": {
-        "blockrazor": 21,
-        "nozomi": 39,
-        "astralane": 63,
-        "helius": 19,
-        "zeroslot": 2,
-        "jito": 1
+        "astralane": 30,
+        "nozomi": 15,
+        "blockrazor": 4,
+        "jito": 1,
+        "helius": 5
       }
     },
     "pool_nonce": {
@@ -600,9 +587,9 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "shift_signature": null,
       "warm": {
         "есть": true,
-        "возраст_с": 6.53,
+        "возраст_с": 10.26,
         "почему": "",
-        "обновлений": 220,
+        "обновлений": 54,
         "взят_тёплым": 0,
         "взят_по_сети": 0,
         "срок_с": 30.0
@@ -611,90 +598,166 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   },
   "leg_cache": {
     "enabled": true,
-    "pools": 57,
+    "pools": 17,
     "templates": {
-      "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh": {
-        "age_s": 57.3,
-        "flipped": true,
-        "sig": "5EtKPgd3mbD1XKk9QYgsgi5mB4JckEru7dZoVGWFMcj8Vnx426buG4aieG1drJu3kGGDq4UHcqPzKs9FU4hcTyRv"
-      },
-      "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw": {
-        "age_s": 9.5,
-        "flipped": true,
-        "sig": "cZsCtv7zczrSSHGhNsfbAGVnuKTMJvgKB6kJcdGM5TWNU2t3guQY8TUCCumhQEhKiS2j3Uy6CjuJfZtoXyu3Qjy"
-      },
-      "SiLVFMgD3eD2rgK628NbTBq9MnuJF5FW2CRaVyTB35L": {
-        "age_s": 25.9,
-        "flipped": true,
-        "sig": "4Y7rTQF61RUHAWu7UZoJhcxpgZ64XK7QA6PiyWyD9hs3mH9KBYKSpRgsH8Xq1o9dy9dpsdmK892maMpJ5guDEZxF"
-      },
-      "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp": {
-        "age_s": 0.2,
-        "flipped": false,
-        "sig": "gEJPBVkGZs6Txfw2TKLtwr8iPyUvc42KR3S5MS5y29o9ZY43o77CBS51syonSJnF5PQnRz5gyMu4h3Q9ojFEzUz"
-      },
-      "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ": {
-        "age_s": 61.8,
-        "flipped": false,
-        "sig": "2GP8gcmpCywDEzsCMvr2MgQ83xvKZvyucKJrC8xpEpm9fRZxECLVBZkTeQ9EzANaU2v49dAns9uKAJ5DpS9gehoB"
-      },
-      "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx": {
-        "age_s": 14.0,
-        "flipped": false,
-        "sig": "2X7cyGwyPGNrg3oJVk8t2tjXorkzX4X1Wzqvd22MYAVV4vY5TMttGsDsqpgTCD3FkVWzaiAug3jiQRbGRqhfRYxN"
-      },
-      "7ga6rtE9qSb3wdEiDCpTu2kHqoGVfT52jD8ign1rYTvx": {
-        "age_s": 27.4,
-        "flipped": true,
-        "sig": "ZmdGckpagnbLbywLeGRp8dagBaf2TS1n4c34849yUUw8hww2fjv1rRYrbkb6ZLG6VYSZoM9zNhAmJf5bnyvGYHf"
-      },
-      "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT": {
-        "age_s": 7.5,
-        "flipped": true,
-        "sig": "3JGKekMND9DMgkYVtmgjpnfNTrSLuTZMSBLcvUDeNxcPt57B5nQku8x9CWt3YcJ1wxSpzLN2sCy8KT43EmX7kDqW"
-      },
-      "HcRLc9VDgjLeK154xDawfb1dmVJ98DoSqcwTHGqiDeJR": {
-        "age_s": 4.6,
-        "flipped": true,
-        "sig": "31zCz4sxhYoN19ChuRXhTnh9ddmprKSgkCcykvMf32eJGQD4qczdLsHqZQMKGYWkj6ifUWbA5NYgytvhBC3Gmbij"
-      },
-      "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN": {
-        "age_s": 53.3,
-        "flipped": false,
-        "sig": "hgLH6woG3JPhnjQseuaUUSEb333JS4ikJqHA4gB3TnJktAhGf5yZ6o5FuH8ni1d3An3fwwqhR8D1Ppwr4ZYP361"
-      },
-      "METvsvVRapdj9cFLzq4Tr43xK4tAjQfwX76z3n6mWQL": {
-        "age_s": 4.7,
-        "flipped": true,
-        "sig": "43p5SzHVAzB8uyXxFKPqi53gLEiji5xqdbib6daqGsrMFe3wq9cYwXWRaypGWMW9oWrkZz6tUDw9wzMLbF7ayKGD"
-      },
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-        "age_s": 6.2,
-        "flipped": true,
-        "sig": "9aQuRetjn8kLZXy6nKqExEFxtwrBmdLcJw9ggvvzXrhHoRZZMsuCK9MG6ZykekngJ41b9nuSqWfkLdw6UySKroK"
+        "age_s": 0.3,
+        "flipped": false,
+        "sig": "5Z2dnoiBLyqBe63YnffNLVWWJAjAajpu4Vt7FP2gTpUCqPdUxen2aqJQeH5CDWo2gvznhCPdf6HqHFtxJCLsdgy4"
       },
-      "PEPEqnuuCDbBC89p1u9vpnP1KQ2oj1xTcQBsjt9X55m": {
-        "age_s": 18.0,
-        "flipped": true,
-        "sig": "ayqLJ3SWNYn1SwBvnXHj6DWAy5Gz2gVtT1yExiFK91UCddwNUktME92wzJ7rFo2AZ9XngWJtKywaUFKM9zBPjGG"
+      "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
+        "age_s": 1.4,
+        "flipped": false,
+        "sig": "oWaSX9rbETC12icNRvq7zPXaRFtq8kXJDhzXJxm8Hh9n7kMcwkPtFgt7PUsfyeHRRUBf9NKTqwBBGd9CHgjZ92g"
       },
       "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2": {
-        "age_s": 85.2,
+        "age_s": 27.8,
         "flipped": false,
-        "sig": "i5vdxu1GmyJZUhp1TqaFyufw68thbbiEZHsWRgXxRK564ikyR2CMLmuj2QZ5W7LrhX2vLro79Y7Yv1ihduSHxHa"
+        "sig": "5zAyCcmKTPqvdKsNMsJSQvmnMDEX5zhyZpj6BpSTBEbQj95kZ2vaY65RFXZeR4HjrTXBjKsxbUPXTubp36rvNcCX"
       },
-      "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF": {
-        "age_s": 28.0,
-        "flipped": true,
-        "sig": "25unKo1UnDmvjzdo4zbynm5ZvgMj7puTbCHSPfa
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-27T19:11:41Z):
+      "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
+        "age_s": 2.2,
+        "flipped": false,
+        "sig": "5KN2sWdnLJEdERsuAxfLh7BFkVf5Wad4Kw3G7UiYRtVBj9TfmioPB7TC4NMWXKhh7y73yTebWYKQW5RCmAAs5JY1"
+      },
+      "Cm6fNnMk7NfzStP9CZpsQA2v3jjzbcYGAxdJySmHpump": {
+        "age_s": 1.0,
+        "flipped": false,
+        "sig": "worFV56X3mKrrqhsvKZhEC3KPgj5t4PCQkYCZogm8Q11oYpwoT9jaDVpvjwhsDp9oqRfJhuByY7iQuyei3kvSCC"
+      },
+      "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump": {
+        "age_s": 497.5,
+        "flipped": false,
+        "sig": "RQscaQz1qAzxUpUbjNDpWQqpUnxWeYbfrahKFNnhyxUXZcYAHQ1rT6EV1vTMumJWgF9Nd6XRdY9PDL4Tzv7ZZfh"
+      },
+      "4N4DnNo3qpPks9aQCkcWkzoir8tnvT6diS4TnnZibonk": {
+        "age_s": 25.1,
+        "flipped": false,
+        "sig": "5pv3Jovn6AnhDdQdPjHqVwGJzVzdXodfuCd2jDK88KE4DsaaZ9Q7jRzoJVoqJZ3Gtz1aXd3pC6d5zCjoeCFEpYC6"
+      },
+      "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump": {
+        "age_s": 1.4,
+        "flipped": false,
+        "sig": "3nYMHrQuhSZphnPwtvJ5f44XrDUfdkZCv7dnShmXucuidgvRKqLjaub2V488KquERq5JNGALsANFz6SSBJ9K2Noc"
+      },
+      "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump": {
+        "age_s": 12.9,
+        "flipped": false,
+        "sig": "57ADAMeSfdc26QdB54KoW97zdh6UdNW2i2MAk7VGKep2XMwDFjBqsoiLbQMCNxAbCCCgPgct6zvtATyYRhTh84bH"
+      }
+    },
+    "fed": 551,
+    "no_tx": 0,
+    "failed": 0,
+    "luts": 194,
+    "luts_pending": 6,
+    "luts_warmed": 18,
+    "warm_why_not": "",
+    "luts_topped_up": 176,
+    "top_up_why_not": "",
+    "bytes": 16135763,
+    "credits": 308,
+    "credits_day": 164708,
+    "credits_before_start": 164400,
+    "credits_write_why_not": "",
+    "credit_budget": 0,
+    "credit_cap": "нет потолка",
+    "dropped": false,
+    "dropped_why": "",
+    "ingest_stats": {
+      "не своп / счета не зависят от цены -- шаблон подтверждён": 319,
+      "шаблона нет": 135,
+      "новый шаблон": 182
+    }
+  },
+  "leg_static": {
+    "fayl": "/home/bot/data/nogi_shablony.json",
+    "obrazcov": 1,
+    "zhivyh": 1,
+    "bez_shablona": 0,
+    "obnovleniy": 130,
+    "vozrast_s": 0.3,
+    "why_not": null,
+    "kotirovki": {
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "USDC"
+    },
+    "otkazy": {}
+  },
+  "two_step": {
+    "module": true,
+    "why_not": null,
+    "buy": true,
+    "sell": true
+  },
+  "telegram_commands": {
+    "enabled": true,
+    "why_not": "",
+    "accepted": 0,
+    "from_strangers": 0,
+    "errors": 0,
+    "last_error": "",
+    "last_command": "",
+    "last_command_utc": "",
+    "offset": 396350741,
+    "seen_chats": {}
+  },
+  "bloom_keepalive": {
+    "enabled": true,
+    "period_s": 20.0,
+    "ok": 34,
+    "failed": 0,
+    "skipped_while_buying": 0,
+    "last_code": 200,
+    "last_utc": "2026-09-28T05:31:39Z",
+    "last_error": ""
+  },
+  "executor_attached": true,
+  "executed": 0,
+  "exec_by_code": {},
+  "executor": {
+    "schema_version": 2,
+    "mode": "live",
+    "live_buy_enabled": true,
+    "live_test_enabled": false,
+    "dry_run": false,
+    "bump_sol": 0.005,
+    "buy_sol": 0.2,
+    "slippage_pct": 35.0,
+    "priority_fee": 0.001,
+    "processor_tip": 0.001,
+    "sell_after_s": 28.8,
+    "sell_slippage_pct": 40.0,
+    "sent": 0,
+    "refused": 0,
+    "last_error": "",
+    "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  "credits_logged": true,
+  "credits_log_error": "",
+  "decide_latency_ms": {
+    "n": 200,
+    "median": 0.8,
+    "min": 0.3,
+    "max": 14.8
+  }
+}
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-28T05:32:29Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-27T19:11:41Z",
-  "updated_ts": 1790536301.7371252,
+  "updated_utc": "2026-09-28T05:32:29Z",
+  "updated_ts": 1790573549.2562087,
   "mode": "live",
-  "positions_in_cycle": 0,
-  "last_cycle": [],
+  "positions_in_cycle": 1,
+  "last_cycle": [
+    {
+      "client_order_id": "lane-own-9gNUP1ee1ZX2CsN3PEfgPHwf9XdFiBTNsUnGJtMh",
+      "mint": "CC5D6puFmcsnGaJh7kNXeAcRpL2SZzQfoQezvx45uKjt",
+      "action": "ждём срок продажи полосы",
+      "why_not": null,
+      "balance_raw": null,
+      "attempt": null
+    }
+  ],
   "max_attempts": 2,
   "jupiter": {
     "enabled": true,
@@ -726,7 +789,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "format3": true,
     "tracked_messages": 0,
     "tracked_texts": 0,
-    "sent": 0,
+    "sent": 3,
     "failed": 0,
     "last_error": "",
     "off_reason": "",
@@ -734,7 +797,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
       "main": {
-        "sent": 0,
+        "sent": 3,
         "failed": 0,
         "last_error": ""
       },
@@ -745,7 +808,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       }
     }
   },
-  "credits_logged": null,
+  "credits_logged": true,
   "credits_log_error": "",
   "kill_sell": {
     "path": "/etc/bloom-executor/KILL_SELL",
@@ -754,10 +817,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "note": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-09-27T19:11:45Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-28T05:32:20Z):
 {
-  "updated_utc": "2026-09-27T19:11:45Z",
-  "uptime_s": 117629.2,
+  "updated_utc": "2026-09-28T05:32:20Z",
+  "uptime_s": 154864.2,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
@@ -783,35 +846,53 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "method": "logsSubscribe",
       "acked": 18,
       "of": 18
+    },
+    {
+      "utc": "2026-09-27T19:24:17Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-09-27T23:15:04Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-09-28T05:03:51Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
     }
   ],
   "источников": 18,
-  "событий_записано": 1908,
-  "дублей_пропущено": 2,
-  "неудачных_пропущено": 539,
-  "переподключений_tx": 3,
+  "событий_записано": 2573,
+  "дублей_пропущено": 4,
+  "неудачных_пропущено": 677,
+  "переподключений_tx": 6,
   "причины_разрыва_tx": {
-    "ConnectionClosedError: no close frame received or sent": 3
+    "ConnectionClosedError: no close frame received or sent": 6
   },
-  "слепое_время_с": 3.2,
-  "слепое_время_доля": 3e-05,
-  "переподключений_slot": 2,
-  "slot_уведомлений": 438782,
-  "текущий_слот": 451087182,
-  "последнее_событие_utc": "2026-09-27T19:11:21Z",
+  "слепое_время_с": 6.4,
+  "слепое_время_доля": 4e-05,
+  "переподключений_slot": 7,
+  "slot_уведомлений": 577361,
+  "текущий_слот": 451225829,
+  "последнее_событие_utc": "2026-09-28T05:32:05Z",
   "часы": {
-    "checked_at_utc": "2026-09-27T18:31:18Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Sun 2026-09-27 20:31:18 CEST\nRTCTimeUSec=Sun 2026-09-27 20:31:18 CEST",
+    "checked_at_utc": "2026-09-28T05:31:18Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Mon 2026-09-28 07:31:18 CEST\nRTCTimeUSec=Mon 2026-09-28 07:31:18 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
-/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-27T19:11:43Z):
+/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-28T05:32:28Z):
 {
-  "utc": "2026-09-27T19:11:43Z",
+  "utc": "2026-09-28T05:32:28Z",
   "started_utc": "2026-09-26T10:31:17Z",
-  "uptime_s": 117626.2,
+  "uptime_s": 154870.6,
   "channels": 4,
   "channel_names": [
     "grpc",
@@ -898,7 +979,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "spent_today": 14,
     "limit": 300000,
     "share": 0.0,
-    "projected_daily": 10,
+    "projected_daily": 7,
     "threshold": 0.7,
     "projection_limit": 200000,
     "window_s": 0.0,
@@ -930,10 +1011,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "rabbit_fra": 2474,
-      "rabbit_ams": 2471,
-      "grpc2": 1923,
-      "grpc": 1923
+      "rabbit_fra": 3278,
+      "rabbit_ams": 3275,
+      "grpc2": 2589,
+      "grpc": 2589
     },
     "duplicates": {},
     "unpaired_single_channel": {
@@ -947,111 +1028,104 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "by_group": {},
     "pairwise": {
       "grpc_vs_grpc2": {
-        "pairs": 58,
-        "first_share": 0.2931,
-        "median_ms": -3.54,
-        "p10_ms": -15.72,
-        "p90_ms": 1.56,
-        "p95_ms": 2.07,
-        "mean_ms": -5.81
+        "pairs": 23,
+        "first_share": 0.087,
+        "median_ms": -6.19,
+        "p10_ms": -77.82,
+        "p90_ms": -0.34,
+        "p95_ms": 0.72,
+        "mean_ms": -32.62
       },
       "grpc_vs_rabbit_ams": {
-        "pairs": 57,
-        "first_share": 0.0526,
-        "median_ms": -3.24,
-        "p10_ms": -19.58,
-        "p90_ms": -1.32,
-        "p95_ms": -0.63,
-        "mean_ms": -3.28
+        "pairs": 23,
+        "first_share": 0.0,
+        "median_ms": -7.98,
+        "p10_ms": -76.08,
+        "p90_ms": -4.14,
+        "p95_ms": -3.82,
+        "mean_ms": -35.19
       },
       "grpc_vs_rabbit_fra": {
-        "pairs": 58,
-        "first_share": 0.069,
-        "median_ms": -5.83,
-        "p10_ms": -20.44,
-        "p90_ms": -0.81,
-        "p95_ms": 0.97,
-        "mean_ms": -8.36
+        "pairs": 23,
+        "first_share": 0.0,
+        "median_ms": -11.07,
+        "p10_ms": -80.41,
+        "p90_ms": -3.03,
+        "p95_ms": -2.47,
+        "mean_ms": -36.38
       },
       "grpc2_vs_rabbit_ams": {
-        "pairs": 57,
-        "first_share": 0.3509,
-        "median_ms": -1.74,
-        "p10_ms": -5.2,
-        "p90_ms": 1.69,
-        "p95_ms": 4.87,
-        "mean_ms": 2.57
+        "pairs": 23,
+        "first_share": 0.2609,
+        "median_ms": -2.56,
+        "p10_ms": -7.0,
+        "p90_ms": 1.75,
+        "p95_ms": 2.78,
+        "mean_ms": -2.58
       },
       "grpc2_vs_rabbit_fra": {
-        "pairs": 58,
-        "first_share": 0.0862,
-        "median_ms": -2.92,
-        "p10_ms": -4.75,
-        "p90_ms": -0.55,
-        "p95_ms": 0.64,
-        "mean_ms": -2.55
+        "pairs": 23,
+        "first_share": 0.0,
+        "median_ms": -3.24,
+        "p10_ms": -7.48,
+        "p90_ms": -1.86,
+        "p95_ms": -1.48,
+        "mean_ms": -3.76
       },
       "rabbit_ams_vs_rabbit_fra": {
-        "pairs": 71,
-        "first_share": 0.4366,
-        "median_ms": -1.21,
-        "p10_ms": -4.89,
-        "p90_ms": 2.87,
-        "p95_ms": 6.15,
-        "mean_ms": -12.35
+        "pairs": 36,
+        "first_share": 0.4444,
+        "median_ms": -0.36,
+        "p10_ms": -4.29,
+        "p90_ms": 1.85,
+        "p95_ms": 2.74,
+        "mean_ms": -12.29
       }
     },
-    "pairs_total": 72
+    "pairs_total": 36
   }
 }
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 120578 строк
-/home/bot/bloom_executor_live_data/positions.jsonl: 1495 строк
-/home/bot/dbot_detect_probe/events.jsonl: 11202 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 254017 строк
+/home/bot/bloom_executor_live_data/positions.jsonl: 263 строк
+/home/bot/dbot_detect_probe/events.jsonl: 11867 строк
 
 --- решения детектора по кодам ---
-всего решений: 120604
-первое: "ts_utc": "2026-09-26T22:00:01Z"
-последнее: "ts_utc": "2026-09-27T19:11:50Z"
+всего решений: 254017
+первое: "ts_utc": "2026-09-27T22:00:02Z"
+последнее: "ts_utc": "2026-09-28T05:32:32Z"
 по кодам:
-  71948 NOT_A_BUY
-  15573 TARGET_AMOUNT_OUT_OF_RANGE
-   4867 TOKEN_RECEIVED_NOT_BOUGHT
-   1340 INSUFFICIENT_BALANCE
-   1106 BUY
-    788 STALE
-    569 SKIP_TARGET_INCREASE_POSITION
-    326 AMBIGUOUS_TX
-    101 THRESHOLD_EDGE
-     74 MAX_BUY_TIMES_PER_TOKEN_REACHED
-     65 OWN_TX_SEEN
-     46 KILL_SWITCH
-     40 SKIP_TAXED_ROUTE
-     11 SKIPPED_DUP_MINT
+ 201467 NOT_A_BUY
+  16776 TARGET_AMOUNT_OUT_OF_RANGE
+   6528 TOKEN_RECEIVED_NOT_BOUGHT
+   2649 STALE
+   1914 INSUFFICIENT_BALANCE
+    797 SKIP_TARGET_INCREASE_POSITION
+    441 AMBIGUOUS_TX
+    296 THRESHOLD_EDGE
+     83 SKIP_TAXED_ROUTE
+      2 WS_BREAK
 по задачам источника:
-  60441 log_only
-  32106 speed_only
-   1997 lane_only
-    882 BATCH-5
-    403 off
-    371 BATCH-3
-    339 lane_s0
-    114 batch5
-      4 TEST
-забран bloom_detector.json (13680 байт)
-забран bloom_seller.json (7776 байт)
+ 228149 log_only
+   1156 off
+    911 lane_s0
+    326 BATCH-5
+    252 batch5
+    127 BATCH-3
+забран bloom_detector.json (15293 байт)
+забран bloom_seller.json (8951 байт)
 забран c2_own_send_dry.json (793 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 425408 кредитов, бюджет 1000000, доля 0.4254
-  bloom_seller: 219 кредитов, бюджет 15000, доля 0.0146
-  ВСЕГО за 2026-09-27: 425627 кредитов
+  bloom_detector: 1351725 кредитов, бюджет 1000000, доля 1.3517  ВЫШЕ БЮДЖЕТА (останов запрещён владельцем -- только доклад)
+  bloom_seller: 19 кредитов, бюджет 15000, доля 0.0013
+  ВСЕГО за 2026-09-28: 1351744 кредитов
 
 --- возраст признаков жизни (порог 600 с) ---
-/home/bot/bloom_executor_live_data/detector_status.json: 28 с (свежий)
+/home/bot/bloom_executor_live_data/detector_status.json: 66 с (свежий)
 /home/bot/bloom_executor_live_data/seller_heartbeat.json: 9 с (свежий)
-/home/bot/dbot_detect_probe/status.json: 20 с (свежий)
-/home/bot/grpc_feed_probe_data/heartbeat.json: 2 с (свежий)
+/home/bot/dbot_detect_probe/status.json: 33 с (свежий)
+/home/bot/grpc_feed_probe_data/heartbeat.json: 5 с (свежий)
 
 --- сбои за последние 60 минут ---
 сбоев в окне нет
@@ -1059,303 +1133,303 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
 журнала продаж нет
 
 --- журнал детектора (ключи вычищены) ---
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,005 INFO полоса: старт на 239LBdbFbZya
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,020 INFO полоса: конец на 239LBdbFbZya -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,039 INFO полоса: старт на 5uNkU5jkZbQv
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,058 INFO полоса: конец на 5uNkU5jkZbQv -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,073 INFO полоса: старт на 2Z8Nf7PZc62Y
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,089 INFO полоса: конец на 2Z8Nf7PZc62Y -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,116 INFO полоса: старт на 4jVKkAsS6Mj4
-Sep 27 20:45:43 claude-nl python[381547]: 2026-09-27 20:45:43,119 INFO полоса: конец на 4jVKkAsS6Mj4 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:45:53 claude-nl python[381547]: 2026-09-27 20:45:53,910 INFO полоса: старт на 2ZxAYNZwpMnw
-Sep 27 20:45:53 claude-nl python[381547]: 2026-09-27 20:45:53,929 INFO полоса: конец на 2ZxAYNZwpMnw -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:46:29 claude-nl python[381547]: 2026-09-27 20:46:29,250 INFO таблицы адресов догружены: 50, в очереди осталось 0
-Sep 27 20:46:39 claude-nl python[381547]: 2026-09-27 20:46:39,946 INFO полоса: старт на 45mtnE3RAUmR
-Sep 27 20:46:39 claude-nl python[381547]: 2026-09-27 20:46:39,959 INFO полоса: конец на 45mtnE3RAUmR -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:06 claude-nl python[381547]: 2026-09-27 20:47:06,060 INFO полоса: старт на 5pxBGnBsvL23
-Sep 27 20:47:06 claude-nl python[381547]: 2026-09-27 20:47:06,076 INFO полоса: конец на 5pxBGnBsvL23 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:26 claude-nl python[381547]: 2026-09-27 20:47:26,389 INFO полоса: старт на 3WWzNzwe9nB3
-Sep 27 20:47:26 claude-nl python[381547]: 2026-09-27 20:47:26,404 INFO полоса: конец на 3WWzNzwe9nB3 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:35 claude-nl python[381547]: 2026-09-27 20:47:35,078 INFO полоса: старт на 2BhVW2Nc8HV4
-Sep 27 20:47:35 claude-nl python[381547]: 2026-09-27 20:47:35,091 INFO полоса: конец на 2BhVW2Nc8HV4 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:40 claude-nl python[381547]: 2026-09-27 20:47:40,033 INFO таблицы адресов догружены: 40, в очереди осталось 0
-Sep 27 20:47:40 claude-nl python[381547]: 2026-09-27 20:47:40,792 INFO полоса: старт на K8Qj32ZGUvtV
-Sep 27 20:47:40 claude-nl python[381547]: 2026-09-27 20:47:40,805 INFO полоса: конец на K8Qj32ZGUvtV -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:47 claude-nl python[381547]: 2026-09-27 20:47:47,010 INFO полоса: старт на 5p2biFyFzery
-Sep 27 20:47:47 claude-nl python[381547]: 2026-09-27 20:47:47,024 INFO полоса: конец на 5p2biFyFzery -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:50 claude-nl python[381547]: 2026-09-27 20:47:50,599 INFO полоса: старт на 3mw5uUP1uCe5
-Sep 27 20:47:50 claude-nl python[381547]: 2026-09-27 20:47:50,610 INFO полоса: конец на 3mw5uUP1uCe5 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:51 claude-nl python[381547]: 2026-09-27 20:47:51,611 INFO полоса: старт на 2a3AkGmLp39v
-Sep 27 20:47:51 claude-nl python[381547]: 2026-09-27 20:47:51,625 INFO полоса: конец на 2a3AkGmLp39v -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:52 claude-nl python[381547]: 2026-09-27 20:47:52,701 INFO полоса: старт на 3MNPpkHTnumE
-Sep 27 20:47:52 claude-nl python[381547]: 2026-09-27 20:47:52,718 INFO полоса: конец на 3MNPpkHTnumE -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:53 claude-nl python[381547]: 2026-09-27 20:47:53,889 INFO полоса: старт на 3kjEHB5qaCE2
-Sep 27 20:47:53 claude-nl python[381547]: 2026-09-27 20:47:53,902 INFO полоса: конец на 3kjEHB5qaCE2 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:47:59 claude-nl python[381547]: 2026-09-27 20:47:59,405 INFO полоса: старт на 5ZVdQug5m9gH
-Sep 27 20:47:59 claude-nl python[381547]: 2026-09-27 20:47:59,413 INFO полоса: конец на 5ZVdQug5m9gH -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:48:11 claude-nl python[381547]: 2026-09-27 20:48:11,566 INFO полоса: старт на rpr9bp9objeP
-Sep 27 20:48:11 claude-nl python[381547]: 2026-09-27 20:48:11,581 INFO полоса: конец на rpr9bp9objeP -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:48:23 claude-nl python[381547]: 2026-09-27 20:48:23,596 INFO полоса: старт на KsmNZWKSpqqS
-Sep 27 20:48:23 claude-nl python[381547]: 2026-09-27 20:48:23,608 INFO полоса: конец на KsmNZWKSpqqS -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:48:51 claude-nl python[381547]: 2026-09-27 20:48:51,437 INFO таблицы адресов догружены: 41, в очереди осталось 0
-Sep 27 20:48:54 claude-nl python[381547]: 2026-09-27 20:48:54,698 INFO полоса: старт на 3rzSGxXQMaM8
-Sep 27 20:48:54 claude-nl python[381547]: 2026-09-27 20:48:54,710 INFO полоса: конец на 3rzSGxXQMaM8 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:49:13 claude-nl python[381547]: 2026-09-27 20:49:13,398 INFO полоса: старт на 4emZ6G9e1BrY
-Sep 27 20:49:13 claude-nl python[381547]: 2026-09-27 20:49:13,414 INFO полоса: конец на 4emZ6G9e1BrY -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:49:26 claude-nl python[381547]: 2026-09-27 20:49:26,531 INFO полоса: старт на 4UwYvEZQ6koS
-Sep 27 20:49:26 claude-nl python[381547]: 2026-09-27 20:49:26,547 INFO полоса: конец на 4UwYvEZQ6koS -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:49:28 claude-nl python[381547]: 2026-09-27 20:49:28,230 INFO полоса: старт на 47zJwXwEsRHe
-Sep 27 20:49:28 claude-nl python[381547]: 2026-09-27 20:49:28,234 INFO полоса: конец на 47zJwXwEsRHe -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:49:30 claude-nl python[381547]: 2026-09-27 20:49:30,379 INFO полоса: старт на KLUEugBGeefK
-Sep 27 20:49:30 claude-nl python[381547]: 2026-09-27 20:49:30,396 INFO полоса: конец на KLUEugBGeefK -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:50:02 claude-nl python[381547]: 2026-09-27 20:50:02,954 INFO таблицы адресов догружены: 39, в очереди осталось 0
-Sep 27 20:50:33 claude-nl python[381547]: 2026-09-27 20:50:33,494 INFO полоса: старт на 5ZDEjWqqjoHp
-Sep 27 20:50:33 claude-nl python[381547]: 2026-09-27 20:50:33,508 INFO полоса: конец на 5ZDEjWqqjoHp -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:50:39 claude-nl python[381547]: 2026-09-27 20:50:39,126 INFO полоса: старт на hm69GBdxwmha
-Sep 27 20:50:39 claude-nl python[381547]: 2026-09-27 20:50:39,143 INFO полоса: конец на hm69GBdxwmha -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:50:40 claude-nl python[381547]: 2026-09-27 20:50:40,085 INFO полоса: старт на 3xMMcw3X6dDc
-Sep 27 20:50:40 claude-nl python[381547]: 2026-09-27 20:50:40,099 INFO полоса: конец на 3xMMcw3X6dDc -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:51:10 claude-nl python[381547]: 2026-09-27 20:51:10,438 INFO полоса: старт на 2QmfKdTLJZ9g
-Sep 27 20:51:10 claude-nl python[381547]: 2026-09-27 20:51:10,450 INFO полоса: конец на 2QmfKdTLJZ9g -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:51:13 claude-nl python[381547]: 2026-09-27 20:51:13,888 INFO таблицы адресов догружены: 46, в очереди осталось 0
-Sep 27 20:51:33 claude-nl python[381547]: 2026-09-27 20:51:33,401 INFO полоса: старт на 2tPNLmu4h4Bz
-Sep 27 20:51:33 claude-nl python[381547]: 2026-09-27 20:51:33,403 INFO полоса: конец на 2tPNLmu4h4Bz -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:51:45 claude-nl python[381547]: 2026-09-27 20:51:45,269 INFO полоса: старт на 2bEkUUjGz7wm
-Sep 27 20:51:45 claude-nl python[381547]: 2026-09-27 20:51:45,284 INFO полоса: конец на 2bEkUUjGz7wm -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:52:11 claude-nl python[381547]: 2026-09-27 20:52:11,421 INFO полоса: старт на 4nKFs72piEwB
-Sep 27 20:52:11 claude-nl python[381547]: 2026-09-27 20:52:11,434 INFO полоса: конец на 4nKFs72piEwB -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:52:19 claude-nl python[381547]: 2026-09-27 20:52:19,706 INFO полоса: старт на 5qkJnAgoZL5M
-Sep 27 20:52:19 claude-nl python[381547]: 2026-09-27 20:52:19,720 INFO полоса: конец на 5qkJnAgoZL5M -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:52:26 claude-nl python[381547]: 2026-09-27 20:52:26,037 INFO таблицы адресов догружены: 66, в очереди осталось 0
-Sep 27 20:52:28 claude-nl python[381547]: 2026-09-27 20:52:28,436 INFO полоса: старт на hq5MT1v6dr7z
-Sep 27 20:52:28 claude-nl python[381547]: 2026-09-27 20:52:28,479 INFO полоса: конец на hq5MT1v6dr7z -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:52:30 claude-nl python[381547]: 2026-09-27 20:52:30,850 INFO полоса: старт на 3z3XyN6xXLjN
-Sep 27 20:52:30 claude-nl python[381547]: 2026-09-27 20:52:30,865 INFO полоса: конец на 3z3XyN6xXLjN -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:52:34 claude-nl python[381547]: 2026-09-27 20:52:34,956 INFO полоса: старт на 3Hq5qT38zVQ6
-Sep 27 20:52:34 claude-nl python[381547]: 2026-09-27 20:52:34,978 INFO полоса: конец на 3Hq5qT38zVQ6 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:52:50 claude-nl python[381547]: 2026-09-27 20:52:50,085 INFO полоса: старт на 5MwjSGavg1kJ
-Sep 27 20:52:50 claude-nl python[381547]: 2026-09-27 20:52:50,099 INFO полоса: конец на 5MwjSGavg1kJ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:02 claude-nl python[381547]: 2026-09-27 20:53:02,092 INFO полоса: старт на 47xVyUEzRETL
-Sep 27 20:53:02 claude-nl python[381547]: 2026-09-27 20:53:02,108 INFO полоса: конец на 47xVyUEzRETL -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:02 claude-nl python[381547]: 2026-09-27 20:53:02,562 INFO полоса: старт на 41XJi5QnRuuZ
-Sep 27 20:53:02 claude-nl python[381547]: 2026-09-27 20:53:02,583 INFO полоса: конец на 41XJi5QnRuuZ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:07 claude-nl python[381547]: 2026-09-27 20:53:07,671 INFO полоса: старт на 46kzxpod2Wt1
-Sep 27 20:53:07 claude-nl python[381547]: 2026-09-27 20:53:07,685 INFO полоса: конец на 46kzxpod2Wt1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:14 claude-nl python[381547]: 2026-09-27 20:53:14,900 INFO полоса: старт на 58X8c4Wti62M
-Sep 27 20:53:14 claude-nl python[381547]: 2026-09-27 20:53:14,916 INFO полоса: конец на 58X8c4Wti62M -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:17 claude-nl python[381547]: 2026-09-27 20:53:17,382 INFO полоса: старт на 4ozbsK6C41zb
-Sep 27 20:53:17 claude-nl python[381547]: 2026-09-27 20:53:17,401 INFO полоса: конец на 4ozbsK6C41zb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:28 claude-nl python[381547]: 2026-09-27 20:53:28,056 INFO полоса: старт на 2ZSSVmpCgS2p
-Sep 27 20:53:28 claude-nl python[381547]: 2026-09-27 20:53:28,071 INFO полоса: конец на 2ZSSVmpCgS2p -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:29 claude-nl python[381547]: 2026-09-27 20:53:29,289 INFO полоса: старт на 5nZcQA9CZMFD
-Sep 27 20:53:29 claude-nl python[381547]: 2026-09-27 20:53:29,304 INFO полоса: конец на 5nZcQA9CZMFD -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:32 claude-nl python[381547]: 2026-09-27 20:53:32,434 INFO полоса: старт на 4ytyXeSy5jZL
-Sep 27 20:53:32 claude-nl python[381547]: 2026-09-27 20:53:32,453 INFO полоса: конец на 4ytyXeSy5jZL -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:36 claude-nl python[381547]: 2026-09-27 20:53:36,955 INFO таблицы адресов догружены: 79, в очереди осталось 0
-Sep 27 20:53:44 claude-nl python[381547]: 2026-09-27 20:53:44,263 INFO полоса: старт на sMiFafMaQiSL
-Sep 27 20:53:44 claude-nl python[381547]: 2026-09-27 20:53:44,292 INFO полоса: конец на sMiFafMaQiSL -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:54 claude-nl python[381547]: 2026-09-27 20:53:54,865 INFO полоса: старт на 4CKWWC7ugjZq
-Sep 27 20:53:54 claude-nl python[381547]: 2026-09-27 20:53:54,882 INFO полоса: конец на 4CKWWC7ugjZq -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:53:57 claude-nl python[381547]: 2026-09-27 20:53:57,298 INFO полоса: старт на 5XYPAgnzKboH
-Sep 27 20:53:57 claude-nl python[381547]: 2026-09-27 20:53:57,312 INFO полоса: конец на 5XYPAgnzKboH -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:01 claude-nl python[381547]: 2026-09-27 20:54:01,578 INFO полоса: старт на 218Mv1k5NBkN
-Sep 27 20:54:01 claude-nl python[381547]: 2026-09-27 20:54:01,612 INFO полоса: конец на 218Mv1k5NBkN -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:01 claude-nl python[381547]: 2026-09-27 20:54:01,632 INFO полоса: старт на 5V61AmzQadFa
-Sep 27 20:54:01 claude-nl python[381547]: 2026-09-27 20:54:01,661 INFO полоса: конец на 5V61AmzQadFa -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:01 claude-nl python[381547]: 2026-09-27 20:54:01,669 INFO полоса: старт на 58RyoGbPJFyR
-Sep 27 20:54:01 claude-nl python[381547]: 2026-09-27 20:54:01,682 INFO полоса: конец на 58RyoGbPJFyR -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:12 claude-nl python[381547]: 2026-09-27 20:54:12,791 INFO полоса: старт на 41jB3VhyJ3tc
-Sep 27 20:54:12 claude-nl python[381547]: 2026-09-27 20:54:12,805 INFO полоса: конец на 41jB3VhyJ3tc -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:18 claude-nl python[381547]: 2026-09-27 20:54:18,477 INFO полоса: старт на 2oJWBAkHrcHU
-Sep 27 20:54:18 claude-nl python[381547]: 2026-09-27 20:54:18,492 INFO полоса: конец на 2oJWBAkHrcHU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:30 claude-nl python[381547]: 2026-09-27 20:54:30,042 INFO полоса: старт на 2autvZ5WRvax
-Sep 27 20:54:30 claude-nl python[381547]: 2026-09-27 20:54:30,055 INFO полоса: конец на 2autvZ5WRvax -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:48 claude-nl python[381547]: 2026-09-27 20:54:48,061 INFO таблицы адресов догружены: 25, в очереди осталось 0
-Sep 27 20:54:48 claude-nl python[381547]: 2026-09-27 20:54:48,121 INFO полоса: старт на 5qSHuxtFJpz1
-Sep 27 20:54:48 claude-nl python[381547]: 2026-09-27 20:54:48,144 INFO полоса: конец на 5qSHuxtFJpz1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:51 claude-nl python[381547]: 2026-09-27 20:54:51,178 INFO полоса: старт на 4x2Qmpn2qMvk
-Sep 27 20:54:51 claude-nl python[381547]: 2026-09-27 20:54:51,193 INFO полоса: конец на 4x2Qmpn2qMvk -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:54:58 claude-nl python[381547]: 2026-09-27 20:54:58,272 INFO полоса: старт на zpKYwdBsXsWP
-Sep 27 20:54:58 claude-nl python[381547]: 2026-09-27 20:54:58,288 INFO полоса: конец на zpKYwdBsXsWP -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:55:04 claude-nl python[381547]: 2026-09-27 20:55:04,724 INFO полоса: старт на 4JzebepWbdZt
-Sep 27 20:55:04 claude-nl python[381547]: 2026-09-27 20:55:04,737 INFO полоса: конец на 4JzebepWbdZt -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:55:16 claude-nl python[381547]: 2026-09-27 20:55:16,516 INFO полоса: старт на 4dapHyj8o4jk
-Sep 27 20:55:16 claude-nl python[381547]: 2026-09-27 20:55:16,534 INFO полоса: конец на 4dapHyj8o4jk -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:55:23 claude-nl python[381547]: 2026-09-27 20:55:23,164 WARNING часы слотов оборвались (ConnectionClosedError: no close frame received or sent) -- переподключение через 1 с
-Sep 27 20:55:24 claude-nl python[381547]: 2026-09-27 20:55:24,226 INFO slotSubscribe подтверждён (подписка 12550159)
-Sep 27 20:55:25 claude-nl python[381547]: 2026-09-27 20:55:25,875 INFO полоса: старт на 4iz2AxwtNw1s
-Sep 27 20:55:25 claude-nl python[381547]: 2026-09-27 20:55:25,894 INFO полоса: конец на 4iz2AxwtNw1s -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:55:45 claude-nl python[381547]: 2026-09-27 20:55:45,592 INFO полоса: старт на 3k4R3oryizCu
-Sep 27 20:55:45 claude-nl python[381547]: 2026-09-27 20:55:45,605 INFO полоса: конец на 3k4R3oryizCu -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:55:58 claude-nl python[381547]: 2026-09-27 20:55:58,917 INFO таблицы адресов догружены: 50, в очереди осталось 0
-Sep 27 20:56:04 claude-nl python[381547]: 2026-09-27 20:56:04,403 INFO полоса: старт на 5tt2joy9kv3G
-Sep 27 20:56:04 claude-nl python[381547]: 2026-09-27 20:56:04,416 INFO полоса: конец на 5tt2joy9kv3G -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:56:12 claude-nl python[381547]: 2026-09-27 20:56:12,933 INFO полоса: старт на bdnAfp6tYmKL
-Sep 27 20:56:12 claude-nl python[381547]: 2026-09-27 20:56:12,950 INFO полоса: конец на bdnAfp6tYmKL -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:56:20 claude-nl python[381547]: 2026-09-27 20:56:20,051 INFO полоса: старт на 5TcsHuGcZBdi
-Sep 27 20:56:20 claude-nl python[381547]: 2026-09-27 20:56:20,068 INFO полоса: конец на 5TcsHuGcZBdi -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:56:25 claude-nl python[381547]: 2026-09-27 20:56:25,004 INFO полоса: старт на qM2CkWXW9aTG
-Sep 27 20:56:25 claude-nl python[381547]: 2026-09-27 20:56:25,019 INFO полоса: конец на qM2CkWXW9aTG -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:56:29 claude-nl python[381547]: 2026-09-27 20:56:29,791 INFO полоса: старт на 5GEbhgcU4Rrt
-Sep 27 20:56:29 claude-nl python[381547]: 2026-09-27 20:56:29,807 INFO полоса: конец на 5GEbhgcU4Rrt -- gate предел полосы: по группе off полоса не торгует (lane_trades выключен)
-Sep 27 20:57:00 claude-nl python[381547]: 2026-09-27 20:57:00,550 INFO полоса: старт на 2ozz8F3VPmQx
-Sep 27 20:57:00 claude-nl python[381547]: 2026-09-27 20:57:00,562 INFO полоса: конец на 2ozz8F3VPmQx -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:57:09 claude-nl python[381547]: 2026-09-27 20:57:09,920 INFO таблицы адресов догружены: 15, в очереди осталось 0
-Sep 27 20:57:16 claude-nl python[381547]: 2026-09-27 20:57:16,838 INFO полоса: старт на 4CjnVWSYxTdK
-Sep 27 20:57:16 claude-nl python[381547]: 2026-09-27 20:57:16,854 INFO полоса: конец на 4CjnVWSYxTdK -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:57:32 claude-nl python[381547]: 2026-09-27 20:57:32,001 INFO полоса: старт на 5QoeyPiqm63S
-Sep 27 20:57:32 claude-nl python[381547]: 2026-09-27 20:57:32,022 INFO полоса: конец на 5QoeyPiqm63S -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:57:32 claude-nl python[381547]: 2026-09-27 20:57:32,120 INFO полоса: старт на 38wLBAxgFzu3
-Sep 27 20:57:32 claude-nl python[381547]: 2026-09-27 20:57:32,135 INFO полоса: конец на 38wLBAxgFzu3 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:57:47 claude-nl python[381547]: 2026-09-27 20:57:47,434 INFO полоса: старт на 34xKsxnTqmWm
-Sep 27 20:57:47 claude-nl python[381547]: 2026-09-27 20:57:47,449 INFO полоса: конец на 34xKsxnTqmWm -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:58:00 claude-nl python[381547]: 2026-09-27 20:58:00,821 INFO полоса: старт на 5AsZRCY6TPaN
-Sep 27 20:58:00 claude-nl python[381547]: 2026-09-27 20:58:00,836 INFO полоса: конец на 5AsZRCY6TPaN -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:58:06 claude-nl python[381547]: 2026-09-27 20:58:06,819 INFO полоса: старт на 3ZJyX3nKDatA
-Sep 27 20:58:06 claude-nl python[381547]: 2026-09-27 20:58:06,833 INFO полоса: конец на 3ZJyX3nKDatA -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:58:13 claude-nl python[381547]: 2026-09-27 20:58:13,156 INFO полоса: старт на 2oLbbrUeooGM
-Sep 27 20:58:13 claude-nl python[381547]: 2026-09-27 20:58:13,167 INFO полоса: конец на 2oLbbrUeooGM -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:58:20 claude-nl python[381547]: 2026-09-27 20:58:20,849 INFO таблицы адресов догружены: 31, в очереди осталось 0
-Sep 27 20:58:40 claude-nl python[381547]: 2026-09-27 20:58:40,517 INFO полоса: старт на 5XMNdHsSUgtn
-Sep 27 20:58:40 claude-nl python[381547]: 2026-09-27 20:58:40,533 INFO полоса: конец на 5XMNdHsSUgtn -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:58:46 claude-nl python[381547]: 2026-09-27 20:58:46,941 INFO полоса: старт на 4P7RTwgSgNJy
-Sep 27 20:58:46 claude-nl python[381547]: 2026-09-27 20:58:46,955 INFO полоса: конец на 4P7RTwgSgNJy -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:59:07 claude-nl python[381547]: 2026-09-27 20:59:07,246 INFO полоса: старт на 57Mq6hNsLZo7
-Sep 27 20:59:07 claude-nl python[381547]: 2026-09-27 20:59:07,260 INFO полоса: конец на 57Mq6hNsLZo7 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:59:29 claude-nl python[381547]: 2026-09-27 20:59:29,171 INFO полоса: старт на 5QW9KhXAbHb8
-Sep 27 20:59:29 claude-nl python[381547]: 2026-09-27 20:59:29,185 INFO полоса: конец на 5QW9KhXAbHb8 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:59:29 claude-nl python[381547]: 2026-09-27 20:59:29,525 INFO полоса: старт на 4LNqHANpTEcd
-Sep 27 20:59:29 claude-nl python[381547]: 2026-09-27 20:59:29,540 INFO полоса: конец на 4LNqHANpTEcd -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:59:31 claude-nl python[381547]: 2026-09-27 20:59:31,856 INFO таблицы адресов догружены: 31, в очереди осталось 0
-Sep 27 20:59:38 claude-nl python[381547]: 2026-09-27 20:59:38,603 INFO полоса: старт на 31BLPEbCn93A
-Sep 27 20:59:38 claude-nl python[381547]: 2026-09-27 20:59:38,615 INFO полоса: конец на 31BLPEbCn93A -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:59:39 claude-nl python[381547]: 2026-09-27 20:59:39,760 INFO полоса: старт на 1w4dHzVbDu8W
-Sep 27 20:59:39 claude-nl python[381547]: 2026-09-27 20:59:39,770 INFO полоса: конец на 1w4dHzVbDu8W -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 20:59:55 claude-nl python[381547]: 2026-09-27 20:59:55,873 INFO полоса: старт на 2LQMk7AVX7gE
-Sep 27 20:59:55 claude-nl python[381547]: 2026-09-27 20:59:55,886 INFO полоса: конец на 2LQMk7AVX7gE -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:00:14 claude-nl python[381547]: 2026-09-27 21:00:14,366 INFO полоса: старт на oBUufWi5oqFC
-Sep 27 21:00:14 claude-nl python[381547]: 2026-09-27 21:00:14,384 INFO полоса: конец на oBUufWi5oqFC -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:00:22 claude-nl python[381547]: 2026-09-27 21:00:22,639 INFO полоса: старт на 3QDCz8jBUWVg
-Sep 27 21:00:22 claude-nl python[381547]: 2026-09-27 21:00:22,652 INFO полоса: конец на 3QDCz8jBUWVg -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:00:27 claude-nl python[381547]: 2026-09-27 21:00:27,074 INFO полоса: старт на 5yuY94QaewFx
-Sep 27 21:00:27 claude-nl python[381547]: 2026-09-27 21:00:27,090 INFO полоса: конец на 5yuY94QaewFx -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:00:35 claude-nl python[381547]: 2026-09-27 21:00:35,382 INFO полоса: старт на 5ZiUNMpDpjBM
-Sep 27 21:00:35 claude-nl python[381547]: 2026-09-27 21:00:35,398 INFO полоса: конец на 5ZiUNMpDpjBM -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:00:42 claude-nl python[381547]: 2026-09-27 21:00:42,837 INFO таблицы адресов догружены: 38, в очереди осталось 0
-Sep 27 21:00:45 claude-nl python[381547]: 2026-09-27 21:00:45,055 INFO полоса: старт на 3UzWBuNijsk1
-Sep 27 21:00:45 claude-nl python[381547]: 2026-09-27 21:00:45,074 INFO полоса: конец на 3UzWBuNijsk1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:00:55 claude-nl python[381547]: 2026-09-27 21:00:55,153 INFO полоса: старт на qoPbR8mFFh5E
-Sep 27 21:00:55 claude-nl python[381547]: 2026-09-27 21:00:55,171 INFO полоса: конец на qoPbR8mFFh5E -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:00 claude-nl python[381547]: 2026-09-27 21:01:00,645 INFO полоса: старт на 5HEYXBoNCTpb
-Sep 27 21:01:00 claude-nl python[381547]: 2026-09-27 21:01:00,661 INFO полоса: конец на 5HEYXBoNCTpb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:01 claude-nl python[381547]: 2026-09-27 21:01:01,019 INFO полоса: старт на 58GhBVLDhCpM
-Sep 27 21:01:01 claude-nl python[381547]: 2026-09-27 21:01:01,032 INFO полоса: конец на 58GhBVLDhCpM -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:02 claude-nl python[381547]: 2026-09-27 21:01:02,267 INFO полоса: старт на PsSYy33NobVH
-Sep 27 21:01:02 claude-nl python[381547]: 2026-09-27 21:01:02,291 INFO полоса: конец на PsSYy33NobVH -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:04 claude-nl python[381547]: 2026-09-27 21:01:04,314 INFO полоса: старт на 3vVTe5ww2Jbb
-Sep 27 21:01:04 claude-nl python[381547]: 2026-09-27 21:01:04,322 INFO полоса: конец на 3vVTe5ww2Jbb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:09 claude-nl python[381547]: 2026-09-27 21:01:09,382 INFO полоса: старт на 4Eqfmncoa5uE
-Sep 27 21:01:09 claude-nl python[381547]: 2026-09-27 21:01:09,415 INFO полоса: конец на 4Eqfmncoa5uE -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:13 claude-nl python[381547]: 2026-09-27 21:01:13,348 INFO полоса: старт на wDcx8fjhi21d
-Sep 27 21:01:13 claude-nl python[381547]: 2026-09-27 21:01:13,363 INFO полоса: конец на wDcx8fjhi21d -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:51 claude-nl python[381547]: 2026-09-27 21:01:51,208 INFO полоса: старт на aKprNkJv2nLZ
-Sep 27 21:01:51 claude-nl python[381547]: 2026-09-27 21:01:51,223 INFO полоса: конец на aKprNkJv2nLZ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:01:53 claude-nl python[381547]: 2026-09-27 21:01:53,816 INFO таблицы адресов догружены: 23, в очереди осталось 0
-Sep 27 21:02:00 claude-nl python[381547]: 2026-09-27 21:02:00,211 INFO полоса: старт на 2AAEAR5HT3FC
-Sep 27 21:02:00 claude-nl python[381547]: 2026-09-27 21:02:00,225 INFO полоса: конец на 2AAEAR5HT3FC -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:02:00 claude-nl python[381547]: 2026-09-27 21:02:00,612 INFO полоса: старт на 3RwMF52DY9Kx
-Sep 27 21:02:00 claude-nl python[381547]: 2026-09-27 21:02:00,624 INFO полоса: конец на 3RwMF52DY9Kx -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:02:11 claude-nl python[381547]: 2026-09-27 21:02:11,679 INFO полоса: старт на QzLQWqtR8DP1
-Sep 27 21:02:11 claude-nl python[381547]: 2026-09-27 21:02:11,693 INFO полоса: конец на QzLQWqtR8DP1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:02:18 claude-nl python[381547]: 2026-09-27 21:02:18,449 INFO полоса: старт на 4oixjNTTmKPw
-Sep 27 21:02:18 claude-nl python[381547]: 2026-09-27 21:02:18,467 INFO полоса: конец на 4oixjNTTmKPw -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:02:41 claude-nl python[381547]: 2026-09-27 21:02:41,472 INFO полоса: старт на 5QMNp8pByhFU
-Sep 27 21:02:41 claude-nl python[381547]: 2026-09-27 21:02:41,486 INFO полоса: конец на 5QMNp8pByhFU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:02:43 claude-nl python[381547]: 2026-09-27 21:02:43,210 INFO полоса: старт на 5eq7fQjs6gue
-Sep 27 21:02:43 claude-nl python[381547]: 2026-09-27 21:02:43,224 INFO полоса: конец на 5eq7fQjs6gue -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:02:56 claude-nl python[381547]: 2026-09-27 21:02:56,698 INFO полоса: старт на 4jFzurhEx3Cb
-Sep 27 21:02:56 claude-nl python[381547]: 2026-09-27 21:02:56,716 INFO полоса: конец на 4jFzurhEx3Cb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:03:06 claude-nl python[381547]: 2026-09-27 21:03:06,641 INFO полоса: старт на 5pt4LWWzWxXV
-Sep 27 21:03:06 claude-nl python[381547]: 2026-09-27 21:03:06,654 INFO полоса: конец на 5pt4LWWzWxXV -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:03:06 claude-nl python[381547]: 2026-09-27 21:03:06,810 INFO таблицы адресов догружены: 47, в очереди осталось 0
-Sep 27 21:03:23 claude-nl python[381547]: 2026-09-27 21:03:23,505 INFO полоса: старт на JdWW6CsUppiv
-Sep 27 21:03:23 claude-nl python[381547]: 2026-09-27 21:03:23,511 INFO полоса: конец на JdWW6CsUppiv -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:03:25 claude-nl python[381547]: 2026-09-27 21:03:25,882 INFO полоса: старт на 2AucrGHe5ur8
-Sep 27 21:03:25 claude-nl python[381547]: 2026-09-27 21:03:25,896 INFO полоса: конец на 2AucrGHe5ur8 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:04:15 claude-nl python[381547]: 2026-09-27 21:04:15,279 INFO полоса: старт на 3USE77TsfJ7C
-Sep 27 21:04:15 claude-nl python[381547]: 2026-09-27 21:04:15,291 INFO полоса: конец на 3USE77TsfJ7C -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:04:15 claude-nl python[381547]: 2026-09-27 21:04:15,305 INFO полоса: старт на 2uvGF4ML9yXg
-Sep 27 21:04:15 claude-nl python[381547]: 2026-09-27 21:04:15,320 INFO полоса: конец на 2uvGF4ML9yXg -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:04:17 claude-nl python[381547]: 2026-09-27 21:04:17,753 INFO полоса: старт на ra6MMa5RhTef
-Sep 27 21:04:17 claude-nl python[381547]: 2026-09-27 21:04:17,765 INFO полоса: конец на ra6MMa5RhTef -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:04:17 claude-nl python[381547]: 2026-09-27 21:04:17,839 INFO таблицы адресов догружены: 29, в очереди осталось 0
-Sep 27 21:04:21 claude-nl python[381547]: 2026-09-27 21:04:21,931 INFO полоса: старт на 3Q4hu8JG8xyw
-Sep 27 21:04:21 claude-nl python[381547]: 2026-09-27 21:04:21,946 INFO полоса: конец на 3Q4hu8JG8xyw -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:04:47 claude-nl python[381547]: 2026-09-27 21:04:47,061 INFO полоса: старт на 5pUGxzroYkcN
-Sep 27 21:04:47 claude-nl python[381547]: 2026-09-27 21:04:47,077 INFO полоса: конец на 5pUGxzroYkcN -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:04:52 claude-nl python[381547]: 2026-09-27 21:04:52,867 INFO полоса: старт на 5tC88wEubH2B
-Sep 27 21:04:52 claude-nl python[381547]: 2026-09-27 21:04:52,882 INFO полоса: конец на 5tC88wEubH2B -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:04:53 claude-nl python[381547]: 2026-09-27 21:04:53,344 INFO полоса: старт на 2kqhTTxmAfMJ
-Sep 27 21:04:53 claude-nl python[381547]: 2026-09-27 21:04:53,359 INFO полоса: конец на 2kqhTTxmAfMJ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:05:21 claude-nl python[381547]: 2026-09-27 21:05:21,405 INFO полоса: старт на 3a9Dzs1hmx8H
-Sep 27 21:05:21 claude-nl python[381547]: 2026-09-27 21:05:21,420 INFO полоса: конец на 3a9Dzs1hmx8H -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:05:21 claude-nl python[381547]: 2026-09-27 21:05:21,567 INFO полоса: старт на 5fmiqEkmcVRU
-Sep 27 21:05:21 claude-nl python[381547]: 2026-09-27 21:05:21,584 INFO полоса: конец на 5fmiqEkmcVRU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:05:30 claude-nl python[381547]: 2026-09-27 21:05:30,520 INFO таблицы адресов догружены: 20, в очереди осталось 0
-Sep 27 21:06:10 claude-nl python[381547]: 2026-09-27 21:06:10,147 INFO полоса: старт на MhR7eT5Vo7Pq
-Sep 27 21:06:10 claude-nl python[381547]: 2026-09-27 21:06:10,165 INFO полоса: конец на MhR7eT5Vo7Pq -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:06:13 claude-nl python[381547]: 2026-09-27 21:06:13,850 INFO полоса: старт на 3dWNgmBN5H4K
-Sep 27 21:06:13 claude-nl python[381547]: 2026-09-27 21:06:13,866 INFO полоса: конец на 3dWNgmBN5H4K -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:06:35 claude-nl python[381547]: 2026-09-27 21:06:35,681 INFO полоса: старт на 2xWyTKea8wSE
-Sep 27 21:06:35 claude-nl python[381547]: 2026-09-27 21:06:35,697 INFO полоса: конец на 2xWyTKea8wSE -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:06:36 claude-nl python[381547]: 2026-09-27 21:06:36,038 INFO полоса: старт на 4pCTWXKjvJdW
-Sep 27 21:06:36 claude-nl python[381547]: 2026-09-27 21:06:36,054 INFO полоса: конец на 4pCTWXKjvJdW -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:06:36 claude-nl python[381547]: 2026-09-27 21:06:36,112 INFO полоса: старт на 8XE6rQZ6wR12
-Sep 27 21:06:36 claude-nl python[381547]: 2026-09-27 21:06:36,126 INFO полоса: конец на 8XE6rQZ6wR12 -- gate предел полосы: по группе off полоса не торгует (lane_trades выключен)
-Sep 27 21:06:36 claude-nl python[381547]: 2026-09-27 21:06:36,524 INFO полоса: старт на QEF6SKGS9Nz8
-Sep 27 21:06:36 claude-nl python[381547]: 2026-09-27 21:06:36,543 INFO полоса: конец на QEF6SKGS9Nz8 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:06:41 claude-nl python[381547]: 2026-09-27 21:06:41,607 INFO таблицы адресов догружены: 17, в очереди осталось 0
-Sep 27 21:06:46 claude-nl python[381547]: 2026-09-27 21:06:46,743 INFO полоса: старт на 4LXBoDEawnGf
-Sep 27 21:06:46 claude-nl python[381547]: 2026-09-27 21:06:46,758 INFO полоса: конец на 4LXBoDEawnGf -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:06:52 claude-nl python[381547]: 2026-09-27 21:06:52,671 INFO полоса: старт на 4E9HWUhQSjhS
-Sep 27 21:06:52 claude-nl python[381547]: 2026-09-27 21:06:52,687 INFO полоса: конец на 4E9HWUhQSjhS -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:07:30 claude-nl python[381547]: 2026-09-27 21:07:30,220 INFO полоса: старт на 2kDh2iqxeChU
-Sep 27 21:07:30 claude-nl python[381547]: 2026-09-27 21:07:30,238 INFO полоса: конец на 2kDh2iqxeChU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:07:30 claude-nl python[381547]: 2026-09-27 21:07:30,727 INFO полоса: старт на 3V9v1mQaXFeE
-Sep 27 21:07:30 claude-nl python[381547]: 2026-09-27 21:07:30,744 INFO полоса: конец на 3V9v1mQaXFeE -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:07:53 claude-nl python[381547]: 2026-09-27 21:07:53,155 INFO таблицы адресов догружены: 25, в очереди осталось 0
-Sep 27 21:08:06 claude-nl python[381547]: 2026-09-27 21:08:06,140 INFO полоса: старт на 5xrWxyCQG4MN
-Sep 27 21:08:06 claude-nl python[381547]: 2026-09-27 21:08:06,153 INFO полоса: конец на 5xrWxyCQG4MN -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:08:13 claude-nl python[381547]: 2026-09-27 21:08:13,616 INFO полоса: старт на 53HpzEUvFrVV
-Sep 27 21:08:13 claude-nl python[381547]: 2026-09-27 21:08:13,630 INFO полоса: конец на 53HpzEUvFrVV -- gate предел полосы: по группе off полоса не торгует (lane_trades выключен)
-Sep 27 21:08:34 claude-nl python[381547]: 2026-09-27 21:08:34,561 INFO полоса: старт на 3QHZ4Uw4Wt8F
-Sep 27 21:08:34 claude-nl python[381547]: 2026-09-27 21:08:34,580 INFO полоса: конец на 3QHZ4Uw4Wt8F -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:09:01 claude-nl python[381547]: 2026-09-27 21:09:01,147 INFO полоса: старт на zDYZoRa5b8nn
-Sep 27 21:09:01 claude-nl python[381547]: 2026-09-27 21:09:01,165 INFO полоса: конец на zDYZoRa5b8nn -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:09:04 claude-nl python[381547]: 2026-09-27 21:09:04,513 INFO таблицы адресов догружены: 31, в очереди осталось 0
-Sep 27 21:09:22 claude-nl python[381547]: 2026-09-27 21:09:22,074 INFO полоса: старт на PtM2kHvvMJvd
-Sep 27 21:09:22 claude-nl python[381547]: 2026-09-27 21:09:22,090 INFO полоса: конец на PtM2kHvvMJvd -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:09:25 claude-nl python[381547]: 2026-09-27 21:09:25,671 INFO полоса: старт на 3ZdRX1irsoDa
-Sep 27 21:09:25 claude-nl python[381547]: 2026-09-27 21:09:25,690 INFO полоса: конец на 3ZdRX1irsoDa -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:09:28 claude-nl python[381547]: 2026-09-27 21:09:28,838 INFO полоса: старт на 28ht3B6VHngs
-Sep 27 21:09:28 claude-nl python[381547]: 2026-09-27 21:09:28,851 INFO полоса: конец на 28ht3B6VHngs -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:10:05 claude-nl python[381547]: 2026-09-27 21:10:05,998 INFO полоса: старт на 3fqH29etoiGV
-Sep 27 21:10:06 claude-nl python[381547]: 2026-09-27 21:10:06,016 INFO полоса: конец на 3fqH29etoiGV -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:10:06 claude-nl python[381547]: 2026-09-27 21:10:06,642 INFO полоса: старт на 3Y4njUrc1gwh
-Sep 27 21:10:06 claude-nl python[381547]: 2026-09-27 21:10:06,660 INFO полоса: конец на 3Y4njUrc1gwh -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:10:07 claude-nl python[381547]: 2026-09-27 21:10:07,935 INFO полоса: старт на 3DyPMUw7QxZR
-Sep 27 21:10:07 claude-nl python[381547]: 2026-09-27 21:10:07,953 INFO полоса: конец на 3DyPMUw7QxZR -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:10:15 claude-nl python[381547]: 2026-09-27 21:10:15,684 INFO таблицы адресов догружены: 25, в очереди осталось 0
-Sep 27 21:10:29 claude-nl python[381547]: 2026-09-27 21:10:29,690 INFO полоса: старт на 8Jifj6VarCU9
-Sep 27 21:10:29 claude-nl python[381547]: 2026-09-27 21:10:29,704 INFO полоса: конец на 8Jifj6VarCU9 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:10:32 claude-nl python[381547]: 2026-09-27 21:10:32,894 INFO полоса: старт на 5zUHDFnRvG6y
-Sep 27 21:10:32 claude-nl python[381547]: 2026-09-27 21:10:32,912 INFO полоса: конец на 5zUHDFnRvG6y -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:11:04 claude-nl python[381547]: 2026-09-27 21:11:04,063 INFO полоса: старт на 4DiSRwFCAe6W
-Sep 27 21:11:04 claude-nl python[381547]: 2026-09-27 21:11:04,082 INFO полоса: конец на 4DiSRwFCAe6W -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:11:07 claude-nl python[381547]: 2026-09-27 21:11:07,827 INFO полоса: старт на 5iXiEP9vFYX6
-Sep 27 21:11:07 claude-nl python[381547]: 2026-09-27 21:11:07,842 INFO полоса: конец на 5iXiEP9vFYX6 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:11:10 claude-nl python[381547]: 2026-09-27 21:11:10,768 INFO полоса: старт на 4ipX3dvAtF2K
-Sep 27 21:11:10 claude-nl python[381547]: 2026-09-27 21:11:10,783 INFO полоса: конец на 4ipX3dvAtF2K -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
-Sep 27 21:11:26 claude-nl python[381547]: 2026-09-27 21:11:26,843 INFO таблицы адресов догружены: 23, в очереди осталось 0
-Sep 27 21:11:43 claude-nl python[381547]: 2026-09-27 21:11:43,798 INFO полоса: старт на 4zvqkhsUMH4s
-Sep 27 21:11:43 claude-nl python[381547]: 2026-09-27 21:11:43,810 INFO полоса: конец на 4zvqkhsUMH4s -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:51:44 claude-nl python[815271]: 2026-09-28 06:51:44,453 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Sep 28 06:52:13 claude-nl python[815271]: 2026-09-28 06:52:13,629 INFO полоса: старт на 5CcP1vNd86gJ
+Sep 28 06:52:13 claude-nl python[815271]: 2026-09-28 06:52:13,635 INFO полоса: конец на 5CcP1vNd86gJ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:53:02 claude-nl python[815271]: 2026-09-28 06:53:02,478 INFO полоса: старт на 2cKBZT8EnBLo
+Sep 28 06:53:02 claude-nl python[815271]: 2026-09-28 06:53:02,484 INFO полоса: конец на 2cKBZT8EnBLo -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:53:02 claude-nl python[815271]: 2026-09-28 06:53:02,753 INFO полоса: старт на 5Y4W9kvr5cwN
+Sep 28 06:53:02 claude-nl python[815271]: 2026-09-28 06:53:02,759 INFO полоса: конец на 5Y4W9kvr5cwN -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:53:24 claude-nl python[815271]: 2026-09-28 06:53:24,788 INFO полоса: старт на 4mj46sJLrnzM
+Sep 28 06:53:24 claude-nl python[815271]: 2026-09-28 06:53:24,794 INFO полоса: конец на 4mj46sJLrnzM -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:53:48 claude-nl python[815271]: 2026-09-28 06:53:48,693 INFO полоса: старт на pLbjFAzRLCfA
+Sep 28 06:53:48 claude-nl python[815271]: 2026-09-28 06:53:48,699 INFO полоса: конец на pLbjFAzRLCfA -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:53:48 claude-nl python[815271]: 2026-09-28 06:53:48,707 INFO полоса: старт на 3XMTwZEKVhKV
+Sep 28 06:53:48 claude-nl python[815271]: 2026-09-28 06:53:48,712 INFO полоса: конец на 3XMTwZEKVhKV -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:54:05 claude-nl python[815271]: 2026-09-28 06:54:05,160 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 28 06:54:12 claude-nl python[815271]: 2026-09-28 06:54:12,487 INFO полоса: старт на 5juPgJUPh87Q
+Sep 28 06:54:12 claude-nl python[815271]: 2026-09-28 06:54:12,494 INFO полоса: конец на 5juPgJUPh87Q -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:54:16 claude-nl python[815271]: 2026-09-28 06:54:16,632 INFO полоса: старт на 8cCXPJXb3u9V
+Sep 28 06:54:16 claude-nl python[815271]: 2026-09-28 06:54:16,636 INFO полоса: конец на 8cCXPJXb3u9V -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:54:52 claude-nl python[815271]: 2026-09-28 06:54:52,906 INFO полоса: старт на 372VZgfnHdWJ
+Sep 28 06:54:52 claude-nl python[815271]: 2026-09-28 06:54:52,911 INFO полоса: конец на 372VZgfnHdWJ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:54:56 claude-nl python[815271]: 2026-09-28 06:54:56,731 INFO полоса: старт на 3kQ73dpDDo3w
+Sep 28 06:54:56 claude-nl python[815271]: 2026-09-28 06:54:56,739 INFO полоса: конец на 3kQ73dpDDo3w -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:55:01 claude-nl python[815271]: 2026-09-28 06:55:01,234 INFO полоса: старт на 5vbmyZujwhLG
+Sep 28 06:55:01 claude-nl python[815271]: 2026-09-28 06:55:01,239 INFO полоса: конец на 5vbmyZujwhLG -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:55:15 claude-nl python[815271]: 2026-09-28 06:55:15,660 INFO таблицы адресов догружены: 12, в очереди осталось 0
+Sep 28 06:55:35 claude-nl python[815271]: 2026-09-28 06:55:35,414 INFO полоса: старт на 5Dqo8sFp3P9e
+Sep 28 06:55:35 claude-nl python[815271]: 2026-09-28 06:55:35,421 INFO полоса: конец на 5Dqo8sFp3P9e -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:56:26 claude-nl python[815271]: 2026-09-28 06:56:26,020 INFO таблицы адресов догружены: 8, в очереди осталось 0
+Sep 28 06:56:37 claude-nl python[815271]: 2026-09-28 06:56:37,379 INFO полоса: старт на 5baAAx5Cp6y2
+Sep 28 06:56:37 claude-nl python[815271]: 2026-09-28 06:56:37,385 INFO полоса: конец на 5baAAx5Cp6y2 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:57:27 claude-nl python[815271]: 2026-09-28 06:57:27,809 INFO полоса: старт на 4eASeguRVKDX
+Sep 28 06:57:27 claude-nl python[815271]: 2026-09-28 06:57:27,814 INFO полоса: конец на 4eASeguRVKDX -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:57:36 claude-nl python[815271]: 2026-09-28 06:57:36,401 INFO таблицы адресов догружены: 12, в очереди осталось 0
+Sep 28 06:57:54 claude-nl python[815271]: 2026-09-28 06:57:54,870 INFO полоса: старт на 5EeZUwnFQWds
+Sep 28 06:57:54 claude-nl python[815271]: 2026-09-28 06:57:54,875 INFO полоса: конец на 5EeZUwnFQWds -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:58:15 claude-nl python[815271]: 2026-09-28 06:58:15,921 INFO полоса: старт на 3TrcDGVTFEHh
+Sep 28 06:58:15 claude-nl python[815271]: 2026-09-28 06:58:15,923 INFO полоса: конец на 3TrcDGVTFEHh -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:58:44 claude-nl python[815271]: 2026-09-28 06:58:44,753 INFO полоса: старт на NTETiqPBuUdb
+Sep 28 06:58:44 claude-nl python[815271]: 2026-09-28 06:58:44,759 INFO полоса: конец на NTETiqPBuUdb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:58:47 claude-nl python[815271]: 2026-09-28 06:58:47,196 INFO таблицы адресов догружены: 20, в очереди осталось 0
+Sep 28 06:58:56 claude-nl python[815271]: 2026-09-28 06:58:56,762 INFO полоса: старт на 43RYbyG82Gwb
+Sep 28 06:58:56 claude-nl python[815271]: 2026-09-28 06:58:56,764 INFO полоса: конец на 43RYbyG82Gwb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:59:01 claude-nl python[815271]: 2026-09-28 06:59:01,074 INFO полоса: конец на 485AGh5HKJSz -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:59:01 claude-nl python[815271]: 2026-09-28 06:59:01,076 INFO полоса: старт на 485AGh5HKJSz
+Sep 28 06:59:10 claude-nl python[815271]: 2026-09-28 06:59:10,909 INFO полоса: старт на 3DFUgPn5PzAm
+Sep 28 06:59:10 claude-nl python[815271]: 2026-09-28 06:59:10,916 INFO полоса: конец на 3DFUgPn5PzAm -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:59:11 claude-nl python[815271]: 2026-09-28 06:59:11,044 INFO полоса: старт на 2wGEQ47YChQ4
+Sep 28 06:59:11 claude-nl python[815271]: 2026-09-28 06:59:11,046 INFO полоса: конец на 2wGEQ47YChQ4 -- gate предел полосы: по группе off полоса не торгует (lane_trades выключен)
+Sep 28 06:59:23 claude-nl python[815271]: 2026-09-28 06:59:23,522 INFO полоса: старт на 5HwuQzez3K4R
+Sep 28 06:59:23 claude-nl python[815271]: 2026-09-28 06:59:23,526 INFO полоса: конец на 5HwuQzez3K4R -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 06:59:57 claude-nl python[815271]: 2026-09-28 06:59:57,696 INFO таблицы адресов догружены: 38, в очереди осталось 0
+Sep 28 07:00:19 claude-nl python[815271]: 2026-09-28 07:00:19,738 INFO полоса: старт на L19RfDyHtyyh
+Sep 28 07:00:19 claude-nl python[815271]: 2026-09-28 07:00:19,742 INFO полоса: конец на L19RfDyHtyyh -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:00:19 claude-nl python[815271]: 2026-09-28 07:00:19,750 INFO полоса: старт на 2PhUQA9Gct5t
+Sep 28 07:00:19 claude-nl python[815271]: 2026-09-28 07:00:19,755 INFO полоса: конец на 2PhUQA9Gct5t -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:00:55 claude-nl python[815271]: 2026-09-28 07:00:55,717 INFO полоса: старт на CEPAwRT8v9oH
+Sep 28 07:00:55 claude-nl python[815271]: 2026-09-28 07:00:55,723 INFO полоса: конец на CEPAwRT8v9oH -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:00:55 claude-nl python[815271]: 2026-09-28 07:00:55,806 INFO полоса: старт на 1oXxp2uJkEJB
+Sep 28 07:00:55 claude-nl python[815271]: 2026-09-28 07:00:55,811 INFO полоса: конец на 1oXxp2uJkEJB -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:01:08 claude-nl python[815271]: 2026-09-28 07:01:08,085 INFO таблицы адресов догружены: 6, в очереди осталось 0
+Sep 28 07:01:09 claude-nl python[815271]: 2026-09-28 07:01:09,188 INFO полоса: старт на 5hpWWxBHMq9S
+Sep 28 07:01:09 claude-nl python[815271]: 2026-09-28 07:01:09,194 INFO полоса: конец на 5hpWWxBHMq9S -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:01:33 claude-nl python[815271]: 2026-09-28 07:01:33,895 INFO полоса: старт на 3ExjNRJNy976
+Sep 28 07:01:33 claude-nl python[815271]: 2026-09-28 07:01:33,899 INFO полоса: конец на 3ExjNRJNy976 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:02:18 claude-nl python[815271]: 2026-09-28 07:02:18,681 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Sep 28 07:02:51 claude-nl python[815271]: 2026-09-28 07:02:51,739 INFO полоса: старт на 3MWCiDHdm4HE
+Sep 28 07:02:51 claude-nl python[815271]: 2026-09-28 07:02:51,744 INFO полоса: конец на 3MWCiDHdm4HE -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:03:19 claude-nl python[815271]: 2026-09-28 07:03:19,033 INFO полоса: старт на 67qn2MPwJT2f
+Sep 28 07:03:19 claude-nl python[815271]: 2026-09-28 07:03:19,038 INFO полоса: конец на 67qn2MPwJT2f -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:03:29 claude-nl python[815271]: 2026-09-28 07:03:29,609 INFO таблицы адресов догружены: 29, в очереди осталось 0
+Sep 28 07:03:31 claude-nl python[815271]: 2026-09-28 07:03:31,576 INFO полоса: старт на 5QPjvgTvQ2Mp
+Sep 28 07:03:31 claude-nl python[815271]: 2026-09-28 07:03:31,581 INFO полоса: конец на 5QPjvgTvQ2Mp -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:03:39 claude-nl python[815271]: 2026-09-28 07:03:39,133 INFO полоса: старт на p67seBtDnJZW
+Sep 28 07:03:39 claude-nl python[815271]: 2026-09-28 07:03:39,137 INFO полоса: конец на p67seBtDnJZW -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:04:03 claude-nl python[815271]: 2026-09-28 07:04:03,948 INFO полоса: старт на 2urEztW4i7mU
+Sep 28 07:04:03 claude-nl python[815271]: 2026-09-28 07:04:03,954 INFO полоса: конец на 2urEztW4i7mU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:04:08 claude-nl python[815271]: 2026-09-28 07:04:08,970 INFO полоса: старт на 4zX68bGacz4t
+Sep 28 07:04:08 claude-nl python[815271]: 2026-09-28 07:04:08,974 INFO полоса: конец на 4zX68bGacz4t -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:04:08 claude-nl python[815271]: 2026-09-28 07:04:08,981 INFO полоса: старт на 8E5gMtp9Eerz
+Sep 28 07:04:08 claude-nl python[815271]: 2026-09-28 07:04:08,987 INFO полоса: конец на 8E5gMtp9Eerz -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:04:34 claude-nl python[815271]: 2026-09-28 07:04:34,870 INFO полоса: старт на 32vfcV6ud6c1
+Sep 28 07:04:34 claude-nl python[815271]: 2026-09-28 07:04:34,871 INFO полоса: конец на 32vfcV6ud6c1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:04:40 claude-nl python[815271]: 2026-09-28 07:04:40,080 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Sep 28 07:04:50 claude-nl python[815271]: 2026-09-28 07:04:50,540 INFO полоса: старт на 5zHwhTXLFsZu
+Sep 28 07:04:50 claude-nl python[815271]: 2026-09-28 07:04:50,545 INFO полоса: конец на 5zHwhTXLFsZu -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:05:26 claude-nl python[815271]: 2026-09-28 07:05:26,339 INFO полоса: старт на 4A5uSaPSKaKd
+Sep 28 07:05:26 claude-nl python[815271]: 2026-09-28 07:05:26,343 INFO полоса: конец на 4A5uSaPSKaKd -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:05:26 claude-nl python[815271]: 2026-09-28 07:05:26,395 INFO полоса: старт на hpbtsH1nrUc3
+Sep 28 07:05:26 claude-nl python[815271]: 2026-09-28 07:05:26,439 INFO полоса: старт на HBucikaU911x
+Sep 28 07:05:26 claude-nl python[815271]: 2026-09-28 07:05:26,442 INFO полоса: конец на HBucikaU911x -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:05:29 claude-nl python[815271]: 2026-09-28 07:05:29,684 INFO полоса: конец на hpbtsH1nrUc3 -- sent
+Sep 28 07:05:33 claude-nl python[815271]: 2026-09-28 07:05:33,741 INFO полоса: старт на XcBBK7PG8c8W
+Sep 28 07:05:33 claude-nl python[815271]: 2026-09-28 07:05:33,746 INFO полоса: конец на XcBBK7PG8c8W -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:05:41 claude-nl python[815271]: 2026-09-28 07:05:41,954 INFO полоса: старт на 5qXmDKFuMAQX
+Sep 28 07:05:41 claude-nl python[815271]: 2026-09-28 07:05:41,961 INFO полоса: конец на 5qXmDKFuMAQX -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:05:50 claude-nl python[815271]: 2026-09-28 07:05:50,767 INFO таблицы адресов догружены: 4, в очереди осталось 0
+Sep 28 07:06:01 claude-nl python[815271]: 2026-09-28 07:06:01,347 INFO полоса: старт на 4yB56jg98Wem
+Sep 28 07:06:01 claude-nl python[815271]: 2026-09-28 07:06:01,351 INFO полоса: конец на 4yB56jg98Wem -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:06:27 claude-nl python[815271]: 2026-09-28 07:06:27,471 INFO полоса: старт на 4LhuDE49Tic1
+Sep 28 07:06:27 claude-nl python[815271]: 2026-09-28 07:06:27,472 INFO полоса: конец на 4LhuDE49Tic1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:06:28 claude-nl python[815271]: 2026-09-28 07:06:28,413 INFO полоса: старт на 3zJCRXLpButH
+Sep 28 07:06:28 claude-nl python[815271]: 2026-09-28 07:06:28,419 INFO полоса: конец на 3zJCRXLpButH -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:07:01 claude-nl python[815271]: 2026-09-28 07:07:01,804 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 28 07:07:17 claude-nl python[815271]: 2026-09-28 07:07:17,658 INFO полоса: старт на 241PRr2oFSvd
+Sep 28 07:07:17 claude-nl python[815271]: 2026-09-28 07:07:17,662 INFO полоса: конец на 241PRr2oFSvd -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:08:02 claude-nl python[815271]: 2026-09-28 07:08:02,796 INFO полоса: старт на nSh1c1ZAwZwq
+Sep 28 07:08:02 claude-nl python[815271]: 2026-09-28 07:08:02,800 INFO полоса: конец на nSh1c1ZAwZwq -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:08:14 claude-nl python[815271]: 2026-09-28 07:08:14,327 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 28 07:08:25 claude-nl python[815271]: 2026-09-28 07:08:25,494 INFO полоса: старт на 8eHStyPDWWHX
+Sep 28 07:08:25 claude-nl python[815271]: 2026-09-28 07:08:25,502 INFO полоса: конец на 8eHStyPDWWHX -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:08:30 claude-nl python[815271]: 2026-09-28 07:08:30,594 INFO полоса: старт на uN39fRA13tJ5
+Sep 28 07:08:30 claude-nl python[815271]: 2026-09-28 07:08:30,599 INFO полоса: конец на uN39fRA13tJ5 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:08:57 claude-nl python[815271]: 2026-09-28 07:08:57,768 INFO полоса: старт на 4LyrWL1p8acT
+Sep 28 07:08:57 claude-nl python[815271]: 2026-09-28 07:08:57,774 INFO полоса: конец на 4LyrWL1p8acT -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:09:12 claude-nl python[815271]: 2026-09-28 07:09:12,548 INFO полоса: старт на 2DR8zvu3ZTcS
+Sep 28 07:09:12 claude-nl python[815271]: 2026-09-28 07:09:12,550 INFO полоса: конец на 2DR8zvu3ZTcS -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:09:24 claude-nl python[815271]: 2026-09-28 07:09:24,915 INFO таблицы адресов догружены: 12, в очереди осталось 0
+Sep 28 07:09:48 claude-nl python[815271]: 2026-09-28 07:09:48,666 INFO полоса: конец на 2iwCho2zRWqL -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:09:48 claude-nl python[815271]: 2026-09-28 07:09:48,667 INFO полоса: старт на 2iwCho2zRWqL
+Sep 28 07:09:50 claude-nl python[815271]: 2026-09-28 07:09:50,713 INFO полоса: старт на 5E6ZnB97Po7N
+Sep 28 07:09:50 claude-nl python[815271]: 2026-09-28 07:09:50,718 INFO полоса: конец на 5E6ZnB97Po7N -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:10:35 claude-nl python[815271]: 2026-09-28 07:10:35,625 INFO таблицы адресов догружены: 36, в очереди осталось 0
+Sep 28 07:11:34 claude-nl python[815271]: 2026-09-28 07:11:34,624 INFO полоса: старт на BqxSv8jemzv8
+Sep 28 07:11:34 claude-nl python[815271]: 2026-09-28 07:11:34,629 INFO полоса: конец на BqxSv8jemzv8 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:11:46 claude-nl python[815271]: 2026-09-28 07:11:46,389 INFO таблицы адресов догружены: 46, в очереди осталось 0
+Sep 28 07:11:52 claude-nl python[815271]: 2026-09-28 07:11:52,971 WARNING подписка (transactionSubscribe) оборвалась: ConnectionClosedError: no close frame received or sent
+Sep 28 07:11:52 claude-nl python[815271]: 2026-09-28 07:11:52,972 INFO обрыв основного: переподключаюсь сразу (с первого обрыва 0.0 с из 5)
+Sep 28 07:11:53 claude-nl python[815271]: 2026-09-28 07:11:53,047 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 644
+Sep 28 07:12:01 claude-nl python[815271]: 2026-09-28 07:12:01,102 INFO полоса: старт на QjWpE1E3auMb
+Sep 28 07:12:01 claude-nl python[815271]: 2026-09-28 07:12:01,107 INFO полоса: конец на QjWpE1E3auMb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:12:19 claude-nl python[815271]: 2026-09-28 07:12:19,449 INFO полоса: старт на 3kPUZLTNgaoi
+Sep 28 07:12:19 claude-nl python[815271]: 2026-09-28 07:12:19,453 INFO полоса: конец на 3kPUZLTNgaoi -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:12:39 claude-nl python[815271]: 2026-09-28 07:12:39,485 INFO полоса: старт на 3htRWNi2d1Pj
+Sep 28 07:12:39 claude-nl python[815271]: 2026-09-28 07:12:39,490 INFO полоса: конец на 3htRWNi2d1Pj -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:12:49 claude-nl python[815271]: 2026-09-28 07:12:49,243 INFO полоса: старт на 3cK2eT84et1m
+Sep 28 07:12:49 claude-nl python[815271]: 2026-09-28 07:12:49,247 INFO полоса: конец на 3cK2eT84et1m -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:12:56 claude-nl python[815271]: 2026-09-28 07:12:56,869 INFO таблицы адресов догружены: 28, в очереди осталось 0
+Sep 28 07:13:06 claude-nl python[815271]: 2026-09-28 07:13:06,367 INFO полоса: старт на 43ctfXo6kdRh
+Sep 28 07:13:06 claude-nl python[815271]: 2026-09-28 07:13:06,372 INFO полоса: конец на 43ctfXo6kdRh -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:13:06 claude-nl python[815271]: 2026-09-28 07:13:06,382 INFO полоса: старт на 4gQLg8WKqK8t
+Sep 28 07:13:06 claude-nl python[815271]: 2026-09-28 07:13:06,386 INFO полоса: конец на 4gQLg8WKqK8t -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:13:35 claude-nl python[815271]: 2026-09-28 07:13:35,803 INFO полоса: старт на 3k4SFSjZEEup
+Sep 28 07:13:35 claude-nl python[815271]: 2026-09-28 07:13:35,810 INFO полоса: конец на 3k4SFSjZEEup -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:13:41 claude-nl python[815271]: 2026-09-28 07:13:41,575 INFO полоса: старт на 2zLtSdetcpmf
+Sep 28 07:13:41 claude-nl python[815271]: 2026-09-28 07:13:41,581 INFO полоса: конец на 2zLtSdetcpmf -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:13:59 claude-nl python[815271]: 2026-09-28 07:13:59,900 INFO полоса: старт на 5uuyUycL8gJL
+Sep 28 07:13:59 claude-nl python[815271]: 2026-09-28 07:13:59,905 INFO полоса: конец на 5uuyUycL8gJL -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:14:07 claude-nl python[815271]: 2026-09-28 07:14:07,707 INFO таблицы адресов догружены: 15, в очереди осталось 0
+Sep 28 07:14:08 claude-nl python[815271]: 2026-09-28 07:14:08,829 INFO полоса: старт на 3UsaoUigWDhR
+Sep 28 07:14:08 claude-nl python[815271]: 2026-09-28 07:14:08,834 INFO полоса: конец на 3UsaoUigWDhR -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:14:13 claude-nl python[815271]: 2026-09-28 07:14:13,462 INFO полоса: старт на 8jEW8n8kSAFV
+Sep 28 07:14:13 claude-nl python[815271]: 2026-09-28 07:14:13,466 INFO полоса: конец на 8jEW8n8kSAFV -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:12 claude-nl python[815271]: 2026-09-28 07:15:12,276 INFO полоса: старт на 22jjteG1WQiP
+Sep 28 07:15:12 claude-nl python[815271]: 2026-09-28 07:15:12,282 INFO полоса: конец на 22jjteG1WQiP -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:12 claude-nl python[815271]: 2026-09-28 07:15:12,340 INFO полоса: старт на 49XbCiEumvHV
+Sep 28 07:15:12 claude-nl python[815271]: 2026-09-28 07:15:12,345 INFO полоса: конец на 49XbCiEumvHV -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:16 claude-nl python[815271]: 2026-09-28 07:15:16,400 INFO полоса: старт на 2HYArYFt3doj
+Sep 28 07:15:16 claude-nl python[815271]: 2026-09-28 07:15:16,405 INFO полоса: конец на 2HYArYFt3doj -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:18 claude-nl python[815271]: 2026-09-28 07:15:18,440 INFO таблицы адресов догружены: 6, в очереди осталось 0
+Sep 28 07:15:18 claude-nl python[815271]: 2026-09-28 07:15:18,737 INFO полоса: старт на 5exRP17BGCu1
+Sep 28 07:15:18 claude-nl python[815271]: 2026-09-28 07:15:18,743 INFO полоса: конец на 5exRP17BGCu1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:26 claude-nl python[815271]: 2026-09-28 07:15:26,540 INFO полоса: старт на 2ffWcB4MPTgq
+Sep 28 07:15:26 claude-nl python[815271]: 2026-09-28 07:15:26,545 INFO полоса: конец на 2ffWcB4MPTgq -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:33 claude-nl python[815271]: 2026-09-28 07:15:33,102 INFO полоса: старт на 56YzEybE6nm9
+Sep 28 07:15:33 claude-nl python[815271]: 2026-09-28 07:15:33,107 INFO полоса: конец на 56YzEybE6nm9 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:33 claude-nl python[815271]: 2026-09-28 07:15:33,112 INFO полоса: старт на 63uwCELjLoKo
+Sep 28 07:15:33 claude-nl python[815271]: 2026-09-28 07:15:33,121 INFO полоса: конец на 63uwCELjLoKo -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:15:45 claude-nl python[815271]: 2026-09-28 07:15:45,000 WARNING часы слотов оборвались (ConnectionClosedError: no close frame received or sent) -- переподключение через 1 с
+Sep 28 07:15:46 claude-nl python[815271]: 2026-09-28 07:15:46,061 INFO slotSubscribe подтверждён (подписка 14841480)
+Sep 28 07:15:53 claude-nl python[815271]: 2026-09-28 07:15:53,010 INFO полоса: старт на 2vxCwTk2L9Ah
+Sep 28 07:15:53 claude-nl python[815271]: 2026-09-28 07:15:53,014 INFO полоса: конец на 2vxCwTk2L9Ah -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:16:41 claude-nl python[815271]: 2026-09-28 07:16:41,580 INFO полоса: старт на 3hx6Su5SDvJ9
+Sep 28 07:16:41 claude-nl python[815271]: 2026-09-28 07:16:41,585 INFO полоса: конец на 3hx6Su5SDvJ9 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:16:47 claude-nl python[815271]: 2026-09-28 07:16:47,655 INFO полоса: старт на 5feUutW6u4AL
+Sep 28 07:16:47 claude-nl python[815271]: 2026-09-28 07:16:47,663 INFO полоса: конец на 5feUutW6u4AL -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:17:39 claude-nl python[815271]: 2026-09-28 07:17:39,834 INFO полоса: старт на tQMhwrvgMDCp
+Sep 28 07:17:39 claude-nl python[815271]: 2026-09-28 07:17:39,839 INFO полоса: конец на tQMhwrvgMDCp -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:17:39 claude-nl python[815271]: 2026-09-28 07:17:39,993 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Sep 28 07:17:42 claude-nl python[815271]: 2026-09-28 07:17:42,000 INFO полоса: старт на 5xNe7CfYrLWa
+Sep 28 07:17:42 claude-nl python[815271]: 2026-09-28 07:17:42,009 INFO полоса: конец на 5xNe7CfYrLWa -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:17:53 claude-nl python[815271]: 2026-09-28 07:17:53,829 INFO полоса: старт на 5hGPQpLtbjas
+Sep 28 07:17:53 claude-nl python[815271]: 2026-09-28 07:17:53,836 INFO полоса: конец на 5hGPQpLtbjas -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:18:17 claude-nl python[815271]: 2026-09-28 07:18:17,511 INFO полоса: старт на 45PTp5nwm7m3
+Sep 28 07:18:17 claude-nl python[815271]: 2026-09-28 07:18:17,514 INFO полоса: конец на 45PTp5nwm7m3 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:18:20 claude-nl python[815271]: 2026-09-28 07:18:20,884 INFO полоса: старт на 3v5VV7MB3aKB
+Sep 28 07:18:20 claude-nl python[815271]: 2026-09-28 07:18:20,887 INFO полоса: конец на 3v5VV7MB3aKB -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:18:22 claude-nl python[815271]: 2026-09-28 07:18:22,682 INFO полоса: старт на 2u3JNUQossnk
+Sep 28 07:18:22 claude-nl python[815271]: 2026-09-28 07:18:22,686 INFO полоса: конец на 2u3JNUQossnk -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:18:26 claude-nl python[815271]: 2026-09-28 07:18:26,014 INFO полоса: старт на 2BCdsW6YquMA
+Sep 28 07:18:26 claude-nl python[815271]: 2026-09-28 07:18:26,019 INFO полоса: конец на 2BCdsW6YquMA -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:18:26 claude-nl python[815271]: 2026-09-28 07:18:26,038 INFO полоса: старт на qFDXjuPpTjaT
+Sep 28 07:18:26 claude-nl python[815271]: 2026-09-28 07:18:26,043 INFO полоса: конец на qFDXjuPpTjaT -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:18:26 claude-nl python[815271]: 2026-09-28 07:18:26,055 INFO полоса: старт на 42Zpg9MkG2xQ
+Sep 28 07:18:29 claude-nl python[815271]: 2026-09-28 07:18:29,339 INFO полоса: конец на 42Zpg9MkG2xQ -- sent
+Sep 28 07:18:50 claude-nl python[815271]: 2026-09-28 07:18:50,663 INFO таблицы адресов догружены: 8, в очереди осталось 0
+Sep 28 07:18:55 claude-nl python[815271]: 2026-09-28 07:18:55,382 INFO полоса: старт на 3V8tYYyXWcqx
+Sep 28 07:18:55 claude-nl python[815271]: 2026-09-28 07:18:55,390 INFO полоса: конец на 3V8tYYyXWcqx -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:18:58 claude-nl python[815271]: 2026-09-28 07:18:58,171 INFO полоса: старт на 4SkWAxvuDZ6w
+Sep 28 07:18:58 claude-nl python[815271]: 2026-09-28 07:18:58,175 INFO полоса: конец на 4SkWAxvuDZ6w -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:19:12 claude-nl python[815271]: 2026-09-28 07:19:12,744 INFO полоса: старт на 5myVgtgL96ty
+Sep 28 07:19:12 claude-nl python[815271]: 2026-09-28 07:19:12,751 INFO полоса: конец на 5myVgtgL96ty -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:19:13 claude-nl python[815271]: 2026-09-28 07:19:13,955 INFO полоса: старт на iArohsjNLjZM
+Sep 28 07:19:13 claude-nl python[815271]: 2026-09-28 07:19:13,962 INFO полоса: конец на iArohsjNLjZM -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:19:24 claude-nl python[815271]: 2026-09-28 07:19:24,396 INFO полоса: старт на 3SnW2DXUb2Rd
+Sep 28 07:19:24 claude-nl python[815271]: 2026-09-28 07:19:24,400 INFO полоса: конец на 3SnW2DXUb2Rd -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:19:25 claude-nl python[815271]: 2026-09-28 07:19:25,633 INFO полоса: старт на 5KbXqGzm1ujm
+Sep 28 07:19:25 claude-nl python[815271]: 2026-09-28 07:19:25,639 INFO полоса: конец на 5KbXqGzm1ujm -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:19:45 claude-nl python[815271]: 2026-09-28 07:19:45,290 INFO полоса: старт на 2PDpZHH228m2
+Sep 28 07:19:45 claude-nl python[815271]: 2026-09-28 07:19:45,297 INFO полоса: конец на 2PDpZHH228m2 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:20:02 claude-nl python[815271]: 2026-09-28 07:20:02,498 INFO таблицы адресов догружены: 6, в очереди осталось 0
+Sep 28 07:20:05 claude-nl python[815271]: 2026-09-28 07:20:05,222 INFO полоса: конец на 2xSUw7wjwvei -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:20:05 claude-nl python[815271]: 2026-09-28 07:20:05,223 INFO полоса: старт на 2xSUw7wjwvei
+Sep 28 07:20:05 claude-nl python[815271]: 2026-09-28 07:20:05,230 INFO полоса: старт на 58rMaajEgDr5
+Sep 28 07:20:05 claude-nl python[815271]: 2026-09-28 07:20:05,236 INFO полоса: конец на 58rMaajEgDr5 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:20:05 claude-nl python[815271]: 2026-09-28 07:20:05,728 INFO полоса: старт на 5hibouj8GFcF
+Sep 28 07:20:05 claude-nl python[815271]: 2026-09-28 07:20:05,733 INFO полоса: конец на 5hibouj8GFcF -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:20:44 claude-nl python[815271]: 2026-09-28 07:20:44,354 INFO полоса: старт на 4G79EZoFX2uz
+Sep 28 07:20:44 claude-nl python[815271]: 2026-09-28 07:20:44,358 INFO полоса: конец на 4G79EZoFX2uz -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:20:58 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
+Sep 28 07:20:58 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
+Sep 28 07:20:58 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 28 07:20:58 claude-nl systemd[1]: bloom-detector.service: Consumed 5min 6.583s CPU time, 263.5M memory peak, 0B memory swap peak.
+Sep 28 07:20:58 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Sep 28 07:20:58 claude-nl python[871920]: 2026-09-28 07:20:58,842 INFO исполнитель подключён, режим live
+Sep 28 07:20:59 claude-nl python[871920]: 2026-09-28 07:20:59,014 INFO таблицы адресов прогреты: 18 из 18 запрошенных
+Sep 28 07:20:59 claude-nl python[871920]: 2026-09-28 07:20:59,024 INFO прогрев соединения к Bloom: раз в 20 с
+Sep 28 07:20:59 claude-nl python[871920]: 2026-09-28 07:20:59,025 INFO команды Telegram: слушаю
+Sep 28 07:20:59 claude-nl python[871920]: 2026-09-28 07:20:59,025 INFO источников: 625 (BATCH-3, BATCH-5, TEST, batch5, lane_s0, log_only, off), откуда: DBot живьём + групп источников: 605 + тестовых источников из окружения: 2
+Sep 28 07:20:59 claude-nl python[871920]: 2026-09-28 07:20:59,262 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 644
+Sep 28 07:20:59 claude-nl python[871920]: 2026-09-28 07:20:59,303 INFO slotSubscribe подтверждён (подписка 14913752)
+Sep 28 07:22:09 claude-nl python[871920]: 2026-09-28 07:22:09,757 INFO таблицы адресов догружены: 11, в очереди осталось 0
+Sep 28 07:22:28 claude-nl python[871920]: 2026-09-28 07:22:28,414 INFO полоса: старт на aLB7hdKMM8DV
+Sep 28 07:22:28 claude-nl python[871920]: 2026-09-28 07:22:28,420 INFO полоса: конец на aLB7hdKMM8DV -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:22:28 claude-nl python[871920]: 2026-09-28 07:22:28,441 INFO полоса: старт на 3Yugf1PWf5xu
+Sep 28 07:22:28 claude-nl python[871920]: 2026-09-28 07:22:28,449 INFO полоса: конец на 3Yugf1PWf5xu -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:22:28 claude-nl python[871920]: 2026-09-28 07:22:28,598 INFO полоса: старт на 5Xqg2iSVUeS4
+Sep 28 07:22:28 claude-nl python[871920]: 2026-09-28 07:22:28,606 INFO полоса: конец на 5Xqg2iSVUeS4 -- gate предел полосы: по группе off полоса не торгует (lane_trades выключен)
+Sep 28 07:22:57 claude-nl python[871920]: 2026-09-28 07:22:57,755 INFO полоса: старт на U3FTcDePHus1
+Sep 28 07:22:57 claude-nl python[871920]: 2026-09-28 07:22:57,756 INFO полоса: конец на U3FTcDePHus1 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:23:06 claude-nl python[871920]: 2026-09-28 07:23:06,847 INFO полоса: старт на 3JHsdchoHNR4
+Sep 28 07:23:06 claude-nl python[871920]: 2026-09-28 07:23:06,854 INFO полоса: конец на 3JHsdchoHNR4 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:23:08 claude-nl python[871920]: 2026-09-28 07:23:08,928 INFO полоса: старт на 3fKjoeyhUGBU
+Sep 28 07:23:08 claude-nl python[871920]: 2026-09-28 07:23:08,933 INFO полоса: конец на 3fKjoeyhUGBU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:23:20 claude-nl python[871920]: 2026-09-28 07:23:20,603 INFO таблицы адресов догружены: 15, в очереди осталось 0
+Sep 28 07:23:34 claude-nl python[871920]: 2026-09-28 07:23:34,694 INFO полоса: старт на 6ZymPHpsnMax
+Sep 28 07:23:34 claude-nl python[871920]: 2026-09-28 07:23:34,702 INFO полоса: конец на 6ZymPHpsnMax -- gate предел полосы: по группе off полоса не торгует (lane_trades выключен)
+Sep 28 07:24:31 claude-nl python[871920]: 2026-09-28 07:24:31,429 INFO таблицы адресов догружены: 45, в очереди осталось 0
+Sep 28 07:24:38 claude-nl python[871920]: 2026-09-28 07:24:38,540 INFO полоса: старт на 28Gg2TGoJkWU
+Sep 28 07:24:38 claude-nl python[871920]: 2026-09-28 07:24:38,544 INFO полоса: конец на 28Gg2TGoJkWU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:24:40 claude-nl python[871920]: 2026-09-28 07:24:40,070 INFO полоса: старт на 366bN4j6Auqj
+Sep 28 07:24:40 claude-nl python[871920]: 2026-09-28 07:24:40,074 INFO полоса: конец на 366bN4j6Auqj -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:25:31 claude-nl python[871920]: 2026-09-28 07:25:31,007 INFO полоса: старт на VLbNZSsd7Dy6
+Sep 28 07:25:31 claude-nl python[871920]: 2026-09-28 07:25:31,015 INFO полоса: конец на VLbNZSsd7Dy6 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:25:42 claude-nl python[871920]: 2026-09-28 07:25:42,106 INFO таблицы адресов догружены: 30, в очереди осталось 0
+Sep 28 07:25:45 claude-nl python[871920]: 2026-09-28 07:25:45,259 INFO полоса: старт на 5D2vdpmJhmny
+Sep 28 07:25:45 claude-nl python[871920]: 2026-09-28 07:25:45,264 INFO полоса: конец на 5D2vdpmJhmny -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:26:21 claude-nl python[871920]: 2026-09-28 07:26:21,481 INFO полоса: старт на FzkUyLxVfxcK
+Sep 28 07:26:21 claude-nl python[871920]: 2026-09-28 07:26:21,486 INFO полоса: конец на FzkUyLxVfxcK -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:26:44 claude-nl python[871920]: 2026-09-28 07:26:44,380 INFO полоса: старт на KPjrSwDtJGSZ
+Sep 28 07:26:44 claude-nl python[871920]: 2026-09-28 07:26:44,384 INFO полоса: конец на KPjrSwDtJGSZ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:26:52 claude-nl python[871920]: 2026-09-28 07:26:52,711 INFO таблицы адресов догружены: 16, в очереди осталось 0
+Sep 28 07:26:54 claude-nl python[871920]: 2026-09-28 07:26:54,819 INFO полоса: старт на 5dmeKopQAWdB
+Sep 28 07:26:54 claude-nl python[871920]: 2026-09-28 07:26:54,823 INFO полоса: конец на 5dmeKopQAWdB -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:26:57 claude-nl python[871920]: 2026-09-28 07:26:57,439 INFO полоса: старт на 54P3vK2rQj7V
+Sep 28 07:26:57 claude-nl python[871920]: 2026-09-28 07:26:57,455 INFO полоса: конец на 54P3vK2rQj7V -- gate предел полосы: по группе off полоса не торгует (lane_trades выключен)
+Sep 28 07:27:00 claude-nl python[871920]: 2026-09-28 07:27:00,716 INFO полоса: старт на 3HBmnsmEqxt7
+Sep 28 07:27:00 claude-nl python[871920]: 2026-09-28 07:27:00,722 INFO полоса: конец на 3HBmnsmEqxt7 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:27:03 claude-nl python[871920]: 2026-09-28 07:27:03,456 INFO полоса: старт на 5tLoGhh9h6qN
+Sep 28 07:27:03 claude-nl python[871920]: 2026-09-28 07:27:03,459 INFO полоса: конец на 5tLoGhh9h6qN -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:28:04 claude-nl python[871920]: 2026-09-28 07:28:04,653 INFO таблицы адресов догружены: 8, в очереди осталось 0
+Sep 28 07:28:29 claude-nl python[871920]: 2026-09-28 07:28:29,416 INFO полоса: старт на 3DcLtd53Mu3q
+Sep 28 07:28:29 claude-nl python[871920]: 2026-09-28 07:28:29,421 INFO полоса: конец на 3DcLtd53Mu3q -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:28:46 claude-nl python[871920]: 2026-09-28 07:28:46,725 INFO полоса: старт на 39A2Qijh1NvC
+Sep 28 07:28:46 claude-nl python[871920]: 2026-09-28 07:28:46,732 INFO полоса: конец на 39A2Qijh1NvC -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:28:46 claude-nl python[871920]: 2026-09-28 07:28:46,740 INFO полоса: старт на 3yXgd2ShZALb
+Sep 28 07:28:46 claude-nl python[871920]: 2026-09-28 07:28:46,741 INFO полоса: конец на 3yXgd2ShZALb -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:29:15 claude-nl python[871920]: 2026-09-28 07:29:15,515 INFO таблицы адресов догружены: 8, в очереди осталось 0
+Sep 28 07:29:16 claude-nl python[871920]: 2026-09-28 07:29:16,927 INFO полоса: старт на 2oD15Hc5hTK3
+Sep 28 07:29:16 claude-nl python[871920]: 2026-09-28 07:29:16,931 INFO полоса: конец на 2oD15Hc5hTK3 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:29:27 claude-nl python[871920]: 2026-09-28 07:29:27,218 INFO полоса: старт на MJhAATzn81Wc
+Sep 28 07:29:27 claude-nl python[871920]: 2026-09-28 07:29:27,223 INFO полоса: конец на MJhAATzn81Wc -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:30:10 claude-nl python[871920]: 2026-09-28 07:30:10,593 INFO полоса: старт на 3KgQrW4iD9bU
+Sep 28 07:30:10 claude-nl python[871920]: 2026-09-28 07:30:10,599 INFO полоса: конец на 3KgQrW4iD9bU -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:30:15 claude-nl python[871920]: 2026-09-28 07:30:15,519 INFO полоса: старт на 3xPgVGGqgaKQ
+Sep 28 07:30:15 claude-nl python[871920]: 2026-09-28 07:30:15,524 INFO полоса: конец на 3xPgVGGqgaKQ -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:30:26 claude-nl python[871920]: 2026-09-28 07:30:26,223 INFO таблицы адресов догружены: 22, в очереди осталось 0
+Sep 28 07:30:27 claude-nl python[871920]: 2026-09-28 07:30:27,914 INFO полоса: старт на 2rY8hRqCvevr
+Sep 28 07:30:27 claude-nl python[871920]: 2026-09-28 07:30:27,919 INFO полоса: конец на 2rY8hRqCvevr -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:31:16 claude-nl python[871920]: 2026-09-28 07:31:16,513 INFO полоса: старт на t5hyAxnpGLeC
+Sep 28 07:31:16 claude-nl python[871920]: 2026-09-28 07:31:16,516 INFO полоса: конец на t5hyAxnpGLeC -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:31:37 claude-nl python[871920]: 2026-09-28 07:31:37,004 INFO таблицы адресов догружены: 21, в очереди осталось 0
+Sep 28 07:31:48 claude-nl python[871920]: 2026-09-28 07:31:48,748 INFO полоса: старт на 3XrUQ9syucz8
+Sep 28 07:31:48 claude-nl python[871920]: 2026-09-28 07:31:48,753 INFO полоса: конец на 3XrUQ9syucz8 -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:32:05 claude-nl python[871920]: 2026-09-28 07:32:05,428 INFO полоса: старт на 9gNUP1ee1ZX2
+Sep 28 07:32:05 claude-nl python[871920]: 2026-09-28 07:32:05,527 INFO полоса: старт на 4haLQD4YnPca
+Sep 28 07:32:05 claude-nl python[871920]: 2026-09-28 07:32:05,534 INFO полоса: конец на 4haLQD4YnPca -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:32:08 claude-nl python[871920]: 2026-09-28 07:32:08,689 INFO полоса: конец на 9gNUP1ee1ZX2 -- sent
+Sep 28 07:32:37 claude-nl python[871920]: 2026-09-28 07:32:37,141 INFO полоса: старт на jE8MRpgUk8JE
+Sep 28 07:32:37 claude-nl python[871920]: 2026-09-28 07:32:37,145 INFO полоса: конец на jE8MRpgUk8JE -- gate предел полосы: по группе log_only полоса не торгует (lane_trades выключен)
+Sep 28 07:32:47 claude-nl python[871920]: 2026-09-28 07:32:47,696 INFO таблицы адресов догружены: 39, в очереди осталось 0
