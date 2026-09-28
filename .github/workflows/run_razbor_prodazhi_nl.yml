@@ -1,0 +1,136 @@
+name: "Разбор продажи: запись позиции и журнал службы (только чтение)"
+
+# ЗАЧЕМ. По конкретной продаже владелец спрашивает факт: почему отказала
+# подпись Jupiter, какое удержание применилось, где ждали между попытками.
+# Прогон печатает ВСЕ поля позиции, времена по ним и строки журнала службы за
+# окно -- без гипотез.
+#
+# Только чтение: журнал позиций (потоком), файл групп, journalctl. Ни подписи,
+# ни отправки, ни ордера. Ключи из строк журнала вычищаются тем же прогоном,
+# что и в проверке живучести.
+on:
+  workflow_dispatch:
+    inputs:
+      chto:
+        description: "минты, cid или подписи через запятую (хватит начала)"
+        required: true
+      since:
+        description: "начало окна журнала службы, например '2026-09-28 13:45' (местное время хоста) или '-2h'"
+        required: false
+        default: "-2h"
+      grep:
+        description: "что искать в журналах (регулярное выражение)"
+        required: false
+        default: "SignerError|jupiter|Jupiter|продажа|UNSOLD|подпись"
+
+concurrency:
+  group: razbor-prodazhi
+  cancel-in-progress: false
+
+env:
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+  OUT_FILE: data/razbor_prodazhi.json
+
+jobs:
+  razbor:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается и самопроверка счёта"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/razbor_prodazhi.py
+          python3 deploy/checks/razbor_prodazhi.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Запись позиции и времена"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/rzb"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/rzb/razbor_prodazhi.py" < deploy/checks/razbor_prodazhi.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            python3 /tmp/rzb/razbor_prodazhi.py \
+              --state-dir $STATE_DIR \
+              --chto '${{ inputs.chto }}' \
+              --out /tmp/rzb/itog.json" | tail -200
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/rzb/itog.json 2>/dev/null || true" > /tmp/rzb_itog.json || true
+          if python3 -c "import json; json.load(open('/tmp/rzb_itog.json'))" 2>/dev/null; then
+            cp /tmp/rzb_itog.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: razbor ne napisal itog"
+            exit 1
+          fi
+
+      - name: "Журнал сторожа продаж и детектора за окно"
+        run: |
+          set -e
+          for svc in bloom-seller bloom-detector; do
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $svc --since '${{ inputs.since }}' --no-pager 2>/dev/null | tail -n 4000" \
+              > "/tmp/zhurnal_$svc.txt" 2>&1 || true
+          done
+          # Ключи чистим ДО печати: в URL Helius ключ стоит прямо в строке
+          # запроса, и журнал службы его несёт.
+          python3 - <<'PY'
+          import os, pathlib, re
+          шаблон = re.compile(os.environ.get("GREP_RE") or ".")
+          for имя in ("bloom-seller", "bloom-detector"):
+              п = pathlib.Path(f"/tmp/zhurnal_{имя}.txt")
+              if not п.exists():
+                  print(f"===== {имя}: журнала нет =====")
+                  continue
+              строки = []
+              with п.open(encoding="utf-8", errors="replace") as ф:
+                  for с in ф:
+                      if шаблон.search(с):
+                          строки.append(с.rstrip("\n"))
+              чистое = "\n".join(строки[-120:])
+              чистое = re.sub(r"api-key=[A-Za-z0-9._\-]+", "api-key=СКРЫТ", чистое)
+              чистое = re.sub(r"(?i)(x-token[\"']?\s*[:=]\s*)[A-Za-z0-9._\-]{8,}",
+                              r"\1СКРЫТ", чистое)
+              чистое = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._\-]{8,}", r"\1СКРЫТ", чистое)
+              print(f"===== {имя}: строк подошло {len(строки)} =====")
+              print(чистое or "строк нет")
+          PY
+        env:
+          GREP_RE: ${{ inputs.grep }}
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Razbor prodazhi: zapis pozicii i vremena [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
