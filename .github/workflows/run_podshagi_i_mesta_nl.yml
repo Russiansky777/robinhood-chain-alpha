@@ -1,0 +1,90 @@
+name: "Подшаги решения, место источника, симуляции продажи (только чтение)"
+
+# ЗАЧЕМ (слово владельца 28.09):
+#   п.5 -- "«РЕШИЛИ» 37-77 мс ... разложить по подшагам из журнала решений
+#          (parse / gate / подготовка веера / прочее) ... цель <= 5 мс.
+#          Сначала число, потом правка";
+#   п.6 -- "source_block_index и число транзакций блока -- заполнять у всех
+#          сделок ... дозаполнить сегодняшние" (проверяем долю заполнения);
+#   п.4 -- симуляции своей продажи Pump AMM: счётчик и вердикты.
+#
+# Одним прогоном, потому что все три числа лежат в одних и тех же журналах
+# состояния и второй проход по ним ничего не добавит.
+# Только чтение: журналы потоком, сети нет вовсе.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "с какого времени (UTC, пусто -- за 2 часа)"
+        required: false
+        default: ""
+
+concurrency:
+  group: podshagi-i-mesta
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/podshagi_mesta
+  OUT_FILE: data/podshagi_i_mesta.json
+
+jobs:
+  zamer:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Сборка модуля"
+        run: python3 -m py_compile deploy/checks/podshagi_i_mesta.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Замер на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/podshagi_i_mesta.py" < deploy/checks/podshagi_i_mesta.py
+          SS=""
+          [ -n "${{ inputs.s }}" ] && SS="--s ${{ inputs.s }}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $RABOTA/podshagi_i_mesta.py --state-dir $STATE_DIR $SS --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/podshagi_i_mesta.json || true
+          if python3 -c "import json; json.load(open('/tmp/podshagi_i_mesta.json'))" 2>/dev/null; then
+            cp /tmp/podshagi_i_mesta.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: zamer ne sobralsya"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Podshagi resheniya, mesto istochnika, simulyacii prodazhi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
