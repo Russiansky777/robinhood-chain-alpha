@@ -167,6 +167,53 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
 }
 
 
+# СНАЙПЕРЫ ИЗ РАЗБОРА KABUTSTR (слово владельца 28.09): "log_only += все 37
+# адресов из docs/podbivka_2026-09-28_snaipery.md (ветка Code-2, 7 дней) и
+# 2CQgjcdN". Это источники, за которыми снайперы 54ua и BomGAZnA садились
+# в одном слоте: их сигналы нужны в журнале, но торговать по ним не велено.
+# Адрес 2CQgjcdN владелец назвал отдельно -- он же стоит в таблице Code-2
+# пятым по частоте, поэтому в списке он один раз, а не дважды.
+СНАЙПЕРЫ_28_09 = (
+    "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+    "4S9Vbao13SjpeXsCaUE3nG7DA3oqi73mGEgmwqkRPy9g",
+    "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+    "9emXYGUF7cYtX2uyuZavDhhxZ65wHcYZgRv5AHVAHGSp",
+    "2CQgjcdNEo7WtbQLpJTAVcC3Ga61pNvRDTgP5grzctFG",
+    "DNreL4DMJ7xraNunLNxTVbM22aTtTAB2CoWogWoL5ph8",
+    "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+    "HttjoPHbWwMtK5ZUmqxouwzGtwynJsHC9Ztsm5YwbNQm",
+    "3HxvTCvBwQNXsyortzrryQeBoJCRd5QwUJJPVoZbS7SL",
+    "Fuw8N9qSnhRTKDpezFHdKS1ymvyNXxmtYay2g36AubNi",
+    "5dzH7gh5FjtrxUwtfBufJyTBA4fyCUGheZsdYQsE9vag",
+    "5t4fzb85DYYXqHMXPjFUKBSxLQisSciu1eYLpRDUKkQB",
+    "3xEgQCqNhJGHqavQzEFpmet8Vtc6o1L43snhRFeVLE1w",
+    "3GzBLpxTWWTPWwBYQ8Jgrz5XLUCg9aY6HiB3GEBUBAv6",
+    "9LXWa7V3AE15VfBupcx5gDts2ix3Y9NzbcKZKjkkq6hV",
+    "8WpSLDwsGnd3DEZXWSeShXzvFbAUFfACmCya434uPUH9",
+    "GfhYK5H4PV5KDw1nDXbbFkjsRhHVyf93394Rw7ND9yUu",
+    "CxgPWvH2GoEDENELne2XKAR2z2Fr4shG2uaeyqZceGve",
+    "49nvFkUxnxd4wXY5W9XygB93rzDUvugaxK5AkMqqxmgS",
+    "6BFyW8EJWbhZx12RBn5tqvSEwVWaFWknEZLaQSBgEkQA",
+    "7jNRZuKsEXBEp8JSBbEKHsL42mw8WxveriEBthURg3oF",
+    "H2Y8BrxU8wRDzXK2idwHu3H5DG2DBqZrAuPkpsv8kmuB",
+    "HNhuE4Y3RNCx5tPBkNsCTWKT14542NxnGi9aXEyN1x8E",
+    "JUWYu6WL3QiCfgRCaAzZgFvM7v7UfimiNvNMvu5P3u1",
+    "7DAGQqeVzenmi2UnWdymHobBM9fuRHFBpTYJqwddy4Pd",
+    "DdqHe96ogUJuPdzwVcPtXvLEpZRTFrPqESrTF1H8K5gL",
+    "EsRjHyw4nkNMPdYDF3HE6Y3W1VjSQMuNMSp53tesbt2W",
+    "MMMkhDRfNXpyE8ZZzEFAnaRubLxKsUrADwLNAevnMMM",
+    "6yJ31rTuwegHvbrdyunsBnjtgTHkQrw6NrvMrrQaL8AV",
+    "6GYCARF8VxkVQgoekq6k1YEL5divJwTM7C2r5VmRUfu3",
+    "4vgKuiktnNfXsoa9YTCUz9fRpfYDpDko4cBG15nkqazo",
+    "2avbra2ua3E8u94GSZdzTxTHGWHzjoH18YWDFrVX2Buu",
+    "9Lsuq7ur72ejVLxZyt1zw2biGRRc1xdJUckGHb1Nru3r",
+    "4U9s6ktkZVD6W9K5X1RRVG89Mm9ZGznrPhhPhXezNedm",
+    "CigQMfS81SVVbRRthYUkswhKUWQQncegCT7DBK4Q5gnH",
+    "9W1SEk8D4FQRUtUx5LBAb95LjBMbbLGDARRLfBWWFTLa",
+    "GUiSJYdAs5nyPcTkyZbnnEsL4R6VJKzemcUQgnHWBCgq",
+)
+
+
 def разрешить_префиксы(префиксы: tuple, все: set) -> dict:
     """Префикс -> полный адрес. Совпадений не ровно одно -- отказ со словами."""
     из_, беда = {}, []
@@ -278,6 +325,15 @@ def собрать(путь_прежнего: str) -> dict:
             continue
         группы["log_only"]["addresses"][а] = {"from": откуда}
 
+    # СНАЙПЕРЫ (владелец 28.09): в лог-группу, если адрес ещё не назван.
+    for а in СНАЙПЕРЫ_28_09:
+        if а in названные or а in НАШИ_КОШЕЛЬКИ:
+            continue
+        if а in группы["log_only"]["addresses"]:
+            группы["log_only"]["addresses"][а]["also"] = "снайперы 28.09"
+            continue
+        группы["log_only"]["addresses"][а] = {"from": "снайперы 28.09 (Code-2)"}
+
     новый = {
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "decision": ("Финальный план живого теста, владелец 27.09. Четыре группы: "
@@ -376,6 +432,17 @@ def self_test() -> int:
     # Часть списка 543 -- это и есть кошельки, которых владелец назвал для
     # торговли (их оттуда и выбирали). Правило не "их там нет", а "список 543
     # не перебивает названную группу и не двоит адрес".
+    в_логе_с = sum(1 for а in СНАЙПЕРЫ_28_09
+                   if а in ф["groups"]["log_only"]["addresses"])
+    chk(f"снайперы 28.09 в log_only: {в_логе_с} из {len(СНАЙПЕРЫ_28_09)}",
+        all(а in ф["groups"]["log_only"]["addresses"] or а in НАШИ_КОШЕЛЬКИ
+            or any(а in ф["groups"][г]["addresses"]
+                   for г in ("leader", "batch5", "lane_s0", "off"))
+            for а in СНАЙПЕРЫ_28_09),
+        [а for а in СНАЙПЕРЫ_28_09
+         if а not in ф["groups"]["log_only"]["addresses"]][:5])
+    chk("2CQgjcdN, названный владельцем отдельно, лежит в log_only",
+        any(а.startswith("2CQgjcdN") for а in ф["groups"]["log_only"]["addresses"]))
     общие = set(а for а, _ in адреса_543()) & торг
     chk("адреса из 543, названные для торговли, остались в торгующей группе и "
         "в log_only не задвоены",
