@@ -99,7 +99,8 @@ def метки() -> dict:
     for a, x in json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"].items():
         м[a] = {"группы": x.get("группы"), "имя": x.get("имя")}
     for a in ("54uaRuJEc9BHY7uVMXtcf9JWcYDtB75hUeFJWeCxEkBE", "BomGAZnAGwnjs3oaqNHm4Wk5sKctQi83PKVxjRuGGbrm"):
-        м.setdefault(a, {"группы": [], "имя": None})["группы"] = sorted(set((м[a].get("группы") or []) + ["снайпер KABUTSTR"]))
+        м.setdefault(a, {"группы": [], "имя": None})
+        м[a]["группы"] = sorted(set((м[a].get("группы") or []) + ["снайпер KABUTSTR"]))
     м[НАШ] = {"группы": ["МЫ"], "имя": "наш кошелёк полосы"}
     return м
 
