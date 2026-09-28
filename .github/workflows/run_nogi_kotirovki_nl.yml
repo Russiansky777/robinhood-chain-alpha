@@ -1,0 +1,115 @@
+name: "Пулы первой ноги по ВСЕМ котировкам источников (только чтение)"
+
+# ЗАЧЕМ. Кэш ног жил на файле 57 пулов от 24.09, и котировки лидера 28.09 в него
+# не попали: три ночные покупки BATCH-5 встали на "шаблона SOL -> Q в кэше нет".
+# Прогон берёт все котировки из data/podbivka/kotirovki_grupp.json (Code-2),
+# ищет по каждой пул SOL<->Q в свежих сделках минта и пишет новый файл пулов
+# ноги плюс образцы статичных шаблонов для главных котировок.
+#
+# Только чтение цепи: getSignaturesForAddress, getTransaction,
+# getMultipleAccounts, getAsset. Ни одной отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      podpisey_na_kotirovku:
+        description: "сколько свежих сделок минта читать на котировку"
+        required: false
+        default: "12"
+      glavnyh:
+        description: "сколько котировок по частоте считать главными"
+        required: false
+        default: "10"
+      skolko_kotirovok:
+        description: "0 -- все котировки файла Code-2"
+        required: false
+        default: "0"
+
+concurrency:
+  group: nogi-kotirovki
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  CODE_DIR: /home/bot/bloom_executor
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  TARGET_HOST: 127.0.0.1
+  OUT_POOLS: data/c2_leg_pools_2026-09-28.json
+  OUT_SHABLONY: data/nogi_shablony.json
+  OUT_OTCHET: data/nogi_pokrytie.json
+
+jobs:
+  sbor:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается"
+        run: python3 -m py_compile deploy/checks/nogi_vse_kotirovki.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить прогон и собрать пулы ноги"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/nogi"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/nogi_vse_kotirovki.py" < deploy/checks/nogi_vse_kotirovki.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/kotirovki_grupp.json" < data/podbivka/kotirovki_grupp.json
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/leg_pools_prezhnie.json" < data/c2_leg_pools_2026-09-24.json
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            $PYBIN /tmp/nogi/nogi_vse_kotirovki.py \
+              --code-dir '$CODE_DIR' \
+              --kotirovki /tmp/nogi/kotirovki_grupp.json \
+              --leg-pools /tmp/nogi/leg_pools_prezhnie.json \
+              --podpisey-na-kotirovku '${{ inputs.podpisey_na_kotirovku }}' \
+              --glavnyh '${{ inputs.glavnyh }}' \
+              --skolko-kotirovok '${{ inputs.skolko_kotirovok }}' \
+              --out-pools /tmp/nogi/pools.json \
+              --out-shablony /tmp/nogi/shablony.json \
+              --out-otchet /tmp/nogi/otchet.json" | tail -25
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/pools.json" > "$OUT_POOLS"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/shablony.json" > "$OUT_SHABLONY"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/otchet.json" > "$OUT_OTCHET"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/nogi"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET"; do
+            [ -f "$f" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$f" || true
+          done
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET"; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Nogi: puly pervoy nogi po vsem kotirovkam + obrazcy statichnyh shablonov [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
