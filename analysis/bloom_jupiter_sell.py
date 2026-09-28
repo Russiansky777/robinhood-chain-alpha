@@ -40,6 +40,7 @@ import base64
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -463,14 +464,23 @@ def продать(*, mint: str, amount_raw: int, taker: str, вход_sol: floa
             отказы_подписи.append(f"{имя_пути}: {type(exc).__name__}")
             continue
         шаги.append({"step": "sign", "api": имя_пути, "ok": True})
+        # МОМЕНТ ОТПРАВКИ -- ДО execute, А НЕ ПОСЛЕ (решение владельца 28.09).
+        # execute у Jupiter ждёт подтверждения, то есть возвращается уже ПОСЛЕ
+        # посадки: время после него -- это не "когда отправили", и половина
+        # "отправка -> посадка" по нему выходила нулём при живых 4 секундах.
+        t_отправки = time.time()
+        итог["ts_execute_start"] = t_отправки
         ответ = и_фн_п(подписанная, order["requestId"])
         шаги.append({"step": "execute", "api": имя_пути,
                       "ok": not ответ.get("ошибка"),
                       "status": ответ.get("status"),
                       "signature": ответ.get("signature"),
+                      "ts_execute_start": round(t_отправки, 6),
+                      "execute_ms": round((time.time() - t_отправки) * 1000.0, 1),
                       "why_not": ответ.get("ошибка")})
         итог.update(ok=not ответ.get("ошибка"), signature=ответ.get("signature"),
-                     status=ответ.get("status"), why_not=ответ.get("ошибка"))
+                     status=ответ.get("status"), why_not=ответ.get("ошибка"),
+                     execute_ms=round((time.time() - t_отправки) * 1000.0, 1))
         return итог
     # НИ ОДИН ПУТЬ НЕ ДОШЁЛ ДО ОТПРАВКИ. Причина называется по месту отказа:
     # заказ и подпись -- разные поломки, и лечатся они по-разному.
