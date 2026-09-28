@@ -1213,8 +1213,12 @@ class Seller:
         отправка = (доложено or {}).get("отправка") or {}
         if cid:
             try:
-                self.state.update_position(cid, doklad_sell_sent=True,
-                                            doklad_sell_ok=bool(отправка.get("ok")))
+                # ok=None -- "в очереди" (оповещатель шлёт фоновым потоком), а
+                # не отказ: bool() врал на всех сделках 28.09.
+                self.state.update_position(
+                    cid, doklad_sell_sent=True,
+                    doklad_sell_ok=отправка.get("ok"),
+                    doklad_sell_queued=bool(отправка.get("queued")))
             except Exception:  # noqa: BLE001
                 pass
         # ПОСЛЕДНИЙ РУБЕЖ. BUY отправлен выше, ДО продажи; здесь повтор
@@ -1255,7 +1259,8 @@ class Seller:
             try:
                 self.state.update_position(
                     cid, doklad_buy_sent=True,
-                    doklad_buy_ok=bool(отправка.get("ok")),
+                    doklad_buy_ok=отправка.get("ok"),
+                    doklad_buy_queued=bool(отправка.get("queued")),
                     doklad_buy_dosylkoy=True,
                     doklad_buy_pered_sell=bool(до_продажи))
             except Exception:  # noqa: BLE001

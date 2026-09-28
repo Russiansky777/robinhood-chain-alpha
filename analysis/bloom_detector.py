@@ -4427,12 +4427,18 @@ class Детектор:
                 log.warning("строка BUY не собралась: %s: %s",
                             type(exc).__name__, str(exc)[:160])
                 continue
-            ушло = bool(((доложено or {}).get("отправка") or {}).get("ok"))
+            отправка_b = ((доложено or {}).get("отправка") or {})
+            # ok=None ЗНАЧИТ "В ОЧЕРЕДИ", А НЕ "ОТКАЗ". Оповещатель из горячего
+            # пути посылает в фоновом потоке и возвращает {"ok": None,
+            # "queued": True}; bool() от этого давал doklad_buy_ok=false у
+            # сделок, чьи строки владелец в чате видел (28.09 zVbJ3e -- обе).
+            ушло = отправка_b.get("ok")
             итог["sent"] += 1
             итог["by_deadline"] += int(not собраны)
             try:
                 self.состояние.update_position(
                     cid, doklad_buy_sent=True, doklad_buy_ok=ушло,
+                    doklad_buy_queued=bool(отправка_b.get("queued")),
                     doklad_buy_full=собраны,
                     doklad_buy_wait_ms=round(возраст * 1000.0, 1))
             except Exception as exc:  # noqa: BLE001
