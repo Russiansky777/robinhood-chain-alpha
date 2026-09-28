@@ -1,0 +1,108 @@
+name: "Кривая V2: спросить у программы связанный накопитель (без отправки)"
+
+# ЗАЧЕМ. Место 21 у 27-счётной покупки кривой -- связанный накопитель. Семена
+# его неизвестны (IDL на цепи нет, перебор по трём фактам цепи пуст), поэтому
+# правильный адрес берём У САМОЙ ПРОГРАММЫ: она печатает его в ошибке
+# ConstraintSeeds. Прогон собирает НАШУ покупку из живой сделки источника,
+# симулирует без подписи, читает ожидаемый ключ, кладёт в состояние службы и
+# проверяет второй симуляцией.
+#
+# Денег не двигает: только simulateTransaction с sigVerify=false.
+on:
+  workflow_dispatch:
+    inputs:
+      podpisi:
+        description: "подписи живых покупок кривой V2 через пробел"
+        required: false
+        default: "3c24kzRVEyTAUuj7ZHAcshsqbZAnqvz9HsLSEZhv5BawT7wQr3WWGqmyRMFCPNJgSimX1tW9i3gjidPqwF34AzS5 3UTZPFcciyBKEpVErRGs1CAvATfPufjEoL5yCZ1bKs18TNmv2boPtu1bfc9tXAW9RzrmSKZHitamhkMQhDzN8RCf"
+      koshelek:
+        description: "наш кошелёк полосы"
+        required: false
+        default: "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+      sol:
+        description: "размер для симуляции в SOL"
+        required: false
+        default: "0.01"
+
+concurrency:
+  group: bonding-v2-klyuch
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/bonding_v2_klyuch
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/bonding_v2_klyuch.json
+
+jobs:
+  klyuch:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка сборщика ДО сети"
+        run: |
+          set -e
+          cd analysis
+          python3 -m py_compile c2_swap_build.py bonding_v2_uznat_klyuch.py
+          python3 c2_swap_build.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Спросить программу на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/bonding_v2_uznat_klyuch.py" < analysis/bonding_v2_uznat_klyuch.py
+          ARGI=""
+          for P in ${{ inputs.podpisi }}; do ARGI="$ARGI --podpis $P"; done
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA $PY_HOSTA $RABOTA/bonding_v2_uznat_klyuch.py $ARGI --koshelek '${{ inputs.koshelek }}' --sol '${{ inputs.sol }}' --fajl $STATE_DIR/bonding_v2_assoc.json --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/bonding_v2_klyuch.json || true
+          if python3 -c "import json; json.load(open('/tmp/bonding_v2_klyuch.json'))" 2>/dev/null; then
+            cp /tmp/bonding_v2_klyuch.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: otvet ne sobralsya"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "ls -l $STATE_DIR/bonding_v2_assoc.json; cat $STATE_DIR/bonding_v2_assoc.json"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Bonding V2: klyuch ot programmy [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

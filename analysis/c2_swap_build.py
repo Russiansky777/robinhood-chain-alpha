@@ -33,6 +33,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import struct
 import sys
 import time
@@ -104,6 +105,9 @@ BONDING_DISCS = {
         "spec": {"n_accounts": 27, "user": [13],
                   "user_ata": [(14, 1, 3), (15, 2, 4)],
                   "pda": [(20, [b"user_volume_accumulator", "USER"])],
+                  # место 21 -- связанный накопитель: ключ не выводится
+                  # семенами, берётся из состояния (см. assoc_uva).
+                  "assoc_uva": (21, 2),
                   "base_mint": 1, "quote_mint": 2, "base_vault": 11,
                   "quote_vault": 12, "native_quote": False},
     },
@@ -392,6 +396,100 @@ def flip_template(tpl: dict, in_mint: str) -> dict:
     return t
 
 
+# ------------------------------------- СВЯЗАННЫЙ НАКОПИТЕЛЬ 27-счётной кривой
+#
+# 28.09 семь наших копий источника 6qudAN2k сели с ошибкой: программа кривой
+# сказала прямо --
+#   AnchorError caused by account: associated_user_volume_accumulator.
+#   Error Code: ConstraintSeeds. Error Number: 2006.
+# Место 20 (наш user_volume_accumulator) мы подставляли верно, а место 21 --
+# СВЯЗАННЫЙ накопитель -- переносили из сделки источника, то есть отдавали
+# программе ЧУЖОЙ счёт.
+#
+# ОТКУДА БЕРЁМ ПРАВИЛЬНЫЙ КЛЮЧ, не выдумывая семена. IDL программы на цепи не
+# выложен (счёт IDL пуст), а перебор строковых семян по трём фактам цепи
+# (кошелёк+котировка -> ключ) не дал ни одного совпадения. Зато сама программа
+# печатает ожидаемый адрес в ошибке, и по фактам он зависит ТОЛЬКО от
+# пользователя и минта котировки: у нас один и тот же ключ на семи разных
+# базовых минтах, а у источника ключ меняется вместе с котировкой (WSOL против
+# XsCPL9dN...). Поэтому ключи живут в состоянии службы, а не в коде: файл
+# заполняется тем, что назвала цепь.
+#
+# ЕСЛИ КЛЮЧА НЕТ -- сборка ОТКАЗЫВАЕТ. Отправить чужой накопитель значит
+# заранее сжечь комиссию: именно так ушло 0.007035 SOL за 28.09.
+ASSOC_UVA_ПО_УМОЛЧАНИЮ = "/home/bot/bloom_executor_live_data/bonding_v2_assoc.json"
+_ASSOC_UVA_КЭШ: dict = {}
+
+
+def assoc_uva_файл() -> str:
+    return os.environ.get("BLOOM_ASSOC_UVA_FILE") or ASSOC_UVA_ПО_УМОЛЧАНИЮ
+
+
+def assoc_uva_забыть() -> None:
+    """Сбросить память процесса о файле (нужно самопроверке и после правки)."""
+    _ASSOC_UVA_КЭШ.clear()
+
+
+def assoc_uva_все() -> dict:
+    путь = assoc_uva_файл()
+    if путь in _ASSOC_UVA_КЭШ:
+        return _ASSOC_UVA_КЭШ[путь]
+    try:
+        with open(путь, encoding="utf-8") as ф:
+            зн = json.load(ф)
+        если = зн if isinstance(зн, dict) else {}
+    except Exception:  # noqa: BLE001
+        если = {}
+    _ASSOC_UVA_КЭШ[путь] = если
+    return если
+
+
+def assoc_uva(пользователь: str, минт_котировки: str) -> str | None:
+    """Ключ связанного накопителя для этой пары -- только из состояния."""
+    по_кошельку = (assoc_uva_все().get(пользователь) or {})
+    зн = по_кошельку.get(минт_котировки)
+    return зн if isinstance(зн, str) and зн else None
+
+
+def assoc_uva_запомнить(пользователь: str, минт_котировки: str, ключ: str,
+                         *, путь: str | None = None) -> dict:
+    """Записать ключ, названный цепью. Пишем атомарно и без потери чужих пар."""
+    путь = путь or assoc_uva_файл()
+    все = {}
+    try:
+        with open(путь, encoding="utf-8") as ф:
+            зн = json.load(ф)
+        все = зн if isinstance(зн, dict) else {}
+    except Exception:  # noqa: BLE001
+        все = {}
+    все.setdefault(пользователь, {})[минт_котировки] = ключ
+    врем = f"{путь}.tmp"
+    with open(врем, "w", encoding="utf-8") as ф:
+        json.dump(все, ф, ensure_ascii=False, indent=1)
+    os.replace(врем, путь)
+    _ASSOC_UVA_КЭШ[путь] = все
+    return все
+
+
+def assoc_uva_из_логов(логи) -> str | None:
+    """Ожидаемый адрес связанного накопителя из ошибки программы.
+
+    Anchor печатает: строку с именем счёта и Error Code: ConstraintSeeds,
+    затем "Left:" (что дали) и "Right:" (что ждали). Берём Right и только
+    для нашего счёта -- чужие ошибки сюда не относятся.
+    """
+    строки = [str(л) for л in (логи or [])]
+    for i, л in enumerate(строки):
+        if ("associated_user_volume_accumulator" not in л
+                or "ConstraintSeeds" not in л):
+            continue
+        for j in range(i, min(i + 8, len(строки))):
+            if строки[j].strip().endswith("Right:") and j + 1 < len(строки):
+                хвост = строки[j + 1].split()
+                return хвост[-1] if хвост else None
+    return None
+
+
 def user_accounts(tpl: dict, tx: dict, user: str) -> dict:
     """{индекс: адрес} для пользовательских счетов шаблона при данном user."""
     spec = spec_of(tpl)
@@ -408,6 +506,19 @@ def user_accounts(tpl: dict, tx: dict, user: str) -> dict:
             out[i] = ata(user, acc[mi], acc[pi])
     for i, seeds in spec["pda"]:
         out[i] = pda(seeds, user, tpl["program"])
+    ас = spec.get("assoc_uva")
+    if ас:
+        место, место_котировки = ас
+        # ПЕРЕСБОРКА СДЕЛКИ САМОГО ИСТОЧНИКА: на месте 21 уже стоит ЕГО
+        # накопитель, и подставлять туда ничего не надо -- иначе самопроверка
+        # "восстанови инструкцию источника точно" стала бы ложной.
+        свой = acc[spec["user"][0]] == user if spec.get("user") else False
+        ключ = acc[место] if свой else assoc_uva(user, acc[место_котировки])
+        if not ключ:
+            # ЧЕСТНЫЙ ОТКАЗ. Чужой накопитель программа не примет, и покупка
+            # сгорит на комиссии. Пусть лучше сделка не соберётся.
+            return {}
+        out[место] = ключ
     return out
 
 
@@ -1256,6 +1367,13 @@ def rebuild_check(s: dict, program: str) -> dict:
 
 def self_test() -> int:
     checks = []
+    # СОСТОЯНИЕ СЛУЖБЫ САМОПРОВЕРКА НЕ ТРОГАЕТ: связанные накопители пишем в
+    # временный файл, а не в файл хоста.
+    import tempfile as _tfm  # noqa: PLC0415
+    _проб_файл = os.path.join(_tfm.mkdtemp(), "assoc.json")
+    _env_было = os.environ.get("BLOOM_ASSOC_UVA_FILE")
+    os.environ["BLOOM_ASSOC_UVA_FILE"] = _проб_файл
+    assoc_uva_забыть()
     # --- CLMM: СОБЫТИЕ СВОПА ИЗ ЛОГОВ, сверенное с самой сделкой. Это первый
     # шаг строителя Raydium CLMM (очередь владельца, второй номер): без события
     # минимума выхода у сосредоточенной ликвидности не посчитать, а угадывать
@@ -1541,6 +1659,14 @@ def self_test() -> int:
             if not tpl["ok"]:
                 continue
             kp = Keypair()
+            # У 27-счётной кривой место 21 -- связанный накопитель, и для
+            # случайного кошелька его знать неоткуда: для проверки СБОРКИ
+            # кладём в временное состояние ключ из шаблона. Отказ при
+            # неизвестном ключе проверяется отдельно, ниже.
+            ас_ = spec_of(tpl).get("assoc_uva")
+            if ас_:
+                assoc_uva_запомнить(str(kp.pubkey()), tpl["accounts"][ас_[1]],
+                                     tpl["accounts"][ас_[0]], путь=_проб_файл)
             b = build_buy(tpl, s["tx"], user=str(kp.pubkey()), payer=s["source"] or str(kp.pubkey()), amount_in=10_000_000,
                           min_out=1, cu_price_micro=100_000, tip=None)
             n += 1
@@ -1697,6 +1823,13 @@ def self_test() -> int:
             continue
         kp = Keypair()
         me = str(kp.pubkey())
+        # 27-счётная разновидность: связанный накопитель случайного кошелька
+        # знать неоткуда, для проверки СБОРКИ кладём ключ из шаблона в
+        # временное состояние (отказ при неизвестном ключе проверяется отдельно).
+        ас_п = spec_of(tpl).get("assoc_uva")
+        if ас_п:
+            assoc_uva_запомнить(me, tpl["accounts"][ас_п[1]],
+                                 tpl["accounts"][ас_п[0]], путь=_проб_файл)
         # Порядок аргументов -- по разновидности: "точный выход" это
         # (минимум токенов, предел траты), "точный вход" -- (трата, минимум).
         ожид = ((mo["min_out"], 10_000_000) if tpl.get("exact_out")
@@ -1873,6 +2006,65 @@ def self_test() -> int:
     checks.append((f"DBC: комиссия кривой 2 % (с округлением вверх) у обеих живых сделок "
                    f"({sum(dbc_ком)} из {len(dbc_ком)})",
                    len(dbc_ком) >= 2 and all(dbc_ком)))
+    # --- СВЯЗАННЫЙ НАКОПИТЕЛЬ 27-счётной кривой (28.09: семь сгоревших покупок).
+    # Проверяем три вещи: ключ из ошибки программы читается; при известном ключе
+    # он встаёт РОВНО на место 21; при неизвестной котировке сборка отказывает.
+    логи_обр = [
+        "Program log: Instruction: BuyExactQuoteInV2",
+        "Program log: AnchorError caused by account: associated_user_volume_accumulator."
+        " Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds"
+        " constraint was violated.",
+        "Program log: Left:",
+        "Program log: 6HX8mmdYYYZ79YMETXcLUydFq9Eef1Dy8SyRZx9Zu2Mh",
+        "Program log: Right:",
+        "Program log: FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2",
+    ]
+    checks.append(("кривая V2: ожидаемый накопитель читается из ошибки программы",
+                   assoc_uva_из_логов(логи_обр)
+                   == "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2"))
+    checks.append(("кривая V2: чужая ошибка ConstraintSeeds ключа не даёт",
+                   assoc_uva_из_логов([
+                       "Program log: AnchorError caused by account: creator_vault."
+                       " Error Code: ConstraintSeeds. Error Number: 2006.",
+                       "Program log: Left:", "Program log: 11111111111111111111111111111111",
+                       "Program log: Right:", "Program log: So11111111111111111111111111111111111111112",
+                   ]) is None))
+    # Шаблон 27 счетов: только места, которые нужны подстановке, реальные.
+    _наш = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+    _минт = "7ncdD1BiWSPG6U1SqtuopyLeRdyNSBwt4x18xnL69XMR"
+    _wsol = "So11111111111111111111111111111111111111112"
+    _счета = [SYSTEM] * 27
+    _счета[1], _счета[2] = _минт, _wsol
+    _счета[3], _счета[4] = TOKEN_PROGRAM, TOKEN_PROGRAM
+    _шаблон = {"program": BONDING, "ix": "c2ab1c46684d5b2f", "accounts": _счета,
+                "data": b"\x00" * 25, "writable": {}, "arg0": 1, "arg1": 1}
+    _файл = os.path.join(os.path.dirname(_проб_файл), "assoc_proba.json")
+    os.environ["BLOOM_ASSOC_UVA_FILE"] = _файл
+    assoc_uva_забыть()
+    checks.append(("кривая V2: без известного ключа сборка ОТКАЗЫВАЕТ "
+                   "(комиссия не горит)",
+                   user_accounts(_шаблон, {}, _наш) == {}))
+    assoc_uva_запомнить(_наш, _wsol, "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2",
+                         путь=_файл)
+    _роли = user_accounts(_шаблон, {}, _наш)
+    checks.append(("кривая V2: известный ключ встаёт на место 21, а место 20 "
+                   "остаётся нашим PDA",
+                   _роли.get(21) == "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2"
+                   and _роли.get(20) == pda([b"user_volume_accumulator", "USER"],
+                                             _наш, BONDING)
+                   and _роли.get(13) == _наш))
+    checks.append(("кривая V2: у другой котировки своего ключа нет -- отказ",
+                   (lambda: (
+                       _счета.__setitem__(2, "XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN"),
+                       user_accounts(dict(_шаблон, accounts=list(_счета)), {}, _наш) == {},
+                   )[1])()))
+    _счета[2] = _wsol
+    if _env_было is None:
+        os.environ.pop("BLOOM_ASSOC_UVA_FILE", None)
+    else:
+        os.environ["BLOOM_ASSOC_UVA_FILE"] = _env_было
+    assoc_uva_забыть()
+
     bad_n = 0
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
