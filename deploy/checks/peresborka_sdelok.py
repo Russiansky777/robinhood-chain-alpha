@@ -159,7 +159,10 @@ def главное() -> int:
                     "closed_confirmed", "pnl_counted_spend_sol",
                     "lane_tips_total_sol", "lane_priority_lamports",
                     "lane_buy_native_sol", "lane_buy_fee_sol", "sol_in",
-                    "closed_sol_net", "lane_landed_slot", "source_slot")}}
+                    "closed_sol_net", "lane_landed_slot", "source_slot",
+                    "program", "lane_two_step", "lane_two_step_quote_mint",
+                    "block_index", "block_total", "block_tries", "block_why_not",
+                    "token_name", "source_name")}}
         if оповещатель is not None:
             зап["otpravleno_buy"] = оповещатель.послать(buy)
             if sell:
