@@ -101,9 +101,21 @@ jobs:
               --out-pools /tmp/nogi/pools.json \
               --out-shablony /tmp/nogi/shablony.json \
               --out-otchet /tmp/nogi/otchet.json" | tail -25
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/pools.json" > "$OUT_POOLS"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/shablony.json" > "$OUT_SHABLONY"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/otchet.json" > "$OUT_OTCHET"
+          # ЗАБИРАЕМ ТОЛЬКО ТО, ЧТО ПРОГОН ДЕЙСТВИТЕЛЬНО НАПИСАЛ. Разбор одного
+          # пула файла пулов не пишет вовсе, и прямое перенаправление затёрло
+          # файл 109 котировок пустотой (28.09, 03:47). Теперь каждый файл
+          # сначала кладётся рядом, проверяется на разбор JSON и только потом
+          # заменяет прежний.
+          for para in "pools.json:$OUT_POOLS" "shablony.json:$OUT_SHABLONY" "otchet.json:$OUT_OTCHET"; do
+            imya="${para%%:*}"; kuda="${para##*:}"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/$imya 2>/dev/null || true" > "/tmp/nogi_$imya" || true
+            if python3 -c "import json,sys; json.load(open('/tmp/nogi_$imya'))" 2>/dev/null; then
+              cp "/tmp/nogi_$imya" "$kuda"
+              echo "obnovlen $kuda"
+            else
+              echo "progon ne napisal $imya -- $kuda ostavlen kak byl"
+            fi
+          done
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/nogi"
 
       - name: "Ключей в отчёте быть не должно"
