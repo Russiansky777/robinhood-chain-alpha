@@ -3365,8 +3365,15 @@ class Детектор:
             # это и стояло прочерком в паре 05:11Z.
             подпись = (подписи[0] if подписи else
                         (p_.get("lane_signature") or p_.get("lane_signature_local")))
-            слот = p_.get("our_slot") or p_.get("own_tx_seen_slot")
-            откуда = ("our_slot" if p_.get("our_slot") else "own_tx_seen_slot")
+            # СЛОТ ПОСАДКИ У ПОЛОСЫ ЛЕЖИТ В lane_landed_slot. Пока его здесь не
+            # было, место в блоке у сделок полосы не догонялось НИКОГДА: полей
+            # our_slot и own_tx_seen_slot у её позиций нет вовсе (проверено по
+            # десяти сделкам ночи 27->28.09 -- ни одного block_* в записи).
+            слот = (p_.get("our_slot") or p_.get("own_tx_seen_slot")
+                    or p_.get("lane_landed_slot"))
+            откуда = ("our_slot" if p_.get("our_slot")
+                      else ("own_tx_seen_slot" if p_.get("own_tx_seen_slot")
+                            else "lane_landed_slot"))
             if not подпись or not isinstance(слот, int):
                 continue
             кандидаты.append((cid, подпись, слот, откуда))
@@ -9189,6 +9196,27 @@ def self_test() -> int:
                 and set(д.тени_подряд) == {"ПУЛ_А", "ПУЛ_Б"}, д.тени_подряд)
         finally:
             подмена_т.вернуть()
+
+        # ---- МЕСТО В БЛОКЕ У СДЕЛКИ ПОЛОСЫ: СЛОТ ИЗ lane_landed_slot ----
+        with _врем_каталог() as d_мб:
+            st_мб = ST.ExecState(base=Path(d_мб) / "s", kill=Path(d_мб) / "k")
+            дет_мб = Детектор(источники={"SRC": "тест"}, состояние=st_мб,
+                               helius=Helius(key="нет"), курс=КурсSOL(), режим="dry")
+            st_мб.write_intent(client_order_id="мб1", mint="МИНТ", source_sig="СИ",
+                                source_slot=500, sol_in=0.3, pool=None, program=None,
+                                taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                                sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ,
+                                lane_group="lane_s0")
+            st_мб.update_position("мб1", lane_landed_slot=501,
+                                   lane_signature="П" * 88)
+            итог_мб = дет_мб.догнать_место_в_блоке()
+            поз_мб = st_мб.positions()["мб1"]
+            chk("место в блоке у сделки полосы берётся по lane_landed_slot "
+                f"(смотрели {итог_мб['looked']}, слот {поз_мб.get('block_slot')}, "
+                f"откуда {поз_мб.get('block_slot_from')})",
+                итог_мб["looked"] == 1 and поз_мб.get("block_slot") == 501
+                and поз_мб.get("block_slot_from") == "lane_landed_slot",
+                (итог_мб, поз_мб.get("block_slot"), поз_мб.get("block_slot_from")))
 
         # ---- СТАТИЧНЫЕ ШАБЛОНЫ НОГИ: ПРИЗНАК ЖИЗНИ И ПОРОГ ГЛУБИНЫ ----
         with _врем_каталог() as d_с:
