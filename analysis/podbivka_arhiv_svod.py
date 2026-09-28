@@ -203,7 +203,9 @@ def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--metka", required=True)
     а = р.parse_args()
-    д = json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{а.metka}.json").read_text(encoding="utf-8"))
+    import gzip  # noqa: PLC0415
+    п = КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{а.metka}.json"
+    д = json.loads(gzip.decompress(Path(f"{п}.gz").read_bytes()) if Path(f"{п}.gz").exists() else п.read_text(encoding="utf-8"))
     имена = json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
     md = [f"# Подбивка: архив PumpApi, сутки с {д['день']} -- лог и режим 1", "",
           f"Файлов: {д['счёт']['файлов']} из {len(д['часы'])}, строк {д['счёт']['строк']}; ошибки: {д['счёт']['ошибки'] or 'нет'}. "

@@ -229,12 +229,13 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
         с["свопов"] = {f"s{k}": sum(1 for e in ряд if e.get("block") == с["block"] + k and e.get("action") in ("buy", "sell"))
                        for k in (1, 2)}
     ряды_целей = {e["poolId"]: ряды.get(e["poolId"]) for e in цели_события if e.get("poolId")}
-    out = КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{метка}.json"
+    import gzip  # noqa: PLC0415
+    out = КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{метка}.json.gz"   # > 100 МБ несжатым -- предел GitHub
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"день": день, "часы": часы, "порог_sol": porog, "окно_слотов": окно, "счёт": счёт,
+    out.write_bytes(gzip.compress(json.dumps({"день": день, "часы": часы, "порог_sol": porog, "окно_слотов": окно, "счёт": счёт,
                                "наши_события": наши_события, "сигналы": сигналы, "цели": цели_события,
                                "ряды_целей": ряды_целей},
-                              ensure_ascii=False), encoding="utf-8")
+                              ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6))
     return out
 
 
