@@ -287,6 +287,48 @@ def найти_у_источника(источник: str, минт: str, *, п
     return {"ok": False, "why_not": "покупки источника по этому минту не нашлось"}
 
 
+def владельцы(ключи: list) -> dict:
+    """Кто владеет счетами и сколько в них данных -- словами цепи.
+
+    Это отвечает на вопрос, какая ПРОГРАММА выводит спорный счёт: угадывать
+    семена без этого бессмысленно.
+    """
+    из_ = {}
+    for начало in range(0, len(ключи), 100):
+        часть = ключи[начало:начало + 100]
+        о = зов("getMultipleAccounts", [часть, {"encoding": "base64"}])
+        if not о["ok"]:
+            for к in часть:
+                из_[к] = {"why_not": о["why_not"]}
+            continue
+        значения = (о["result"] or {}).get("value") or []
+        for к, зн in zip(часть, значения):
+            if not зн:
+                из_[к] = {"есть": False}
+                continue
+            данные = (зн.get("data") or ["", ""])[0]
+            import base64  # noqa: PLC0415
+            сырое = base64.b64decode(данные) if данные else b""
+            из_[к] = {"есть": True, "владелец": зн.get("owner"),
+                       "лампортов": зн.get("lamports"), "байт": len(сырое),
+                       "данные_b64": данные if len(сырое) <= 256 else None}
+    return из_
+
+
+def найти_ключи_в_данных(данные_b64: str | None, кандидаты: dict) -> list:
+    """Какие известные адреса лежат в данных счёта и по каким смещениям."""
+    if not данные_b64:
+        return []
+    import base64  # noqa: PLC0415
+    сырое = base64.b64decode(данные_b64)
+    из_ = []
+    for имя, адрес in кандидаты.items():
+        сдвиг = сырое.find(bytes(Pubkey.from_string(адрес)))
+        if сдвиг >= 0:
+            из_.append({"имя": имя, "адрес": адрес, "смещение": сдвиг})
+    return из_
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--podpis", action="append", default=[],
@@ -300,6 +342,10 @@ def main() -> int:
                     help="ключ, который ждала программа (из журнала ошибки)")
     р.add_argument("--dali", default="",
                     help="ключ, который дали мы (из журнала ошибки)")
+    р.add_argument("--vladelcy", action="store_true",
+                    help="спросить у цепи владельца и размер каждого счёта")
+    р.add_argument("--schet", action="append", default=[],
+                    help="разобрать отдельный счёт (можно несколько)")
     р.add_argument("--out", default="")
     а = р.parse_args()
 
@@ -360,6 +406,42 @@ def main() -> int:
         из_["semena"] = {"пары": пары, "годные": годные}
         print("\nсемена по фактам:", json.dumps(годные, ensure_ascii=False)
               if годные else "перебором не нашлось -- нужен IDL или больше образцов")
+
+    # ВЛАДЕЛЬЦЫ СЧЕТОВ: какая программа держит каждое место раскладки.
+    if а.vladelcy and из_["sdelki"]:
+        ключи = [м["ключ"] for с in из_["sdelki"] if с.get("ok")
+                  for м in с["места"]]
+        в = владельцы(sorted(set(ключи)))
+        из_["vladelcy"] = в
+        print("\nвладельцы счетов раскладки:")
+        for с in из_["sdelki"]:
+            if not с.get("ok"):
+                continue
+            for м in с["места"]:
+                зн = в.get(м["ключ"]) or {}
+                print(f"  {м['место']:2d} {м['ключ']} владелец "
+                      f"{зн.get('владелец') or ('нет счёта' if зн.get('есть') is False else зн.get('why_not'))} "
+                      f"байт {зн.get('байт')}")
+
+    кандидаты = {}
+    if а.koshelek:
+        кандидаты["наш кошелёк"] = а.koshelek
+    if а.istochnik:
+        кандидаты["источник"] = а.istochnik
+    if а.mint:
+        кандидаты["минт"] = а.mint
+    if а.schet:
+        в = владельцы(list(dict.fromkeys(а.schet)))
+        из_["scheta"] = {}
+        print("\nотдельные счета:")
+        for к in dict.fromkeys(а.schet):
+            зн = в.get(к) or {}
+            внутри = найти_ключи_в_данных(зн.get("данные_b64"), кандидаты)
+            из_["scheta"][к] = {"счёт": зн, "известные_внутри": внутри}
+            print(f"  {к}: владелец {зн.get('владелец')} байт {зн.get('байт')} "
+                  f"лампортов {зн.get('лампортов')} есть {зн.get('есть')}")
+            for н in внутри:
+                print(f"      внутри {н['имя']} на смещении {н['смещение']}")
 
     if а.out:
         with open(а.out, "w", encoding="utf-8") as ф:
