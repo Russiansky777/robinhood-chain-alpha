@@ -39,7 +39,8 @@ SYSTEM = "11111111111111111111111111111111"
 ВЫХОД = {"имя": "faza1.json"}
 
 
-def подписи_назад(уз, адрес: str, до: str | None, страниц: int, стоп_bt: int | None = None) -> tuple[list, bool]:
+def подписи_назад(уз, адрес: str, до: str | None, страниц: int, стоп_bt: int | None = None,
+                  стоп_слот: int | None = None) -> tuple[list, bool]:
     """Подписи адреса от `до` назад; (список, дошли_до_начала)."""
     из_, курсор = [], до
     for _ in range(страниц):
@@ -50,6 +51,8 @@ def подписи_назад(уз, адрес: str, до: str | None, стра�
         if len(стр) < 1000:
             return из_, True
         if стоп_bt and (стр[-1].get("blockTime") or 0) < стоп_bt:
+            return из_, False
+        if стоп_слот and (стр[-1].get("slot") or 0) < стоп_слот:
             return из_, False
         курсор = стр[-1]["signature"]
     return из_, False
@@ -113,6 +116,7 @@ def main() -> int:
     р.add_argument("--istochnik", default="")
     р.add_argument("--stranic", type=int, default=15)
     р.add_argument("--metka", default="")
+    р.add_argument("--pered", type=int, default=0, help="история пула только от s_наш − pered слотов")
     а = р.parse_args()
     ВЫХОД["имя"] = f"faza1_{а.metka}.json" if а.metka else "faza1.json"
     уз = S.Узел()
@@ -164,8 +168,10 @@ def main() -> int:
         рез.update(пул={k: пул.get(k) for k in ("pool_vault", "quote_vault", "quote_mint")}, режим=режим, программа=прог)
         # 2. история хранилища пула
         опора = S.подпись_после_слота(уз, пр["slot"] + 151)
-        ист, до_начала = подписи_назад(уз, пул["pool_vault"], опора, а.stranic)
-        ист = [з for з in ист if з.get("err") is None and (з.get("slot") or 0) <= пр["slot"] + 150]
+        стоп = пк["slot"] - а.pered if а.pered else None
+        ист, до_начала = подписи_назад(уз, пул["pool_vault"], опора, а.stranic, стоп_слот=стоп)
+        ист = [з for з in ист if з.get("err") is None and (з.get("slot") or 0) <= пр["slot"] + 150
+               and (стоп is None or (з.get("slot") or 0) >= стоп)]
         ист.reverse()
         рез["история"] = {"подписей": len(ист), "от_создания": до_начала}
         бл = SN.Блоки(уз)
