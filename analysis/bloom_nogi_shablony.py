@@ -153,6 +153,8 @@ class Статичные:
         self.вызовов = 0
         self.последнее_время: float | None = None
         self.последнее_почему = "ещё не обновлялись"
+        self.файл = None
+        self.файл_время = None
         for q, обр in ((содержимое or {}).get("shablony") or {}).items():
             зап = запись_из_образца(q, обр)
             self.символы[q] = обр.get("символ") or None
@@ -265,12 +267,21 @@ class Статичные:
                 self.последнее_почему = f"круг упал: {type(exc).__name__}"
             стоп.wait(max(0.5, период - (self.clock() - t0)))
 
+    def файл_сменился(self) -> bool:
+        """Изменился ли файл образцов с момента загрузки (по mtime)."""
+        if not self.файл:
+            return False
+        try:
+            return Path(self.файл).stat().st_mtime != self.файл_время
+        except OSError:
+            return False
+
     def признак(self) -> dict:
         """Строка для признака жизни: сколько живых, сколько отказов и почему."""
         живых = sum(1 for з in self.записи.values() if з.get("price_sol") is not None)
         возраст = (None if self.последнее_время is None
                    else round(self.clock() - self.последнее_время, 1))
-        return {"obrazcov": len(self.записи), "zhivyh": живых,
+        return {"fayl": self.файл, "obrazcov": len(self.записи), "zhivyh": живых,
                 "bez_shablona": len(self.почему), "obnovleniy": self.обновлений,
                 "vozrast_s": возраст,
                 "why_not": self.последнее_почему or None,
@@ -288,6 +299,14 @@ def загрузить(путь=None, *, корень=None, clock=time.time):
     except (OSError, ValueError) as exc:
         return None, f"файл образцов не читается: {type(exc).__name__}"
     ст = Статичные(содержимое, clock=clock)
+    # ПУТЬ И ВРЕМЯ ФАЙЛА -- чтобы служба подхватила появившийся или обновлённый
+    # файл образцов БЕЗ перезапуска: образцы собираются отдельным прогоном и
+    # доезжают позже кода.
+    try:
+        ст.файл = str(п)
+        ст.файл_время = Path(п).stat().st_mtime
+    except OSError:
+        ст.файл, ст.файл_время = str(п), None
     if not ст.записи:
         return ст, ("в файле образцов нет ни одного годного: "
                      + "; ".join(f"{q[:8]}: {в}" for q, в in list(ст.почему.items())[:4]))
