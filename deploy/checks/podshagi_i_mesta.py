@@ -125,6 +125,7 @@ def подшаги(state_dir: str, *, с: float) -> dict:
     """p50/p90 по каждому подшагу решения из журнала решений."""
     пути = sorted(glob.glob(os.path.join(state_dir, "decisions*.jsonl*")))
     собрано: dict = {}
+    по_сделкам: list = []
     записей = 0
     всего_ряд = []
     for п in пути:
@@ -136,6 +137,9 @@ def подшаги(state_dir: str, *, с: float) -> dict:
             if т is not None and т < с:
                 continue
             записей += 1
+            по_сделкам.append({"cid": зап.get("cid"),
+                                "подпись_источника": зап.get("signature"),
+                                "всего_мс": ш.get("всего")})
             for имя, зн in ш.items():
                 if not isinstance(зн, (int, float)):
                     continue
@@ -152,6 +156,7 @@ def подшаги(state_dir: str, *, с: float) -> dict:
                "p90": процентиль(ряд, 0.9), "max": round(max(ряд), 3)}
         for имя, ряд in sorted(собрано.items(), key=lambda кв: -(процентиль(кв[1], 0.5) or 0))
     }
+    из_["по_сделкам"] = по_сделкам
     return из_
 
 
@@ -166,6 +171,55 @@ def позиции(state_dir: str) -> list:
             было.update({к: v for к, v in зап.items() if v is not None})
             видели[cid] = было
     return list(видели.values())
+
+
+def решили(state_dir: str, *, с: float, шаги: dict) -> dict:
+    """«Решили» и «собрали» по позициям полосы плюс остаток вне подшагов.
+
+    ПОЧЕМУ ЭТО НУЖНО. В отчёте «решили» -- это signal_recv_ts -> ts_intent, а
+    ts_intent полоса пишет в резервирующей записи, то есть УЖЕ после сборки и
+    подписи. Значит подшаги (вход -> подпись внутри провести) целиком лежат
+    ВНУТРИ «решили», а остаток -- это работа детектора до вызова полосы плюс
+    замок и запись брони на диск. Без этой вычитки «цель <= 5 мс» не к чему
+    приложить.
+    """
+    по_подписи = {з.get("подпись_источника"): з for з in (шаги.get("по_сделкам") or [])
+                   if з.get("подпись_источника")}
+    по_cid = {з.get("cid"): з for з in (шаги.get("по_сделкам") or []) if з.get("cid")}
+    из_ = {"сделок": 0, "решили": {}, "собрали": {}, "остаток": {},
+            "без_подшагов": 0, "строки": []}
+    р_ряд, с_ряд, о_ряд = [], [], []
+    for п in позиции(state_dir):
+        if (п.get("lane") or "") != МЕТКА_ПОЛОСЫ:
+            continue
+        ти = п.get("ts_intent")
+        if not isinstance(ти, (int, float)) or float(ти) < с:
+            continue
+        сиг, тс = п.get("signal_recv_ts"), п.get("ts_sent")
+        реш = (float(ти) - float(сиг)) * 1000.0 if isinstance(сиг, (int, float)) else None
+        соб = (float(тс) - float(ти)) * 1000.0 if isinstance(тс, (int, float)) else None
+        з = по_cid.get(п.get("client_order_id")) or по_подписи.get(п.get("source_sig"))
+        шагов = з.get("всего_мс") if з else None
+        ост = (реш - float(шагов)) if (реш is not None and isinstance(шагов, (int, float))) else None
+        из_["сделок"] += 1
+        if шагов is None:
+            из_["без_подшагов"] += 1
+        if реш is not None:
+            р_ряд.append(реш)
+        if соб is not None:
+            с_ряд.append(соб)
+        if ост is not None:
+            о_ряд.append(ост)
+        из_["строки"].append({"cid": п.get("client_order_id"), "минт": п.get("mint"),
+                               "решили_мс": round(реш, 1) if реш is not None else None,
+                               "подшаги_мс": шагов,
+                               "остаток_мс": round(ост, 1) if ост is not None else None,
+                               "собрали_мс": round(соб, 1) if соб is not None else None})
+    for ключ, ряд in (("решили", р_ряд), ("собрали", с_ряд), ("остаток", о_ряд)):
+        из_[ключ] = {"n": len(ряд), "p50": процентиль(ряд, 0.5),
+                      "p90": процентиль(ряд, 0.9),
+                      "max": round(max(ряд), 3) if ряд else None}
+    return из_
 
 
 def места(state_dir: str, *, с: float) -> dict:
@@ -248,9 +302,11 @@ def main() -> int:
     а = р.parse_args()
     с = разобрать_время(а.s) if а.s else (time.time() - 7200)
 
+    шаги = подшаги(а.state_dir, с=с)
     итог = {"с": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(с)),
              "по": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-             "подшаги": подшаги(а.state_dir, с=с),
+             "подшаги": шаги,
+             "решили": решили(а.state_dir, с=с, шаги=шаги),
              "места": места(а.state_dir, с=с),
              "симуляции": симуляции(а.state_dir, с=с),
              "флаги": флаги(а.env_file)}
@@ -260,6 +316,13 @@ def main() -> int:
           f"p90 {п['всего']['p90']}, max {п['всего']['max']}")
     for имя, з in п["по_шагам"].items():
         print(f"   {имя:20s} n={з['n']:3d} p50={з['p50']} p90={з['p90']} max={з['max']}")
+    р_ = итог["решили"]
+    print(f"РЕШИЛИ И ОСТАТОК: сделок {р_['сделок']}, без подшагов {р_['без_подшагов']}")
+    for ключ in ("решили", "собрали", "остаток"):
+        з = р_[ключ]
+        print(f"   {ключ:9s} n={з['n']:3d} p50={з['p50']} p90={з['p90']} max={з['max']}")
+    for з in р_["строки"][:15]:
+        print(f"   {json.dumps(з, ensure_ascii=False)}")
     м = итог["места"]
     print(f"МЕСТО ИСТОЧНИКА: сделок {м['сделок']}, с местом {м['с_местом']}, "
           f"без места {м['без_места']} (попыток исчерпано {м['попыток_исчерпано']})")
