@@ -148,7 +148,18 @@ def главное() -> int:
                 # ВСЕ КЛЮЧИ ЗАПИСИ -- на разбор, почему поле пусто. Только
                 # имена ключей и простые значения: подписи и адреса в отчёт не
                 # печатаем целиком.
-                "klyuchi_zapisi": sorted(поз)}
+                "klyuchi_zapisi": sorted(поз),
+                # ЧИСЛА НА ВОПРОСЫ ВЛАДЕЛЬЦА: куда уходит удержание и что
+                # именно лежит в издержках. Только простые значения.
+                "chisla": {к: поз.get(к) for к in (
+                    "ts_intent", "ts_sent", "ts_accepted", "lane_ts_sent_buy",
+                    "sell_after_s", "ts_first_sell_attempt", "ts_last_sell_attempt",
+                    "ts_jup_attempt", "ts_closed", "sell_attempts", "jup_attempts",
+                    "zero_streak", "closed_via", "closed_reason", "close_on_sell",
+                    "closed_confirmed", "pnl_counted_spend_sol",
+                    "lane_tips_total_sol", "lane_priority_lamports",
+                    "lane_buy_native_sol", "lane_buy_fee_sol", "sol_in",
+                    "closed_sol_net", "lane_landed_slot", "source_slot")}}
         if оповещатель is not None:
             зап["otpravleno_buy"] = оповещатель.послать(buy)
             if sell:
