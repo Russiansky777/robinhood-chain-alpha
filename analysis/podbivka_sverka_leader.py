@@ -44,6 +44,7 @@ import podbivka_sim as S  # noqa: E402
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 SOLы = (C.WSOL, C.NATIVE_QUOTE)
+G_ВЕРХ = 1.6                                     # v5: было 1.05 -- отбрасывало продажи пулов с E
 ГОРИЗОНТ = 150
 
 
@@ -179,7 +180,7 @@ def одна(уз: S.Узел, с: dict) -> dict:
     if not f:
         return {**из_, "why_not": "доля траты не калибруется"}
     из_["f"] = round(f, 5)
-    доли = []
+    доли, f_окна = [], []
     for i in range(0, len(сп)):                   # все продажи пула в окне (кроме нашей)
         if i in (is_, ib):
             continue
@@ -187,12 +188,17 @@ def одна(уз: S.Узел, с: dict) -> dict:
         кв, тв = A3.дельта_счёта(т, пул["quote_vault"]), A3.дельта_счёта(т, пул["pool_vault"])
         if кв and тв and тв[1] > тв[0] and кв[1] < кв[0]:
             g_ = g_все(т, пул)
-            if g_ and 0.5 <= g_ <= 1.05:
+            if g_ and 0.5 <= g_ <= G_ВЕРХ:      # Pump AMM с лишним остатком E: g ≈ (1 − fee)/(1 − E/y) > 1
                 доли.append(g_)
-        if len(доли) >= 30:
+        elif кв and тв and тв[1] < тв[0] and кв[1] > кв[0] and len(f_окна) < 30:
+            ff = f_все(т, пул)
+            if ff and 0.5 <= ff <= 1.0:
+                f_окна.append(ff)
+        if len(доли) >= 30 and len(f_окна) >= 30:
             break
     g = statistics.median(доли) if доли else A3.G_БЕЗ_ПРОДАЖ
     из_["g"], из_["g_продаж"] = round(g, 5), len(доли)
+    из_["f_окна"], из_["f_покупок_окна"] = (round(statistics.median(f_окна), 5) if f_окна else None), len(f_окна)
     # курс котировочного: модель -- из сделки лидера; факт -- плечи наших сделок
     if q in SOLы:
         цена_q, r_in, r_out = 1.0, 1.0, 1.0
