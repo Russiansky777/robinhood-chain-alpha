@@ -14,11 +14,11 @@ on:
   workflow_dispatch:
     inputs:
       shag:
-        description: "'docs' -- вычитать документацию потока с хоста; 'zamer' -- сам замер"
+        description: "'docs' -- документация потока с хоста; 'start' -- запустить замер в отрыве; 'sobrat' -- забрать итог"
         required: false
         default: "docs"
       minut:
-        description: "сколько минут слушать поток (шаг zamer; слово владельца -- час)"
+        description: "сколько минут слушать поток (шаг start; слово владельца -- час)"
         required: false
         default: "60"
 
@@ -35,7 +35,10 @@ env:
 jobs:
   zamer:
     runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
-    timeout-minutes: 90
+    # ЗАМЕР ИДЁТ В ОТРЫВЕ ОТ РАННЕРА (nohup), а не внутри работы: свой раннер
+    # стоит на хосте и один, и час занятого раннера значил бы час без деплоев,
+    # без проверок живучести и без получасовой страховки по балансу.
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
@@ -69,36 +72,40 @@ jobs:
             /home/bot/robinhood-chain-alpha/venv/bin/python -c "import websockets; print(\"websockets\", websockets.__version__)"'
 
       - name: "Модуль замера разбирается и самопроверка счёта"
-        if: ${{ github.event.inputs.shag == 'zamer' }}
+        if: ${{ github.event.inputs.shag == 'start' || github.event.inputs.shag == 'sobrat' }}
         run: |
           set -e
           python3 -m py_compile deploy/checks/pumpapi_vs_helius.py
           python3 deploy/checks/pumpapi_vs_helius.py --self-test
 
-      - name: "Замер: одно соединение, только приём"
-        if: ${{ github.event.inputs.shag == 'zamer' }}
+      - name: "Запуск замера в отрыве от раннера"
+        if: ${{ github.event.inputs.shag == 'start' }}
         run: |
           set -e
-          set -o pipefail
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pvh"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pvh/pumpapi_vs_helius.py" < deploy/checks/pumpapi_vs_helius.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "
-            set -e
-            set -a; . $ENV_DIR/env; set +a
-            /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/pvh/pumpapi_vs_helius.py \
-              --minut '${{ inputs.minut }}' \
-              --zhurnal $STATE_DIR/decisions.jsonl \
-              --gruppy /home/bot/data/sources_2026-09-25.json \
-              --out /tmp/pvh/itog.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "pgrep -f pumpapi_vs_helius.py >/dev/null && { echo 'SBOY: zamer uzhe idet'; exit 1; } || true"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pvh/itog.json /tmp/pvh/log.txt
+            setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/pvh/pumpapi_vs_helius.py --minut ${{ inputs.minut }} --zhurnal $STATE_DIR/decisions.jsonl --gruppy /home/bot/data/sources_2026-09-25.json --out /tmp/pvh/itog.json > /tmp/pvh/log.txt 2>&1 < /dev/null &
+            sleep 5
+            pgrep -f pumpapi_vs_helius.py >/dev/null || { echo 'SBOY: zamer ne podnyalsya'; cat /tmp/pvh/log.txt; exit 1; }
+            echo 'zamer idet, log /tmp/pvh/log.txt'
+            cat /tmp/pvh/log.txt"
+
+      - name: "Забрать итог замера"
+        if: ${{ github.event.inputs.shag == 'sobrat' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "pgrep -f pumpapi_vs_helius.py >/dev/null && echo 'zamer vse eshche idet' || echo 'zamer zavershen'"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "tail -20 /tmp/pvh/log.txt 2>/dev/null || true"
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pvh/itog.json 2>/dev/null || true" > /tmp/pvh_itog.json || true
           if python3 -c "import json; json.load(open('/tmp/pvh_itog.json'))" 2>/dev/null; then
             cp /tmp/pvh_itog.json "$OUT_FILE"
-            echo "obnovlen $OUT_FILE"
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("svod:", json.dumps(d.get("свод"), ensure_ascii=False))' "$OUT_FILE"
           else
-            echo "SBOY: zamer ne napisal itog"
+            echo "SBOY: itog eshche ne gotov"
             exit 1
           fi
-          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/pvh"
 
       - name: "Ключей в отчёте быть не должно"
         if: always()
@@ -106,7 +113,7 @@ jobs:
           [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
 
       - name: "Коммит"
-        if: ${{ always() && github.event.inputs.shag == 'zamer' }}
+        if: ${{ always() && github.event.inputs.shag == 'sobrat' }}
         run: |
           set -e
           git config user.name "github-actions[bot]"
