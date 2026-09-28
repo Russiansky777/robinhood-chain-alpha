@@ -175,7 +175,7 @@ def рисунок(сигнал: dict, ряд: list, вверх: int = 30, вн�
     пик = ст(ep)[0] / ст(ep)[1]
     после = [e for i, e in enumerate(ряд) if i > ip and (e.get("block") or 0) <= s0 + вниз and ст(e)]
     дно = min((ст(e)[0] / ст(e)[1] for e in после), default=пик)
-    продавцы = [{"кто": e.get("txSigner"), "q": e.get("quoteAmount"), "t": e.get("tokenAmount"), "slot": e.get("block")}
+    продавцы = [{"кто": e.get("трейдер") or e.get("txSigner"), "q": e.get("quoteAmount"), "t": e.get("tokenAmount"), "slot": e.get("block")}
                 for e in после if e.get("action") == "sell"]
     вверх_пп, вниз_пп = (пик / p0 - 1) * 100, (дно / пик - 1) * 100
     return {"p0": p0, "пик_слот": ep.get("block"), "вверх_пп": round(вверх_пп, 2), "от_пика_пп": round(вниз_пп, 2),
@@ -267,6 +267,8 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                     except ValueError:
                         continue
                     e = {k: e_full.get(k) for k in КЛЮЧИ}
+                    _бд = [b.get("trader") for b in e_full.get("breakdown") or [] if isinstance(b, dict) and b.get("trader")]
+                    e["трейдер"] = _бд[0] if _бд else e.get("txSigner")      # кошелёк -- по трейдеру, не по плательщику
                     if по_минту:
                         ленты_минтов.setdefault(мм.group(1), []).append(
                             {**e, "трейдеры": [b.get("trader") for b in e_full.get("breakdown") or [] if isinstance(b, dict)],
@@ -355,11 +357,16 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
         for e in ряд[i0 + 1:]:
             if (e.get("timestamp") or 0) > (п["timestamp"] or 0) + 15000:
                 break
-            if e.get("action") == "buy" and e.get("txSigner") != п["trader"] and e.get("quoteMint") == WSOL:
-                следом.append({"кто": e.get("txSigner"), "q": float(e.get("quoteAmount") or 0), "slot": e.get("block"),
+            if e.get("action") == "buy" and e.get("трейдер") != п["trader"] and e.get("quoteMint") == WSOL:
+                следом.append({"кто": e.get("трейдер"), "q": float(e.get("quoteAmount") or 0), "slot": e.get("block"),
                                "мс": (e.get("timestamp") or 0) - (п["timestamp"] or 0)})
         п["следом"] = следом
         п["следом_05_15с"] = sum(1 for x in следом if x["q"] >= 0.5)
+        # продажи в его слоте после его покупки (порядок файла внутри слота -- по timestamp, оценка)
+        прод_сл = [e for e in ряд[i0 + 1:] if e.get("block") == п["block"] and e.get("action") == "sell"
+                   and e.get("трейдер") != п["trader"]]
+        п["продаж_в_слоте"] = len(прод_сл)
+        п["продажи_в_слоте_sol"] = round(sum(float(e.get("quoteAmount") or 0) for e in прод_сл), 4)
     # слоты s0+1 / s0+2: число свопов (для сверки с историей пула)
     for с in сигналы:
         ряд = ряды.get(с["poolId"]) or []
