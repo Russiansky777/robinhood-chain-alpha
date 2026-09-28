@@ -1,0 +1,126 @@
+name: "Triton преконфы: утренний отчёт по зонду (только чтение)"
+
+# ЗАЧЕМ (владелец 28.09, дополнение по преконфам, п.4 и п.5): доля покупок
+# источников в слотах лидеров фида, из них с преконфом, опережение p50/p90 мс,
+# ложные преконфы, счётчик расхода, и у покупок без преконфа -- версия
+# транзакции и есть ли источник среди СТАТИЧЕСКИХ ключей.
+#
+# Только чтение: журнал зонда и журнал решений читаются потоком на хосте, по
+# цепи -- getSignatureStatuses и getTransaction с пределом. Ни подписи, ни
+# отправки. Зонд при этом не останавливается.
+on:
+  workflow_dispatch:
+    inputs:
+      chasov:
+        description: "окно отчёта в часах назад"
+        required: false
+        default: "24"
+      predel_razbora:
+        description: "сколько транзакций без преконфа разбирать по цепи (п.5)"
+        required: false
+        default: "40"
+      bez_seti:
+        description: "'yes' -- без цепи: (г) и (п.5) останутся без чисел"
+        required: false
+        default: "no"
+      ostanovit_zond:
+        description: "'yes' -- после отчёта погасить службы зонда"
+        required: false
+        default: "no"
+
+concurrency:
+  group: triton-prekonf-otchet
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  ZOND_DIR: /home/bot/triton_zond
+  VENV: /home/bot/triton_venv
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT_FILE: data/triton/prekonf_otchet.json
+
+jobs:
+  otchet:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки счёта ДО любой сети"
+        run: |
+          set -e
+          cd analysis
+          python3 triton_preconfs_otchet.py --self-test | tail -1
+          python3 triton_validators.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Отчёт на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $ZOND_DIR"
+          for M in triton_preconfs_otchet triton_validators; do
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $ZOND_DIR/$M.py" < "analysis/$M.py"
+          done
+          BEZ=""
+          [ "${{ inputs.bez_seti }}" = "yes" ] && BEZ="--bez-seti"
+          ZH=$(ssh -n $SSH_OPTS root@$TARGET_HOST "ls $ZOND_DIR/preconfs_*.jsonl 2>/dev/null | tr '\n' ',' | sed 's/,$//'")
+          echo "zhurnaly zonda: $ZH"
+          [ -n "$ZH" ] || { echo "SBOY: zhurnalov zonda net -- snachala run_triton_zond_24h_nl.yml"; exit 1; }
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR TRITON_STATE_DIR=$ZOND_DIR python3 $ZOND_DIR/triton_preconfs_otchet.py --zhurnaly '$ZH' --resheniya $STATE_DIR --katalog $ZOND_DIR --chasov '${{ inputs.chasov }}' --predel-razbora '${{ inputs.predel_razbora }}' $BEZ --out $ZOND_DIR/otchet.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $ZOND_DIR/otchet.json 2>/dev/null || true" > /tmp/prekonf_otchet.json || true
+          if python3 -c "import json; json.load(open('/tmp/prekonf_otchet.json'))" 2>/dev/null; then
+            install -d -m 755 data/triton
+            cp /tmp/prekonf_otchet.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: otchet ne sobran"
+            exit 1
+          fi
+
+      - name: "Остановить зонд, если просили"
+        if: ${{ inputs.ostanovit_zond == 'yes' }}
+        run: |
+          set -e
+          for F in bam harmonic; do
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl stop triton-zond-$F.service 2>/dev/null || true"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "head -c 800 $ZOND_DIR/status_$F.json 2>/dev/null || true"
+          done
+          echo "zond pogashen"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Triton: utrennij otchyot po prekonfam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

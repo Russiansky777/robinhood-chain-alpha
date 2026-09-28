@@ -79,9 +79,26 @@ class ПределДостигнут(Exception):
     """Поток закрывается по пределу владельца, а не по ошибке сети."""
 
 
+ИМЯ_СЕКРЕТА_ФАЙЛОМ = "TRITON_X_TOKEN_FILE"
+
+
 def токен(окружение=None) -> str | None:
+    """Ключ из окружения, а если задан файл -- из файла.
+
+    ФАЙЛОМ -- ЧТОБЫ КЛЮЧ НЕ ПОПАЛ В КОМАНДНУЮ СТРОКУ. Суточный зонд поднимают
+    временной службой systemd, и передать значение через --setenv значило бы
+    показать его в argv любому, кто смотрит ps. Файл читается правами 600 под
+    тем же пользователем; в журнал по-прежнему идёт только слово "задан".
+    """
     окр = os.environ if окружение is None else окружение
     з = (окр.get(ИМЯ_СЕКРЕТА) or "").strip()
+    if not з:
+        путь = (окр.get(ИМЯ_СЕКРЕТА_ФАЙЛОМ) or "").strip()
+        if путь:
+            try:
+                з = Path(путь).read_text(encoding="utf-8").strip()
+            except Exception:  # noqa: BLE001
+                з = ""
     return з or None
 
 
@@ -806,6 +823,17 @@ def self_test() -> int:
         chk("без секрета зонд не идёт и говорит, какого секрета нет",
             токен_задан({})["ok"] is False
             and ИМЯ_СЕКРЕТА in токен_задан({})["why_not"])
+        import tempfile as _tф  # noqa: PLC0415
+
+        with _tф.TemporaryDirectory() as _д_т:
+            _ф_т = Path(_д_т) / "token"
+            _ф_т.write_text("ТОКЕН_ИЗ_ФАЙЛА\n", encoding="utf-8")
+            chk("ключ можно подать файлом, и в ответе снова только длина",
+                токен({ИМЯ_СЕКРЕТА_ФАЙЛОМ: str(_ф_т)}) == "ТОКЕН_ИЗ_ФАЙЛА"
+                and токен_задан({ИМЯ_СЕКРЕТА_ФАЙЛОМ: str(_ф_т)})["length"] == 14)
+            chk("файла нет -- зонд говорит, что ключа нет, а не падает",
+                токен_задан({ИМЯ_СЕКРЕТА_ФАЙЛОМ: str(_ф_т) + ".нет"})["ok"]
+                is False)
         з = токен_задан({ИМЯ_СЕКРЕТА: "СЕКРЕТНЫЙ_ТОКЕН"})
         chk("с секретом -- только длина, без значения",
             з["ok"] and з["length"] == len("СЕКРЕТНЫЙ_ТОКЕН")
@@ -1293,6 +1321,9 @@ def main() -> int:
                     help=("предел сообщений НА ЭТОТ ПРОГОН вместо суточного "
                           "(контрольная проверка фильтра: владелец 25.09 "
                           "просил потолок 20 000 на пять минут)"))
+    р.add_argument("--limit-slots", type=int, default=None,
+                    help=("предел ОПЛАЧЕННЫХ слотов Harmonic вместо записанных "
+                          "20 000 (~$30 по ориентиру владельца)"))
     р.add_argument("--seconds", type=float, default=None,
                     help="сколько держать поток (по умолчанию -- предел фида)")
     р.add_argument("--out", default=None, help="журнал зонда, jsonl")
@@ -1331,6 +1362,25 @@ def main() -> int:
             with open(а.report_out, "w", encoding="utf-8") as ф:
                 json.dump(св, ф, ensure_ascii=False, indent=2)
             print(f"записано: {а.report_out}")
+        return 0
+
+    # АДРЕСА ТОРГУЮЩИХ ГРУПП В ФАЙЛ И ВЫЙТИ. Нужно прогону: он кладёт список
+    # на хост одной командой, без питона внутри YAML.
+    if а.accounts_out and (а.iz_grupp or а.groups_file):
+        гр = адреса_торгующих_групп(
+            файл=а.groups_file or None,
+            группы=tuple(г.strip() for г in (а.gruppy or "").split(",")
+                          if г.strip()))
+        if not гр["ok"]:
+            print(f"СБОЙ: {гр['why_not']}")
+            return 1
+        Path(а.accounts_out).write_text("\n".join(гр["accounts"]) + "\n",
+                                         encoding="utf-8")
+        print(json.dumps({"adresov": len(гр["accounts"]),
+                           "po_gruppam": гр["by_group"],
+                           "gruppy_bez_adresov": гр["groups_missing"],
+                           "fajl_grupp": гр["file"] or "из BLOOM_SOURCE_GROUPS",
+                           "zapisano": а.accounts_out}, ensure_ascii=False))
         return 0
 
     if а.accounts_out or а.accounts_from_snapshot:
@@ -1397,6 +1447,8 @@ def main() -> int:
         return 1
     счёт = Счёт(фид=а.feed, окно_s=(а.seconds if а.seconds else None),
                  предел_сообщений=а.limit_messages,
+                 предел_слотов=(а.limit_slots if а.limit_slots is not None
+                                 else ПРЕДЕЛ_СЛОТОВ_HARMONIC),
                  каталог=а.state_dir)
     путь_признака = а.status
     # ДОЛЯ СЛОТОВ BAM/HARMONIC -- В ПРИЗНАК ЖИЗНИ, РАЗ В ЧАС (владелец 28.09,
