@@ -364,6 +364,14 @@ def открытая_позиция_полосы(state_dir: str, *, програ
             continue
         if str(п.get("state") or "").lower() not in ("open", "selling"):
             continue
+        # ЗАКРЫТИЕ БЫВАЕТ БЕЗ ПЕРЕЗАПИСИ state. Служба и гейт деплоя видят 0
+        # открытых, а моя склейка журнала нашла запись speed_only от 25.09 как
+        # "open": закрывающая строка дописала итог, но поле state не повторила.
+        # Значит признаком закрытия считаем и следы продажи.
+        if any(п.get(к) is not None for к in
+                ("closed_reason", "last_sell_reported", "sell_landed_ts",
+                 "pnl_counted_sol", "last_sell_outcome")):
+            continue
         # ТИП ПУЛА -- СТРОГО ТОТ. Прежде None проходил как "любой", и первый
         # живой прогон 28.09 взял позицию speed_only от 25.09 с pool_program
         # null: у неё в покупке нет инструкции Pump AMM вовсе.
@@ -655,6 +663,17 @@ def self_test() -> int:
             is False
             and "возраст" in (открытая_позиция_полосы(
                 д, свежесть_s=900.0, сейчас=100000.0)["why_not"] or ""))
+        (Path(д) / "positions.jsonl").write_text("\n".join(
+            _js2.dumps(з, ensure_ascii=False) for з in [
+                {"client_order_id": "з8", "lane": "own_send", "state": "open",
+                  "pool_program": SB.PUMP_AMM, "lane_landed_signature": "П8",
+                  "ts_sent": 2000.0},
+                {"client_order_id": "з8", "last_sell_reported": "ПРОДАЖА",
+                  "pnl_counted_sol": 0.01},
+            ]) + "\n", encoding="utf-8")
+        chk("запись со следом продажи не считается открытой, хоть state и open",
+            открытая_позиция_полосы(д, свежесть_s=None)["ok"] is False,
+            открытая_позиция_полосы(д, свежесть_s=None))
     print(f"самопроверка своей продажи: {пройдено}/{пройдено + провалено} пройдено")
     return 1 if провалено else 0
 
