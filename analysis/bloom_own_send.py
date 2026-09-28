@@ -4682,7 +4682,15 @@ def провести(*, tx_источника: dict, источник: str, ми
                 о.get("cid"), state="bought", lane=МЕТКА,
                 lane_signature=о.get("result") or пд.get("signature"),
                 lane_signature_local=пд.get("signature"),
-                ts_sent=сейчас, ts_accepted=time.time(),
+                # ВРЕМЯ ОТПРАВКИ -- НАСТОЯЩЕЕ. Здесь стояло ts_sent=сейчас,
+                # то есть метка НАЧАЛА обработки сигнала, а ts_intent полоса
+                # пишет позже, в резервирующей записи. Из-за этого "собрали"
+                # (ts_intent -> ts_sent) в отчёте выходило ОТРИЦАТЕЛЬНЫМ (от
+                # -12 до -64 мс на 22 сделках с 18:00Z 28.09), а "всего" --
+                # меньше правды. Настоящий момент отправки уже посчитан в
+                # ts_sent_buy, его и пишем.
+                ts_sent=(из_.get("ts_sent_buy") or сейчас),
+                ts_accepted=time.time(),
                 pool=None, program=сб.get("pool_program"),
                 lane_min_out=сб.get("min_out"),
                 lane_expected_out=сб.get("expected_out"),
