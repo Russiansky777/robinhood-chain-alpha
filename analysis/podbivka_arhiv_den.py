@@ -141,11 +141,41 @@ def модель(сигнал: dict, ряд: list) -> dict:
     return из_
 
 
-def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str) -> Path:
+def рисунок(сигнал: dict, ряд: list, вверх: int = 30, вниз: int = 75) -> dict:
+    """«≥ +20 % к s0+30 и ≥ −25 % от пика к s0+75»: p0 -- цена после события сигнала;
+    пик -- наибольшая цена после событий слотов (s0, s0+вверх]; падение -- наименьшая
+    цена после пика до s0+вниз включительно, к пику. Продавцы -- продажи после пика
+    до s0+вниз (txSigner, quoteAmount, tokenAmount)."""
+    s0 = сигнал["block"]
+    i0 = next((i for i, e in enumerate(ряд) if e["signature"] == сигнал["signature"]), None)
+    if i0 is None or not ст(ряд[i0]):
+        return {"why_not": "сигнал не найден в ряду"}
+    x, y = ст(ряд[i0])
+    p0 = x / y
+    пос = [(i, e) for i, e in enumerate(ряд) if i > i0 and s0 < (e.get("block") or 0) <= s0 + вверх and ст(e)]
+    if not пос:
+        return {"p0": p0, "вверх_пп": 0.0, "паттерн": False, "событий_до_30": 0}
+    ip, ep = max(пос, key=lambda t: ст(t[1])[0] / ст(t[1])[1])
+    пик = ст(ep)[0] / ст(ep)[1]
+    после = [e for i, e in enumerate(ряд) if i > ip and (e.get("block") or 0) <= s0 + вниз and ст(e)]
+    дно = min((ст(e)[0] / ст(e)[1] for e in после), default=пик)
+    продавцы = [{"кто": e.get("txSigner"), "q": e.get("quoteAmount"), "t": e.get("tokenAmount"), "slot": e.get("block")}
+                for e in после if e.get("action") == "sell"]
+    вверх_пп, вниз_пп = (пик / p0 - 1) * 100, (дно / пик - 1) * 100
+    return {"p0": p0, "пик_слот": ep.get("block"), "вверх_пп": round(вверх_пп, 2), "от_пика_пп": round(вниз_пп, 2),
+            "паттерн": вверх_пп >= 20 and вниз_пп <= -25, "продавцы_после_пика": продавцы,
+            "событий_до_30": len(пос)}
+
+
+def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
+           доп: set | None = None, porog_доп: float | None = None) -> Path:
     import requests  # noqa: PLC0415
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
     import zstandard  # noqa: PLC0415
-    адр = json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
+    адр = dict(json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"])
+    доп = доп or set()
+    for a in доп:
+        адр.setdefault(a, {"группы": ["доп"]})
     наши_события, сигналы, цели_события = [], [], []
     активные: dict = {}          # poolId -> до_слота
     ряды: dict = {}              # poolId -> [события]
@@ -205,7 +235,8 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                              "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
                                              "первая": первая, "block": e.get("block"), "timestamp": e.get("timestamp"),
                                              "priorityFee": e.get("priorityFee")})
-                        if (e["action"] == "buy" and первая and sol is not None and sol >= porog and q == WSOL
+                        порог_t = porog_доп if (t in доп and porog_доп is not None) else porog
+                        if (e["action"] == "buy" and первая and sol is not None and sol >= порог_t and q == WSOL
                                 and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
                             сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
                                             "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
@@ -221,6 +252,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
               f"активных пулов {len(активные)}", flush=True)
     for с in сигналы:
         с["модель"] = модель(с, ряды.get(с["poolId"]) or [])
+        с["рисунок"] = рисунок(с, ряды.get(с["poolId"]) or [])
         ряд = ряды.get(с["poolId"]) or []
         с["событий_пула_в_окне"] = sum(1 for e in ряд if с["block"] <= (e.get("block") or 0) <= с["block"] + окно)
     # слоты s0+1 / s0+2: число свопов (для сверки с историей пула)
@@ -247,11 +279,14 @@ def main() -> int:
     р.add_argument("--okno", type=int, default=160)
     р.add_argument("--celi", default="", help="json со списком подписей-целей")
     р.add_argument("--metka", required=True)
+    р.add_argument("--dop-adresa", default="", help="json: список доп. адресов (события и сигналы)")
+    р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для доп. адресов, SOL")
     а = р.parse_args()
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
-    out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka)
+    доп = set(json.loads(Path(а.dop_adresa).read_text(encoding="utf-8"))) if а.dop_adresa else set()
+    out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop)
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
     R.пуш(f"Podbivka-2: arhiv den {а.metka} [automated]", [str(out)])
