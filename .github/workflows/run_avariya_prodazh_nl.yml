@@ -1,0 +1,103 @@
+name: "АВАРИЯ: почему полоса не продала по таймеру (только чтение)"
+
+# ЗАЧЕМ (слово владельца 28.09 вечером, аварийный список):
+#   п.2 -- таблица по цепи и по записи с 21:00Z: план продажи против факта;
+#   п.3 и п.6 -- лента правок позиции и журнал СЛУЖБЫ за её жизнь: дошло ли до
+#          simulateTransaction, было ли исключение, дошло ли до Jupiter;
+#   п.7 -- сколько позиций было ОТКРЫТО по правилу службы.
+#
+# Только чтение: журнал позиций потоком и journalctl службы сторожа. Ни одной
+# подписи, ни одной отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "с какого времени (UTC)"
+        required: false
+        default: "2026-09-28T21:00:00Z"
+      lent:
+        description: "по скольким последним позициям печатать полную ленту"
+        required: false
+        default: "8"
+      zhurnal_min:
+        description: "сколько минут журнала службы сторожа забрать"
+        required: false
+        default: "90"
+
+concurrency:
+  group: avariya-prodazh
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/avariya_prodazh
+  OUT_FILE: data/avariya_prodazh.json
+  LOG_FILE: data/avariya_prodazh_zhurnal.txt
+
+jobs:
+  razbor:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Сборка модуля"
+        run: python3 -m py_compile deploy/checks/avariya_prodazh.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Лента позиций"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/avariya_prodazh.py" < deploy/checks/avariya_prodazh.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $RABOTA/avariya_prodazh.py --state-dir $STATE_DIR --s '${{ inputs.s }}' --lent '${{ inputs.lent }}' --out $RABOTA/out.json" | tail -200
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/avariya_prodazh.json || true
+          if python3 -c "import json; json.load(open('/tmp/avariya_prodazh.json'))" 2>/dev/null; then
+            cp /tmp/avariya_prodazh.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: lenta ne sobralas"
+            exit 1
+          fi
+
+      - name: "Журнал службы сторожа (ключи не печатаются)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u bloom-seller --since '${{ inputs.zhurnal_min }} min ago' --no-pager -o short-iso | tail -900" > /tmp/seller_log.txt || true
+          python3 -c "import re,sys; op=('KEY','TOKEN','SECRET','PRIVATE','PASS','AUTH'); out=open('$LOG_FILE','w',encoding='utf-8'); [out.write((re.sub(r'[A-Za-z0-9_-]{24,}','<vychishheno>',s) if any(o in s.upper() for o in op) else s)) for s in open('/tmp/seller_log.txt',encoding='utf-8',errors='replace')]; out.close()"
+          wc -l "$LOG_FILE"
+          grep -c -i "traceback\|error\|ошибка" "$LOG_FILE" || true
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          [ -f "$LOG_FILE" ] && git add "$LOG_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Avariya prodazh: lenta pozicij i zhurnal storozha [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
