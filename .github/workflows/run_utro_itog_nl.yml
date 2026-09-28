@@ -1,0 +1,105 @@
+name: "Утренний итог полосы: сделки по группам, возраст сигналов, строители (только чтение)"
+
+# ЗАЧЕМ. Слово владельца 28.09: "Утренний итог -- как договорено: сделки по
+# группам, место в слоте и свопы перед нами по каждой, возраст сигналов
+# (медиана, p90, доля > 3), строители в бою/в коде". Место в блоке и свопы
+# перед нами даёт run_peresborka_sdelok_nl (по цепи); здесь -- числа из журнала
+# решений, который читается ПОТОКОМ, и список типов пулов, включённых сейчас.
+#
+# Только чтение: журнал решений и политика групп. Ни одной отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      since_utc:
+        description: "начало окна UTC, например 2026-09-27T20:00:00Z (пусто -- весь журнал)"
+        required: false
+        default: ""
+      gruppy:
+        description: "группы через запятую: по каким показать строителей"
+        required: false
+        default: "lane_s0,batch5,leader"
+
+concurrency:
+  group: utro-itog
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  TARGET_HOST: 127.0.0.1
+  OUT_ITOG: data/utro_itog.json
+
+jobs:
+  itog:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается и самопроверка счёта"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/utro_itog.py
+          python3 deploy/checks/utro_itog.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить прогон и посчитать итог"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/utro"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/utro/utro_itog.py" < deploy/checks/utro_itog.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            BLOOM_CODE_DIR='$CODE_DIR' $PYBIN /tmp/utro/utro_itog.py \
+              --state-dir '$STATE_DIR' \
+              --since-utc '${{ inputs.since_utc }}' \
+              --gruppy '${{ inputs.gruppy }}' \
+              --out /tmp/utro/itog.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/utro/itog.json 2>/dev/null || true" > /tmp/utro_itog.json || true
+          if python3 -c "import json; json.load(open('/tmp/utro_itog.json'))" 2>/dev/null; then
+            cp /tmp/utro_itog.json "$OUT_ITOG"
+            echo "obnovlen $OUT_ITOG"
+          else
+            echo "progon ne napisal itog -- $OUT_ITOG ostavlen kak byl"
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/utro"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT_ITOG" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_ITOG" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_ITOG" ] && git add "$OUT_ITOG"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Utrenniy itog polosy [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
