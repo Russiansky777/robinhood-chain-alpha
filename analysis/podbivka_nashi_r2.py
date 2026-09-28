@@ -126,6 +126,13 @@ def main() -> int:
     for e, вх in ВХОДЫ:
         md.append(f"| {вх} (n {стат([знач(р, e, 72) for р in ок]).get('n', 0)}) | {я(стат([знач(р, e, 72) for р in ок]))} | "
                   f"{я(стат([знач(р, e, 150) for р in ок]))} |")
+    md += ["", "## Без числа по причинам", "", "| причина | покупок |", "|---|---|"]
+    причины = collections.Counter((р.get("why_not") or "").split(":")[0][:60] if not (р.get("why_not") or "").startswith("программа пула")
+                                  else "программа пула " + имя_прог((р.get("why_not") or "").split()[2].rstrip(":"))
+                                  for р in по.values() if р.get("why_not"))
+    for k, v in причины.most_common():
+        md.append(f"| {k} | {v} |")
+    md.append(f"| не обработано | {len(нужны) - len(по)} |")
     md.append("")
     (КОРЕНЬ / "docs" / "podbivka_2026-09-27_nashi_rezhim2.md").write_text("\n".join(md), encoding="utf-8")
     print("\n".join(md))
