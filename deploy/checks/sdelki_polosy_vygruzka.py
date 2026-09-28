@@ -78,9 +78,16 @@ def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--s", default="2026-09-25T18:00", help="с какой метки UTC")
+    р.add_argument("--do", default="", help="до какой метки UTC (пусто -- без предела)")
+    р.add_argument("--polnye", action="store_true",
+                   help="выложить ВСЕ поля записи позиции, а не отобранные "
+                         "(слово владельца 28.09, п.5: выгрузка для Code-2)")
     р.add_argument("--out", default="")
     а = р.parse_args()
     с_ = метка(а.s)
+    # ВЕРХНЯЯ ГРАНИЦА ОКНА. Суточная выгрузка просит ровно сутки, и без предела
+    # сверху в файл за 27->28 попали бы и сделки следующего дня.
+    до_ = метка(а.do) if а.do else None
     по_cid: dict = {}
     просмотрено = 0
     # ДВА ПРОХОДА, И ЭТО НЕ ЛИШНЕЕ. Дописки позиции (state=closed,
@@ -101,6 +108,8 @@ def main() -> int:
                 continue
             т = з.get("ts_intent") or з.get("ts_sent")
             if not isinstance(т, (int, float)) or float(т) < с_:
+                continue
+            if до_ is not None and float(т) >= до_:
                 continue
             if з.get("client_order_id"):
                 свои_cid.add(з["client_order_id"])
@@ -149,6 +158,24 @@ def main() -> int:
             "state": п.get("state"),
             "closed_reason": п.get("closed_reason"),
             "итог_sol": None, "расход_sol": None,
+            # ПОЛЯ, КОТОРЫЕ ПРОСИЛ ВЛАДЕЛЕЦ ОТДЕЛЬНО (п.5, 28.09): подписи
+            # покупки и продажи и СЕВШАЯ подпись со своим слотом. Севшая --
+            # это та, что действительно легла в блок; в lane_signature может
+            # стоять вариант, который не сел.
+            "buy_sig": (п.get("lane_landed_signature")
+                        or п.get("lane_signature")
+                        or п.get("lane_signature_local")),
+            "sell_sig": ((п.get("last_sell_signatures") or [None])[-1]
+                          if isinstance(п.get("last_sell_signatures"), list)
+                          else п.get("jup_signature")),
+            "landed_sig": п.get("lane_landed_signature"),
+            "landed_slot": п.get("lane_landed_slot"),
+            "token_name": п.get("token_name"),
+            "source_name": п.get("source_name"),
+            # ВСЕ ПОЛЯ ЗАПИСИ -- по явному запросу. Без этого вторая сессия
+            # видит только отобранное, и каждое новое поле требует правки
+            # выгрузки.
+            **({"zapis": dict(п)} if а.polnye else {}),
         })
     # ИТОГ -- ТЕМ ЖЕ МОДУЛЕМ, ЧТО У СЛУЖБЫ. Порядок каталогов важен: служба
     # работает из /home/bot/bloom_executor, а рядом лежит возможно устаревшая
@@ -183,7 +210,10 @@ def main() -> int:
             ряд["расход_sol"] = round(расход, 9)
 
     свод = {"снято_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-             "с": а.s, "строк_просмотрено": просмотрено, "сделок": len(ряды),
+             "с": а.s, "до": а.do or None, "полные_поля": bool(а.polnye),
+             "строк_просмотрено": просмотрено, "сделок": len(ряды),
+             "с_севшей_подписью": sum(1 for р_ in ряды if р_.get("landed_sig")),
+             "с_именем_токена": sum(1 for р_ in ряды if р_.get("token_name")),
              "с_минтом_и_слотом": sum(1 for р_ in ряды
                                        if р_["mint"] and р_["source_slot"]),
              "ряды": ряды}
@@ -192,8 +222,9 @@ def main() -> int:
         with open(а.out, "w", encoding="utf-8") as ф:
             ф.write(текст + "\n")
         print(json.dumps({к: свод[к] for к in
-                           ("снято_utc", "с", "строк_просмотрено", "сделок",
-                            "с_минтом_и_слотом")}, ensure_ascii=False))
+                           ("снято_utc", "с", "до", "полные_поля",
+                            "строк_просмотрено", "сделок", "с_минтом_и_слотом",
+                            "с_севшей_подписью", "с_именем_токена")}, ensure_ascii=False))
     else:
         print(текст)
     return 0
