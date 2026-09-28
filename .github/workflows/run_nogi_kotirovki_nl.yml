@@ -31,6 +31,10 @@ on:
         description: "сколько сделок минта листать для главных котировок без пула CPMM/Pump AMM"
         required: false
         default: "200"
+      razbor_pula:
+        description: "адрес пула: разобрать раскладки счетов его сделок (только чтение, пусто -- обычный сбор)"
+        required: false
+        default: ""
 
 concurrency:
   group: nogi-kotirovki
@@ -93,6 +97,7 @@ jobs:
               --skolko-kotirovok '${{ inputs.skolko_kotirovok }}' \
               --tolko '${{ inputs.tolko }}' \
               --glubokiy-poisk '${{ inputs.glubokiy_poisk }}' \
+              --razbor-pula '${{ inputs.razbor_pula }}' \
               --out-pools /tmp/nogi/pools.json \
               --out-shablony /tmp/nogi/shablony.json \
               --out-otchet /tmp/nogi/otchet.json" | tail -25

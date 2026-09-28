@@ -291,6 +291,9 @@ def main() -> int:
     р.add_argument("--glubokiy-poisk", type=int, default=200,
                    help="для главных котировок без пула с постоянным произведением -- "
                         "сколько сделок минта пролистать страницами")
+    р.add_argument("--razbor-pula", default="",
+                   help="адрес пула: разобрать его сделки по числу счетов инструкции "
+                        "(зачем: у Pump AMM встречается 25 счетов вместо 26)")
     р.add_argument("--tolko", default="",
                    help="считать только эти котировки (минты через запятую)")
     р.add_argument("--out-pools", required=True)
@@ -308,6 +311,53 @@ def main() -> int:
     программы = {B.PUMP_AMM, B.CPMM, B.DAMM2, B.LAUNCHLAB, B.DLMM, B.CLMM, B.DBC}
     global программы_разных_владельцев
     программы_разных_владельцев = {B.DLMM, B.DAMM2, B.CLMM, B.DBC}
+
+    # РАЗБОР ОДНОГО ПУЛА: только чтение, печать и выход. Нужен, чтобы понять
+    # РАЗНИЦУ между раскладками счетов одной и той же инструкции.
+    if а.razbor_pula:
+        из_ = {"пул": а.razbor_pula, "сделки": []}
+        for sg in подписи(а.razbor_pula, 60):
+            tx = транзакция(sg)
+            if tx is None:
+                continue
+            for ix in B.all_instructions(tx):
+                if ix.get("programId") not in программы:
+                    continue
+                данные = ix.get("data") or ""
+                try:
+                    сырое = B.b58decode(данные)
+                except Exception:  # noqa: BLE001
+                    continue
+                из_["сделки"].append({
+                    "signature": sg, "program": ix["programId"],
+                    "disc": сырое[:8].hex(),
+                    "счетов": len(ix.get("accounts") or []),
+                    "accounts": list(ix.get("accounts") or [])})
+        по_числу: dict = {}
+        for з in из_["сделки"]:
+            по_числу.setdefault((з["program"], з["disc"], з["счетов"]), []).append(з)
+        из_["свод"] = [{"program": к[0], "disc": к[1], "счетов": к[2], "сколько": len(v),
+                         "пример": v[0]["signature"]} for к, v in по_числу.items()]
+        # РАЗНИЦА РАСКЛАДОК: сравниваем списки счетов двух видов одного
+        # дискриминатора -- что именно пропало в коротком.
+        for к1, v1 in по_числу.items():
+            for к2, v2 in по_числу.items():
+                if к1[:2] != к2[:2] or к1[2] >= к2[2]:
+                    continue
+                короткий, длинный = v1[0]["accounts"], v2[0]["accounts"]
+                из_.setdefault("разница", []).append({
+                    "disc": к1[1], "короткий": к1[2], "длинный": к2[2],
+                    "нет_в_коротком": [а_ for а_ in длинный if а_ not in короткий],
+                    "лишние_в_коротком": [а_ for а_ in короткий if а_ not in длинный],
+                    "позиции_расхождения": [i for i, (x, y) in
+                                             enumerate(zip(короткий, длинный)) if x != y][:6],
+                    "пример_короткий": v1[0]["signature"],
+                    "пример_длинный": v2[0]["signature"]})
+        Path(а.out_otchet).write_text(json.dumps(из_, ensure_ascii=False, indent=1),
+                                       encoding="utf-8")
+        print(json.dumps({"свод": из_["свод"], "разница": из_.get("разница")},
+                          ensure_ascii=False)[:2000])
+        return 0
 
     список = котировки_из_файла(а.kotirovki)
     если_только = [x.strip() for x in (а.tolko or "").split(",") if x.strip()]
