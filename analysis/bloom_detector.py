@@ -4756,12 +4756,33 @@ class Детектор:
                 поля["lane_bought_why_not"] = (причина or куплено.get("why_not"))
                 if куплено.get("chain_ok") is False:
                     поля["chain_ok"] = False
+                # ПОКУПКА НЕ СЕЛА ВОВСЕ (слово владельца 28.09). Подпись в
+                # записи есть, на цепи её нет и уже не появится: срок жизни
+                # blockhash вышел. Денег такая попытка не двигала -- ни
+                # комиссии, ни чаевых, транзакции на цепи просто нет. Значит:
+                # позиция НЕ ОТКРЫТА (закрываем сразу, сторожу там нечего
+                # продавать), итог не "несчитаемый", а ноль, и в Telegram
+                # уходит одна белая строка вместо зелёной BUY.
+                не_села = (not села.get("signature") and tx is None
+                            and float(поз.get("ts_intent") or 0) > 0
+                            and (time.time() - float(поз["ts_intent"]))
+                            > НЕ_СЕЛА_ЧЕРЕЗ_S)
+                if не_села and not поз.get("lane_not_landed"):
+                    поля.update(lane_not_landed=True,
+                                 lane_not_landed_ts=time.time(),
+                                 state=ST.STATE_CLOSED,
+                                 close_reason="покупка не села на цепи")
+                    try:
+                        self._строка_не_села(поз)
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("строка 'не села' не ушла: %s",
+                                    type(exc).__name__)
                 # ПОПЫТКИ ВЫШЛИ -- ИТОГ НЕСЧИТАЕМ (уточнение владельца 25.09).
                 # Количество так и не добралось: посчитать итог этой пары
                 # нечем. Это не утечка и не повод останавливать полосу --
                 # пара помечается, и замер скорости у неё остаётся годным.
-                if попыток + 1 >= ПОПЫТОК_МЕСТА_В_БЛОКЕ and not поз.get(
-                        "result_uncountable"):
+                if (попыток + 1 >= ПОПЫТОК_МЕСТА_В_БЛОКЕ and not не_села
+                        and not поз.get("result_uncountable")):
                     OS.отметить_итог_несчитаемым(
                         self.состояние, cid,
                         f"количество полосы не добралось за {попыток + 1} попыток: "
@@ -4773,6 +4794,31 @@ class Детектор:
                 log.warning("количество полосы в позицию не легло: %s",
                             type(exc).__name__)
         return итог
+
+    def _строка_не_села(self, поз: dict) -> None:
+        """Одна белая строка в Telegram про покупку, которой нет на цепи."""
+        if self.оповещатель is None or NT is None:
+            return
+        try:
+            import bloom_tg_format3 as F3  # noqa: PLC0415
+        except Exception:  # noqa: BLE001
+            return
+        минт = поз.get("mint")
+        имя = None
+        if минт:
+            try:
+                имя = self.имя_токена(минт)
+            except Exception:  # noqa: BLE001
+                имя = None
+        тс = поз.get("ts_intent")
+        время = (поз.get("utc") or (time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                  time.gmtime(float(тс)))
+                                     if isinstance(тс, (int, float)) and тс else None))
+        текст = F3.строка_не_села(
+            время_utc=время, группа=поз.get("lane_group"),
+            источник=поз.get("source") or поз.get("lane_source"),
+            имя=имя, минт=минт)
+        self.оповещатель.послать(текст)
 
     def _хвост_журнала(self, путь, *, байт: int = 1_500_000) -> list:
         """Последние строки журнала. Читаем ХВОСТ, а не весь файл: журнал
@@ -6582,6 +6628,11 @@ async def слушать(детектор: Детектор, ключ: str, *, �
 # сгорели бы за три секунды, пока узел ещё не отдаёт транзакцию; три попытки с
 # этой паузой укладываются в удержание (19-30 с) и успевают до продажи.
 ПАУЗА_ПОПЫТОК_КОЛИЧЕСТВА_S = ST.env_float("BLOOM_BOUGHT_RETRY_S", 3.0)
+# ЧЕРЕЗ СКОЛЬКО СЕКУНД ПОСЛЕ НАМЕРЕНИЯ ПОКУПКА СЧИТАЕТСЯ НЕ СЕВШЕЙ. Срок жизни
+# blockhash -- 150 слотов; при измеренной длине слота 0.274 с это около 41 с.
+# Берём 90 с с запасом: раньше этого срока "нет на цепи" может значить просто
+# отставший узел, а не отказ.
+НЕ_СЕЛА_ЧЕРЕЗ_S = ST.env_float("BLOOM_NE_SELA_POSLE_S", 90.0)
 # Соседей по слоту ищет полный getBlock -- он дорог, поэтому попыток на позицию
 # меньше: блок старше пары минут узел может уже не отдать, и вечный повтор
 # только жёг бы кредиты.
@@ -9659,6 +9710,32 @@ def self_test() -> int:
                 == ПОПЫТОК_МЕСТА_В_БЛОКЕ
                 and st_п.positions()["lane3"].get("lane_bought_why_not"),
                 st_п.positions()["lane3"])
+
+            # 6а-бис. ПОКУПКА НЕ СЕЛА ВОВСЕ (слово владельца 28.09). Подпись
+            # в записи есть, на цепи её нет и уже не будет: позиция обязана
+            # закрыться сама, а не висеть открытой и не считаться
+            # "несчитаемой" -- денег такая попытка не двигала.
+            st_п.write_intent(client_order_id="lane_ns", mint="MINTNS",
+                             source_sig="SLNS", source_slot=12, sol_in=0.3,
+                             pool=None, program=None, taxed=None, tax_bps=None,
+                             mode=ST.MODE_LIVE, sell_after_s=28.8,
+                             lane=ST.МЕТКА_ПОЛОСЫ)
+            st_п.update_position("lane_ns", state="bought",
+                                lane_signature="ПОДПИСЬ_КОТОРОЙ_НЕТ_НА_ЦЕПИ",
+                                lane_group="lane_s0",
+                                source="3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+                                ts_intent=time.time() - (НЕ_СЕЛА_ЧЕРЕЗ_S + 5),
+                                ts_sent=time.time() - (НЕ_СЕЛА_ЧЕРЕЗ_S + 5))
+            HeliusСчётный.tx_ответ = None
+            HeliusСчётный.tx_по_подписи = {}
+            HeliusСчётный.севшая_ответ = {"signature": None, "slot": None,
+                                          "err": None, "why_not": "не села"}
+            детектор_пп.догнать_купленное_полосы()
+            поз_нс = st_п.positions()["lane_ns"]
+            chk("покупка не села: позиция закрыта, помечена и НЕ несчитаемая",
+                поз_нс.get("lane_not_landed") is True
+                and поз_нс.get("state") == ST.STATE_CLOSED
+                and not поз_нс.get("result_uncountable"), поз_нс)
 
             # 6б. ДОГОН ИДЁТ ЗА СЕВШЕЙ ПОДПИСЬЮ, А НЕ ЗА ПРИНЯТОЙ. Вариантов
             # шесть, садится один; за ночь 25->26.09 догон спрашивал про
