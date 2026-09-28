@@ -146,7 +146,7 @@ def кошелёк(уз, кош: str, часов: float) -> dict:
     до_ts = time.time() - часов * 3600
     подписи, до = [], None
     while True:
-        with уз.на("shyft"):
+        with уз.на("shyft" if часов <= 48 else "helius"):
             стр = уз.подписи(кош, до=до, limit=1000)
         if not стр:
             break
