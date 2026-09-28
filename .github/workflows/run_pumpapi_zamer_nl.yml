@@ -84,11 +84,11 @@ jobs:
           set -e
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pvh"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pvh/pumpapi_vs_helius.py" < deploy/checks/pumpapi_vs_helius.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "pgrep -f pumpapi_vs_helius.py >/dev/null && { echo 'SBOY: zamer uzhe idet'; exit 1; } || true"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "pgrep -f pumpapi_vs_heliu[s].py >/dev/null && { echo 'SBOY: zamer uzhe idet'; exit 1; } || true"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pvh/itog.json /tmp/pvh/log.txt
             setsid nohup /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/pvh/pumpapi_vs_helius.py --minut ${{ inputs.minut }} --zhurnal $STATE_DIR/decisions.jsonl --gruppy /home/bot/data/sources_2026-09-25.json --out /tmp/pvh/itog.json > /tmp/pvh/log.txt 2>&1 < /dev/null &
             sleep 5
-            pgrep -f pumpapi_vs_helius.py >/dev/null || { echo 'SBOY: zamer ne podnyalsya'; cat /tmp/pvh/log.txt; exit 1; }
+            pgrep -f pumpapi_vs_heliu[s].py >/dev/null || { echo 'SBOY: zamer ne podnyalsya'; cat /tmp/pvh/log.txt; exit 1; }
             echo 'zamer idet, log /tmp/pvh/log.txt'
             cat /tmp/pvh/log.txt"
 
@@ -96,7 +96,7 @@ jobs:
         if: ${{ github.event.inputs.shag == 'sobrat' }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$TARGET_HOST "pgrep -f pumpapi_vs_helius.py >/dev/null && echo 'zamer vse eshche idet' || echo 'zamer zavershen'"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "pgrep -f pumpapi_vs_heliu[s].py >/dev/null && echo 'zamer vse eshche idet' || echo 'zamer zavershen'"
           ssh -n $SSH_OPTS root@$TARGET_HOST "tail -20 /tmp/pvh/log.txt 2>/dev/null || true"
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pvh/itog.json 2>/dev/null || true" > /tmp/pvh_itog.json || true
           if python3 -c "import json; json.load(open('/tmp/pvh_itog.json'))" 2>/dev/null; then
