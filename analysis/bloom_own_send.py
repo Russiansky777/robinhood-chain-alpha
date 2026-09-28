@@ -754,9 +754,26 @@ def clmm_включён(группа: str | None = None) -> bool:
 
 # Типы пулов, которые полоса берёт ТОЛЬКО ПО ФЛАГУ. Имя константы в
 # c2_swap_build -- функция, решающая по группе источника.
+def launchlab_включён(группа: str | None = None) -> bool:
+    """Raydium LaunchLab -- по флагу LANE_LAUNCHLAB / LANE_LAUNCHLAB_GROUPS.
+
+    СТРОИТЕЛЬ N3 в очереди владельца 28.09 (после DAMM v2 + DBC и CLMM).
+    Сборка у LaunchLab уже сверена на живых сделках источников: инструкция
+    buy_exact_in, 18 счетов, подставляем только подписанта и два наших ATA,
+    остальное переносится из сделки источника (c2_swap_build.SPECS). Цена
+    считается НЕ по хранилищам, а по событию TradeEvent из логов: у кривой
+    запуска резервы виртуальные, и хранилища цену не дают. Событие даёт
+    virtual_base/virtual_quote и real_* до и после, доля комиссии выводится из
+    самой сделки источника (amount_in минус прирост реальной котировки), а
+    формула кривой воспроизводит выход источника точно -- это и проверено
+    самопроверкой сборщика на десятке живых сделок.
+    """
+    return _тип_включён("LAUNCHLAB", группа)
+
+
 ДОП_ТИПЫ_ПОЛОСЫ = (("BONDING", кривая_включена), ("DAMM2", damm2_включён),
                     ("DBC", dbc_включён), ("DLMM", dlmm_включён),
-                    ("CLMM", clmm_включён))
+                    ("CLMM", clmm_включён), ("LAUNCHLAB", launchlab_включён))
 
 # ПОТОЛОК КОМИССИИ ПУЛА. У свежих пулов Meteora бывает расписание комиссии: в
 # живой сделке 26.09 комиссия пула была 50.9 % (и это правда, а не ошибка
@@ -5008,6 +5025,95 @@ def self_test() -> int:
     else:
         chk("образца Raydium CLMM с котировкой SOL и посчитанным минимумом нет -- "
             "строитель проверять нечем", False)
+
+    # --- RAYDIUM LAUNCHLAB В ПОЛОСЕ (очередь строителей владельца 28.09, N3).
+    # Сборка сверена на живых сделках источников (buy_exact_in, 18 счетов),
+    # цена -- по событию TradeEvent из ЛОГОВ: у кривой запуска резервы
+    # виртуальные, и хранилища цену не дают. Здесь проверяется ДЕНЕЖНОЕ: без
+    # флага не берём, по флагу собираем с положительным минимумом ниже
+    # ожидания, по чужой группе не берём, а без события в логах -- отказ.
+    try:
+        обр_ll = B_ж.load_samples(B_ж.LAUNCHLAB)
+    except Exception:  # noqa: BLE001
+        обр_ll = []
+
+    def _ll_годный(x):
+        """Образец с котировкой SOL, у которого минимум выхода считается."""
+        t_ = B_ж.extract_template(x["tx"], B_ж.LAUNCHLAB, x["pool_vault"])
+        if not t_.get("ok"):
+            return False
+        mv_ = B_ж.mints_and_vaults(t_, x["tx"])
+        if not mv_ or mv_["quote_mint"] != C_ж.WSOL:
+            return False
+        return bool(B_ж.min_out_from_reserves(t_, x["tx"], 10_000_000, 0.35).get("ok"))
+
+    образец_ll = next((x for x in обр_ll if _ll_годный(x)), None)
+    if образец_ll is not None:
+        хран_ll = образец_ll["pool_vault"]
+
+        class МодулиLL:
+            class C:
+                WSOL = C_ж.WSOL
+                NATIVE_QUOTE = getattr(C_ж, "NATIVE_QUOTE", "native_sol")
+
+                @staticmethod
+                def identify_pool(*a, **kw):
+                    return {"ok": True, "pool_vault": хран_ll, "quote_mint": C_ж.WSOL}
+
+        было_мll = globals()["_модули"]
+        было_фll = os.environ.get("LANE_LAUNCHLAB")
+        globals()["_модули"] = lambda: (МодулиLL.C, PP_ж, SB_ж, B_ж)
+        try:
+            os.environ.pop("LANE_LAUNCHLAB_GROUPS", None)
+            os.environ["LANE_LAUNCHLAB"] = "0"
+            ll_выкл = собрать(tx_источника=образец_ll["tx"],
+                               источник=образец_ll["source"],
+                               минт=образец_ll["mint"], наш_кошелёк=кошелёк_полосы(),
+                               лампорты=10_000_000)
+            chk("Raydium LaunchLab без флага -- отказ, полоса его не берёт",
+                ll_выкл["ok"] is False and "вне полосы" in (ll_выкл["why_not"] or ""),
+                ll_выкл)
+            os.environ["LANE_LAUNCHLAB"] = "1"
+            ll_вкл = собрать(tx_источника=образец_ll["tx"],
+                              источник=образец_ll["source"],
+                              минт=образец_ll["mint"], наш_кошелёк=кошелёк_полосы(),
+                              лампорты=10_000_000)
+            chk("Raydium LaunchLab по флагу -- собран, минимум положителен и ниже ожидания",
+                ll_вкл["ok"] is True and isinstance(ll_вкл.get("min_out"), int)
+                and 0 < ll_вкл["min_out"] < int(ll_вкл.get("expected_out") or 0),
+                ll_вкл)
+            os.environ["LANE_LAUNCHLAB_GROUPS"] = "speed_only"
+            ll_чужая = собрать(tx_источника=образец_ll["tx"],
+                                источник=образец_ll["source"],
+                                минт=образец_ll["mint"], наш_кошелёк=кошелёк_полосы(),
+                                лампорты=10_000_000)
+            chk("Raydium LaunchLab только для speed_only: по источнику другой группы -- отказ",
+                ll_чужая["ok"] is False and "вне полосы" in (ll_чужая["why_not"] or ""),
+                ll_чужая)
+            os.environ.pop("LANE_LAUNCHLAB_GROUPS", None)
+            # СОБЫТИЯ НЕТ -- НЕ ПОКУПАЕМ. У кривой запуска цена живёт только в
+            # событии; без него минимум выхода считать нечем, а брать
+            # хранилища как у x*y=k значило бы считать по ложным резервам.
+            tx_без_лога = json.loads(json.dumps(образец_ll["tx"]))
+            tx_без_лога.setdefault("meta", {})["logMessages"] = []
+            ll_без_события = собрать(tx_источника=tx_без_лога,
+                                      источник=образец_ll["source"],
+                                      минт=образец_ll["mint"],
+                                      наш_кошелёк=кошелёк_полосы(),
+                                      лампорты=10_000_000)
+            chk(f"Raydium LaunchLab без события в логах -- отказ: "
+                f"{str(ll_без_события.get('why_not'))[:70]}",
+                ll_без_события["ok"] is False, ll_без_события.get("why_not"))
+        finally:
+            globals()["_модули"] = было_мll
+            os.environ.pop("LANE_LAUNCHLAB_GROUPS", None)
+            if было_фll is None:
+                os.environ.pop("LANE_LAUNCHLAB", None)
+            else:
+                os.environ["LANE_LAUNCHLAB"] = было_фll
+    else:
+        chk("образца Raydium LaunchLab с котировкой SOL и посчитанным минимумом "
+            "нет -- строитель проверять нечем", False)
 
     # --- METEORA DBC В ПОЛОСЕ (ночное задание владельца 27.09, пункт 3).
     # Берётся образец с котировкой SOL: остальные полоса и так не возьмёт.
