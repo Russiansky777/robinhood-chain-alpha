@@ -1,0 +1,124 @@
+name: "Вечерний итог полосы: числа утра плюс CU, комиссии и место (только чтение)"
+
+# ЗАЧЕМ. Утренний итог отвечает "что было за ночь". К вечеру владелец просил
+# (28.09, п.4) ещё: кредиты Helius ПО ДНЯМ после снятия подписки, сделки полосы
+# по строителям и sniper_src отдельно, метрики сторожа продаж, CU по строителям
+# (p50/p99 и падения по вычислительному лимиту, с предложением предела ПО
+# СТРОИТЕЛЮ), число отказов по потолку комиссии пула и ответ про freeze
+# authority.
+#
+# Только чтение: журналы потоком, учёт кредитов, признак жизни сторожа и по
+# цепи getSignatureStatuses/getTransaction ради CU. Ни подписи, ни отправки,
+# ни ордера, ни одной правки на хосте.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "начало окна, например 2026-09-28T00:21:00Z (пусто -- без окна)"
+        required: false
+        default: ""
+      gruppy:
+        description: "группы через запятую"
+        required: false
+        default: "lane_s0,batch5,sniper_src"
+      dnej:
+        description: "за сколько последних дней показать кредиты"
+        required: false
+        default: "7"
+      bez_seti:
+        description: "'yes' -- не спрашивать цепь (CU останутся без чисел)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: vecher-itog
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+  OUT_FILE: data/vecher_itog.json
+
+jobs:
+  itog:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модули разбираются и самопроверки счёта"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/vecher_itog.py
+          python3 -m py_compile deploy/checks/utro_itog.py
+          python3 -m py_compile deploy/checks/cu_po_stroitelyam.py
+          python3 deploy/checks/cu_po_stroitelyam.py --self-test
+          python3 deploy/checks/utro_itog.py --self-test
+          python3 deploy/checks/vecher_itog.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Собрать вечерний итог на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          BEZ=""
+          [ "${{ inputs.bez_seti }}" = "yes" ] && BEZ="--bez-seti"
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/vech"
+          for M in vecher_itog utro_itog cu_po_stroitelyam; do
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vech/$M.py" < "deploy/checks/$M.py"
+          done
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            python3 /tmp/vech/vecher_itog.py \
+              --state-dir $STATE_DIR \
+              --since-utc '${{ inputs.since }}' \
+              --gruppy '${{ inputs.gruppy }}' \
+              --dnej-kreditov '${{ inputs.dnej }}' \
+              $BEZ \
+              --out /tmp/vech/itog.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/vech/itog.json 2>/dev/null || true" > /tmp/vech_itog.json || true
+          if python3 -c "import json; json.load(open('/tmp/vech_itog.json'))" 2>/dev/null; then
+            cp /tmp/vech_itog.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: progon ne napisal itog"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/vech"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Vechernij itog polosy [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
