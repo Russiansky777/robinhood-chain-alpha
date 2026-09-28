@@ -43,6 +43,7 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -195,26 +196,37 @@ def пул_через_jupiter(q: str, лампорты: int = 300_000_000) -> di
     """
     из_ = {"ok": False, "pools": [], "why_not": None}
     базы = ("https://lite-api.jup.ag/swap/v1", "https://api.jup.ag/swap/v1")
-    запрос = (f"/quote?inputMint={WSOL}&outputMint={q}&amount={лампорты}"
-              f"&slippageBps=50&onlyDirectRoutes=true")
+    # ПРЯМОЙ МАРШРУТ БЕЗ ОТБОРА ДАЁТ ЧТО УГОДНО: 28.09 у SOL -> USDC это был
+    # "Kipseli" -- программа вне нашего словаря. Поэтому спрашиваем ОТДЕЛЬНО по
+    # площадкам, которые мы умеем собирать, и берём их адреса пулов.
+    отборы = ("Raydium CP", "Raydium", "Pump.fun Amm", "Raydium Launchlab", "")
     for база in базы:
-        try:
-            req = urllib.request.Request(база + запрос,
-                                         headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=20) as r:
-                о = json.loads(r.read().decode())
-        except Exception as exc:  # noqa: BLE001
-            из_["why_not"] = f"{база.split('//')[1].split('/')[0]}: {type(exc).__name__}"
-            continue
-        for шаг in (о.get("routePlan") or []):
-            инф = шаг.get("swapInfo") or {}
-            if инф.get("ammKey"):
-                из_["pools"].append({"pool": инф["ammKey"],
-                                      "label": инф.get("label"),
-                                      "outAmount": инф.get("outAmount")})
+        ошибка = None
+        for отбор in отборы:
+            запрос = (f"/quote?inputMint={WSOL}&outputMint={q}&amount={лампорты}"
+                      f"&slippageBps=50&onlyDirectRoutes=true")
+            if отбор:
+                запрос += "&dexes=" + urllib.parse.quote(отбор)
+            try:
+                req = urllib.request.Request(база + запрос,
+                                             headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    о = json.loads(r.read().decode())
+            except Exception as exc:  # noqa: BLE001
+                ошибка = f"{база.split('//')[1].split('/')[0]} [{отбор or 'без отбора'}]: {type(exc).__name__}"
+                continue
+            for шаг in (о.get("routePlan") or []):
+                инф = шаг.get("swapInfo") or {}
+                если_есть = {п["pool"] for п in из_["pools"]}
+                if инф.get("ammKey") and инф["ammKey"] not in если_есть:
+                    из_["pools"].append({"pool": инф["ammKey"],
+                                          "label": инф.get("label"),
+                                          "dexes": отбор or "без отбора"})
         из_["ok"] = bool(из_["pools"])
+        из_["why_not"] = None if из_["ok"] else ошибка
         из_["from"] = база
-        return из_
+        if из_["ok"]:
+            return из_
     return из_
 
 
@@ -409,7 +421,7 @@ def main() -> int:
                     "pools": [п.get("pool") for п in чз.get("pools") or []],
                     "labels": [п.get("label") for п in чз.get("pools") or []]}
                 for п_ in (чз.get("pools") or []):
-                    for прог_, qv_, wv_, q2_ in образцы_пула(п_["pool"], 8, C, B,
+                    for прог_, qv_, wv_, q2_ in образцы_пула(п_["pool"], 12, C, B,
                                                               программы):
                         if q2_ == q and (прог_, qv_, wv_) not in найдено:
                             найдено.append((прог_, qv_, wv_))
