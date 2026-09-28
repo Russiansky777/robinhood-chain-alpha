@@ -253,6 +253,50 @@ def минимум_выхода(state_dir: str, *, с: float) -> dict:
     return из_
 
 
+def непроданные(state_dir: str, *, с: float) -> dict:
+    """Позиции, помеченные «токен ушёл не нашей продажей», и запись сторожа.
+
+    ЗАЧЕМ. 28.09 к 22:43Z цепь показала, что три таких позиции токен ДЕРЖАТ
+    (getTokenAccountsByOwner: 649 290.69, 2 395 531.47, 1 533 551.95 -- все
+    минты Token-2022), а служба посчитала остаток нулём и закрыла пару как
+    несчитаемую. Чтобы назвать причину, а не догадываться, нужна её же запись:
+    какой кошелёк она спрашивала, что ответил узел и с каким фильтром.
+    """
+    из_ = {"позиций": 0, "строки": [], "записей_сторожа": 0, "сторож": []}
+    интересные = set()
+    for п_ in позиции(state_dir):
+        причина = str(п_.get("uncountable_why") or п_.get("closed_reason") or "")
+        if "не нашей продажей" not in причина and "продавать нечего" not in причина:
+            continue
+        т_ = п_.get("ts_intent")
+        if isinstance(т_, (int, float)) and float(т_) < с:
+            continue
+        из_["позиций"] += 1
+        cid = п_.get("client_order_id") or п_.get("cid")
+        интересные.add(cid)
+        из_["строки"].append({
+            "cid": cid, "минт": п_.get("mint"), "группа": п_.get("lane_group"),
+            "кошелёк": (п_.get("wallet") or п_.get("lane_wallet")),
+            "куплено_raw": п_.get("lane_bought_raw"),
+            "причина": причина[:140]})
+
+    for имя in ("seller.jsonl", os.path.join("lane_sell", "seller.jsonl")):
+        for зап in строки(os.path.join(state_dir, имя)):
+            if зап.get("cid") not in интересные:
+                continue
+            если = ("остаток" in str(зап.get("action") or "")
+                     or "остаток" in str(зап.get("closed_reason") or "")
+                     or зап.get("balance_raw") is not None)
+            if not если:
+                continue
+            из_["записей_сторожа"] += 1
+            из_["сторож"].append({к: зап.get(к) for к in
+                                   ("cid", "action", "balance_raw", "lane_amount_raw",
+                                    "bought_raw", "wallet", "mint", "filter",
+                                    "failures", "why_not") if к in зап})
+    return из_
+
+
 def места(state_dir: str, *, с: float) -> dict:
     """Сколько сделок с известным местом источника в блоке и почему нет."""
     из_ = {"сделок": 0, "с_местом": 0, "без_места": 0, "попыток_исчерпано": 0,
@@ -339,6 +383,7 @@ def main() -> int:
              "подшаги": шаги,
              "решили": решили(а.state_dir, с=с, шаги=шаги),
              "минимум_выхода": минимум_выхода(а.state_dir, с=с),
+             "непроданные": непроданные(а.state_dir, с=с),
              "места": места(а.state_dir, с=с),
              "симуляции": симуляции(а.state_dir, с=с),
              "флаги": флаги(а.env_file)}
@@ -355,6 +400,13 @@ def main() -> int:
         print(f"   {ключ:9s} n={з['n']:3d} p50={з['p50']} p90={з['p90']} max={з['max']}")
     for з in р_["строки"][:15]:
         print(f"   {json.dumps(з, ensure_ascii=False)}")
+    нп = итог["непроданные"]
+    print(f"НЕ ПРОДАНО (токен ушёл не нашей продажей): позиций {нп['позиций']}, "
+          f"записей сторожа {нп['записей_сторожа']}")
+    for з in нп["строки"][:12]:
+        print(f"   поз: {json.dumps(з, ensure_ascii=False)[:260]}")
+    for з in нп["сторож"][:12]:
+        print(f"   сторож: {json.dumps(з, ensure_ascii=False)[:320]}")
     мв = итог["минимум_выхода"]
     print(f"МИНИМУМ ВЫХОДА: записей {мв['записей']}")
     for з in мв["строки"][-12:]:
