@@ -1,0 +1,93 @@
+name: "Регион лидера слота источника рядом с «увидели» (только чтение)"
+
+# ЗАЧЕМ (слово владельца 28.09, к п.4): "по каждой сделке с 18:00Z -- регион
+# лидера слота источника (EU / US / Asia) рядом с «увидели». Если 180-250 только
+# у не-EU лидеров -- это география, зонд ни при чём; если и у EU -- хост".
+#
+# Карта "личность -> регион" берётся готовой из репозитория
+# (data/leader_regions.json, прогон karta_regionov_liderov), лидер слота -- из
+# расписания эпохи. Только чтение: журнал позиций потоком, getEpochInfo и
+# getLeaderSchedule.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "с какого времени (UTC)"
+        required: false
+        default: "2026-09-28T18:00:00Z"
+      po:
+        description: "до какого времени (пусто -- сейчас)"
+        required: false
+        default: ""
+
+concurrency:
+  group: region-lidera-sdelok
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/region_lidera
+  OUT_FILE: data/region_lidera_sdelok.json
+
+jobs:
+  region:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Сборка модуля"
+        run: python3 -m py_compile deploy/checks/region_lidera_sdelok.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Замер на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/region_lidera_sdelok.py" < deploy/checks/region_lidera_sdelok.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/leader_regions.json" < data/leader_regions.json
+          PO=""
+          [ -n "${{ inputs.po }}" ] && PO="--po ${{ inputs.po }}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; python3 $RABOTA/region_lidera_sdelok.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO --regiony $RABOTA/leader_regions.json --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/region_lidera.json || true
+          if python3 -c "import json; json.load(open('/tmp/region_lidera.json'))" 2>/dev/null; then
+            cp /tmp/region_lidera.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: zamer ne sobralsya"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Region lidera slota istochnika ryadom s uvideli [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
