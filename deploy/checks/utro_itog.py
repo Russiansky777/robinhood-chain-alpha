@@ -130,6 +130,20 @@ def итог(state_dir: str, since_ts: float | None) -> dict:
     return из_
 
 
+# Адреса строителей -> имена, которыми их называет владелец. Адрес в отчёте
+# читать неудобно, а имя строителя -- это то, чем он спрашивает.
+ИМЕНА_СТРОИТЕЛЕЙ = {
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": "bonding",
+    "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": "pump_amm",
+    "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": "cpmm",
+    "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG": "damm2",
+    "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN": "dbc",
+    "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": "clmm",
+    "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": "launchlab",
+    "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": "dlmm",
+}
+
+
 def сделки_полосы(state_dir: str, since_ts: float | None) -> dict:
     """Сделки полосы за окно -- ПО ЖУРНАЛУ ПОЗИЦИЙ, а не по решениям.
 
@@ -153,13 +167,20 @@ def сделки_полосы(state_dir: str, since_ts: float | None) -> dict:
             з = состояния.setdefault(cid, {})
             з.update(r)
     for з in состояния.values():
-        if з.get("lane") != "lane":
+        # МЕТКА ПОЛОСЫ -- "own_send", А НЕ "lane". Сравнение с "lane" не
+        # совпадало НИ РАЗУ, и раздел "сделки полосы" показывал ноль при
+        # двадцати четырёх настоящих сделках (найдено 28.09 вечером, когда CU по
+        # строителям посчитал 24, а этот раздел -- 0). Проверяем сам факт метки:
+        # её значение задаёт служба (bloom_exec_state.МЕТКА_ПОЛОСЫ), и вторая
+        # копия строки здесь снова разъехалась бы.
+        if not з.get("lane"):
             continue
         т = з.get("ts_intent") or з.get("ts_sent")
         if since_ts is not None and т and float(т) < since_ts:
             continue
         из_["сделок"] += 1
-        тип = з.get("program") or "поля нет"
+        тип = ИМЕНА_СТРОИТЕЛЕЙ.get(з.get("program"),
+                                    з.get("program") or "поля нет")
         из_["по_строителям"][тип] = из_["по_строителям"].get(тип, 0) + 1
         гр = з.get("lane_group") or "поля нет"
         из_["по_группам"][гр] = из_["по_группам"].get(гр, 0) + 1
@@ -349,6 +370,28 @@ def self_test() -> int:
     chk("p90 десяти", abs(кванти(list(range(1, 11)), 0.9) - 9.1) < 1e-9,
         кванти(list(range(1, 11)), 0.9))
     chk("время разбирается", разобрать_время("2026-09-27T20:00:00Z") is not None)
+    # МЕТКА ПОЛОСЫ: сравнение с "lane" давало ноль сделок при живых сделках.
+    import tempfile  # noqa: PLC0415
+
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "positions.jsonl").write_text("\n".join([
+            json.dumps({"client_order_id": "a", "lane": "own_send",
+                         "ts_sent": 2000.0, "lane_group": "batch5",
+                         "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+                         "state": "closed"}, ensure_ascii=False),
+            json.dumps({"client_order_id": "b", "lane": "own_send",
+                         "ts_sent": 10.0, "lane_group": "batch5"},
+                        ensure_ascii=False),
+            json.dumps({"client_order_id": "c", "ts_sent": 2000.0},
+                        ensure_ascii=False),
+        ]) + "\n", encoding="utf-8")
+        сп = сделки_полосы(d, 1000.0)
+        chk(f"сделка полосы с настоящей меткой сосчитана ({сп['сделок']}), "
+            f"строитель назван именем ({list(сп['по_строителям'])})",
+            сп["сделок"] == 1 and сп["по_строителям"] == {"pump_amm": 1}
+            and сп["закрыто"] == 1, сп)
+        chk("сделка не полосы не считается и старая вне окна тоже",
+            сп["по_группам"] == {"batch5": 1}, сп["по_группам"])
     chk("мусорное время -- None", разобрать_время("вчера") is None)
     print(f"самопроверка утреннего итога: {пройдено}/{пройдено + провалено} пройдено")
     return 0 if провалено == 0 else 1
