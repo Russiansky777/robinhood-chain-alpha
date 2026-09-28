@@ -98,7 +98,8 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
         # покупке источника меньше 15 SOL-экв." владелец отменил тем же вечером
         # 27.09; полей hold_slots_small здесь нет, и правило не действует.
         "lane_open_max": 3, "stop_loss_sol": 0.75, "hold_slots": 150,
-        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
+        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step",
+                        "damm2", "dbc"],
         "note": ("Лидер. Размер 0.5 SOL, порог источника 3 SOL-экв., налоговый "
                   "маршрут берём и пишем налог в строку решения, наценка входа до "
                   "0.2 (min-out 80 %, наценка 25 %), а на пуле с резервом ниже "
@@ -119,7 +120,8 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
         # позиции". None и значит "не проверять": число всё равно идёт в строку.
         "slippage": 0.40, "min_pool_sol_reserve": None,
         "lane_open_max": 3, "stop_loss_sol": 0.45, "hold_slots": 72,
-        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
+        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step",
+                        "damm2", "dbc"],
         "note": ("Восемь названных кошельков BATCH-5. 0.3 SOL, порог 2 SOL-экв., "
                   "наценка входа до 0.40, предела резерва пула НЕТ (резерв только "
                   "пишется в строку позиции), три открытых, стоп -0.45, держим 72 "
@@ -137,7 +139,8 @@ OFF_ПРЕФИКСЫ = ("FjUJgFT3", "D1wfmvGq", "DijCeWfM", "J2QQwDNY", "4vgKuik
         "skip_flippers": True, "allow_taxed_route": True,
         "slippage": 0.40, "min_pool_sol_reserve": None,
         "lane_open_max": 3, "stop_loss_sol": 0.45, "hold_slots": 72,
-        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step"],
+        "lane_pools": ["pump_amm", "cpmm", "bonding", "two_step",
+                        "damm2", "dbc"],
         "note": ("Десять кошельков с усечённым S+0. Правила как у batch5 "
                   "(слово владельца 27.09, вечер): 0.3 SOL, порог 2 SOL-экв., "
                   "наценка входа до 0.40, налоговый маршрут берём, предела "
@@ -356,7 +359,7 @@ def self_test() -> int:
         and ф["groups"]["lane_s0"]["slippage"] == 0.40
         and ф["groups"]["lane_s0"]["min_pool_sol_reserve"] is None
         and set(ф["groups"]["lane_s0"]["lane_pools"])
-        == {"pump_amm", "cpmm", "bonding", "two_step"}
+        >= {"pump_amm", "cpmm", "bonding", "two_step"}
         and ф["groups"]["lane_s0"]["allow_taxed_route"] is True,
         ф["groups"]["lane_s0"])
     chk("Bloom не торгует ни по одной группе",

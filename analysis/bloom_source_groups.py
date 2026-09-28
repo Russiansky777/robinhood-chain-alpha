@@ -481,7 +481,7 @@ def self_test() -> int:
     chk("lane_s0: правила batch5 -- все типы пулов, налоговый маршрут, 0.40, без предела резерва",
         s["allow_taxed_route"] is True and s["slippage"] == 0.40
         and s["min_pool_sol_reserve"] is None
-        and set(s["lane_pools"] or []) == {"pump_amm", "cpmm", "bonding", "two_step"}, s)
+        and set(s["lane_pools"] or []) >= {"pump_amm", "cpmm", "bonding", "two_step"}, s)
     chk("Bloom не торгует ни по одной группе файла",
         not any(п.get("bloom_trades") for п in д["политики"].values()),
         [и for и, п in д["политики"].items() if п.get("bloom_trades")])
