@@ -1,92 +1,7 @@
-снято 2026-09-28T00:55:55Z
+снято 2026-09-28T03:00:02Z
 confirm: ZAMENIT, ожидаемый хэш: dcfe1ae4509e
 --- в бою ДО ---
--rw-r--r-- 1 bot bot 123655 Sep 27 23:52 /home/bot/data/sources_2026-09-25.json
-{
- "ok": true,
- "file": "/home/bot/data/sources_2026-09-25.json",
- "hash": "1b287d4ad5f8",
- "mtime_utc": "2026-09-27T21:52:32Z",
- "почему": null,
- "тревога": null,
- "адресов_по_группам": {
-  "leader": 1,
-  "batch5": 12,
-  "lane_s0": 10,
-  "off": 9,
-  "log_only": 555
- },
- "торгуют_полосой": [
-  "batch5",
-  "lane_s0",
-  "leader"
- ],
- "торгуют_площадкой": [],
- "политики_торгующих": {
-  "batch5": {
-   "lane_size": 0.3,
-   "min_target_sol": 2,
-   "slippage": 0.4,
-   "slippage_thin_pool": null,
-   "thin_pool_below_sol": null,
-   "min_pool_sol_reserve": null,
-   "max_slots_from_source": null,
-   "skip_flippers": false,
-   "allow_taxed_route": true,
-   "lane_open_max": 3,
-   "stop_loss_sol": 0.45,
-   "hold_slots": 72.0,
-   "lane_pools": [
-    "pump_amm",
-    "cpmm",
-    "bonding",
-    "two_step"
-   ]
-  },
-  "lane_s0": {
-   "lane_size": 0.3,
-   "min_target_sol": 2,
-   "slippage": 0.4,
-   "slippage_thin_pool": null,
-   "thin_pool_below_sol": null,
-   "min_pool_sol_reserve": null,
-   "max_slots_from_source": 3,
-   "skip_flippers": true,
-   "allow_taxed_route": true,
-   "lane_open_max": 3,
-   "stop_loss_sol": 0.45,
-   "hold_slots": 72.0,
-   "lane_pools": [
-    "pump_amm",
-    "cpmm",
-    "bonding",
-    "two_step"
-   ]
-  },
-  "leader": {
-   "lane_size": 0.5,
-   "min_target_sol": 3,
-   "slippage": 0.2,
-   "slippage_thin_pool": 0.5,
-   "thin_pool_below_sol": 30,
-   "min_pool_sol_reserve": null,
-   "max_slots_from_source": null,
-   "skip_flippers": false,
-   "allow_taxed_route": true,
-   "lane_open_max": 3,
-   "stop_loss_sol": 0.75,
-   "hold_slots": 150.0,
-   "lane_pools": [
-    "pump_amm",
-    "cpmm",
-    "bonding",
-    "two_step"
-   ]
-  }
- },
- "беды": []
-}
---- в бою ПОСЛЕ ---
+-rw-r--r-- 1 bot bot 123727 Sep 28 02:55 /home/bot/data/sources_2026-09-25.json
 {
  "ok": true,
  "file": "/home/bot/data/sources_2026-09-25.json",
@@ -177,13 +92,104 @@ confirm: ZAMENIT, ожидаемый хэш: dcfe1ae4509e
  },
  "беды": []
 }
+--- в бою ПОСЛЕ ---
+{
+ "ok": true,
+ "file": "/home/bot/data/sources_2026-09-25.json",
+ "hash": "dcfe1ae4509e",
+ "mtime_utc": "2026-09-28T02:59:15Z",
+ "почему": null,
+ "тревога": null,
+ "адресов_по_группам": {
+  "leader": 1,
+  "batch5": 12,
+  "lane_s0": 10,
+  "off": 9,
+  "log_only": 555
+ },
+ "торгуют_полосой": [
+  "batch5",
+  "lane_s0",
+  "leader"
+ ],
+ "торгуют_площадкой": [],
+ "политики_торгующих": {
+  "batch5": {
+   "lane_size": 0.3,
+   "min_target_sol": 2,
+   "slippage": 0.4,
+   "slippage_thin_pool": null,
+   "thin_pool_below_sol": null,
+   "min_pool_sol_reserve": null,
+   "max_slots_from_source": null,
+   "skip_flippers": false,
+   "allow_taxed_route": true,
+   "lane_open_max": 3,
+   "stop_loss_sol": 0.45,
+   "hold_slots": 72.0,
+   "lane_pools": [
+    "pump_amm",
+    "cpmm",
+    "bonding",
+    "two_step",
+    "damm2",
+    "dbc"
+   ]
+  },
+  "lane_s0": {
+   "lane_size": 0.3,
+   "min_target_sol": 2,
+   "slippage": 0.4,
+   "slippage_thin_pool": null,
+   "thin_pool_below_sol": null,
+   "min_pool_sol_reserve": null,
+   "max_slots_from_source": 3,
+   "skip_flippers": true,
+   "allow_taxed_route": true,
+   "lane_open_max": 3,
+   "stop_loss_sol": 0.45,
+   "hold_slots": 72.0,
+   "lane_pools": [
+    "pump_amm",
+    "cpmm",
+    "bonding",
+    "two_step",
+    "damm2",
+    "dbc"
+   ]
+  },
+  "leader": {
+   "lane_size": 0.5,
+   "min_target_sol": 3,
+   "slippage": 0.2,
+   "slippage_thin_pool": 0.5,
+   "thin_pool_below_sol": 30,
+   "min_pool_sol_reserve": null,
+   "max_slots_from_source": null,
+   "skip_flippers": false,
+   "allow_taxed_route": true,
+   "lane_open_max": 3,
+   "stop_loss_sol": 0.75,
+   "hold_slots": 150.0,
+   "lane_pools": [
+    "pump_amm",
+    "cpmm",
+    "bonding",
+    "two_step",
+    "damm2",
+    "dbc"
+   ]
+  }
+ },
+ "беды": []
+}
 --- признак жизни ---
 {
  "ok": true,
- "метка": "2026-09-28T00:54:57Z",
- "живёт_с": "2026-09-28T00:53:35Z",
- "hash": "1b287d4ad5f8",
- "mtime_utc": "2026-09-27T21:52:32Z",
+ "метка": "2026-09-28T02:59:21Z",
+ "живёт_с": "2026-09-28T02:52:05Z",
+ "hash": "dcfe1ae4509e",
+ "mtime_utc": "2026-09-28T02:59:15Z",
  "тревога": null,
  "why_not": null,
  "в_файле": {
@@ -201,31 +207,30 @@ confirm: ZAMENIT, ожидаемый хэш: dcfe1ae4509e
   "log_only": 555
  },
  "источников": 589,
- "сигналов": 453,
+ "сигналов": 6135,
  "к_покупке": 0,
  "обрывов_подписки": 0,
  "способ_подписки": "transactionSubscribe",
- "кредитов_за_сеанс": 2829,
+ "кредитов_за_сеанс": 38603,
  "по_кодам": {
-  "NOT_A_BUY": 295,
-  "TARGET_AMOUNT_OUT_OF_RANGE": 76,
-  "TOKEN_RECEIVED_NOT_BOUGHT": 32,
-  "INSUFFICIENT_BALANCE": 23,
-  "SKIP_TARGET_INCREASE_POSITION": 21,
-  "AMBIGUOUS_TX": 5,
-  "THRESHOLD_EDGE": 1
+  "NOT_A_BUY": 5857,
+  "TARGET_AMOUNT_OUT_OF_RANGE": 192,
+  "INSUFFICIENT_BALANCE": 20,
+  "AMBIGUOUS_TX": 1,
+  "TOKEN_RECEIVED_NOT_BOUGHT": 53,
+  "SKIP_TARGET_INCREASE_POSITION": 7,
+  "THRESHOLD_EDGE": 5
  },
  "площадка_не_звана_по_группе": 0,
  "полоса": {
   "enabled": true,
   "live": true,
-  "sent": 1,
+  "sent": 0,
   "by_stage": {
-   "gate": 22,
-   "sent": 1
+   "gate": 20
   },
   "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
-  "balance_sol": 5.89404759,
+  "balance_sol": 6.275816386,
   "limits": {
    "open": 1,
    "per_day": 50,
@@ -247,21 +252,21 @@ confirm: ZAMENIT, ожидаемый хэш: dcfe1ae4509e
    "why_not": "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)",
    "signature": null,
    "pool_program": null,
-   "ts_utc": "2026-09-28T00:54:54Z"
+   "ts_utc": "2026-09-28T02:59:03Z"
   },
   "balance_day_threshold": {
    "ok": true,
    "kill": false,
-   "why": "просадка от 00:00 0.185029 SOL при пороге 2.0",
+   "why": "просадка от 00:00 -0.19674 SOL при пороге 2.0",
    "threshold_sol": 2.0,
    "day": "20260928",
    "open_sol": 6.07907666,
-   "balance_sol": 5.89404759,
-   "drop_sol": 0.18502907
+   "balance_sol": 6.275816386,
+   "drop_sol": -0.196739726
   },
   "lane_daily_stop": {
    "threshold_sol": 1.5,
-   "pnl_all_groups_sol": 0.114970928,
+   "pnl_all_groups_sol": 0.196739721,
    "stopped": false,
    "why_not": null
   }
@@ -272,113 +277,71 @@ confirm: ZAMENIT, ожидаемый хэш: dcfe1ae4509e
  "рубильник_площадки": false,
  "кэш_ног": {
   "enabled": true,
-  "pools": 57,
+  "pools": 16,
   "templates": {
-   "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN": {
-    "age_s": 52.4,
-    "flipped": true,
-    "sig": "4Y3EU3QAHLSNJFxbqVGnamvZPbXU2XMZVWFeSFbxHhMtuHBNtteKbRuzye12tfikR7Vi4xwSPvkqDdZc4KfZecA"
-   },
-   "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw": {
-    "age_s": 1.0,
-    "flipped": false,
-    "sig": "4DWA8hwFXMDKLQqHRR2KYtigyvQ8Y1Q7PKj9UCYvZHgDFKRm6djLcFJdjiBSGZhSnW9wArA1k4hSNLdsUs1DD1ny"
-   },
-   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-    "age_s": 3.4,
-    "flipped": false,
-    "sig": "34fZrE3tyxUEC4SkHMibsatjWzgkGXTT317eHTb3YvTeZVoS25eniq9nQWJFt7xisNt2Gw6VzsbbPL2EDLgbzih9"
-   },
-   "METvsvVRapdj9cFLzq4Tr43xK4tAjQfwX76z3n6mWQL": {
-    "age_s": 5.7,
-    "flipped": true,
-    "sig": "2DdHsP6AxWvKHXNWeoZ5Z9kCV9JFXiLGccgfshFruymCQy294GfLdhgCYSGG9AACWiGXZTY4CfZMXJU762mZmu3k"
-   },
-   "7ga6rtE9qSb3wdEiDCpTu2kHqoGVfT52jD8ign1rYTvx": {
-    "age_s": 59.7,
-    "flipped": false,
-    "sig": "2itkdr2AiqJooiq6g3HWW4BdYRkwNLoScwCL4TDetmBPsiWB9Nm52FpY18vhySgxByj1CxpnQay1FeQyYRhAdKSY"
-   },
-   "PEPEqnuuCDbBC89p1u9vpnP1KQ2oj1xTcQBsjt9X55m": {
-    "age_s": 19.7,
-    "flipped": false,
-    "sig": "2APU5uhrU6yCF4iQUMz5u4MRczJN5NpzvTQTGYGbBy3E9w1nTY4tVWkk3za7pHen3dAsikYHwPQvCJVezJKKXwtB"
-   },
-   "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ": {
-    "age_s": 40.8,
-    "flipped": false,
-    "sig": "33HLhZAYmjBQUuhSK1KGF4jftJ5jFYK22nhBPLDDN9HCJ5NcXsRQUKw91wqWGvGWdDQZw9EEF9NVpHb7jFVay1Q2"
-   },
-   "SiLVFMgD3eD2rgK628NbTBq9MnuJF5FW2CRaVyTB35L": {
-    "age_s": 62.9,
-    "flipped": true,
-    "sig": "2VYwAnSMimeBcQAKZqizUG6b8Dsu6NzYcMarLZ8J3kpvFqFzomWnX1UUJmxwDHxBQNUbVXbKgn49ofprrGkQJZwL"
-   },
-   "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp": {
-    "age_s": 2.1,
-    "flipped": false,
-    "sig": "4azgDhGQGVTuJ5qX5DbNVgxvAHy6rYMFYMLwzozCKSLHZvxjCshp1ZDU12UJ8ouPjCTS4GZdCwuQm9SpQ26KPcte"
-   },
    "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
-    "age_s": 2.7,
+    "age_s": 0.6,
     "flipped": false,
-    "sig": "2hJESVwMvLJb5dwL4NEt5PPNT4ZQbmm7Dd4eiNaxPvg8ksDx3UAH2eJ87fT8DMmDAgdU9UQqtjXFyRUkTzvLazQF"
+    "sig": "5DbpmtL59EBs7JedTiH5Pwd52vJ6BF23guePMfpVgwTQyiK8UqFqsu8JpLRsLA6QqzSzhFXLQvcMdCPESYBBnhrc"
    },
-   "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx": {
-    "age_s": 2.7,
+   "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
+    "age_s": 4.0,
     "flipped": false,
-    "sig": "37H2xEnLwWzgHbvXGY67kMQoi7LqRrMNEStKST8ahW4w1tExd7vrF5KckCYNNerUoLNhs5B5eDco3Vys9MmorUUQ"
+    "sig": "4XtYQeQJi8bZVVLmCBErmzSCPD6mfS7LStFsCSGGHWeGh4QRZV1EHmo8Pn9mmDeFcuoguKC6e8Yv9gZYXRxPFP5R"
    },
-   "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT": {
-    "age_s": 10.1,
+   "Cm6fNnMk7NfzStP9CZpsQA2v3jjzbcYGAxdJySmHpump": {
+    "age_s": 4.7,
     "flipped": false,
-    "sig": "51kTUwZmnLeznxe1t81cGN7yjc67wNgqRGUx4pZf5tXLBmezxX6AbVz5sDL9ELpLLWLoDBFCZsAedyaECmfqroxr"
+    "sig": "49zEaCvcGXB3yAowA2BWsaSdx6xhMeNXmo6P1QDnF4d8aDDYYZRPXycbf7RvQgMjmy5HBDnCtGxApvfihKc3wh7P"
    },
-   "HcRLc9VDgjLeK154xDawfb1dmVJ98DoSqcwTHGqiDeJR": {
-    "age_s": 18.6,
-    "flipped": true,
-    "sig": "5TNZC1seJyLSmTm1BTjVqKsgh3wLNZMpuKnFXPajGUmKAyR3wMbPXDvuks8XoPksA7RQB47YcWD1VQB1mjgyjZRa"
-   },
-   "SNAPcESrvnH8yUdgeMF6xm1hym9b6hW6s8YeqeHdZFz": {
-    "age_s": 3.7,
+   "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump": {
+    "age_s": 348.7,
     "flipped": false,
-    "sig": "EEBz1mW7Eaqig3UXyzfUeZdcKAzSnu5t3vQkGoAPB8Hv1tkrKnFVh6onkX5WWskbEKoWH5Pyd94TRqtF5LXz9UZ"
+    "sig": "31G3u9SjcxWewbnQGMUpCzSUc1xSwSmQHvTkLqbZdfi2hs8tLio2PmgXcYY7Lc5zWr8BjuXTb8ptPxktmfbocpV4"
    },
-   "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh": {
-    "age_s": 23.3,
+   "4N4DnNo3qpPks9aQCkcWkzoir8tnvT6diS4TnnZibonk": {
+    "age_s": 102.6,
     "flipped": false,
-    "sig": "3dMtYzkY3kimukrzzcQQLskCtGW9ZYJsiS4nG3MbytMGVPCRYWnjBSZL43AfWQC1E5KrH2WEvukaeaTJb2ZJWiQy"
+    "sig": "5NSTCq2EiiDozfn96742XUSPiL9kMVgQ9kfrnuAS2ciY88V18jvkqBg3C8QkQCRWbSwPtRwzagwCF6ucHLgbLdyM"
    },
-   "72yxYmhLgDGwdyi2b9GjDynBB6VuG3kDxNKqDbzXh5bi": {
+   "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2": {
+    "age_s": 36.5,
+    "flipped": false,
+    "sig": "4KCic4CSX98SPStxL6iY6PkhxRywReuDqViwTtKfZguYUjSFAFj1kNUUQGVDqnbeu5hTwCGZgUYNTWh6ovQofr8Z"
+   },
+   "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump": {
+    "age_s": 0.1,
+    "flipped": false,
+    "sig": "jLg37KAQREv6K52Lbv4amzn4k8TDQU7BdazjfDovhnsS87jkd3UAFjTAfprjRY9z1DR9GAjibQcoNKuZ3ZE4gtp"
+   },
+   "8J69rbLTzWWgUJziFY8jeu5tDwEPBwUz4pKBMr5rpump": {
     "age_s": 12.1,
     "flipped": false,
-    "sig": "5p7BkRtrPx6F2yoq3bMUoTQBArQbxQzSMSt1KGRRfC6QVM18vJ7zkCWKxb14BiTog3n1GkV4AchxrUcBQ4fR9SyJ"
+    "sig": "62g6NgZqVxjUUgdqC8EauUewFWNrv2BMPfc85Be39idWJDWg9JYeBYgyokfr9HFtmJXRKgt3MmrKisyscyTknRmr"
    }
   },
-  "fed": 654,
+  "fed": 3163,
   "no_tx": 0,
   "failed": 0,
-  "luts": 163,
-  "luts_pending": 29,
-  "luts_warmed": 32,
+  "luts": 66,
+  "luts_pending": 4,
+  "luts_warmed": 6,
   "warm_why_not": "",
-  "luts_topped_up": 119,
+  "luts_topped_up": 60,
   "top_up_why_not": "",
-  "bytes": 17386132,
-  "credits": 332,
-  "credits_day": 99932,
-  "credits_before_start": 99600,
+  "bytes": 73918794,
+  "credits": 1410,
+  "credits_day": 144610,
+  "credits_before_start": 143200,
   "credits_write_why_not": "",
   "credit_budget": 0,
   "credit_cap": "нет потолка",
   "dropped": false,
   "dropped_why": "",
   "ingest_stats": {
-   "шаблона нет": 255,
-   "новый шаблон (из продажи, перевёрнут)": 45,
-   "новый шаблон": 87,
-   "не своп / счета не зависят от цены -- шаблон подтверждён": 301,
-   "своп без шаблона -- шаблон не подтверждён": 1
+   "шаблона нет": 108,
+   "новый шаблон": 52,
+   "не своп / счета не зависят от цены -- шаблон подтверждён": 3038
   }
  },
  "двухшаговый": {
