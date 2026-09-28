@@ -1,0 +1,95 @@
+name: "Ставка комиссии пула Pump AMM: вывести по цепи (только чтение)"
+
+# ЗАЧЕМ. Своя продажа одной ногой считает минимум выхода по ЖИВЫМ резервам, и
+# для этого нужна доля, не доходящая до кривой -- комиссия пула. У покупки она
+# калибруется по сделке источника, у продажи источника нет. Прогон сводит два
+# независимых числа: долю, РЕШЁННУЮ по нашим же покупкам, и все целые поля
+# счетов пула и global config, перебранные по ВСЕМ смещениям.
+#
+# Только чтение: getTransaction и getMultipleAccounts. Ни подписи, ни отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      podpisi:
+        description: "подписи НАШИХ покупок Pump AMM через запятую"
+        required: true
+
+concurrency:
+  group: pump-amm-komissiya
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  OUT_FILE: data/pump_amm_komissiya.json
+
+jobs:
+  vyvod:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается и самопроверка счёта"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/pump_amm_komissiya.py
+          python3 deploy/checks/pump_amm_komissiya.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить прогон и вывести ставку"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pak"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pak/pump_amm_komissiya.py" < deploy/checks/pump_amm_komissiya.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            python3 /tmp/pak/pump_amm_komissiya.py \
+              --podpisi '${{ inputs.podpisi }}' \
+              --out /tmp/pak/itog.json" | tail -30
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pak/itog.json 2>/dev/null || true" > /tmp/pak_itog.json || true
+          if python3 -c "import json; json.load(open('/tmp/pak_itog.json'))" 2>/dev/null; then
+            cp /tmp/pak_itog.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: progon ne napisal itog"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/pak"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Stavka komissii pula Pump AMM: vyvod po cepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
