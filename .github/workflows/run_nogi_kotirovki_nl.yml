@@ -23,6 +23,14 @@ on:
         description: "0 -- все котировки файла Code-2"
         required: false
         default: "0"
+      tolko:
+        description: "только эти котировки (минты через запятую; пусто -- все)"
+        required: false
+        default: ""
+      glubokiy_poisk:
+        description: "сколько сделок минта листать для главных котировок без пула CPMM/Pump AMM"
+        required: false
+        default: "200"
 
 concurrency:
   group: nogi-kotirovki
@@ -80,6 +88,8 @@ jobs:
               --podpisey-na-kotirovku '${{ inputs.podpisey_na_kotirovku }}' \
               --glavnyh '${{ inputs.glavnyh }}' \
               --skolko-kotirovok '${{ inputs.skolko_kotirovok }}' \
+              --tolko '${{ inputs.tolko }}' \
+              --glubokiy-poisk '${{ inputs.glubokiy_poisk }}' \
               --out-pools /tmp/nogi/pools.json \
               --out-shablony /tmp/nogi/shablony.json \
               --out-otchet /tmp/nogi/otchet.json" | tail -25
