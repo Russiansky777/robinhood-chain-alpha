@@ -36,6 +36,7 @@ import podbivka_snaipery as SN  # noqa: E402
 П = КОРЕНЬ / "data" / "podbivka" / "pygoscelis"
 НАШ = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
 SYSTEM = "11111111111111111111111111111111"
+ВЫХОД = {"имя": "faza1.json"}
 
 
 def подписи_назад(уз, адрес: str, до: str | None, страниц: int, стоп_bt: int | None = None) -> tuple[list, bool]:
@@ -107,33 +108,48 @@ def метки() -> dict:
 
 def main() -> int:
     р = argparse.ArgumentParser()
-    р.add_argument("--t", default="2026-09-28T14:54:56")
+    р.add_argument("--t", default="2026-09-28T14:54:56", help="время нашей продажи (если нет --pokupka)")
+    р.add_argument("--pokupka", default="", help="подпись нашей покупки (продажа -- первая продажа минта после неё)")
     р.add_argument("--istochnik", default="")
     р.add_argument("--stranic", type=int, default=15)
+    р.add_argument("--metka", default="")
     а = р.parse_args()
-    T = calendar.timegm(time.strptime(а.t, "%Y-%m-%dT%H:%M:%S"))
+    ВЫХОД["имя"] = f"faza1_{а.metka}.json" if а.metka else "faza1.json"
     уз = S.Узел()
     М = метки()
-    рез: dict = {"t": а.t, "наш": НАШ}
+    рез: dict = {"t": а.t, "наш": НАШ, "pokupka": а.pokupka or None}
     with уз.на("helius"):
         # 1. наши сделки
-        сп, _ = подписи_назад(уз, НАШ, None, 10, стоп_bt=T - 1800)
-        окно = [з for з in сп if з.get("err") is None and T - 600 <= (з.get("blockTime") or 0) <= T + 10]
+        if а.pokupka:
+            tb0 = уз.tx(а.pokupka)
+            T0 = (tb0 or {}).get("blockTime") or 0
+            сп, _ = подписи_назад(уз, НАШ, None, 20, стоп_bt=T0 - 60)
+            окно = [з for з in сп if з.get("err") is None and T0 - 5 <= (з.get("blockTime") or 0) <= T0 + 3600]
+        else:
+            T = calendar.timegm(time.strptime(а.t, "%Y-%m-%dT%H:%M:%S"))
+            сп, _ = подписи_назад(уз, НАШ, None, 10, стоп_bt=T - 1800)
+            окно = [з for з in сп if з.get("err") is None and T - 600 <= (з.get("blockTime") or 0) <= T + 10]
         txs = уз.пакет([з["signature"] for з in окно])
         сд = []
         for з in окно:
             т = txs.get(з["signature"])
             for x in SN.разбор(т, НАШ) if т else []:
                 сд.append({**x, "signature": з["signature"], "slot": т["slot"], "blockTime": т.get("blockTime")})
-        прод = [x for x in сд if x["сторона"] == "sell" and abs((x["blockTime"] or 0) - T) <= 3]
+        if а.pokupka:
+            пк = next((x for x in сд if x["signature"] == а.pokupka and x["сторона"] == "buy"), None)
+            прод = sorted([x for x in сд if пк and x["сторона"] == "sell" and x["mint"] == пк["mint"] and x["slot"] >= пк["slot"]],
+                          key=lambda x: x["slot"])
+        else:
+            прод = [x for x in сд if x["сторона"] == "sell" and abs((x["blockTime"] or 0) - T) <= 3]
         if not прод:
-            рез["why_not"] = "продажа в указанное время не найдена"
+            рез["why_not"] = "продажа не найдена"
             рез["наши_сделки_в_окне"] = сд
             return выход(рез, уз)
         пр = прод[0]
         mint = пр["mint"]
-        пок = [x for x in сд if x["сторона"] == "buy" and x["mint"] == mint and x["slot"] <= пр["slot"]]
-        пк = max(пок, key=lambda x: (x["slot"], x["blockTime"] or 0)) if пок else None
+        if not а.pokupka:
+            пок = [x for x in сд if x["сторона"] == "buy" and x["mint"] == mint and x["slot"] <= пр["slot"]]
+            пк = max(пок, key=lambda x: (x["slot"], x["blockTime"] or 0)) if пок else None
         рез.update(mint=mint, продажа=пр, покупка=пк)
         if not пк:
             рез["why_not"] = "наша покупка не найдена"
@@ -214,7 +230,7 @@ def main() -> int:
 def выход(рез: dict, уз) -> int:
     П.mkdir(parents=True, exist_ok=True)
     рез["расход"] = уз.расход()
-    out = П / "faza1.json"
+    out = П / ВЫХОД["имя"]
     out.write_text(json.dumps(рез, ensure_ascii=False, default=str), encoding="utf-8")
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
