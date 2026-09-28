@@ -296,7 +296,9 @@ def симулировать(tx_base64: str, *, урл: str) -> dict:
              "why_not": (None if зн.get("err") is None else str(зн.get("err"))[:200])}
 
 
-def открытая_позиция_полосы(state_dir: str, *, программа: str = SB.PUMP_AMM) -> dict:
+def открытая_позиция_полосы(state_dir: str, *, программа: str = SB.PUMP_AMM,
+                             свежесть_s: float | None = 900.0,
+                             сейчас: float | None = None) -> dict:
     """Открытая позиция полосы этого типа пула: её покупка и количество.
 
     ЗАЧЕМ ЖДАТЬ ЖИВУЮ ПОЗИЦИЮ. Симулировать продажу закрытой позиции
@@ -337,7 +339,10 @@ def открытая_позиция_полосы(state_dir: str, *, програ
             continue
         if str(п.get("state") or "").lower() not in ("open", "selling"):
             continue
-        if программа and п.get("pool_program") not in (None, программа):
+        # ТИП ПУЛА -- СТРОГО ТОТ. Прежде None проходил как "любой", и первый
+        # живой прогон 28.09 взял позицию speed_only от 25.09 с pool_program
+        # null: у неё в покупке нет инструкции Pump AMM вовсе.
+        if программа and п.get("pool_program") != программа:
             continue
         подпись = п.get("lane_landed_signature") or п.get("lane_signature")
         if not подпись:
@@ -349,6 +354,19 @@ def открытая_позиция_полосы(state_dir: str, *, програ
                          "программа": п.get("pool_program"),
                          "ts": п.get("ts_sent") or п.get("ts_intent") or 0})
     для_нас.sort(key=lambda з: -float(з["ts"] or 0))
+    # СВЕЖЕСТЬ. Запись, открытая сутки назад, -- это остаток или недозакрытая
+    # позиция, а не живое окно держания: симулировать по ней продажу значит
+    # мерить не то. Отказ называет возраст самой свежей найденной.
+    if для_нас and свежесть_s:
+        т = сейчас if сейчас is not None else __import__("time").time()
+        свежие = [з for з in для_нас
+                   if float(т) - float(з["ts"] or 0) <= float(свежесть_s)]
+        if not свежие:
+            возраст = round(float(т) - float(для_нас[0]["ts"] or 0), 1)
+            return {"ok": False, "открытых": len(для_нас),
+                     "why_not": (f"самая свежая открытая позиция старше "
+                                  f"{свежесть_s} с (возраст {возраст} с)")}
+        для_нас = свежие
     if not для_нас:
         return {"ok": False, "why_not": "открытых позиций полосы этого типа нет"}
     return {"ok": True, "позиция": для_нас[0], "открытых": len(для_нас),
@@ -565,12 +583,13 @@ def self_test() -> int:
                   "pool_program": SB.PUMP_AMM, "lane_landed_signature": "П4",
                   "ts_sent": 400.0},
             ]) + "\n", encoding="utf-8")
-        оп = открытая_позиция_полосы(д)
+        оп = открытая_позиция_полосы(д, свежесть_s=None)
         chk("взята открытая позиция полосы нужного типа, а не закрытая и не чужая",
             оп["ok"] and оп["позиция"]["подпись"] == "П2"
             and оп["позиция"]["куплено"] == 555 and оп["открытых"] == 1, оп)
         chk("другой тип пула не берётся под Pump AMM",
-            открытая_позиция_полосы(д, программа=SB.BONDING)["позиция"]["подпись"]
+            открытая_позиция_полосы(д, программа=SB.BONDING,
+                                     свежесть_s=None)["позиция"]["подпись"]
             == "П3")
         (Path(д) / "positions.jsonl").write_text(
             _js2.dumps({"client_order_id": "з5", "lane": "own_send",
@@ -578,7 +597,24 @@ def self_test() -> int:
                          "lane_landed_signature": "П5"}) + "\n",
             encoding="utf-8")
         chk("нет открытых -- отказ словами, а не пустая сборка",
-            открытая_позиция_полосы(д)["ok"] is False)
+            открытая_позиция_полосы(д, свежесть_s=None)["ok"] is False)
+        (Path(д) / "positions.jsonl").write_text("\n".join(
+            _js2.dumps(з, ensure_ascii=False) for з in [
+                {"client_order_id": "з6", "lane": "own_send", "state": "open",
+                  "pool_program": SB.PUMP_AMM, "lane_landed_signature": "П6",
+                  "ts_sent": 1000.0},
+                {"client_order_id": "з7", "lane": "own_send", "state": "open",
+                  "pool_program": None, "lane_landed_signature": "П7",
+                  "ts_sent": 9000.0},
+            ]) + "\n", encoding="utf-8")
+        chk("pool_program null НЕ считается за Pump AMM",
+            открытая_позиция_полосы(д, свежесть_s=None)["позиция"]["подпись"]
+            == "П6")
+        chk("старая открытая запись не берётся, и возраст назван",
+            открытая_позиция_полосы(д, свежесть_s=900.0, сейчас=100000.0)["ok"]
+            is False
+            and "возраст" in (открытая_позиция_полосы(
+                д, свежесть_s=900.0, сейчас=100000.0)["why_not"] or ""))
     print(f"самопроверка своей продажи: {пройдено}/{пройдено + провалено} пройдено")
     return 1 if провалено else 0
 
