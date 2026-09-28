@@ -87,6 +87,12 @@ def цена_котировочного(уз: S.Узел, tsrc: dict, q: str):
 МАКС_ЧТЕНИЙ = 300              # состояний на покупку: все свопы, иначе конец слота, иначе шаг
 ПРОДАЖИ = False                # слоты продаж источника (по его счёту минта) и выход по первой
 SOL_ПУЛ = False                # котировка SOL: та же модель режима 2, цена q = 1
+# Ночь 28.09: «доля траты не калибруется» (в основном Raydium CPMM, f источника
+# чуть > 1: хранилища CPMM держат накопленные комиссии, резерв меньше остатка) --
+# поиск калибровочной покупки до F_ПОИСК сделок пула, затем медиана f по программе
+# (по посчитанным режимом 2 покупкам) с пометкой «оценка».
+F_ПОИСК = 30
+F_ПО_ПРОГРАММЕ: dict = {}      # {программа: (медиана f, n)}; пусто -- выкл.
 
 
 def одна(уз: S.Узел, п: dict) -> dict:
@@ -176,12 +182,16 @@ def одна(уз: S.Узел, п: dict) -> dict:
             из_["f_откуда"] = "хранилища, сделка источника"
         else:
             # как в A3 (прогон 5): ближайшая покупка пула после источника, окно 0.5–1.0
-            for i in range(min(len(сп), 30)):
+            for i in range(min(len(сп), F_ПОИСК)):
                 ff = A3.f_по_хранилищам(txi(i), пул)
                 if ff and 0.5 <= ff <= 1.0:
                     f = ff
                     из_["f_откуда"] = "ближайшая покупка пула после источника"
                     break
+        if not f and прог in F_ПО_ПРОГРАММЕ:
+            f, n_f = F_ПО_ПРОГРАММЕ[прог]
+            из_["f_откуда"] = f"оценка: медиана f по программе пула (n {n_f})"
+            из_["f_оценка"] = True
         из_["f"] = round(f, 5) if f else None
         if not f:
             return {**из_, "why_not": "доля траты не калибруется"}
@@ -380,8 +390,15 @@ def main() -> int:
     р.add_argument("--maks", default="", help="окна максимума по свопам, напр. 36,150,600,1800")
     р.add_argument("--prodazhi", action="store_true")
     р.add_argument("--sol-pul", action="store_true")
+    р.add_argument("--f-poisk", type=int, default=30)
+    р.add_argument("--f-po-programme", action="store_true",
+                   help="нет калибровки -- медиана f по программе (data/podbivka/rezhim2_f_po_programme.json)")
     а = р.parse_args()
-    global ГОРИЗОНТЫ, МАКС_ОКНА, ПРОДАЖИ, SOL_ПУЛ
+    global ГОРИЗОНТЫ, МАКС_ОКНА, ПРОДАЖИ, SOL_ПУЛ, F_ПОИСК, F_ПО_ПРОГРАММЕ
+    F_ПОИСК = а.f_poisk
+    if а.f_po_programme:
+        F_ПО_ПРОГРАММЕ = {к: tuple(v) for к, v in json.loads(
+            (КОРЕНЬ / "data" / "podbivka" / "rezhim2_f_po_programme.json").read_text(encoding="utf-8"))["f"].items()}
     ГОРИЗОНТЫ = tuple(int(x) for x in а.gorizonty.split(","))
     МАКС_ОКНА = tuple(int(x) for x in а.maks.split(",") if x)
     ПРОДАЖИ, SOL_ПУЛ = а.prodazhi, а.sol_pul
