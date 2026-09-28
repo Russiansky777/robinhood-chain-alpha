@@ -95,7 +95,7 @@ jobs:
             echo "OUT_FILE=data/triton/podpisi_proverka.json" >> "$GITHUB_ENV"
             OUT_FILE=data/triton/podpisi_proverka.json
           fi
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR TRITON_STATE_DIR=$ZOND_DIR python3 $ZOND_DIR/triton_preconfs_otchet.py $PODP --zhurnaly '$ZH' --resheniya $STATE_DIR --katalog $ZOND_DIR --chasov '${{ inputs.chasov }}' --predel-razbora '${{ inputs.predel_razbora }}' $BEZ --out $ZOND_DIR/otchet.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR TRITON_STATE_DIR=$ZOND_DIR python3 $ZOND_DIR/triton_preconfs_otchet.py $PODP --zhurnaly '$ZH' --resheniya $STATE_DIR --katalog $ZOND_DIR --katalog-validatorov $STATE_DIR --chasov '${{ inputs.chasov }}' --predel-razbora '${{ inputs.predel_razbora }}' $BEZ --out $ZOND_DIR/otchet.json" | tail -120
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $ZOND_DIR/otchet.json 2>/dev/null || true" > /tmp/prekonf_otchet.json || true
           if python3 -c "import json; json.load(open('/tmp/prekonf_otchet.json'))" 2>/dev/null; then
             install -d -m 755 data/triton
