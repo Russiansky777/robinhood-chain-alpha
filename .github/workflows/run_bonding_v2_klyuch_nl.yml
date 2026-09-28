@@ -48,12 +48,11 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "Самопроверка сборщика ДО сети"
+      - name: "Сборка модулей на бегунке (solders здесь нет)"
         run: |
           set -e
           cd analysis
           python3 -m py_compile c2_swap_build.py bonding_v2_uznat_klyuch.py
-          python3 c2_swap_build.py --self-test | tail -1
 
       - name: "SSH key"
         env:
@@ -72,9 +71,13 @@ jobs:
           set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/bonding_v2_uznat_klyuch.py" < analysis/bonding_v2_uznat_klyuch.py
+          # НОВЫЙ СБОРЩИК ДОСТАВЛЯЕТСЯ РЯДОМ: в каталоге службы лежит ещё старая
+          # версия без подстановки места 21, и импорт брал бы её.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/c2_swap_build.py" < analysis/c2_swap_build.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $RABOTA && PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA c2_swap_build.py --self-test | tail -1"
           ARGI=""
           for P in ${{ inputs.podpisi }}; do ARGI="$ARGI --podpis $P"; done
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA $PY_HOSTA $RABOTA/bonding_v2_uznat_klyuch.py $ARGI --koshelek '${{ inputs.koshelek }}' --sol '${{ inputs.sol }}' --fajl $STATE_DIR/bonding_v2_assoc.json --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA $RABOTA/bonding_v2_uznat_klyuch.py $ARGI --koshelek '${{ inputs.koshelek }}' --sol '${{ inputs.sol }}' --fajl $STATE_DIR/bonding_v2_assoc.json --out $RABOTA/out.json" | tail -60
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/bonding_v2_klyuch.json || true
           if python3 -c "import json; json.load(open('/tmp/bonding_v2_klyuch.json'))" 2>/dev/null; then
             cp /tmp/bonding_v2_klyuch.json "$OUT_FILE"
