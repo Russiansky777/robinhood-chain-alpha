@@ -40,6 +40,11 @@ try:
 except Exception as exc:  # noqa: BLE001
     print(f"PREDUPREZHDENIE: cu_po_stroitelyam ne zagruzhen: {type(exc).__name__}")
     CU = None
+try:
+    import signaly_stroitelej as SS  # noqa: PLC0415
+except Exception as exc:  # noqa: BLE001
+    print(f"PREDUPREZHDENIE: signaly_stroitelej ne zagruzhen: {type(exc).__name__}")
+    SS = None
 
 # Текст отказа по потолку комиссии пула -- ровно тот, что пишет сборка полосы
 # (bloom_own_send: "комиссия пула X % выше потолка Y % -- покупка не берётся").
@@ -269,6 +274,14 @@ def main() -> int:
     по_группам = (о["сделки_полосы"] or {}).get("по_группам") or {}
     о["сделки_полосы"]["sniper_src_отдельно"] = по_группам.get("sniper_src")
     о["место_в_блоке"] = место_в_блоке_заполнено(а.state_dir, since_ts)
+    # СИГНАЛЫ ПО СТРОИТЕЛЯМ -- ЧИСЛОМ, ПО ГРУППАМ. Очередь строителей владельца
+    # требует знать, сколько ждать первую живую сделку: сколько сигналов по
+    # пулам этого строителя прошло за сутки и по каким группам.
+    if SS is not None:
+        о["сигналы_по_строителям"] = SS.посчитать(
+            а.state_dir, since_ts or (time.time() - 86400.0))
+    else:
+        о["сигналы_по_строителям"] = {"why_not": "модуль счёта сигналов не загружен"}
     о["отказы_по_комиссии_пула"] = отказы_комиссии_пула(а.state_dir, since_ts)
     # FREEZE AUTHORITY -- ОТВЕТ ФАКТОМ, А НЕ ЗАМЕРОМ. Гейт полосы его не
     # смотрит: ни одной проверки freeze authority на пути покупки нет. С 28.09
@@ -306,7 +319,7 @@ def main() -> int:
     краткое = {к: о.get(к) for к in
                 ("окно_с", "сделки_полосы", "метрики_сторожа", "cu_по_строителям",
                  "место_в_блоке", "отказы_по_комиссии_пула", "кредиты_по_дням",
-                 "freeze_authority")}
+                 "freeze_authority", "сигналы_по_строителям")}
     print(json.dumps(краткое, ensure_ascii=False, indent=1)[:6000])
     return 0
 
@@ -326,6 +339,7 @@ def self_test() -> int:
 
     chk("утренний модуль подключён", UI is not None)
     chk("модуль CU подключён", CU is not None)
+    chk("модуль счёта сигналов по строителям подключён", SS is not None)
     import tempfile  # noqa: PLC0415
 
     with tempfile.TemporaryDirectory() as d:
