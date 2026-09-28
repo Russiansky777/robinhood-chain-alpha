@@ -53,6 +53,10 @@ on:
         description: "пометка адреса в файле"
         required: false
         default: ""
+      plan:
+        description: "'yes' -- применить СПИСОК правок из data/pravka_grupp_plan.json одним прогоном (остальные входы игнорируются)"
+        required: false
+        default: "no"
       otklyuchit:
         description: "адрес -- выключить переводом в НЕТОРГУЮЩУЮ группу из v"
         required: false
@@ -106,11 +110,22 @@ jobs:
           V: ${{ inputs.v }}
           POMETKA: ${{ inputs.pometka }}
           OTKLYUCHIT: ${{ inputs.otklyuchit }}
+          PLAN: ${{ inputs.plan }}
         run: |
           set -e
           set -o pipefail
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pravka_grupp.py" < deploy/checks/pravka_grupp.py
           ARGS="--file $FILE"
+          # СПИСОК ПРАВОК ОДНИМ ФАЙЛОМ. Слово владельца приходит списком из
+          # нескольких правок сразу; по одной на прогон это десяток прогонов и
+          # десяток шансов ошибиться половиной. План лежит в репозитории, то
+          # есть виден в истории, и уезжает на хост тем же ssh.
+          if [ "$PLAN" = "yes" ]; then
+            [ -f data/pravka_grupp_plan.json ] || { echo "SBOY: net data/pravka_grupp_plan.json"; exit 1; }
+            python3 -c "import json,sys; d=json.load(open('data/pravka_grupp_plan.json')); assert d.get('pravki'), 'net spiska pravki'; print('pravok v plane:', len(d['pravki']))"
+            ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pravka_plan.json" < data/pravka_grupp_plan.json
+            ARGS="$ARGS --plan /tmp/pravka_plan.json"
+          fi
           if [ "$POKAZAT" = "yes" ]; then ARGS="$ARGS --pokazat"; fi
           [ -n "$GRUPPA" ] && ARGS="$ARGS --gruppa $GRUPPA"
           [ -n "$POLE" ] && ARGS="$ARGS --pole $POLE"
@@ -126,7 +141,7 @@ jobs:
             nice -n 5 python3 /tmp/pravka_grupp.py $ARGS \
               --znachenie '$ZNACHENIE' --politika '$POLITIKA' --pometka '$POMETKA'
             rc=\$?
-            rm -f /tmp/pravka_grupp.py
+            rm -f /tmp/pravka_grupp.py /tmp/pravka_plan.json
             chown bot:bot $FILE
             chmod 644 $FILE
             ls -l $FILE
