@@ -1,0 +1,177 @@
+name: "Triton зонд 24 ч: BAM + Harmonic, фильтр по подписантам (только замер)"
+
+# ЗАЧЕМ (владелец 28.09, дополнение по преконфам, п.3): "Зонд 24 ч: подписка
+# BAM + Harmonic, регион ams, фильтр signer_include = все адреса торгующих
+# групп (leader, batch5, lane_s0, sniper_src, kandidaty), дополнительно
+# account_include те же адреса. Писать: подпись, слот, время прихода преконфа
+# (моно-часы), затем время того же сигнала по Helius WS."
+#
+# РУННЕР НЕ ДЕРЖИМ. Сутки держать единственный self-hosted раннер нельзя --
+# он же нужен деплоям. Поэтому зонд поднимается на хосте временной службой
+# systemd (systemd-run --unit), а прогон выходит сразу. Остановить:
+# run_triton_zond_stop_nl.yml или systemctl stop triton-zond-bam.service.
+#
+# ДЕНЬГИ. BAM берёт плату за сообщение, Harmonic -- за БОЛЬШЕЕ из платы за
+# сообщение и за слот, причём слот капает, даже если под фильтр ничего не
+# подошло (раздел Billing сохранённой документации). Записанный владельцем
+# ориентир: 20 000 слотов ~ $30, то есть сутки Harmonic -- это около 216 000
+# слотов, порядка $325. Поэтому по умолчанию у Harmonic стоит записанный
+# предел 20 000 слотов (закроется сам примерно через полтора часа и напишет
+# причину), а поднять его -- отдельным входом и отдельным словом.
+#
+# ТОРГОВЛИ ЗДЕСЬ НЕТ: зонд ничего не подписывает и не отправляет, денежный
+# путь не тронут, службы исполнителя не перезапускаются.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "сколько держать потоки, секунд (сутки = 86400)"
+        required: false
+        default: "86400"
+      region:
+        description: "регион: ams (слово владельца), можно список через запятую"
+        required: false
+        default: "ams"
+      feeds:
+        description: "какие фиды поднять: 'bam,harmonic' или один из них"
+        required: false
+        default: "bam,harmonic"
+      predel_soobshchenij_bam:
+        description: "предел сообщений BAM на прогон (пусто -- суточный 5000)"
+        required: false
+        default: ""
+      predel_slotov_harmonic:
+        description: "предел слотов Harmonic (по умолчанию записанные 20000 ~ $30)"
+        required: false
+        default: "20000"
+      gruppy:
+        description: "группы, адреса которых идут в фильтр"
+        required: false
+        default: "leader,batch5,lane_s0,sniper_src,kandidaty"
+
+concurrency:
+  group: triton-zond-24h
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  ZOND_DIR: /home/bot/triton_zond
+  VENV: /home/bot/triton_venv
+  PROTO_URL: https://raw.githubusercontent.com/rpcpool/preconfs-client/main/preconfs-proto/proto/preconfs.proto
+
+jobs:
+  zond:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки ДО любой сети"
+        run: |
+          set -e
+          python3 -m py_compile analysis/triton_preconfs_probe.py
+          python3 -m py_compile analysis/triton_validators.py
+          python3 -m py_compile analysis/triton_preconfs_otchet.py
+          cd analysis
+          python3 triton_preconfs_probe.py --self-test | tail -1
+          python3 triton_validators.py --self-test | tail -1
+          python3 triton_preconfs_otchet.py --self-test | tail -1
+
+      - name: "Секрет заведён или нет (значение не печатается)"
+        env:
+          TRITON_X_TOKEN: ${{ secrets.TRITON_X_TOKEN }}
+        run: |
+          set -e
+          if [ -n "$TRITON_X_TOKEN" ]; then
+            echo "TRITON_X_TOKEN: задан, длина $(printf '%s' "$TRITON_X_TOKEN" | wc -c)"
+          else
+            echo "SBOY: TRITON_X_TOKEN ne zadan"; exit 1
+          fi
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Протокол из первоисточника и стабы на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          code=$(curl -sS -L --max-time 40 -o /tmp/preconfs.proto -w '%{http_code}' "$PROTO_URL" || echo 000)
+          echo "preconfs.proto -> HTTP $code"
+          [ "$code" = "200" ] || { echo "SBOY: protokol ne skachalsya"; exit 1; }
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $ZOND_DIR"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $ZOND_DIR/preconfs.proto" < /tmp/preconfs.proto
+          for M in triton_preconfs_probe triton_validators triton_preconfs_otchet; do
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $ZOND_DIR/$M.py" < "analysis/$M.py"
+          done
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            if [ ! -x $VENV/bin/python ]; then
+              python3 -m venv $VENV
+              $VENV/bin/pip install -q --upgrade pip
+              $VENV/bin/pip install -q grpcio grpcio-tools protobuf solders
+            fi
+            $VENV/bin/python -m grpc_tools.protoc -I $ZOND_DIR \
+              --python_out=$ZOND_DIR --grpc_python_out=$ZOND_DIR \
+              $ZOND_DIR/preconfs.proto
+            ls -l $ZOND_DIR | head -20"
+
+      - name: "Адреса торгующих групп (разбором того же модуля, что в бою)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $ZOND_DIR; PYTHONPATH=$KOD_HOSTA:$ZOND_DIR $VENV/bin/python $ZOND_DIR/triton_preconfs_probe.py --iz-grupp --gruppy '${{ inputs.gruppy }}' --accounts-out $ZOND_DIR/accounts.txt"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $ZOND_DIR/accounts.txt"
+
+      - name: "Поднять зонды временными службами systemd"
+        env:
+          TRITON_X_TOKEN: ${{ secrets.TRITON_X_TOKEN }}
+        run: |
+          set -e
+          set -o pipefail
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          # КЛЮЧ -- ФАЙЛОМ, правами 600, и НЕ в командной строке: --setenv со
+          # значением показал бы его в argv службы любому, кто смотрит ps.
+          printf '%s' "$TRITON_X_TOKEN" | ssh $SSH_OPTS root@$TARGET_HOST "umask 077; cat > $ZOND_DIR/token"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chmod 600 $ZOND_DIR/token; wc -c < $ZOND_DIR/token"
+          SRC=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -m1 '^BLOOM_SOURCE_GROUPS=' $ENV_DIR/env | cut -d= -f2-")
+          echo "fajl grupp: $SRC"
+          for F in $(printf '%s' '${{ inputs.feeds }}' | tr ',' ' '); do
+            LIM=""
+            if [ "$F" = "bam" ] && [ -n "${{ inputs.predel_soobshchenij_bam }}" ]; then
+              LIM="--limit-messages ${{ inputs.predel_soobshchenij_bam }}"
+            fi
+            SLOTY=""
+            if [ "$F" = "harmonic" ] && [ -n "${{ inputs.predel_slotov_harmonic }}" ]; then
+              SLOTY="--limit-slots ${{ inputs.predel_slotov_harmonic }}"
+            fi
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl stop triton-zond-$F.service 2>/dev/null || true"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemd-run --unit=triton-zond-$F --description='Triton zond $F' --setenv=TRITON_X_TOKEN_FILE=$ZOND_DIR/token --setenv=PYTHONPATH=$KOD_HOSTA:$ZOND_DIR --setenv=TRITON_STATE_DIR=$ZOND_DIR --setenv=BLOOM_SOURCE_GROUPS=$SRC --working-directory=$ZOND_DIR $VENV/bin/python $ZOND_DIR/triton_preconfs_probe.py --feed $F --region '${{ inputs.region }}' --accounts-file $ZOND_DIR/accounts.txt --signers-file $ZOND_DIR/accounts.txt --seconds '${{ inputs.seconds }}' $LIM $SLOTY --out $ZOND_DIR/preconfs_${F}_$STAMP.jsonl --status $ZOND_DIR/status_$F.json --state-dir $ZOND_DIR"
+            echo "podnyat zond $F"
+          done
+          sleep 60
+          for F in $(printf '%s' '${{ inputs.feeds }}' | tr ',' ' '); do
+            echo "--- triton-zond-$F"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl is-active triton-zond-$F.service || true"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u triton-zond-$F.service -n 15 --no-pager | tail -15 || true"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "head -c 1200 $ZOND_DIR/status_$F.json 2>/dev/null || echo 'priznaka poka net'"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l $ZOND_DIR/preconfs_${F}_*.jsonl 2>/dev/null | tail -2 || true"
+          done
+
+      - name: "Предел Harmonic -- словами, чтобы цена была видна"
+        run: |
+          echo "Harmonic: predel slotov = ${{ inputs.predel_slotov_harmonic }}"
+          echo "Orientir vladeltsa: 20000 slotov ~ 30 USD; sutki ~ 216000 slotov ~ 325 USD"
