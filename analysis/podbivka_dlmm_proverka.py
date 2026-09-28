@@ -39,6 +39,84 @@ def инструкции(tx: dict) -> list:
     return ixs
 
 
+EVENT_IX_TAG = bytes.fromhex("e445a52e51cb9a1d")
+DISC_SWAP = bytes([81, 108, 227, 190, 205, 208, 10, 196])
+DISC_SWAP2 = bytes([46, 116, 82, 215, 148, 27, 84, 77])
+DISC_IX = {bytes([248, 198, 158, 145, 225, 117, 135, 200]): "swap", bytes([65, 75, 63, 76, 235, 91, 91, 136]): "swap2"}
+
+
+_АЛФ = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def _b58(s_: str) -> bytes:
+    n = 0
+    for ch in s_:
+        n = n * 58 + _АЛФ.index(ch)
+    сырые = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
+    return b"\x00" * (len(s_) - len(s_.lstrip("1"))) + сырые
+
+
+def _разбор_события(b: bytes) -> dict | None:
+    import struct  # noqa: PLC0415
+    if b[:8] == DISC_SWAP:
+        d = b[8:]
+        lb, fr = Q._pk(d[0:32]), Q._pk(d[32:64])
+        start, end = struct.unpack_from("<ii", d, 64)
+        a_in, a_out = struct.unpack_from("<QQ", d, 72)
+        sfy = d[88] != 0
+        fee, prot = struct.unpack_from("<QQ", d, 89)
+        host = struct.unpack_from("<Q", d, 121)[0]
+        return {"вид": "Swap", "lb_pair": lb, "from": fr, "start": start, "end": end, "amount_in": a_in, "amount_out": a_out,
+                "swap_for_y": sfy, "fee": fee, "protocol_fee": prot, "host_fee": host}
+    if b[:8] == DISC_SWAP2:
+        d = b[8:]
+        lb, fr = Q._pk(d[0:32]), Q._pk(d[32:64])
+        start, end = struct.unpack_from("<ii", d, 64)
+        sfy = d[72] != 0
+        a_in, a_left, a_out, mm_fee, prot, lo_fee, host = struct.unpack_from("<QQQQQQQ", d, 89)
+        return {"вид": "Swap2Evt", "lb_pair": lb, "from": fr, "start": start, "end": end, "amount_in": a_in,
+                "amount_left": a_left, "amount_out": a_out, "swap_for_y": sfy, "fee": mm_fee + lo_fee, "protocol_fee": prot,
+                "host_fee": host, "fees_on_input": d[145] != 0}
+    return None
+
+
+def события_swap(tx: dict) -> list:
+    """События Swap / Swap2Evt: самовызов программы (emit_cpi) и «Program data:» в логах."""
+    import base64 as b64  # noqa: PLC0415
+    из_, видел = [], set()
+    for ix in инструкции(tx):
+        if isinstance(ix, dict) and ix.get("programId") == Q.ПРОГРАММА and ix.get("data"):
+            try:
+                b = _b58(ix["data"])
+            except Exception:  # noqa: BLE001
+                continue
+            if b[:8] == EVENT_IX_TAG:
+                e = _разбор_события(b[8:])
+                if e:
+                    из_.append(e)
+                    видел.add((e["start"], e["amount_in"], e["amount_out"]))
+    for л in ((tx.get("meta") or {}).get("logMessages") or []):
+        if л.startswith("Program data: "):
+            try:
+                e = _разбор_события(b64.b64decode(л[14:]))
+            except Exception:  # noqa: BLE001
+                continue
+            if e and (e["start"], e["amount_in"], e["amount_out"]) not in видел:
+                из_.append(e)
+    return из_
+
+
+def вид_инструкции(tx: dict, пул: str) -> list:
+    out = []
+    for ix in инструкции(tx):
+        if isinstance(ix, dict) and ix.get("programId") == Q.ПРОГРАММА and (ix.get("accounts") or [None])[0] == пул:
+            try:
+                out.append(DISC_IX.get(_b58(ix["data"])[:8], "другая"))
+            except Exception:  # noqa: BLE001
+                out.append("?")
+    return out
+
+
 def dlmm_пулы_tx(tx: dict) -> list:
     return [ix["accounts"][0] for ix in инструкции(tx)
             if isinstance(ix, dict) and ix.get("programId") == Q.ПРОГРАММА and len(ix.get("accounts") or []) >= 11]
@@ -89,81 +167,119 @@ def дельты(tx: dict, lb: dict) -> dict:
     return {"dx": int(rx["post"]) - int(rx["pre"]), "dy": int(ry["post"]) - int(ry["pre"])}
 
 
+def сверить(уз, пул: str, ст: dict, повод: str, пулы: dict) -> dict | None:
+    """Первая успешная транзакция пула со слотом > S; одна инструкция swap/swap2 и одно событие по пулу."""
+    след = None
+    for _ in range(25):
+        time.sleep(2)
+        зз = [з for з in уз.подписи(пул, limit=20) if (з.get("slot") or 0) > (ст["slot"] or 0)]
+        if зз:
+            след = min(зз, key=lambda з: з["slot"])
+            break
+    if not след or след.get("err") is not None:
+        return None
+    т = уз.tx(след["signature"])
+    if not т:
+        return None
+    ев = [e for e in события_swap(т) if e["lb_pair"] == пул]
+    виды = вид_инструкции(т, пул)
+    if len(ев) != 1 or len(виды) != 1 or виды[0] not in ("swap", "swap2"):
+        return None
+    e = ев[0]
+    д = дельты(т, ст["lb"])
+    try:
+        q = Q.котировка_точный_вход(ст["lb"], пул, e["amount_in"], e["swap_for_y"], ст["массивы"],
+                                    т.get("blockTime") or int(time.time()), ст["ext"])
+        why = None
+    except Q.ОшибкаDLMM as exc:
+        q, why = None, str(exc)[:100]
+    факт = e["amount_out"]
+    return {"повод": повод, "пул": пул, "slot_чтения": ст["slot"], "сделка": след["signature"], "slot_сделки": т["slot"],
+            "инструкция": виды[0], "swap_for_y": e["swap_for_y"], "вход": e["amount_in"], "факт_выход": факт,
+            "модель_выход": q["amount_out"] if q else None,
+            "расхождение_пп": round((q["amount_out"] - факт) / факт * 100, 6) if q and факт else None,
+            "корзин_факт": abs(e["end"] - e["start"]) + 1, "start_факт": e["start"], "end_факт": e["end"],
+            "active_id_чтения": ст["lb"]["active_id"], "end_модель": q["active_id_после"] if q else None,
+            "корзин_модель": q["корзин"] if q else None, "host_fee": e.get("host_fee"), "fee_факт": e.get("fee"),
+            "fee_модель": q["fee"] if q else None, "вход_по_хранилищу": д, "подписант": e.get("from"),
+            "why_not": why, "сделки_источников_в_пуле": len(пулы.get(пул, []))}
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--chasov", type=float, default=24)
-    р.add_argument("--cel", type=int, default=10)
-    р.add_argument("--minut", type=float, default=40)
+    р.add_argument("--cel", type=int, default=10, help="сколько многокорзинных (корзин ≥ 2)")
+    р.add_argument("--minut", type=float, default=90)
+    р.add_argument("--krupnaya", type=float, default=1.0, help="покупка источника от стольких SOL -- «наш случай»")
+    р.add_argument("--metka", default="mnogo")
     а = р.parse_args()
     сп = json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki_code1_kandidaty.json").read_text(encoding="utf-8"))
     кошельки = sorted(set(сп["группы_code1"]) | set(сп["кандидаты"]))
     уз = S.Узел()
+    итог, отказы = [], {}
     with уз.на("helius"):
         пулы = пулы_источников(уз, кошельки, а.chasov)
         print("пулов DLMM у источников:", len(пулы), flush=True)
-        итог, отказы = [], {}
+        последняя = {}
+        for w in кошельки:
+            try:
+                зз = уз.подписи(w, limit=1)
+                последняя[w] = зз[0]["signature"] if зз else None
+            except RuntimeError:
+                последняя[w] = None
         конец = time.time() + а.minut * 60
         очередь = sorted(пулы, key=lambda p: -len(пулы[p]))
-        while time.time() < конец and len(итог) < а.cel and очередь:
-            for пул in list(очередь):
-                if len(итог) >= а.cel or time.time() >= конец:
-                    break
-                try:
-                    ст = прочитать(уз, пул)
-                except (Q.ОшибкаDLMM, RuntimeError) as exc:
-                    отказы[пул] = S.чисто(str(exc))[:100]
-                    очередь.remove(пул)
-                    continue
-                след = None
-                for _ in range(20):                     # ждём следующую сделку пула до ~60 с
-                    time.sleep(3)
-                    зз = [з for з in уз.подписи(пул, limit=20) if (з.get("slot") or 0) > (ст["slot"] or 0) and з.get("err") is None]
-                    if зз:
-                        след = min(зз, key=lambda з: з["slot"])
-                        break
-                if not след:
-                    continue
-                т = уз.tx(след["signature"])
-                if not т or dlmm_пулы_tx(т).count(пул) != 1:
-                    continue
-                д = дельты(т, ст["lb"])
-                if not д or not ((д["dx"] > 0 > д["dy"]) or (д["dy"] > 0 > д["dx"])):
-                    continue
-                sfy = д["dx"] > 0
-                вход, факт = (д["dx"], -д["dy"]) if sfy else (д["dy"], -д["dx"])
-                try:
-                    q = Q.котировка_точный_вход(ст["lb"], пул, вход, sfy, ст["массивы"], т.get("blockTime") or int(time.time()),
-                                                ст["ext"])
-                except Q.ОшибкаDLMM as exc:
-                    отказы[пул] = f"котировка: {exc}"[:100]
-                    continue
-                отн = (q["amount_out"] - факт) / факт * 100 if факт else None
-                итог.append({"пул": пул, "slot_чтения": ст["slot"], "сделка": след["signature"], "slot_сделки": т["slot"],
-                             "swap_for_y": sfy, "вход": вход, "факт_выход": факт, "модель_выход": q["amount_out"],
-                             "расхождение_пп": round(отн, 6) if отн is not None else None, "корзин": q["корзин"],
-                             "подписант": (C.account_keys(т) or [None])[0], "сделки_источников_в_пуле": len(пулы[пул])})
-                print(пул[:8], sfy, вход, факт, q["amount_out"], отн, flush=True)
-    out = КОРЕНЬ / "data" / "podbivka" / "dlmm_proverka.json"
-    out.write_text(json.dumps({"итог": итог, "отказы": отказы, "пулов": len(пулы),
-                               "пулы": {p: v[:5] for p, v in пулы.items()}, "расход": уз.расход()},
+        k, опрос = 0, 0.0
+        многo = lambda: sum(1 for x in итог if x["повод"] == "поток" and (x["корзин_факт"] or 0) >= 2)  # noqa: E731
+        while time.time() < конец and (многo() < а.cel or sum(1 for x in итог if x["повод"] != "поток") < 5):
+            # 1. источники: новые покупки в DLMM -- сразу читаем пул («наш случай»)
+            if time.time() - опрос > 15:
+                опрос = time.time()
+                for w in кошельки:
+                    try:
+                        зз = уз.подписи(w, по=последняя.get(w), limit=5) if последняя.get(w) else уз.подписи(w, limit=1)
+                    except RuntimeError:
+                        continue
+                    if not зз:
+                        continue
+                    последняя[w] = зз[0]["signature"]
+                    for з in зз:
+                        if з.get("err") is not None:
+                            continue
+                        т = уз.tx(з["signature"])
+                        for e in события_swap(т) if т else []:
+                            if e["from"] != w:
+                                continue
+                            try:
+                                ст = прочитать(уз, e["lb_pair"])
+                            except (Q.ОшибкаDLMM, RuntimeError) as exc:
+                                отказы[e["lb_pair"]] = S.чисто(str(exc))[:100]
+                                continue
+                            x = сверить(уз, e["lb_pair"], ст, f"после источника {w[:8]} ({e['amount_in']} сырых, "
+                                        f"{abs(e['end'] - e['start']) + 1} корзин)", пулы)
+                            if x:
+                                итог.append(x)
+                                print("ИСТ", x["пул"][:8], x["корзин_факт"], x["расхождение_пп"], flush=True)
+            # 2. поток: пул по кругу
+            if not очередь:
+                break
+            пул = очередь[k % len(очередь)]
+            k += 1
+            try:
+                ст = прочитать(уз, пул)
+            except (Q.ОшибкаDLMM, RuntimeError) as exc:
+                отказы[пул] = S.чисто(str(exc))[:100]
+                очередь.remove(пул)
+                continue
+            x = сверить(уз, пул, ст, "поток", пулы)
+            if x and (x["корзин_факт"] >= 2 or not any(y["пул"] == пул for y in итог)):
+                итог.append(x)
+                print(x["пул"][:8], x["корзин_факт"], x["расхождение_пп"], flush=True)
+    out = КОРЕНЬ / "data" / "podbivka" / f"dlmm_proverka_{а.metka}.json"
+    out.write_text(json.dumps({"итог": итог, "отказы": отказы, "пулов": len(пулы), "расход": уз.расход()},
                               ensure_ascii=False, indent=1), encoding="utf-8")
-    md = ["# Сверка модуля DLMM на живых свопах", "",
-          f"Пулов DLMM в сделках источников за {а.chasov:g} ч: {len(пулы)}. Сверено свопов: {len(итог)}. "
-          "Состояние пула -- чтение getMultipleAccounts (пул + массивы корзин в одном запросе, слот S); сделка -- первая "
-          "успешная транзакция пула со слотом > S и одной инструкцией DLMM по пулу; вход и факт выхода -- изменения "
-          "хранилищ пула в этой транзакции.", "",
-          "| пул | слот чтения → сделки | направление | вход (сырые) | факт выхода | модель | расхождение, % | корзин |",
-          "|---|---|---|---|---|---|---|---|"]
-    for x in итог:
-        md.append(f"| `{x['пул'][:8]}` | {x['slot_чтения']} → {x['slot_сделки']} | {'X→Y' if x['swap_for_y'] else 'Y→X'} | "
-                  f"{x['вход']} | {x['факт_выход']} | {x['модель_выход']} | {x['расхождение_пп']} | {x['корзин']} |")
-    точно = sum(1 for x in итог if x["модель_выход"] == x["факт_выход"])
-    md += ["", f"Совпало до единицы: {точно} из {len(итог)}.", "", "Отказы: " +
-           ("; ".join(f"`{p[:8]}` {r}" for p, r in отказы.items()) if отказы else "нет") + "."]
-    (КОРЕНЬ / "docs" / "podbivka_dlmm_proverka.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
-    R.записано(КОРЕНЬ / "docs" / "podbivka_dlmm_proverka.md")
     return 0
 
 
