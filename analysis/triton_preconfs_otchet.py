@@ -217,6 +217,13 @@ def статические_ключи(подпись: str, *, урл_=None) -> d
              "version": р.get("version"),
              "slot": р.get("slot"),
              "static": list(сообщение.get("accountKeys") or []),
+             # ПОДПИСАНТЫ -- ПЕРВЫЕ numRequiredSignatures СТАТИЧЕСКИХ КЛЮЧЕЙ
+             # (так же это определено в preconfs.proto про signer_include).
+             # Считать подписантом только плательщика неверно: на живой
+             # проверке 28.09 три сообщения из шести подошли фильтру
+             # podpisanty, а "наш плательщик" показывал ноль.
+             "podpisantov": ((сообщение.get("header") or {})
+                              .get("numRequiredSignatures")),
              "alt": alt}
 
 
@@ -442,14 +449,15 @@ def проверка_фильтра(*, журналы: list, адреса: list,
         к = статические_ключи(п, урл_=урл_)
         стат = list(к.get("static") or [])
         alt = list(к.get("alt") or [])
-        подписантов = 0
-        # Подписанты -- первые num_required_signatures статических ключей; их
-        # число берём по числу подписей транзакции, если узел его дал.
-        наш_подписант = bool(наши & set(стат[:1]))
+        n_подп = к.get("podpisantov")
+        n_подп = int(n_подп) if isinstance(n_подп, int) and n_подп > 0 else 1
+        наш_подписант = bool(наши & set(стат[:n_подп]))
         строки.append({
             "signature": п, "slot": з.get("slot"), "feed": з.get("feed"),
             "filters": з.get("filters"),
-            "nash_platelshchik": наш_подписант,
+            "nash_podpisant": наш_подписант,
+            "nash_platelshchik": bool(наши & set(стат[:1])),
+            "podpisantov": n_подп,
             "nash_v_staticheskih": bool(наши & set(стат)),
             "nash_v_tablice": bool(наши & set(alt)),
             "staticheskih": len(стат), "iz_tablic": len(alt),
@@ -461,6 +469,8 @@ def проверка_фильтра(*, журналы: list, адреса: list,
              "nashih": len(наших),
              "dolya_nashih": (round(len(наших) / len(прочитано), 4)
                                if прочитано else None),
+             "nash_podpisant": len([с for с in прочитано
+                                     if с["nash_podpisant"]]),
              "nash_platelshchik": len([с for с in прочитано
                                         if с["nash_platelshchik"]]),
              "tolko_v_tablice": len([с for с in прочитано
