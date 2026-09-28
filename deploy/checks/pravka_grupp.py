@@ -30,7 +30,10 @@ import time
 from pathlib import Path
 
 КОНТЕЙНЕРЫ = ("addresses", "by_signal", "snipers", "dropped_by_credits")
-ПРИЗНАКИ = ("bloom_trades", "lane_trades", "fanout")
+# subscribe -- признак "подписываться ли на адреса группы живьём"
+# (слово владельца 28.09: log_only снять с живой подписки).
+ПРИЗНАКИ = ("bloom_trades", "lane_trades", "fanout", "subscribe",
+             "skip_flippers", "allow_taxed_route")
 СПИСКИ = ("lane_pools",)
 
 
@@ -107,6 +110,110 @@ def убрать_адрес(тело: dict, адрес: str) -> int:
     return убрано
 
 
+def операции_имена(операции: list) -> list:
+    """Короткие имена правок -- только для сообщений об отказе."""
+    из_ = []
+    for оп in операции:
+        из_.append(оп.get("sozdat") or оп.get("perenesti") or оп.get("otklyuchit")
+                   or f"{оп.get('gruppa')}.{оп.get('pole')}")
+    return из_
+
+
+def применить(гр: dict, оп: dict, ждём_группу: dict, ждём_поля: dict) -> int:
+    """Одна операция правки. 0 -- сделано, иначе код выхода как у прежних ветвей.
+
+    ЗАЧЕМ ОТДЕЛЬНОЙ ФУНКЦИЕЙ. Слово владельца 28.09 пришло одним списком из
+    четырёх правок групп сразу (новая группа, перенос девяти адресов, снятие
+    log_only с подписки, clmm двум группам). По одной правке на прогон это
+    двенадцать прогонов, и каждый -- отдельный шанс ошибиться половиной. Теперь
+    список правок применяется одним прогоном, а самопроверка денежного пути и
+    возврат из копии при отказе -- те же, что были.
+    """
+    сoздать = оп.get("sozdat") or ""
+    группа_ = оп.get("gruppa") or ""
+    поле_ = оп.get("pole") or ""
+    значение_ = оп.get("znachenie")
+    перенести_ = оп.get("perenesti") or ""
+    в_ = оп.get("v") or ""
+    пометка_ = оп.get("pometka") or ""
+    отключить_ = оп.get("otklyuchit") or ""
+
+    if сoздать:
+        if сoздать in гр:
+            print(f"СТОП: группа {сoздать} уже есть", file=sys.stderr)
+            return 3
+        политика = оп.get("politika")
+        if isinstance(политика, str):
+            try:
+                политика = json.loads(политика) if политика else {}
+            except ValueError as exc:
+                print(f"СТОП: политика не JSON ({exc})", file=sys.stderr)
+                return 4
+        политика = dict(политика or {})
+        политика.setdefault("addresses", {})
+        гр[сoздать] = политика
+        ждём_поля[сoздать] = {к: v for к, v in политика.items()
+                               if not isinstance(v, (list, dict))}
+        print(f"создана группа {сoздать}: "
+              f"{json.dumps(ждём_поля[сoздать], ensure_ascii=False)}")
+
+    if группа_ and поле_:
+        if группа_ not in гр:
+            print(f"СТОП: группы {группа_} нет; есть {sorted(гр)}", file=sys.stderr)
+            return 5
+        было = гр[группа_].get(поле_)
+        стало = (разобрать(значение_, поле_) if isinstance(значение_, str)
+                 or значение_ is None else значение_)
+        гр[группа_][поле_] = стало
+        ждём_поля.setdefault(группа_, {})[поле_] = стало
+        print(f"{группа_}.{поле_}: было {было!r}, стало {стало!r}")
+
+    if перенести_:
+        if not в_ or в_ not in гр:
+            print(f"СТОП: куда переносить -- группы {в_!r} нет", file=sys.stderr)
+            return 6
+        откуда = [имя for имя, тело in гр.items()
+                  if перенести_ in адреса_группы(тело)]
+        for имя in откуда:
+            n = убрать_адрес(гр[имя], перенести_)
+            print(f"убран из {имя} ({n} мест)")
+        цель = гр[в_]
+        if not isinstance(цель.get("addresses"), dict):
+            цель["addresses"] = {}
+        цель["addresses"][перенести_] = пометка_ or "перенос по слову владельца"
+        ждём_группу[перенести_] = в_
+        print(f"{перенести_[:8]}: {откуда or ['(нигде)']} -> {в_}")
+
+    if отключить_:
+        # ПРОСТО УБРАТЬ ИЗ ФАЙЛА НЕЛЬЗЯ. Адрес, которого в файле нет, модуль
+        # относит к ГРУППЕ ПО УМОЛЧАНИЮ, а она может торговать -- то есть
+        # удаление не выключает источник. Выключение -- перевод в группу, у
+        # которой оба признака торговли сняты, и это проверяется здесь же.
+        if not в_ or в_ not in гр:
+            print(f"СТОП: куда выключать -- группы {в_!r} нет", file=sys.stderr)
+            return 8
+        цел = гр[в_]
+        if цел.get("lane_trades") is not False or цел.get("bloom_trades") is not False:
+            print(f"СТОП: группа {в_} торгует "
+                  f"(lane_trades={цел.get('lane_trades')!r}, "
+                  f"bloom_trades={цел.get('bloom_trades')!r}) -- "
+                  "выключать в неё нельзя", file=sys.stderr)
+            return 9
+        откуда = [имя for имя, тело in гр.items()
+                  if отключить_ in адреса_группы(тело)]
+        for имя in откуда:
+            n = убрать_адрес(гр[имя], отключить_)
+            print(f"убран из {имя} ({n} мест)")
+        if not isinstance(цел.get("addresses"), dict):
+            цел["addresses"] = {}
+        цел["addresses"][отключить_] = пометка_ or "выключен по слову владельца"
+        ждём_группу[отключить_] = в_
+        ждём_поля.setdefault(в_, {}).update(
+            {"lane_trades": False, "bloom_trades": False})
+        print(f"{отключить_[:8]}: {откуда or ['(нигде)']} -> {в_} (не торгует)")
+    return 0
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--file", required=True)
@@ -121,6 +228,8 @@ def main() -> int:
     р.add_argument("--pometka", default="", help="пометка адреса при переносе")
     р.add_argument("--otklyuchit", default="",
                    help="адрес -- перевести в НЕТОРГУЮЩУЮ группу (имя в --v)")
+    р.add_argument("--plan", default="",
+                   help="файл JSON со списком правок: {\"pravki\": [ {...}, ... ]}")
     а = р.parse_args()
 
     путь = Path(а.file)
@@ -130,7 +239,22 @@ def main() -> int:
         print("СТОП: в файле нет словаря groups", file=sys.stderr)
         return 2
 
-    if а.pokazat or not (а.gruppa or а.sozdat or а.perenesti or а.otklyuchit):
+    операции = []
+    if а.plan:
+        # ПЛАН -- СПИСОК ПРАВОК В ОДНОМ ФАЙЛЕ. Порядок важен: сначала создать
+        # группу, потом переносить в неё адреса.
+        план = json.loads(Path(а.plan).read_text(encoding="utf-8"))
+        операции = план.get("pravki") if isinstance(план, dict) else план
+        if not isinstance(операции, list) or not операции:
+            print("СТОП: в плане нет списка правок", file=sys.stderr)
+            return 10
+    elif а.gruppa or а.sozdat or а.perenesti or а.otklyuchit:
+        операции = [{"gruppa": а.gruppa, "pole": а.pole, "znachenie": а.znachenie,
+                      "sozdat": а.sozdat, "politika": а.politika,
+                      "perenesti": а.perenesti, "v": а.v, "pometka": а.pometka,
+                      "otklyuchit": а.otklyuchit}]
+
+    if а.pokazat or not операции:
         свод = {}
         for имя, тело in гр.items():
             свод[имя] = {"адресов": len(адреса_группы(тело)),
@@ -142,76 +266,13 @@ def main() -> int:
     копия = путь.with_suffix(путь.suffix + f".bak-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}")
     shutil.copy2(путь, копия)
     ждём_группу, ждём_поля = {}, {}
-
-    if а.sozdat:
-        if а.sozdat in гр:
-            print(f"СТОП: группа {а.sozdat} уже есть", file=sys.stderr)
-            return 3
-        try:
-            политика = json.loads(а.politika) if а.politika else {}
-        except ValueError as exc:
-            print(f"СТОП: политика не JSON ({exc})", file=sys.stderr)
-            return 4
-        политика.setdefault("addresses", {})
-        гр[а.sozdat] = политика
-        ждём_поля[а.sozdat] = {к: v for к, v in политика.items()
-                                if not isinstance(v, (list, dict))}
-        print(f"создана группа {а.sozdat}: "
-              f"{json.dumps(ждём_поля[а.sozdat], ensure_ascii=False)}")
-
-    if а.gruppa and а.pole:
-        if а.gruppa not in гр:
-            print(f"СТОП: группы {а.gruppa} нет; есть {sorted(гр)}", file=sys.stderr)
-            return 5
-        было = гр[а.gruppa].get(а.pole)
-        стало = разобрать(а.znachenie, а.pole)
-        гр[а.gruppa][а.pole] = стало
-        ждём_поля.setdefault(а.gruppa, {})[а.pole] = стало
-        print(f"{а.gruppa}.{а.pole}: было {было!r}, стало {стало!r}")
-
-    if а.perenesti:
-        if not а.v or а.v not in гр:
-            print(f"СТОП: куда переносить -- группы {а.v!r} нет", file=sys.stderr)
-            return 6
-        откуда = [имя for имя, тело in гр.items() if а.perenesti in адреса_группы(тело)]
-        for имя in откуда:
-            n = убрать_адрес(гр[имя], а.perenesti)
-            print(f"убран из {имя} ({n} мест)")
-        цель = гр[а.v]
-        if not isinstance(цель.get("addresses"), dict):
-            цель["addresses"] = {}
-        цель["addresses"][а.perenesti] = а.pometka or "перенос по слову владельца"
-        ждём_группу[а.perenesti] = а.v
-        print(f"{а.perenesti[:8]}: {откуда or ['(нигде)']} -> {а.v}")
-
-    if а.otklyuchit:
-        # ПРОСТО УБРАТЬ ИЗ ФАЙЛА НЕЛЬЗЯ. Адрес, которого в файле нет, модуль
-        # относит к ГРУППЕ ПО УМОЛЧАНИЮ (bloom_lane), а она торгует и полосой,
-        # и площадкой -- то есть удаление не выключает источник, а даёт ему
-        # САМЫЕ БОЛЬШИЕ деньги. Поэтому выключение -- это перевод в группу, у
-        # которой оба признака торговли сняты, и это проверяется здесь же.
-        if not а.v or а.v not in гр:
-            print(f"СТОП: куда выключать -- группы {а.v!r} нет", file=sys.stderr)
-            return 8
-        цел = гр[а.v]
-        if цел.get("lane_trades") is not False or цел.get("bloom_trades") is not False:
-            print(f"СТОП: группа {а.v} торгует "
-                  f"(lane_trades={цел.get('lane_trades')!r}, "
-                  f"bloom_trades={цел.get('bloom_trades')!r}) -- "
-                  "выключать в неё нельзя", file=sys.stderr)
-            return 9
-        откуда = [имя for имя, тело in гр.items()
-                  if а.otklyuchit in адреса_группы(тело)]
-        for имя in откуда:
-            n = убрать_адрес(гр[имя], а.otklyuchit)
-            print(f"убран из {имя} ({n} мест)")
-        if not isinstance(цел.get("addresses"), dict):
-            цел["addresses"] = {}
-        цел["addresses"][а.otklyuchit] = а.pometka or "выключен по слову владельца"
-        ждём_группу[а.otklyuchit] = а.v
-        ждём_поля.setdefault(а.v, {}).update(
-            {"lane_trades": False, "bloom_trades": False})
-        print(f"{а.otklyuchit[:8]}: {откуда or ['(нигде)']} -> {а.v} (не торгует)")
+    for номер, оп in enumerate(операции, 1):
+        код = применить(гр, оп, ждём_группу, ждём_поля)
+        if код:
+            shutil.copy2(копия, путь)
+            print(f"СТОП: правка {номер} из {len(операции_имена(операции))} не "
+                  f"прошла, файл возвращён из копии", file=sys.stderr)
+            return код
 
     путь.write_text(json.dumps(д, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
