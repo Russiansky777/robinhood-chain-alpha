@@ -180,6 +180,10 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                     e = {k: e_full.get(k) for k in КЛЮЧИ}
                     if цель:
                         цели_события.append({**e, "breakdown": e_full.get("breakdown")})
+                        if pid and pid not in активные:          # ряд пула цели -- тоже в окне
+                            ряды.setdefault(pid, []).append(e)
+                            активные[pid] = (e.get("block") or 0) + окно
+                            в_активе = False
                     if в_активе:
                         if (e.get("block") or 0) > активные[pid]:
                             активные.pop(pid, None)
@@ -224,10 +228,12 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
         ряд = ряды.get(с["poolId"]) or []
         с["свопов"] = {f"s{k}": sum(1 for e in ряд if e.get("block") == с["block"] + k and e.get("action") in ("buy", "sell"))
                        for k in (1, 2)}
+    ряды_целей = {e["poolId"]: ряды.get(e["poolId"]) for e in цели_события if e.get("poolId")}
     out = КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{метка}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"день": день, "часы": часы, "порог_sol": porog, "окно_слотов": окно, "счёт": счёт,
-                               "наши_события": наши_события, "сигналы": сигналы, "цели": цели_события},
+                               "наши_события": наши_события, "сигналы": сигналы, "цели": цели_события,
+                               "ряды_целей": ряды_целей},
                               ensure_ascii=False), encoding="utf-8")
     return out
 
