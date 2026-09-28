@@ -291,6 +291,12 @@ def main() -> int:
     р.add_argument("--glubokiy-poisk", type=int, default=200,
                    help="для главных котировок без пула с постоянным произведением -- "
                         "сколько сделок минта пролистать страницами")
+    р.add_argument("--razbor-podpisi", default="",
+                   help="подписи через запятую: разобрать их инструкции (нужно для "
+                        "образцов продажи Pump AMM -- наши продажи шли через Jupiter, "
+                        "и внутри них лежит настоящая инструкция sell)")
+    р.add_argument("--sohranit-obrazcy", default="",
+                   help="куда сохранить транзакции-образцы по видам инструкций")
     р.add_argument("--razbor-pula", default="",
                    help="адрес пула: разобрать его сделки по числу счетов инструкции "
                         "(зачем: у Pump AMM встречается 25 счетов вместо 26)")
@@ -314,9 +320,13 @@ def main() -> int:
 
     # РАЗБОР ОДНОГО ПУЛА: только чтение, печать и выход. Нужен, чтобы понять
     # РАЗНИЦУ между раскладками счетов одной и той же инструкции.
-    if а.razbor_pula:
-        из_ = {"пул": а.razbor_pula, "сделки": []}
-        for sg in подписи(а.razbor_pula, 60):
+    if а.razbor_pula or а.razbor_podpisi:
+        из_ = {"пул": а.razbor_pula or None,
+                "подписи_входом": bool(а.razbor_podpisi), "сделки": []}
+        список_подписей = ([x.strip() for x in а.razbor_podpisi.split(",") if x.strip()]
+                           if а.razbor_podpisi else подписи(а.razbor_pula, 60))
+        образцы_по_видам: dict = {}
+        for sg in список_подписей:
             tx = транзакция(sg)
             if tx is None:
                 continue
@@ -333,6 +343,16 @@ def main() -> int:
                     "disc": сырое[:8].hex(),
                     "счетов": len(ix.get("accounts") or []),
                     "accounts": list(ix.get("accounts") or [])})
+                # ОБРАЗЕЦ НА ВИД ИНСТРУКЦИИ -- ЦЕЛИКОМ, чтобы раскладку можно
+                # было выводить офлайн, а не гадать по списку адресов.
+                ключ_о = f"{ix['programId']}:{сырое[:8].hex()}:{len(ix.get('accounts') or [])}"
+                if ключ_о not in образцы_по_видам:
+                    образцы_по_видам[ключ_о] = {
+                        "signature": sg, "program": ix["programId"],
+                        "disc": сырое[:8].hex(),
+                        "счетов": len(ix.get("accounts") or []),
+                        "accounts": list(ix.get("accounts") or []),
+                        "tx": tx}
         по_числу: dict = {}
         for з in из_["сделки"]:
             по_числу.setdefault((з["program"], з["disc"], з["счетов"]), []).append(з)
@@ -353,6 +373,16 @@ def main() -> int:
                                              enumerate(zip(короткий, длинный)) if x != y][:6],
                     "пример_короткий": v1[0]["signature"],
                     "пример_длинный": v2[0]["signature"]})
+        if а.sohranit_obrazcy and образцы_по_видам:
+            Path(а.sohranit_obrazcy).write_text(
+                json.dumps({"снято_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                        time.gmtime()),
+                             "зачем": ("образцы по видам инструкций: программа, "
+                                        "дискриминатор и число счетов -- для вывода "
+                                        "раскладки офлайн"),
+                             "obrazcy": образцы_по_видам},
+                            ensure_ascii=False, indent=1), encoding="utf-8")
+            из_["образцов_сохранено"] = len(образцы_по_видам)
         Path(а.out_otchet).write_text(json.dumps(из_, ensure_ascii=False, indent=1),
                                        encoding="utf-8")
         print(json.dumps({"свод": из_["свод"], "разница": из_.get("разница")},
