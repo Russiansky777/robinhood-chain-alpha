@@ -811,6 +811,14 @@ def адреса_торгующих_групп(*, файл: str | None = None,
         import bloom_source_groups as BSG  # noqa: PLC0415
 
         по_адресу = BSG.адреса_всех_групп(файл)
+        # ПУТЬ И ХЭШ ФАЙЛА -- В ОТВЕТ. "из BLOOM_SOURCE_GROUPS" ничего не
+        # доказывает: на живом прогоне 28.09 переменной в окружении не было
+        # вовсе, а адреса нашлись -- значит читался какой-то другой файл, и
+        # какой именно, обязано быть видно числом и путём.
+        лежит = BSG.загрузить(файл)
+        из_["file"] = лежит.get("file")
+        из_["hash"] = лежит.get("hash")
+        из_["mtime_utc"] = лежит.get("mtime_utc")
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:200]}"
         return из_
@@ -1411,7 +1419,9 @@ def main() -> int:
         print(json.dumps({"adresov": len(гр["accounts"]),
                            "po_gruppam": гр["by_group"],
                            "gruppy_bez_adresov": гр["groups_missing"],
-                           "fajl_grupp": гр["file"] or "из BLOOM_SOURCE_GROUPS",
+                           "fajl_grupp": гр.get("file"),
+                           "hash": гр.get("hash"),
+                           "mtime_utc": гр.get("mtime_utc"),
                            "zapisano": а.accounts_out}, ensure_ascii=False))
         return 0
 

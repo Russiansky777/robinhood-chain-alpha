@@ -170,7 +170,7 @@ jobs:
             # ЗАМОК СНИМАЕМ ВРУЧНУЮ ПОСЛЕ ОСТАНОВКИ: сигнал мог убить прогон
             # до finally, и тогда новый поток откажется подниматься (так зонд
             # и остался мёртвым на первом перезапуске 28.09).
-            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl stop triton-zond-$F.service 2>/dev/null || true; sleep 2; rm -f $ZOND_DIR/triton_preconfs_$F.lock"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl stop triton-zond-$F.service 2>/dev/null || true; sleep 2; systemctl reset-failed triton-zond-$F.service 2>/dev/null || true; rm -f $ZOND_DIR/triton_preconfs_$F.lock"
             ssh -n $SSH_OPTS root@$TARGET_HOST "systemd-run --unit=triton-zond-$F --description='Triton zond $F' --setenv=TRITON_X_TOKEN_FILE=$ZOND_DIR/token --setenv=PYTHONPATH=$KOD_HOSTA:$ZOND_DIR --setenv=TRITON_STATE_DIR=$ZOND_DIR --setenv=BLOOM_SOURCE_GROUPS=$SRC --setenv=HELIUS_API_KEY_FILE=$ZOND_DIR/helius_key --working-directory=$ZOND_DIR $VENV/bin/python $ZOND_DIR/triton_preconfs_probe.py --feed $F --region '${{ inputs.region }}' --accounts-file $ZOND_DIR/accounts.txt --signers-file $ZOND_DIR/accounts.txt --seconds '${{ inputs.seconds }}' $LIM $SLOTY --out $ZOND_DIR/preconfs_${F}_$STAMP.jsonl --status $ZOND_DIR/status_$F.json --state-dir $ZOND_DIR"
             echo "podnyat zond $F"
           done
