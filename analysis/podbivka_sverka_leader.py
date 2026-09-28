@@ -114,6 +114,8 @@ def одна(уз: S.Узел, с: dict) -> dict:
     из_.update(src_sig=src, s0=s0, сдвиг_слотов=tb["slot"] - s0)
     # ФАКТ
     вход, выход = A3.своп_sol(tb, "buy"), A3.своп_sol(ts, "sell")
+    if q in SOLы:                                   # на руки: убыль хранилища минус комиссии получателям
+        выход = max(0, выход - комиссии_инструкции(ts, пул))
     т_факт = A3.наши_токены(tb, наш, с["mint"])
     т_прод = -A3.наши_токены(ts, наш, с["mint"])
     кв_b, тв_b = A3.дельта_счёта(tb, пул["quote_vault"]), A3.дельта_счёта(tb, пул["pool_vault"])
@@ -164,12 +166,13 @@ def одна(уз: S.Узел, с: dict) -> dict:
     p0 = ст0["x"] / ст0["y"]
     из_["наценка_факт_пп"] = round((q_в_пул / т_из_пула / p0 - 1) * 100, 3)
     # калибровки
-    f = A3.f_по_хранилищам(tsrc, пул)
+    f = f_все(tsrc, пул)
     из_["f_лидера"] = round(f, 5) if f else None
-    if not f or not (0.95 <= f <= 1.0):
+    из_["f_только_хранилище"] = round(A3.f_по_хранилищам(tsrc, пул) or 0, 5) or None
+    if not f or not (0.5 <= f <= 1.0):
         f = None
         for i in range(ib - 1, max(-1, ib - 30), -1):
-            ff = A3.f_по_хранилищам(txi(i), пул)
+            ff = f_все(txi(i), пул)
             if ff and 0.5 <= ff <= 1.0:
                 f = ff
                 break
@@ -177,17 +180,16 @@ def одна(уз: S.Узел, с: dict) -> dict:
         return {**из_, "why_not": "доля траты не калибруется"}
     из_["f"] = round(f, 5)
     доли = []
-    for i in range(ib + 1, min(len(сп), ib + 80)):
-        if i == is_:
+    for i in range(0, len(сп)):                   # все продажи пула в окне (кроме нашей)
+        if i in (is_, ib):
             continue
         т = txi(i)
         кв, тв = A3.дельта_счёта(т, пул["quote_vault"]), A3.дельта_счёта(т, пул["pool_vault"])
-        if кв and тв and тв[1] > тв[0] and кв[1] < кв[0] and кв[0] > 0:
-            dy, dx = тв[1] - тв[0], кв[0] - кв[1]
-            g_ = dx * (тв[0] + dy) / (кв[0] * dy)
-            if 0.5 <= g_ <= 1.0:
+        if кв and тв and тв[1] > тв[0] and кв[1] < кв[0]:
+            g_ = g_все(т, пул)
+            if g_ and 0.5 <= g_ <= 1.05:
                 доли.append(g_)
-        if len(доли) >= 6:
+        if len(доли) >= 30:
             break
     g = statistics.median(доли) if доли else A3.G_БЕЗ_ПРОДАЖ
     из_["g"], из_["g_продаж"] = round(g, 5), len(доли)
@@ -237,6 +239,9 @@ def одна(уз: S.Узел, с: dict) -> dict:
     if not qf:
         return {**из_, "why_not": "состояние перед нашей продажей не читается"}
     из_["модель_пп"] = round((в_sol(qf) - вход) / вход * 100, 3)
+    if ст_пп and q in SOLы and выход:
+        X, Y = ст_пп["x"], ст_пп["y"]
+        из_["g_нашей_продажи"] = round(выход * (Y + в_пул) / (X * в_пул), 5)
     из_["расхождение_пп"] = round(из_["факт_пп"] - из_["модель_пп"], 3)
     # 4. сдвиг курса котировочного за удержание -- по хранилищам наших сделок:
     # SOL за единицу котировочного, дошедшую до пула токена (покупка), и SOL за
@@ -256,6 +261,53 @@ def одна(уз: S.Узел, с: dict) -> dict:
         из_["из_них_курс_пп"] = round((1 + из_["модель_пп"] / 100) * сдвиг * 100, 3)
         из_["расхождение_без_курса_пп"] = round(из_["расхождение_пп"] - из_["из_них_курс_пп"], 3)
     return из_
+
+
+def комиссии_инструкции(tx: dict, пул: dict) -> int:
+    """Сумма переводов котировки получателям комиссии в инструкциях пула (счета не
+    подписантов, кроме хранилищ, с приростом; в тех наборах счетов инструкций,
+    где есть оба хранилища пула). Pump AMM: комиссии протокола и создателя уходят
+    из хранилища/от покупателя отдельными переводами (слово Code-1 28.09)."""
+    if not tx:
+        return 0
+    sg = C.signers(tx)
+    ряды = [r for r in C.token_rows(tx).values() if r["account"]]
+    q = пул.get("quote_mint")
+    q = C.WSOL if q in SOLы else q
+    наборы = [s_ for s_ in C.instruction_account_sets(tx) if пул["pool_vault"] in s_ and пул["quote_vault"] in s_]
+    if not наборы:
+        return 0
+    счета = set().union(*наборы)
+    return sum(int(r["post"]) - int(r["pre"]) for r in ряды
+               if r["account"] in счета and r["mint"] == q and r["owner"] not in sg
+               and r["account"] not in (пул["quote_vault"], пул["pool_vault"]) and int(r["post"]) > int(r["pre"]))
+
+
+def f_все(tx: dict, пул: dict):
+    """f = x0·dy / ((y0 − dy)·(прирост хранилища + комиссии получателям))."""
+    кв, тв = A3.дельта_счёта(tx, пул["quote_vault"]), A3.дельта_счёта(tx, пул["pool_vault"])
+    if not кв or not тв:
+        return None
+    x0, x1 = кв
+    y0, y1 = тв
+    dx, dy = x1 - x0 + комиссии_инструкции(tx, пул), y0 - y1
+    if dx <= 0 or dy <= 0 or y0 <= dy:
+        return None
+    return x0 * dy / ((y0 - dy) * dx)
+
+
+def g_все(tx: dict, пул: dict):
+    """g = (убыль хранилища − комиссии получателям)·(y0 + dy) / (x0·dy) -- на руки продавцу."""
+    кв, тв = A3.дельта_счёта(tx, пул["quote_vault"]), A3.дельта_счёта(tx, пул["pool_vault"])
+    if not кв or not тв:
+        return None
+    x0, x1 = кв
+    y0, y1 = тв
+    dy = y1 - y0
+    на_руки = x0 - x1 - комиссии_инструкции(tx, пул)
+    if dy <= 0 or на_руки <= 0 or x0 <= 0:
+        return None
+    return на_руки * (y0 + dy) / (x0 * dy)
 
 
 def история(уз, пул: dict, src: str, s0: int, до: int, sell: str, ts: dict) -> dict:
