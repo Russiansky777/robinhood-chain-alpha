@@ -46,6 +46,9 @@ env:
   TARGET_HOST: 127.0.0.1
   KOD_HOSTA: /home/bot/bloom_executor
   RABOTA: /tmp/lane_sell
+  # ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ: solders стоит в venv службы (системный python3
+  # на хосте без него -- поймано первым прогоном 28.09).
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
   OUT_FILE: data/lane_sell_simulyaciya.json
 
 jobs:
@@ -89,7 +92,7 @@ jobs:
           [ -n "${{ inputs.zapas }}" ] && ZAP="--zapas ${{ inputs.zapas }}"
           PODP=""
           [ -n "${{ inputs.podpis }}" ] && PODP="--podpis ${{ inputs.podpis }}"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA timeout 900 python3 $RABOTA/bloom_lane_sell.py $PODP --zhdat-s '${{ inputs.zhdat_s }}' --dolya '${{ inputs.dolya }}' $KOL $ZAP --cu '${{ inputs.cu }}' --simulirovat yes --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA timeout 900 $PY_HOSTA $RABOTA/bloom_lane_sell.py $PODP --zhdat-s '${{ inputs.zhdat_s }}' --dolya '${{ inputs.dolya }}' $KOL $ZAP --cu '${{ inputs.cu }}' --simulirovat yes --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/lane_sell_out.json || true
           if python3 -c "import json; json.load(open('/tmp/lane_sell_out.json'))" 2>/dev/null; then
             cp /tmp/lane_sell_out.json "$OUT_FILE"
