@@ -69,7 +69,7 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zapisat_vyvod_vladelca.py" < deploy/checks/zapisat_vyvod_vladelca.py
           ZAP=""
           [ "${{ inputs.zapisat }}" = "yes" ] && ZAP="--zapisat"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && PYTHONPATH=$CODE_DIR sudo -u bot -E python3 $RABOTA/zapisat_vyvod_vladelca.py --podpis '${{ inputs.podpis }}' --primechanie '${{ inputs.primechanie }}' $ZAP" | tee /tmp/vyvod.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR python3 $RABOTA/zapisat_vyvod_vladelca.py --podpis '${{ inputs.podpis }}' --primechanie '${{ inputs.primechanie }}' $ZAP" | tee /tmp/vyvod.txt
           cp /tmp/vyvod.txt "$OUT_FILE"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
 
