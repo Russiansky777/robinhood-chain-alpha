@@ -4767,6 +4767,19 @@ class Детектор:
                 поля["lane_bought_why_not"] = (причина or куплено.get("why_not"))
                 if куплено.get("chain_ok") is False:
                     поля["chain_ok"] = False
+                    # ТРАНЗАКЦИЯ СЕЛА, НО УПАЛА (слово владельца 28.09):
+                    # позиция НЕ открывается, сторожу продавать нечего -- на
+                    # цепи откатилось всё, кроме комиссии. В Telegram вместо
+                    # зелёной строки идёт красный крест с CU парой.
+                    if not поз.get("doklad_upala_sent"):
+                        поля.update(state=ST.STATE_CLOSED,
+                                     close_reason="покупка села с ошибкой",
+                                     doklad_upala_sent=True)
+                        try:
+                            self._строка_упала(поз, tx)
+                        except Exception as exc:  # noqa: BLE001
+                            log.warning("строка 'упала' не ушла: %s",
+                                        type(exc).__name__)
                 # ПОКУПКА НЕ СЕЛА ВОВСЕ (слово владельца 28.09). Подпись в
                 # записи есть, на цепи её нет и уже не появится: срок жизни
                 # blockhash вышел. Денег такая попытка не двигала -- ни
@@ -4805,6 +4818,36 @@ class Детектор:
                 log.warning("количество полосы в позицию не легло: %s",
                             type(exc).__name__)
         return итог
+
+    def _строка_упала(self, поз: dict, tx: dict | None) -> None:
+        """Красный крест в Telegram: транзакция села, но упала."""
+        if self.оповещатель is None or NT is None:
+            return
+        try:
+            import bloom_tg_format3 as F3  # noqa: PLC0415
+        except Exception:  # noqa: BLE001
+            return
+        мета = ((tx or {}).get("meta") or {})
+        cu = мета.get("computeUnitsConsumed")
+        предел = поз.get("cu_limit")
+        ошибка = мета.get("err")
+        минт = поз.get("mint")
+        имя = None
+        if минт:
+            try:
+                имя = self.имя_токена(минт)
+            except Exception:  # noqa: BLE001
+                имя = None
+        тс = поз.get("ts_intent")
+        время = (поз.get("utc") or (time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                  time.gmtime(float(тс)))
+                                    if isinstance(тс, (int, float)) and тс else None))
+        self.оповещатель.послать(F3.строка_упала(
+            время_utc=время, группа=поз.get("lane_group"),
+            источник=поз.get("source") or поз.get("lane_source"),
+            имя=имя, минт=минт, cu_потрачено=cu, cu_предел=предел,
+            ошибка=(json.dumps(ошибка, ensure_ascii=False)[:60]
+                     if ошибка is not None else None)))
 
     def _строка_не_села(self, поз: dict) -> None:
         """Одна белая строка в Telegram про покупку, которой нет на цепи."""
@@ -9747,6 +9790,35 @@ def self_test() -> int:
                 поз_нс.get("lane_not_landed") is True
                 and поз_нс.get("state") == ST.STATE_CLOSED
                 and not поз_нс.get("result_uncountable"), поз_нс)
+
+            # 6а-трет. ТРАНЗАКЦИЯ СЕЛА, НО УПАЛА: позиция закрывается сразу,
+            # строка ухода одна и красная, повторно не уходит.
+            st_п.write_intent(client_order_id="lane_up", mint="MINTUP",
+                             source_sig="SLUP", source_slot=13, sol_in=0.3,
+                             pool=None, program=None, taxed=None, tax_bps=None,
+                             mode=ST.MODE_LIVE, sell_after_s=28.8,
+                             lane=ST.МЕТКА_ПОЛОСЫ)
+            st_п.update_position("lane_up", state="bought",
+                                lane_signature="УПАВШАЯ", lane_group="sniper_src",
+                                cu_limit=140_000, ts_intent=time.time() - 5,
+                                ts_sent=time.time() - 5)
+            HeliusСчётный.севшая_ответ = {"signature": "УПАВШАЯ", "slot": 777,
+                                          "err": {"InstructionError": [6, {"Custom": 2006}]},
+                                          "why_not": None}
+            HeliusСчётный.tx_по_подписи = {"УПАВШАЯ": {
+                "slot": 777,
+                "meta": {"err": {"InstructionError": [6, {"Custom": 2006}]},
+                         "fee": 1_005_000, "computeUnitsConsumed": 140_000,
+                         "preBalances": [640_856_911], "postBalances": [639_851_911],
+                         "preTokenBalances": [], "postTokenBalances": []},
+                "transaction": {"message": {"accountKeys": [
+                    {"pubkey": OS.кошелёк_полосы()}]}}}}
+            детектор_пп.догнать_купленное_полосы()
+            поз_уп = st_п.positions()["lane_up"]
+            chk("упавшая покупка: позиция закрыта, строка помечена посланной",
+                поз_уп.get("chain_ok") is False
+                and поз_уп.get("state") == ST.STATE_CLOSED
+                and поз_уп.get("doklad_upala_sent") is True, поз_уп)
 
             # 6б. ДОГОН ИДЁТ ЗА СЕВШЕЙ ПОДПИСЬЮ, А НЕ ЗА ПРИНЯТОЙ. Вариантов
             # шесть, садится один; за ночь 25->26.09 догон спрашивал про
