@@ -1,0 +1,111 @@
+name: "Выгрузка сделок полосы за сутки для Code-2 (только чтение)"
+
+# ЗАЧЕМ (слово владельца 28.09, пункт 5): "раз в сутки в 06:00Z полный файл
+# всех сделок полосы за сутки (все поля позиции, source_sig, buy_sig, sell_sig,
+# севшая подпись, севший слот) в ветку".
+#
+# Журнал позиций читается ПОТОКОМ, включая ротированные .gz. Ни одной отправки,
+# ни одного изменения на хосте: только чтение и коммит файла в ветку.
+on:
+  schedule:
+    # 06:00Z каждый день. Окно берётся за прошедшие сутки от этой же метки.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "с какой метки UTC (пусто -- сутки назад от 06:00Z сегодня)"
+        required: false
+        default: ""
+      do:
+        description: "до какой метки UTC (пусто -- 06:00Z сегодня)"
+        required: false
+        default: ""
+
+concurrency:
+  group: vygruzka-sdelok-c2
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+
+jobs:
+  vygruzka:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается"
+        run: python3 -m py_compile deploy/checks/sdelki_polosy_vygruzka.py
+
+      - name: "Окно суток"
+        env:
+          S_VHOD: ${{ inputs.s }}
+          DO_VHOD: ${{ inputs.do }}
+        run: |
+          set -e
+          # ГРАНИЦЫ СЧИТАЮТСЯ ОТ 06:00Z СЕГОДНЯ, а не от момента запуска:
+          # прогон по расписанию может задержаться на минуты, и окно поехало бы.
+          DO_DEF="$(date -u +%Y-%m-%dT06:00)"
+          S_DEF="$(date -u -d 'yesterday' +%Y-%m-%dT06:00)"
+          echo "S_OKNA=${S_VHOD:-$S_DEF}" >> "$GITHUB_ENV"
+          echo "DO_OKNA=${DO_VHOD:-$DO_DEF}" >> "$GITHUB_ENV"
+          echo "OUT_FILE=data/sdelki_polosy_$(date -u +%Y-%m-%d).json" >> "$GITHUB_ENV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить прогон и собрать выгрузку"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/vygr"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vygr/sdelki_polosy_vygruzka.py" < deploy/checks/sdelki_polosy_vygruzka.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            BLOOM_CODE_DIR='$CODE_DIR' python3 /tmp/vygr/sdelki_polosy_vygruzka.py \
+              --state-dir '$STATE_DIR' \
+              --s '$S_OKNA' --do '$DO_OKNA' --polnye \
+              --out /tmp/vygr/sdelki.json" | tail -20
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/vygr/sdelki.json 2>/dev/null || true" > /tmp/vygr_sdelki.json || true
+          if python3 -c "import json; d=json.load(open('/tmp/vygr_sdelki.json')); print('sdelok:', d['сделок'])"; then
+            cp /tmp/vygr_sdelki.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: progon ne napisal vygruzku"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/vygr"
+
+      - name: "Ключей в выгрузке быть не должно"
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Vygruzka sdelok polosy za sutki dlya Code-2 [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
