@@ -147,7 +147,10 @@ jobs:
           # значением показал бы его в argv службы любому, кто смотрит ps.
           printf '%s' "$TRITON_X_TOKEN" | ssh $SSH_OPTS root@$TARGET_HOST "umask 077; cat > $ZOND_DIR/token"
           ssh -n $SSH_OPTS root@$TARGET_HOST "chmod 600 $ZOND_DIR/token; wc -c < $ZOND_DIR/token"
-          SRC=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -m1 '^BLOOM_SOURCE_GROUPS=' $ENV_DIR/env | cut -d= -f2-")
+          # ЗНАЧЕНИЕ БЕРЁМ ИСТОЧНИКОМ env, А НЕ grep'ом: в файле окружения строка
+          # может стоять как "export KEY=...", и grep по '^KEY=' отдавал пустоту
+          # (поймано на первом живом прогоне 28.09 -- служба получила пустой путь).
+          SRC=$(ssh -n $SSH_OPTS root@$TARGET_HOST 'set -a; . /etc/bloom-executor/env; set +a; printf "%s" "$BLOOM_SOURCE_GROUPS"')
           echo "fajl grupp: $SRC"
           for F in $(printf '%s' '${{ inputs.feeds }}' | tr ',' ' '); do
             LIM=""
