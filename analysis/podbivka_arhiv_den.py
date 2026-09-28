@@ -65,6 +65,7 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 р_block = re.compile(r'"block":\s*(\d+)')
 р_q = re.compile(r'"(quoteInPool|tokensInPool|vQuoteInBondingCurve|vTokensInBondingCurve)":\s*"?([0-9.eE+-]+)')
 НАЗАД = 750            # слотов истории цены пула до события (≈ 5 мин) -- рост перед покупкой
+р_mint = re.compile(r'"mint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_trader = re.compile(r'"trader":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 
 
@@ -178,7 +179,8 @@ def рисунок(сигнал: dict, ряд: list, вверх: int = 30, вн�
 
 
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
-           доп: set | None = None, porog_доп: float | None = None, ист: set | None = None) -> Path:
+           доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
+           минты: set | None = None) -> Path:
     import requests  # noqa: PLC0415
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
     import zstandard  # noqa: PLC0415
@@ -192,6 +194,8 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     ряды: dict = {}              # poolId -> [события]
     счёт = {"строк": 0, "файлов": 0, "ошибки": []}
     история_цены: dict = {}      # poolId -> deque[(слот, цена)] за НАЗАД слотов
+    минты = минты or set()
+    ленты_минтов: dict = {}      # минт -> все события (--minty)
     счёт_ист = 0
     for ч in часы:
         url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
@@ -243,13 +247,19 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                     наши = [t for t in трейдеры if t in адр]
                     сг = р_sig.search(стр)
                     цель = bool(сг and сг.group(1) in celi)
-                    if not (в_активе or наши or цель):
+                    мм = р_mint.search(стр) if минты else None
+                    по_минту = bool(мм and мм.group(1) in минты)
+                    if not (в_активе or наши or цель or по_минту):
                         continue
                     try:
                         e_full = json.loads(стр)
                     except ValueError:
                         continue
                     e = {k: e_full.get(k) for k in КЛЮЧИ}
+                    if по_минту:
+                        ленты_минтов.setdefault(мм.group(1), []).append(
+                            {**e, "трейдеры": [b.get("trader") for b in e_full.get("breakdown") or [] if isinstance(b, dict)],
+                             "рост_до_750": цена_до[0] if цена_до else None})
                     if цель:
                         цели_события.append({**e, "breakdown": e_full.get("breakdown")})
                         if pid and pid not in активные:          # ряд пула цели -- тоже в окне
@@ -339,7 +349,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(gzip.compress(json.dumps({"день": день, "часы": часы, "порог_sol": porog, "окно_слотов": окно, "счёт": счёт,
                                "наши_события": наши_события, "сигналы": сигналы, "цели": цели_события,
-                               "покупки_ист": покупки_ист,
+                               "покупки_ист": покупки_ист, "ленты_минтов": ленты_минтов,
                                "ряды_целей": ряды_целей},
                               ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6))
     return out
@@ -354,6 +364,7 @@ def main() -> int:
     р.add_argument("--celi", default="", help="json со списком подписей-целей")
     р.add_argument("--metka", required=True)
     р.add_argument("--dop-adresa", default="", help="json: список доп. адресов (события и сигналы)")
+    р.add_argument("--minty", default="", help="через запятую: минты, все события которых пишутся целиком")
     р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
     р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
     а = р.parse_args()
@@ -362,7 +373,8 @@ def main() -> int:
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
     доп = set(json.loads(Path(а.dop_adresa).read_text(encoding="utf-8"))) if а.dop_adresa else set()
     ист = {x for x in а.istochniki.split(",") if x}
-    out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop, ист)
+    out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop, ист,
+                 {x for x in а.minty.split(",") if x})
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
     R.пуш(f"Podbivka-2: arhiv den {а.metka} [automated]", [str(out)])
