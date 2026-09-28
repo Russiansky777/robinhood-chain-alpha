@@ -274,7 +274,12 @@ jobs:
           # полосы вырос с 0.01 до 0.05. Живой файл групп правится отдельным
           # прогоном (run_vps_pravka_grupp_nl.yml) и перечитывается службой на
           # ходу -- деплою его касаться нельзя вовсе.
-          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json data/c2_leg_pools_2026-09-24.json data/c2_pool_samples data/senders.json"
+          # ФАЙЛЫ ПУЛОВ НОГИ -- ВСЕ ПО МАСКЕ. Модуль тени берёт САМЫЙ СВЕЖИЙ
+          # (sorted(glob)[-1]), поэтому имя с датой в списке зашивать нельзя:
+          # 28.09 появился файл на 109 котировок, и с зашитым именем от 24.09
+          # он на хост не попал бы вовсе.
+          DATA_FILES="data/solana_buyer_200/prior/current/buyer_100/dex_labels.json $(ls -1 data/c2_leg_pools_2*.json | tr '\n' ' ') data/c2_pool_samples data/senders.json"
+          [ -f data/nogi_shablony.json ] && DATA_FILES="$DATA_FILES data/nogi_shablony.json"
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
@@ -291,7 +296,7 @@ jobs:
             chown -R bot:bot /home/bot/data
           "
           ssh -n $SSH_OPTS root@$TARGET_HOST "
-            ls -l /home/bot/data/c2_leg_pools_2026-09-24.json
+            ls -l /home/bot/data/c2_leg_pools_2*.json
             ls /home/bot/data/c2_pool_samples | wc -l
             ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
             ls -l /home/bot/data/senders.json
