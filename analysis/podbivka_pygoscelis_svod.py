@@ -151,6 +151,7 @@ def отчёт(d: dict, заголовок: str, про_источник: str, �
     арх_ев = []
     for a_ in арх_загрузить():
         арх_ев += [e for e in a_.get("наши_события") or [] if e.get("mint") == d["mint"]]
+    арх_ев = list({(e["signature"], e["trader"]): e for e in арх_ев}.values())     # без повторов часа перекрытия
     if арх_ев:
         по_пулу = collections.Counter(e["pool"] for e in арх_ев)
         первое = min(арх_ев, key=lambda e: e["timestamp"])
@@ -199,9 +200,16 @@ def отчёт(d: dict, заголовок: str, про_источник: str, �
         # ---------- архив (г: совместные сделки; д: рисунок)
         арх = арх_файлы()
         события, сигналы, часов = [], [], 0
-        for a in арх_загрузить():
-            события += a.get("наши_события") or []
-            сигналы += a.get("сигналы") or []
+        _в = set()
+        for a in арх_загрузить():                # сутки перекрываются на час -- без повторов
+            for e in a.get("наши_события") or []:
+                if (e["signature"], e["trader"]) not in _в:
+                    _в.add((e["signature"], e["trader"]))
+                    события.append(e)
+            for e in a.get("сигналы") or []:
+                if (e["signature"], e["trader"], "с") not in _в:
+                    _в.add((e["signature"], e["trader"], "с"))
+                    сигналы.append(e)
             часов += (a.get("счёт") or {}).get("файлов", 0)
         md += [f"Архив PumpApi: файлов суток {len(арх)} из 7, часовых файлов {часов}.", ""]
         if арх:

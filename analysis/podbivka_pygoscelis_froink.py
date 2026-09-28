@@ -67,6 +67,7 @@ def раздел(d2: dict, к1: dict, отчёт, sv) -> list:
     лента_а = []
     for a in SV.арх_загрузить():
         лента_а += (a.get("ленты_минтов") or {}).get(d2["mint"]) or []
+    лента_а = list({(e.get("signature"), e.get("action"), e.get("pool")): e for e in лента_а}.values())
     лента_а.sort(key=lambda e: (e.get("block") or 0, e.get("timestamp") or 0))
     if лента_а:
         md += [f"Лента FROINK в архиве PumpApi: {len(лента_а)} событий, "
@@ -162,9 +163,12 @@ def раздел(d2: dict, к1: dict, отчёт, sv) -> list:
             continue
         md.append(f"| {имя} | {ц['слотов_выше']} | {ц['первый_выше'] or '—'} | {ц['макс_пп']:+.2f} | {ц['макс_через_с']} |")
     # 4. архив: покупки источников
-    пок = []
+    пок, видел = [], set()
     for a in SV.арх_загрузить():
-        пок += a.get("покупки_ист") or []
+        for x in a.get("покупки_ист") or []:          # сутки перекрываются на час -- без повторов
+            if x["signature"] + x["trader"] not in видел:
+                видел.add(x["signature"] + x["trader"])
+                пок.append(x)
     md += ["", "### 4. Источник за 7 суток (архив PumpApi): покупает вершину?", ""]
     if not пок:
         md += ["Архив с покупками источников (pyg3) ещё не готов.", ""]
