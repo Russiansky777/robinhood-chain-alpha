@@ -536,6 +536,55 @@ def слот_сети_из_признака(каталог=None, *, свежес
     return из_
 
 
+try:  # Своя продажа одной ногой: без модуля сторож работает как раньше.
+    import bloom_lane_sell as LS
+except Exception:  # noqa: BLE001
+    LS = None
+
+ФАЙЛ_СЧЁТА_СИМУЛЯЦИЙ = "own_sell_sim_count.json"
+
+
+def симуляций_осталось(state_dir=None) -> int:
+    """Сколько ещё симуляций своей продажи разрешено сделать на живых позициях.
+
+    ПОЧЕМУ СЧЁТЧИКОМ, А НЕ ФЛАГОМ. Симуляция идёт ДО продажи (иначе токенов на
+    счёте уже нет и узел ответит про деньги, а не про раскладку счетов) и
+    добавляет несколько вызовов узла перед отправкой -- это задержка на пути
+    денег. Поэтому она разрешена ровно на N первых продаж: проверить раскладку
+    хватает трёх, а постоянного налога на каждую продажу нет.
+    """
+    предел = env_int("BLOOM_SELL_OWN_SIMULATE", 0)
+    if предел <= 0:
+        return 0
+    try:
+        from bloom_exec_state import state_dir as _sd  # noqa: PLC0415
+
+        путь = Path(state_dir or _sd()) / ФАЙЛ_СЧЁТА_СИМУЛЯЦИЙ
+        сделано = int((json.loads(путь.read_text(encoding="utf-8")) or {})
+                       .get("сделано") or 0)
+    except Exception:  # noqa: BLE001
+        сделано = 0
+    return max(0, предел - сделано)
+
+
+def отметить_симуляцию(state_dir=None) -> int:
+    try:
+        from bloom_exec_state import state_dir as _sd  # noqa: PLC0415
+
+        путь = Path(state_dir or _sd()) / ФАЙЛ_СЧЁТА_СИМУЛЯЦИЙ
+        было = 0
+        if путь.exists():
+            было = int((json.loads(путь.read_text(encoding="utf-8")) or {})
+                        .get("сделано") or 0)
+        путь.write_text(json.dumps({"сделано": было + 1,
+                                     "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                           time.gmtime())}),
+                         encoding="utf-8")
+        return было + 1
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def метрики_продавца(позиции: dict, *, сейчас: float | None = None) -> dict:
     """Метрики сторожа за СУТКИ: сколько ждали посадки, неудачи, отказы Jupiter.
 
@@ -1943,6 +1992,29 @@ class Seller:
                 return итог
             итог["two_step_sell_why_not"] = своя.get("why_not")
 
+        # СИМУЛЯЦИЯ СВОЕЙ ПРОДАЖИ -- ДО отправки и только N первых раз
+        # (BLOOM_SELL_OWN_SIMULATE). Иначе токенов на счёте уже нет, и узел
+        # ответит про деньги, а не про раскладку счетов. Отказ симуляции НИЧЕГО
+        # не меняет: продаёт Jupiter, как и раньше.
+        if LS is not None and симуляций_осталось() > 0 \
+                and pos.get("pool_program") == LS.SB.PUMP_AMM:
+            try:
+                сим = self.симуляция_своей_продажи(pos, количество_raw=количество)
+            except Exception as exc:  # noqa: BLE001
+                сим = {"ok": False,
+                        "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
+            номер = отметить_симуляцию()
+            итог["своя_продажа_симуляция"] = сим
+            self.state.update_position(
+                cid, own_sell_sim_ok=bool(сим.get("ok")),
+                own_sell_sim_why_not=сим.get("why_not"),
+                own_sell_sim_units=сим.get("units"),
+                own_sell_sim_n=номер)
+            self.log({"kind": "своя продажа: симуляция", "cid": cid,
+                       "ok": bool(сим.get("ok")), "why_not": сим.get("why_not"),
+                       "units": сим.get("units"), "n": номер,
+                       "логи_хвост": сим.get("логи_хвост")})
+
         if JUP is None or not self.jupiter_включён:
             итог.update(action="полосе продавать нечем: путь Jupiter выключен",
                          why_not=("BLOOM_SELL_VIA_JUPITER не равен 1"
@@ -2027,6 +2099,76 @@ class Seller:
         итог.update(action="UNSOLD полосы -- ждём владельца", why_not=причина)
         return итог
 
+
+    def симуляция_своей_продажи(self, pos: dict, *, количество_raw: int) -> dict:
+        """Собрать свою продажу Pump AMM из НАШЕЙ покупки и прогнать симуляцию.
+
+        Первый шаг порядка владельца: "сборка из нашей покупки ->
+        simulateTransaction -> живая продажа 0.01 -> все группы". Здесь ничего
+        не подписывается и не отправляется; результат ложится в запись позиции,
+        чтобы его было видно в отчёте, а не только в журнале.
+        """
+        из_ = {"ok": False, "why_not": None}
+        if LS is None:
+            из_["why_not"] = "модуль своей продажи не загружен"
+            return из_
+        if pos.get("pool_program") != LS.SB.PUMP_AMM:
+            из_["why_not"] = f"не Pump AMM: {pos.get('pool_program')}"
+            return из_
+        подпись = pos.get("lane_landed_signature") or pos.get("lane_signature")
+        if not подпись:
+            из_["why_not"] = "севшей подписи нашей покупки в записи нет"
+            return из_
+        tx = self.tx_читатель(подпись)
+        if not tx:
+            из_["why_not"] = "нашей покупки по подписи узел не отдал"
+            return из_
+        шб = LS.шаблон_продажи_из_покупки(tx)
+        if not шб.get("ok"):
+            из_["why_not"] = шб.get("why_not")
+            return из_
+        сч = шб["accounts"]
+
+        def остаток(счёт):
+            r = rpc_call("getTokenAccountBalance", [счёт, {"commitment": "processed"}])
+            зн = ((r.get("result") or {}).get("value") or {}).get("amount")                 if r.get("ok") else None
+            try:
+                return int(зн)
+            except (TypeError, ValueError):
+                return None
+
+        рез_б, рез_к = остаток(сч[7]), остаток(сч[8])
+        м = LS.минимум_по_живым_резервам(база_в=int(количество_raw),
+                                          резерв_базы=рез_б or 0,
+                                          резерв_котировки=рез_к or 0)
+        из_.update(резерв_базы=рез_б, резерв_котировки=рез_к, минимум=м)
+        if not м.get("ok"):
+            из_["why_not"] = м.get("why_not")
+            return из_
+        сб = LS.собрать_продажу(шаблон=шб, наш_кошелёк=кошелёк_позиции(pos),
+                                 база_в=int(количество_raw),
+                                 минимум_выхода=м["min_out"],
+                                 минт_котировки=сч[4])
+        if not сб.get("ok"):
+            из_["why_not"] = сб.get("why_not")
+            return из_
+        из_.update(размер_tx=сб.get("size"), инструкций=сб.get("n_instructions"),
+                    закрыт_счёт_wsol=сб.get("закрыт_счёт_wsol"))
+        r = rpc_call("simulateTransaction",
+                      [сб["tx_base64"], {"sigVerify": False,
+                                          "replaceRecentBlockhash": True,
+                                          "encoding": "base64",
+                                          "commitment": "processed"}])
+        if not r.get("ok"):
+            из_["why_not"] = f"узел не ответил на симуляцию: {r.get('why_not')}"
+            return из_
+        зн = (r.get("result") or {}).get("value") or {}
+        логи = зн.get("logs") or []
+        из_.update(ok=(зн.get("err") is None), err=зн.get("err"),
+                    units=зн.get("unitsConsumed"), логи_хвост=логи[-8:],
+                    why_not=(None if зн.get("err") is None
+                              else str(зн.get("err"))[:200]))
+        return из_
 
     def продать_своим_двухшаговым(self, pos: dict, *, bal: dict, now: float,
                                    количество_raw: int | None = None) -> dict:
@@ -3944,6 +4086,24 @@ def self_test() -> None:
             сл_стар)
         chk("нет файла признака -- слот None с причиной, а не падение",
             слот_сети_из_признака(_дсл + "/нет")["slot"] is None)
+    # СЧЁТЧИК СИМУЛЯЦИЙ: ноль без окружения, и предел не перешагивается.
+    import tempfile as _tсим  # noqa: PLC0415
+
+    with _tсим.TemporaryDirectory() as _дсим:
+        os.environ.pop("BLOOM_SELL_OWN_SIMULATE", None)
+        chk("без окружения симуляций не разрешено ни одной",
+            симуляций_осталось(_дсим) == 0)
+        os.environ["BLOOM_SELL_OWN_SIMULATE"] = "3"
+        chk("предел 3 -- осталось 3", симуляций_осталось(_дсим) == 3)
+        (Path(_дсим) / ФАЙЛ_СЧЁТА_СИМУЛЯЦИЙ).write_text(
+            json.dumps({"сделано": 3}), encoding="utf-8")
+        chk("после трёх симуляций больше не разрешено",
+            симуляций_осталось(_дсим) == 0)
+        (Path(_дсим) / ФАЙЛ_СЧЁТА_СИМУЛЯЦИЙ).write_text("не json", encoding="utf-8")
+        chk("битый счётчик не ломает сторож и читается как ноль сделанных",
+            симуляций_осталось(_дсим) == 3)
+        os.environ.pop("BLOOM_SELL_OWN_SIMULATE", None)
+
     chk("отправка позже посадки не превращается в ноль, а считается графой",
         м.get("отправка_позже_посадки") == 0, м.get("отправка_позже_посадки"))
     # ОТРИЦАТЕЛЬНАЯ РАЗНИЦА -- ВИДНА. Время блока идёт с точностью до секунды и
