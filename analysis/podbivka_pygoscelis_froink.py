@@ -71,7 +71,7 @@ def раздел(d2: dict, к1: dict, отчёт, sv) -> list:
     if лента_а:
         md += [f"Лента FROINK в архиве PumpApi: {len(лента_а)} событий, "
                f"{SV.чч(лента_а[0]['timestamp'] / 1000)} – {SV.чч(лента_а[-1]['timestamp'] / 1000)}; по пулам: "
-               + ", ".join(f"{p} {sum(1 for e in лента_а if e.get('pool') == p)}" for p in sorted({e.get('pool') for e in лента_а})) + ".", ""]
+               + ", ".join(f"{p} {sum(1 for e in лента_а if str(e.get('pool')) == p)}" for p in sorted({str(e.get('pool')) for e in лента_а})) + ".", ""]
     # ---------- сравнение
     s1, s2 = к1["src"], к2["src"]
     пад1, пад2 = {x["кошелёк"] for x in к1["пад"]}, {x["кошелёк"] for x in к2["пад"]}
