@@ -375,6 +375,21 @@ def путь_замка(каталог: str | None = None, фид: str | None = 
     return Path(д) / f"triton_preconfs_{фид}.lock"
 
 
+def жив_ли(pid) -> bool:
+    """Жив ли процесс с таким pid. Нет pid -- считаем, что жив: старый замок."""
+    if pid is None:
+        return True
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except Exception:  # noqa: BLE001
+        return True
+    return True
+
+
 def занять_замок(*, фид: str, каталог: str | None = None,
                   сейчас: float | None = None, окно_s: float | None = None) -> dict:
     п = путь_замка(каталог, фид)
@@ -385,7 +400,13 @@ def занять_замок(*, фид: str, каталог: str | None = None,
             # Замок старше двух часов плюс запас -- это след упавшего прогона,
             # а не живой поток: держать зонд закрытым из-за него нельзя.
             срок = float(окно_s if окно_s else ОКНО_HARMONIC_S) + 600
-            if сейчас - float(было.get("ts") or 0) < срок:
+            # ЖИВ ЛИ ТОТ ПРОЦЕСС. Поймано 28.09: systemctl stop убил зонд
+            # сигналом, finally не сработал, замок остался -- и новый прогон
+            # отказался подниматься, оставив зонд мёртвым на сутки. Мёртвый pid
+            # -- это след, а не поток.
+            if not жив_ли(было.get("pid")):
+                было = {}
+            elif сейчас - float(было.get("ts") or 0) < срок:
                 return {"ok": False, "why_not":
                         (f"поток {было.get('feed')} уже открыт с "
                           f"{было.get('utc')} -- второй поток того же фида не "
@@ -972,6 +993,17 @@ def self_test() -> int:
                 занять_замок(фид=ФИД_BAM, каталог=вр, сейчас=6000.0)["ok"])
             chk("замок Harmonic снятием BAM не тронут",
                 путь_замка(вр, ФИД_HARMONIC).exists())
+            # МЁРТВЫЙ PID В ЗАМКЕ -- ЭТО СЛЕД, А НЕ ПОТОК. Поймано на живом
+            # прогоне 28.09: systemctl stop убил зонд сигналом, замок остался,
+            # и перезапуск отказался подниматься -- зонд стоял мёртвым.
+            путь_замка(вр, ФИД_BAM).write_text(json.dumps(
+                {"feed": ФИД_BAM, "ts": 6000.0, "pid": 2 ** 22,
+                  "utc": "2026-09-28T17:37:23Z"}), encoding="utf-8")
+            chk("замок мёртвого процесса не держит зонд",
+                занять_замок(фид=ФИД_BAM, каталог=вр, сейчас=6001.0)["ok"],
+                занять_замок(фид=ФИД_BAM, каталог=вр, сейчас=6001.0))
+            chk("жив_ли: свой pid жив, заведомо чужой номер -- нет",
+                жив_ли(os.getpid()) and not жив_ли(2 ** 22))
 
         # 5б. ВРЕМЯ ПРИХОДА -- ДВУМЯ ЧАСАМИ: стенным для сведения с журналом
         # решений и моно для разниц внутри прогона.
@@ -1482,6 +1514,20 @@ def main() -> int:
                             "region": ",".join(регионы),
                             "validatory": dict(валидаторы), **з}, ф,
                            ensure_ascii=False, indent=2)
+
+    # SIGTERM ДОЛЖЕН ЗАКРЫВАТЬ ЗОНД ЧИСТО. По умолчанию python на SIGTERM
+    # умирает, не доходя до finally, и замок остаётся на диске -- ровно это
+    # оставило зонд мёртвым 28.09 при перезапуске службы.
+    import signal as _sig  # noqa: PLC0415
+
+    def _по_сигналу(номер, _кадр):  # noqa: ANN001
+        raise SystemExit(f"сигнал {номер}")
+
+    for _с in (_sig.SIGTERM, _sig.SIGINT):
+        try:
+            _sig.signal(_с, _по_сигналу)
+        except Exception:  # noqa: BLE001, S110
+            pass
 
     журнал = open(а.out, "a", encoding="utf-8") if а.out else None  # noqa: SIM115
     окно = а.seconds or (счёт.окно_s or 7200)
