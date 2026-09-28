@@ -296,6 +296,31 @@ def симулировать(tx_base64: str, *, урл: str) -> dict:
              "why_not": (None if зн.get("err") is None else str(зн.get("err"))[:200])}
 
 
+def остатки_минта(*, владелец: str, минт: str, урл: str) -> dict:
+    """Сколько токена лежит у владельца и на каких счетах. Только чтение."""
+    о = _зов("getTokenAccountsByOwner",
+              [владелец, {"mint": минт},
+               {"encoding": "jsonParsed", "commitment": "confirmed"}], урл=урл)
+    if not о["ok"]:
+        return {"ok": False, "why_not": о["why_not"], "счетов": None}
+    строки = []
+    всего = 0
+    for сч in ((о["result"] or {}).get("value") or []):
+        инфо = (((сч.get("account") or {}).get("data") or {}).get("parsed")
+                 or {}).get("info") or {}
+        сумма = ((инфо.get("tokenAmount") or {}).get("amount"))
+        try:
+            сырое = int(сумма)
+        except (TypeError, ValueError):
+            сырое = 0
+        всего += сырое
+        строки.append({"account": сч.get("pubkey"), "raw": сырое,
+                        "decimals": (инфо.get("tokenAmount") or {}).get("decimals"),
+                        "ui": (инфо.get("tokenAmount") or {}).get("uiAmountString")})
+    return {"ok": True, "why_not": None, "счетов": len(строки),
+             "всего_raw": всего, "счета": строки}
+
+
 def открытая_позиция_полосы(state_dir: str, *, программа: str = SB.PUMP_AMM,
                              свежесть_s: float | None = 900.0,
                              сейчас: float | None = None) -> dict:
@@ -393,6 +418,10 @@ def main() -> int:
     р.add_argument("--zapas", type=float, default=None)
     р.add_argument("--cu", type=int, default=170_000)
     р.add_argument("--cena-cu", dest="cena_cu", type=int, default=0)
+    р.add_argument("--ostatok-minta", dest="ostatok_minta", default="",
+                    help="только посмотреть остаток минта у владельца (чтение)")
+    р.add_argument("--vladelec", default="",
+                    help="кошелёк для --ostatok-minta")
     р.add_argument("--simulirovat", default="yes")
     р.add_argument("--out", default="")
     а = р.parse_args()
@@ -409,6 +438,17 @@ def main() -> int:
     if not кош:
         print("СБОЙ: кошелёк полосы не задан (BLOOM_LANE_WALLET)")
         return 1
+    if а.ostatok_minta:
+        вл = а.vladelec or кош
+        ост = остатки_минта(владелец=вл, минт=а.ostatok_minta, урл=урл)
+        ост["vladelec"] = вл
+        ост["mint"] = а.ostatok_minta
+        текст_о = _js.dumps(ост, ensure_ascii=False, indent=1)
+        if а.out:
+            Path(а.out).write_text(текст_о, encoding="utf-8")
+        print(текст_о)
+        return 0
+
     подпись = а.podpis
     ждал = None
     if а.zhdat_s and а.zhdat_s > 0:

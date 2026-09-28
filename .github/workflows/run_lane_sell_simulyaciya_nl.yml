@@ -32,6 +32,14 @@ on:
         description: "запас минимума выхода долей (пусто -- 0.25 по умолчанию)"
         required: false
         default: ""
+      ostatok_minta:
+        description: "только посмотреть остаток этого минта у владельца (чтение)"
+        required: false
+        default: ""
+      vladelec:
+        description: "кошелёк для остатка минта (пусто -- кошелёк полосы)"
+        required: false
+        default: ""
       cu:
         description: "предел вычислений для продажи"
         required: false
@@ -92,7 +100,14 @@ jobs:
           [ -n "${{ inputs.zapas }}" ] && ZAP="--zapas ${{ inputs.zapas }}"
           PODP=""
           [ -n "${{ inputs.podpis }}" ] && PODP="--podpis ${{ inputs.podpis }}"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA timeout 900 $PY_HOSTA $RABOTA/bloom_lane_sell.py $PODP --zhdat-s '${{ inputs.zhdat_s }}' --dolya '${{ inputs.dolya }}' $KOL $ZAP --cu '${{ inputs.cu }}' --simulirovat yes --out $RABOTA/out.json" | tail -80
+          OST=""
+          if [ -n "${{ inputs.ostatok_minta }}" ]; then
+            OST="--ostatok-minta ${{ inputs.ostatok_minta }}"
+            [ -n "${{ inputs.vladelec }}" ] && OST="$OST --vladelec ${{ inputs.vladelec }}"
+            echo "OUT_FILE=data/ostatok_minta.json" >> "$GITHUB_ENV"
+            OUT_FILE=data/ostatok_minta.json
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA timeout 900 $PY_HOSTA $RABOTA/bloom_lane_sell.py $OST $PODP --zhdat-s '${{ inputs.zhdat_s }}' --dolya '${{ inputs.dolya }}' $KOL $ZAP --cu '${{ inputs.cu }}' --simulirovat yes --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/lane_sell_out.json || true
           if python3 -c "import json; json.load(open('/tmp/lane_sell_out.json'))" 2>/dev/null; then
             cp /tmp/lane_sell_out.json "$OUT_FILE"
