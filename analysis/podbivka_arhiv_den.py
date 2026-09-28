@@ -65,6 +65,7 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 р_block = re.compile(r'"block":\s*(\d+)')
 р_q = re.compile(r'"(quoteInPool|tokensInPool|vQuoteInBondingCurve|vTokensInBondingCurve)":\s*"?([0-9.eE+-]+)')
 НАЗАД = 750            # слотов истории цены пула до события (≈ 5 мин) -- рост перед покупкой
+р_qmint = re.compile(r'"quoteMint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_mint = re.compile(r'"mint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_trader = re.compile(r'"trader":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 
@@ -85,7 +86,10 @@ def ст(e: dict):
 
 
 def модель(сигнал: dict, ряд: list) -> dict:
-    """Ряд -- события пула в порядке файла, первым -- событие сигнала (или раньше)."""
+    """Ряд -- события пула в порядке файла, первым -- событие сигнала (или раньше).
+    Котировка не SOL: билет и издержки в единицах котировки по курсу сигнала
+    (сигнал["курс_q"] -- SOL за единицу котировки); курс на выходе = на входе (флаг)."""
+    масштаб = 1.0 / сигнал["курс_q"] if сигнал.get("курс_q") else 1.0
     пул = сигнал["pool"]
     s0 = сигнал["block"]
     i0 = next((i for i, e in enumerate(ряд) if e["signature"] == сигнал["signature"]), None)
@@ -124,7 +128,8 @@ def модель(сигнал: dict, ряд: list) -> dict:
         if not с_вх:
             continue
         x, y = с_вх
-        for a in БИЛЕТЫ:
+        for a_sol in БИЛЕТЫ:
+            a = a_sol * масштаб
             if пул in XYK:
                 т = y * из_["f"] * a / (x + из_["f"] * a)
                 вст_x = из_["f"] * a
@@ -146,7 +151,7 @@ def модель(сигнал: dict, ряд: list) -> dict:
                     out = X * из_["g"] * т / (Y + т)
                 else:
                     out = X * т / (Y + т) * (1 - fee)
-                res[f"{имя}|{a}|{H}"] = round((out - a - ИЗДЕРЖКИ) / a * 100, 3)
+                res[f"{имя}|{a_sol}|{H}"] = round((out - a - ИЗДЕРЖКИ * масштаб) / a * 100, 3)
     из_["пп"] = res
     из_["наценка_S1_пп"] = None
     return из_
@@ -180,7 +185,7 @@ def рисунок(сигнал: dict, ряд: list, вверх: int = 30, вн�
 
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
-           минты: set | None = None) -> Path:
+           минты: set | None = None, не_sol: bool = False) -> Path:
     import requests  # noqa: PLC0415
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
     import zstandard  # noqa: PLC0415
@@ -194,6 +199,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     ряды: dict = {}              # poolId -> [события]
     счёт = {"строк": 0, "файлов": 0, "ошибки": []}
     история_цены: dict = {}      # poolId -> deque[(слот, цена)] за НАЗАД слотов
+    цена_sol: dict = {}          # минт -> SOL за единицу (последнее событие SOL-пула этого минта)
     минты = минты or set()
     ленты_минтов: dict = {}      # минт -> все события (--minty)
     счёт_ист = 0
@@ -221,6 +227,11 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                             цена = float(x_) / float(y_) if x_ and y_ and float(y_) > 0 else None
                         except ValueError:
                             цена = None
+                        qм = р_qmint.search(стр) if (цена and не_sol) else None
+                        if qм and qм.group(1) == WSOL:
+                            мм_ = р_mint.search(стр)
+                            if мм_:
+                                цена_sol[мм_.group(1)] = цена
                         if цена:
                             дк = история_цены.setdefault(pid, collections.deque())
                             рост = None
@@ -281,7 +292,17 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                         пост = ((e_full.get("postBalances") or {}).get(t) or {}).get(e.get("mint"))
                         первая = (пост is not None and ток > 0 and abs(float(пост) - ток) <= 0.01 * ток)
                         q = e.get("quoteMint")
-                        sol = кв if q == WSOL else (кв / курс((e.get("timestamp") or 0) / 1000) if q in USD and курс((e.get("timestamp") or 0) / 1000) else None)
+                        курс_q = None
+                        if q == WSOL:
+                            sol = кв
+                        elif q in USD and курс((e.get("timestamp") or 0) / 1000):
+                            курс_q = 1.0 / курс((e.get("timestamp") or 0) / 1000)
+                            sol = кв * курс_q
+                        elif не_sol and цена_sol.get(q):
+                            курс_q = цена_sol[q]
+                            sol = кв * курс_q
+                        else:
+                            sol = None
                         наши_события.append({"trader": t, "signature": e["signature"], "action": e["action"],
                                              "pool": e.get("pool"), "poolId": pid, "mint": e.get("mint"),
                                              "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
@@ -301,11 +322,12 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                     ряды[pid].append(e)
                             активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
                         порог_t = porog_доп if (t in ист and porog_доп is not None) else porog
-                        if (e["action"] == "buy" and первая and sol is not None and sol >= порог_t and q == WSOL
+                        if (e["action"] == "buy" and первая and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
                                 and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
                             сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
                                             "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
                                             "sol": sol, "timestamp": e.get("timestamp"),
+                                            "quoteMint": q, "курс_q": курс_q,
                                             "рост_до_750": цена_до[0] if цена_до else None,
                                             "рост_до_150": цена_до[1] if цена_до else None})
                             if pid not in активные:
@@ -364,6 +386,7 @@ def main() -> int:
     р.add_argument("--celi", default="", help="json со списком подписей-целей")
     р.add_argument("--metka", required=True)
     р.add_argument("--dop-adresa", default="", help="json: список доп. адресов (события и сигналы)")
+    р.add_argument("--ne-sol", action="store_true", help="сигналы и в пулах с котировкой не SOL (курс -- по SOL-пулам архива)")
     р.add_argument("--minty", default="", help="через запятую: минты, все события которых пишутся целиком")
     р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
     р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
@@ -374,7 +397,7 @@ def main() -> int:
     доп = set(json.loads(Path(а.dop_adresa).read_text(encoding="utf-8"))) if а.dop_adresa else set()
     ист = {x for x in а.istochniki.split(",") if x}
     out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop, ист,
-                 {x for x in а.minty.split(",") if x})
+                 {x for x in а.minty.split(",") if x}, а.ne_sol)
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
     R.пуш(f"Podbivka-2: arhiv den {а.metka} [automated]", [str(out)])
