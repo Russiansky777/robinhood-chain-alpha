@@ -301,6 +301,17 @@ def _ставок_clmm() -> dict:
         return {}
 
 
+def _ступеней_dlmm() -> dict:
+    """Сколько шагов корзин DLMM в кэше и сколько пулов ждут чтения."""
+    try:
+        import c2_swap_build as _B  # noqa: PLC0415
+        return {"в_кэше": len(_B.СТУПЕНИ_DLMM),
+                "ждут_чтения": len(_B.НУЖНЫ_ПУЛЫ_DLMM - set(_B.СТУПЕНИ_DLMM)),
+                "без_шага": len(_B.ПУЛЫ_БЕЗ_СТУПЕНИ)}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _предел_cu_покупки() -> int | None:
     """Предел CU покупки полосы -- из модуля отправки, без него None."""
     try:
@@ -2621,6 +2632,7 @@ class Детектор:
                # никто бы не заметил.
                "stale_slots": МАКС_ОТСТАВАНИЕ_СЛОТОВ,
                "clmm_fee_rates": _ставок_clmm(),
+               "dlmm_bin_steps": _ступеней_dlmm(),
                "lane_cu_limit": _предел_cu_покупки(),
                # СВОДКА ЧАСА: на какой минуте и за какой час последний раз
                # докладывали. Без этого не проверить главное обещание п.3в --
@@ -6506,6 +6518,81 @@ async def конфиги_clmm_круг(детектор: "Детектор",
         await asyncio.sleep(пауза)
 
 
+СТУПЕНИ_DLMM_S = ST.env_float("BLOOM_DLMM_STEP_S", 20.0)
+
+
+async def ступени_dlmm_круг(детектор: "Детектор",
+                             стоп_через_s: float | None = None) -> None:
+    """Шаги корзин пулов Meteora DLMM -- фоновым чтением счетов пулов.
+
+    ЗАЧЕМ ФОНОМ, ровно как со ставками CLMM. Цена корзины равна
+    (1 + bin_step/10000)^bin, и шаг корзины лежит в счёте пула, а не в сделке:
+    на горячем пути (решение -> отправка) его не прочитать. Поэтому минимум
+    выхода DLMM смотрит в словарь c2_swap_build.СТУПЕНИ_DLMM, незнакомый пул
+    кладёт в НУЖНЫ_ПУЛЫ_DLMM -- и ОТКАЗЫВАЕТ. Этот круг читает задания одним
+    getMultipleAccounts и наполняет словарь к следующему сигналу.
+
+    ОТЛИЧИЕ ОТ CLMM: у CLMM конфигов уровня комиссии единицы на всю программу, а
+    пулов DLMM много, и каждый новый пул -- новое чтение. Зато шаг корзины у
+    пула НЕ МЕНЯЕТСЯ, поэтому прочитанный один раз не перечитывается никогда, а
+    пул, у которого шаг не разобрался, больше не спрашивается.
+    """
+    дедлайн = (time.time() + стоп_через_s) if стоп_через_s else None
+    засеяно = False
+    while True:
+        if дедлайн and time.time() > дедлайн:
+            return
+        try:
+            import c2_swap_build as _B  # noqa: PLC0415
+        except Exception:  # noqa: BLE001
+            await asyncio.sleep(СТУПЕНИ_DLMM_S)
+            continue
+        if not засеяно:
+            # ФАЙЛ ПРОГОНА -- ЗАСЕВ, А НЕ ИСТИНА: счета всё равно читаются с
+            # цепи по мере надобности, файл лишь избавляет от отказа на первом
+            # же сигнале после перезапуска.
+            try:
+                взято = await asyncio.to_thread(_B.загрузить_ступени_dlmm)
+                if взято:
+                    log.info("шаги корзин DLMM из файла: %s пулов", взято)
+            except Exception:  # noqa: BLE001
+                pass
+            засеяно = True
+        нужны = sorted(_B.НУЖНЫ_ПУЛЫ_DLMM - set(_B.СТУПЕНИ_DLMM))
+        if нужны:
+            часть = нужны[:100]
+            try:
+                от = await asyncio.to_thread(
+                    детектор.helius.call, "getMultipleAccounts",
+                    [часть, {"encoding": "base64", "commitment": "confirmed"}])
+                значения = (от or {}).get("value") or []
+                взяли = 0
+                for адрес, v in zip(часть, значения):
+                    данные = (((v or {}).get("data") or [None])[0])
+                    шк = (_B.шаг_корзины_из_счёта(base64.b64decode(данные))
+                          if данные else None)
+                    if шк:
+                        _B.СТУПЕНИ_DLMM[адрес] = int(шк)
+                        взяли += 1
+                    else:
+                        # Узел ОТВЕТИЛ, а шага нет или места спорят: больше не
+                        # спрашиваем и не выдумываем -- полоса по такому пулу
+                        # не торгует.
+                        _B.ПУЛЫ_БЕЗ_СТУПЕНИ.add(адрес)
+                        log.warning("шаг корзины DLMM не разобрался: пул %s", адрес)
+                    _B.НУЖНЫ_ПУЛЫ_DLMM.discard(адрес)
+                if взяли:
+                    log.info("шаги корзин DLMM прочитаны: %s из %s запрошенных",
+                             взяли, len(часть))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("чтение пулов DLMM упало: %s: %s",
+                            type(exc).__name__, str(exc)[:160])
+        пауза = СТУПЕНИ_DLMM_S
+        if дедлайн:
+            пауза = max(0.0, min(пауза, дедлайн - time.time()))
+        await asyncio.sleep(пауза)
+
+
 async def доклады(детектор: Детектор, стоп_через_s: float | None = None) -> None:
     """Быстрый круг ТОЛЬКО для строки BUY: 1-3 с после посадки покупки.
 
@@ -8191,6 +8278,73 @@ def self_test() -> int:
         chk(f"ставки CLMM в этом окружении не проверяются: {exc}", True)
     except Exception as exc:  # noqa: BLE001
         chk(f"проверка ставок CLMM не прошла: {type(exc).__name__}: {exc}", False)
+
+    # ---- ШАГИ КОРЗИН DLMM ФОНОМ: прочитанное попадает в кэш, спорные места и
+    # пустой счёт не выдумываются, узел спрашивается один раз за оборот.
+    try:
+        import c2_swap_build as _Bд  # noqa: PLC0415
+
+        _Bд.СТУПЕНИ_DLMM.clear()
+        _Bд.НУЖНЫ_ПУЛЫ_DLMM.clear()
+        _Bд.ПУЛЫ_БЕЗ_СТУПЕНИ.clear()
+        _Bд.НУЖНЫ_ПУЛЫ_DLMM.add("ПУЛ_A")
+        _Bд.НУЖНЫ_ПУЛЫ_DLMM.add("ПУЛ_СПОРНЫЙ")
+        _Bд.НУЖНЫ_ПУЛЫ_DLMM.add("ПУЛ_ПУСТОЙ")
+        _сч_ок = bytearray(_Bд.ДЛИНА_СЧЁТА_ПУЛА_DLMM)
+        for _см in _Bд.СМ_ШАГА_КОРЗИНЫ_DLMM:
+            _сч_ок[_см:_см + 2] = (100).to_bytes(2, "little")
+        _сч_спор = bytearray(_сч_ок)
+        _сч_спор[_Bд.СМ_ШАГА_КОРЗИНЫ_DLMM[1]:
+                 _Bд.СМ_ШАГА_КОРЗИНЫ_DLMM[1] + 2] = (25).to_bytes(2, "little")
+
+        class _HeliusПулы(Helius):
+            def __init__(self):
+                super().__init__(key="нет", служба="")
+                self.вызовов = 0
+
+            def call(self, метод, параметры=None, **кв):  # noqa: D102
+                self.вызовов += 1
+                assert метод == "getMultipleAccounts", метод
+                значения = []
+                for а_ in (параметры or [[]])[0]:
+                    если = {"ПУЛ_A": _сч_ок, "ПУЛ_СПОРНЫЙ": _сч_спор}.get(а_)
+                    значения.append(
+                        {"data": [base64.b64encode(bytes(если)).decode(), "base64"]}
+                        if если is not None else None)
+                return {"value": значения}
+
+        with _врем_каталог() as d:
+            stд = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
+            hд = _HeliusПулы()
+            detд = Детектор(источники={}, состояние=stд, helius=hд,
+                             курс=КурсSOL(), режим="dry")
+            asyncio.run(asyncio.wait_for(ступени_dlmm_круг(detд, 0.001), 5))
+            chk(f"шаг корзины DLMM из прочитанного счёта попал в кэш: "
+                f"{_Bд.СТУПЕНИ_DLMM.get('ПУЛ_A')}",
+                _Bд.СТУПЕНИ_DLMM.get("ПУЛ_A") == 100)
+            chk("спорные места шага корзины НЕ берутся -- пул помечен и второй "
+                "раз не спрашивается",
+                "ПУЛ_СПОРНЫЙ" not in _Bд.СТУПЕНИ_DLMM
+                and "ПУЛ_СПОРНЫЙ" in _Bд.ПУЛЫ_БЕЗ_СТУПЕНИ
+                and "ПУЛ_СПОРНЫЙ" not in _Bд.НУЖНЫ_ПУЛЫ_DLMM)
+            chk("пустой счёт шага не выдумал",
+                "ПУЛ_ПУСТОЙ" not in _Bд.СТУПЕНИ_DLMM
+                and "ПУЛ_ПУСТОЙ" in _Bд.ПУЛЫ_БЕЗ_СТУПЕНИ)
+            chk(f"узел спрошен один раз за оборот ({hд.вызовов})",
+                hд.вызовов == 1, hд.вызовов)
+            chk(f"в признаке жизни видно шаги корзин: {_ступеней_dlmm()}",
+                _ступеней_dlmm().get("в_кэше", 0) >= 1
+                and _ступеней_dlmm().get("ждут_чтения") == 0
+                and _ступеней_dlmm().get("без_шага") == 2)
+        _Bд.СТУПЕНИ_DLMM.clear()
+        _Bд.НУЖНЫ_ПУЛЫ_DLMM.clear()
+        _Bд.ПУЛЫ_БЕЗ_СТУПЕНИ.clear()
+    except ImportError as exc:
+        chk(f"шаги корзин DLMM в этом окружении не проверяются: {exc}", True)
+    except Exception as exc:  # noqa: BLE001
+        chk(f"проверка шагов корзин DLMM не прошла: {type(exc).__name__}: {exc}",
+            False)
+
 
     with _врем_каталог() as d:
         stп = ST.ExecState(base=Path(d) / "s", kill=Path(d) / "k")
@@ -11254,6 +11408,7 @@ def main() -> int:
                 asyncio.create_task(доклады(детектор, a.seconds)),
                 asyncio.create_task(статичные_ноги_круг(детектор, a.seconds)),
                 asyncio.create_task(конфиги_clmm_круг(детектор, a.seconds)),
+                asyncio.create_task(ступени_dlmm_круг(детектор, a.seconds)),
                 asyncio.create_task(часы_слотов(детектор, helius.key, a.seconds)),
                 asyncio.create_task(часы_баланса(детектор, стоп_через_s=a.seconds)),
                 asyncio.create_task(тёплый_хеш(детектор, стоп_через_s=a.seconds)),

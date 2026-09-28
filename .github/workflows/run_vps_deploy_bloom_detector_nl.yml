@@ -285,6 +285,10 @@ jobs:
           # фоновое чтение не доберёт конфиг с цепи. Деплой 28.09 в 10:07Z это
           # и показал: clmm_fee_rates в признаке жизни вышел пустым.
           [ -f data/clmm_konfigi.json ] && DATA_FILES="$DATA_FILES data/clmm_konfigi.json"
+          # ШАГИ КОРЗИН ПУЛОВ DLMM -- такой же ЗАСЕВ кэша, и по той же причине:
+          # без файла первый сигнал DLMM после перезапуска отказывает, пока
+          # фоновое чтение не доберёт счёт пула с цепи.
+          [ -f data/dlmm_shag_korziny.json ] && DATA_FILES="$DATA_FILES data/dlmm_shag_korziny.json"
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
@@ -305,7 +309,8 @@ jobs:
             ls /home/bot/data/c2_pool_samples | wc -l
             ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
             ls -l /home/bot/data/senders.json
-            ls -l /home/bot/data/clmm_konfigi.json 2>/dev/null || echo 'clmm_konfigi.json ne dostavlen' 
+            ls -l /home/bot/data/clmm_konfigi.json 2>/dev/null || echo 'clmm_konfigi.json ne dostavlen'
+            ls -l /home/bot/data/dlmm_shag_korziny.json 2>/dev/null || echo 'dlmm_shag_korziny.json ne dostavlen' 
             echo 'fayl grupp deploy ne trogal, pokazyvaem ego vremya kak est:'
             ls -l /home/bot/data/sources_2026-09-25.json
           "
