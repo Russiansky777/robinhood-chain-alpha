@@ -1,0 +1,104 @@
+name: "CU по строителям: p50/p99 и падения по лимиту (только чтение)"
+
+# ЗАЧЕМ. Предел CU покупки один на всех строителей -- BLOOM_LANE_CU_LIMIT,
+# 140 000. Владелец спрашивает в вечерний отчёт: сколько на самом деле жжёт
+# каждый строитель (bonding / pump_amm / cpmm / damm2 / dbc / clmm / two_step),
+# p50 и p99, и сколько падений было ИМЕННО по лимиту. Если двухшаговая у
+# предела -- предел поднимается по строителю (p99 + 10 %), не общий.
+#
+# Только чтение: журнал позиций потоком, getSignatureStatuses пакетом и
+# getTransaction по севшим подписям. Ни подписи, ни отправки, ни ордера.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "с какого момента: '2026-09-28T00:21:00Z', '-24h' или пусто (сутки)"
+        required: false
+        default: ""
+      predel:
+        description: "предел CU для сравнения (пусто -- из env хоста, иначе 140000)"
+        required: false
+        default: ""
+
+concurrency:
+  group: cu-po-stroitelyam
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+  OUT_FILE: data/cu_po_stroitelyam.json
+
+jobs:
+  cu:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается и самопроверка счёта"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/cu_po_stroitelyam.py
+          python3 deploy/checks/cu_po_stroitelyam.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Считать CU по строителям на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/cust"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/cust/cu_po_stroitelyam.py" < deploy/checks/cu_po_stroitelyam.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            python3 /tmp/cust/cu_po_stroitelyam.py \
+              --state-dir $STATE_DIR \
+              --since '${{ inputs.since }}' \
+              ${{ inputs.predel != '' && format('--predel {0}', inputs.predel) || '' }} \
+              --out /tmp/cust/itog.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/cust/itog.json 2>/dev/null || true" > /tmp/cu_itog.json || true
+          if python3 -c "import json; json.load(open('/tmp/cu_itog.json'))" 2>/dev/null; then
+            cp /tmp/cu_itog.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: progon ne napisal itog"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/cust"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "CU po stroitelyam: p50/p99 i padeniya po limitu [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
