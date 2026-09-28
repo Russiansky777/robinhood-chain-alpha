@@ -33,6 +33,12 @@ if КОД and Path(КОД).exists():
     sys.path.insert(0, КОД)
 КОРЕНЬ = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(КОРЕНЬ / "analysis"))
+# СВОЙ КАТАЛОГ -- ПЕРВЫМ. Прогон возит этот файл и СВЕЖИЙ bloom_doklad.py в
+# один каталог на хосте, а в каталоге службы лежит тот докладчик, что был
+# развёрнут. Без этой строки прогон берёт развёрнутый и падает на новых
+# функциях формата ("module bloom_doklad has no attribute строка_buy" --
+# именно так вышло 28.09 в 01:58).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bloom_doklad as DK  # noqa: E402
 
