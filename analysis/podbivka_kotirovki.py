@@ -10,8 +10,8 @@ data/podbivka/kotirovki_grupp.json.
 
 --cep (облако, только чтение): по каждой котировке до --na-kotirovku сделок
 источника -- плечи котировки к WSOL и к USDC/USDT в той же сделке (инструкция DEX,
-где счёт q и счёт WSOL/USD не подписантов двигаются навстречу): программа
-инструкции, хранилища обеих сторон, их владелец (authority пула); символ и имя --
+чьи собственные переводы токенов -- по stackHeight -- двигают счёт q и счёт
+WSOL/USD не подписантов навстречу): программа инструкции, хранилища обеих сторон, их владелец (authority пула); символ и имя --
 DAS getAsset (Helius). Результат -- data/podbivka/kotirovki_nogi.json; офлайн-
 сборка подхватывает его, если он есть.
 """
@@ -87,6 +87,29 @@ def покупки() -> list:
     return из_
 
 
+def слить_ноги(ноги: list) -> list:
+    """Одна пара хранилищ -- одна нога (по сделкам образца)."""
+    пары: dict = {}
+    for н in ноги:
+        к = (н["к"], н["хранилище_q"], н["хранилище_котировки"])
+        п = пары.setdefault(к, {"к": н["к"], "хранилище_q": н["хранилище_q"],
+                                "хранилище_котировки": н["хранилище_котировки"],
+                                "владелец_хранилищ": н.get("владелец_хранилищ"), "программы": {}, "сделок": 0})
+        п["программы"][н["программа"]] = max(п["программы"].get(н["программа"], 0), н.get("сделок", 0))
+        п["сделок"] = max(п["сделок"], н.get("сделок", 0))
+    из_ = []
+    for п in пары.values():
+        изв = sorted(п["программы"])
+        if len(изв) == 1:
+            п["программа"], п["программа_имя"] = изв[0], ПРОГ.get(изв[0], "программа DEX без имени в словаре")
+        else:
+            п["программа"] = None
+            п["программа_имя"] = "не опознана (одна из: " + ", ".join(п["программы"]) + ")"
+        п["программы_в_сделке"] = sorted(п.pop("программы"))
+        из_.append(п)
+    return sorted(из_, key=lambda x: (-x["сделок"], x["к"] != "WSOL"))
+
+
 def сборка() -> int:
     гр = группы()
     пп = покупки()
@@ -107,7 +130,9 @@ def сборка() -> int:
             д["по_программе_пула_токена"][ПРОГ.get(x["program"], x["program"] or "?")] += 1
         из_ = []
         for q, д in sorted(по_q.items(), key=lambda kv: -kv[1]["покупок"]):
-            н = ноги.get(q) or {}
+            н = dict(ноги.get(q) or {})
+            if н.get("ноги"):
+                н["ноги"] = слить_ноги(н["ноги"])
             из_.append({"quote_mint": q, "символ": н.get("символ"), "имя": н.get("имя"),
                         "покупок": д["покупок"], "с_числом_режима_2": д["с_числом"],
                         "по_кошельку": dict(д["по_кошельку"].most_common()),
@@ -144,26 +169,46 @@ def сборка() -> int:
 # ---------------------------------------------------------------- облако: ноги и символы
 
 def ноги_сделки(tx: dict, q: str) -> list:
+    """Ноги q <-> WSOL/USDC/USDT по инструкциям DEX: переводы токенов (spl-token
+    transfer / transferChecked) приписываются ближайшей предыдущей инструкции с
+    stackHeight на 1 меньше -- той, что их вызвала. Нога -- инструкция, чьи
+    собственные переводы двигают счёт q и счёт котировки (оба -- не подписантов)
+    навстречу. Агрегатор (внешняя инструкция) переводы пулов сам не делает и
+    ногой не считается; межпуловые склейки маршрута исключены."""
     import c2_common as C  # noqa: PLC0415
     sg = C.signers(tx)
-    ряды = [r for r in C.token_rows(tx).values() if r["account"] and r["owner"] not in sg and r["post"] != r["pre"]]
+    ряды = {r["account"]: r for r in C.token_rows(tx).values()
+            if r["account"] and r["owner"] not in sg and r["post"] != r["pre"]}
     msg = ((tx.get("transaction") or {}).get("message") or {})
-    инстр = [(ix.get("programId"), ix.get("accounts")) for ix in msg.get("instructions") or [] if isinstance(ix, dict)]
-    for g in ((tx.get("meta") or {}).get("innerInstructions") or []):
-        инстр += [(ix.get("programId"), ix.get("accounts")) for ix in (g or {}).get("instructions") or []
-                  if isinstance(ix, dict)]
+    внутр = {g.get("index"): g.get("instructions") or [] for g in ((tx.get("meta") or {}).get("innerInstructions") or [])}
     из_ = []
-    for прог, сч in инстр:
-        if not isinstance(сч, list):
-            continue
-        s = set(сч)
-        for a in [r for r in ряды if r["mint"] == q and r["account"] in s]:
-            for b in [r for r in ряды if r["mint"] in (C.WSOL, C.USDC, C.USDT) and r["account"] in s]:
-                if (a["post"] - a["pre"] > 0) == (b["post"] - b["pre"] > 0):
-                    continue
-                из_.append({"к": "WSOL" if b["mint"] == C.WSOL else ("USDC" if b["mint"] == C.USDC else "USDT"),
-                            "программа": прог, "программа_имя": ПРОГ.get(прог), "хранилище_q": a["account"],
-                            "хранилище_котировки": b["account"], "владелец_хранилищ": a["owner"]})
+    for i, внеш in enumerate(msg.get("instructions") or []):
+        послед = [(1, внеш)] + [(ix.get("stackHeight") or 2, ix) for ix in внутр.get(i, []) if isinstance(ix, dict)]
+        стек: list = []          # [(высота, программа, {счета переводов})]
+        вызвавшие: list = []
+        for h, ix in послед:
+            п = ix.get("parsed") if isinstance(ix.get("parsed"), dict) else None
+            if п and ix.get("program") in ("spl-token", "spl-token-2022") and п.get("type") in ("transfer", "transferChecked"):
+                инф = п.get("info") or {}
+                родитель = next((x for x in reversed(стек) if x[0] == h - 1), None)
+                if родитель:
+                    родитель[2].update(a for a in (инф.get("source"), инф.get("destination")) if a)
+                continue
+            while стек and стек[-1][0] >= h:
+                стек.pop()
+            зап = (h, ix.get("programId"), set())
+            стек.append(зап)
+            вызвавшие.append(зап)
+        for _, прог, сч in вызвавшие:
+            qa = [ряды[a] for a in сч if a in ряды and ряды[a]["mint"] == q]
+            ba = [ряды[a] for a in сч if a in ряды and ряды[a]["mint"] in (C.WSOL, C.USDC, C.USDT)]
+            for a in qa:
+                for b in ba:
+                    if (a["post"] - a["pre"] > 0) == (b["post"] - b["pre"] > 0):
+                        continue
+                    из_.append({"к": "WSOL" if b["mint"] == C.WSOL else ("USDC" if b["mint"] == C.USDC else "USDT"),
+                                "программа": прог, "программа_имя": ПРОГ.get(прог), "хранилище_q": a["account"],
+                                "хранилище_котировки": b["account"], "владелец_хранилищ": a["owner"]})
     return из_
 
 
