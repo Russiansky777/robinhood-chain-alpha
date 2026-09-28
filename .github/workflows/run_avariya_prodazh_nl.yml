@@ -20,9 +20,17 @@ on:
         required: false
         default: "8"
       zhurnal_min:
-        description: "сколько минут журнала службы сторожа забрать"
+        description: "сколько минут журнала службы забрать"
         required: false
         default: "90"
+      sluzhby:
+        description: "службы через запятую (журналы забираются по очереди)"
+        required: false
+        default: "bloom-seller,dbot-sold-guard,bloom-detector"
+      iskat:
+        description: "строка для поиска в журналах (пусто -- без поиска)"
+        required: false
+        default: ""
 
 concurrency:
   group: avariya-prodazh
@@ -76,13 +84,20 @@ jobs:
             exit 1
           fi
 
-      - name: "Журнал службы сторожа (ключи не печатаются)"
+      - name: "Журналы служб (ключи не печатаются)"
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u bloom-seller --since '${{ inputs.zhurnal_min }} min ago' --no-pager -o short-iso | tail -900" > /tmp/seller_log.txt || true
-          python3 -c "import re,sys; op=('KEY','TOKEN','SECRET','PRIVATE','PASS','AUTH'); out=open('$LOG_FILE','w',encoding='utf-8'); [out.write((re.sub(r'[A-Za-z0-9_-]{24,}','<vychishheno>',s) if any(o in s.upper() for o in op) else s)) for s in open('/tmp/seller_log.txt',encoding='utf-8',errors='replace')]; out.close()"
+          : > /tmp/sluzhby_log.txt
+          for S in $(echo "${{ inputs.sluzhby }}" | tr ',' ' '); do
+            echo "===== $S =====" >> /tmp/sluzhby_log.txt
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $S --since '${{ inputs.zhurnal_min }} min ago' --no-pager -o short-iso | tail -600" >> /tmp/sluzhby_log.txt || true
+          done
+          python3 -c "import re,sys; op=('KEY','TOKEN','SECRET','PRIVATE','PASS','AUTH'); out=open('$LOG_FILE','w',encoding='utf-8'); [out.write((re.sub(r'[A-Za-z0-9_-]{24,}','<vychishheno>',s) if any(o in s.upper() for o in op) else s)) for s in open('/tmp/sluzhby_log.txt',encoding='utf-8',errors='replace')]; out.close()"
           wc -l "$LOG_FILE"
-          grep -c -i "traceback\|error\|ошибка" "$LOG_FILE" || true
+          if [ -n "${{ inputs.iskat }}" ]; then
+            echo "--- nahodki po '${{ inputs.iskat }}' ---"
+            grep -n -- "${{ inputs.iskat }}" "$LOG_FILE" | tail -40 || echo "ne najdeno"
+          fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
 
       - name: "Коммит"
