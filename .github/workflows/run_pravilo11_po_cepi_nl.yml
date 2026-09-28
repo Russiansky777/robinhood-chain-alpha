@@ -1,0 +1,131 @@
+name: "Правило 11 ТОЛЬКО ПО ЦЕПИ: ушло, вернулось, итог (только чтение)"
+
+# ЗАЧЕМ (слово владельца 28.09): "Таблица Правила 11 -- только по цепи, без
+# несчитаемых: у закрытой позиции обе транзакции на цепи, итог = SOL ушло минус
+# SOL вернулось (комиссии, чаевые, рента включены)... Статус несчитаемый из
+# учёта убрать; вместо него -- продажа не найдена на цепи с тревогой в TG".
+#
+# Деньгами считается изменение НАТИВНОГО баланса НАШИХ счетов в самой
+# транзакции: кошелёк плюс его токеновые счета. Ничего не очищается -- комиссия,
+# чаевые и рента входят в число. Полей службы в счёте нет вовсе: таблица нужна
+# как НЕЗАВИСИМАЯ проверка учёта.
+#
+# Только чтение: журнал позиций потоком, по цепи getSignatureStatuses и
+# getTransaction. Ни подписи, ни отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "с какого времени (UTC), например 2026-09-28T00:21:00Z"
+        required: false
+        default: "2026-09-28T00:21:00Z"
+      po:
+        description: "до какого времени (пусто -- до сейчас)"
+        required: false
+        default: ""
+      istochnik:
+        description: "только этот источник (адрес или имя, пусто -- все)"
+        required: false
+        default: ""
+      telegram:
+        description: "'yes' -- строка в TG, если есть тревоги (продажа не найдена)"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: pravilo11-po-cepi
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/pravilo11
+  OUT_FILE: data/pravilo11_po_cepi.json
+
+jobs:
+  tablica:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка счёта ДО любой сети"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/pravilo11_po_cepi.py
+          python3 deploy/checks/pravilo11_po_cepi.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Таблица на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/pravilo11_po_cepi.py" < deploy/checks/pravilo11_po_cepi.py
+          IST=""
+          [ -n "${{ inputs.istochnik }}" ] && IST="--istochnik ${{ inputs.istochnik }}"
+          PO=""
+          [ -n "${{ inputs.po }}" ] && PO="--po ${{ inputs.po }}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA python3 $RABOTA/pravilo11_po_cepi.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $IST --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/pravilo11.json || true
+          if python3 -c "import json; json.load(open('/tmp/pravilo11.json'))" 2>/dev/null; then
+            cp /tmp/pravilo11.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: tablica ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Тревога в TG, если продажа не найдена на цепи"
+        if: ${{ inputs.telegram == 'yes' }}
+        run: |
+          set -e
+          python3 deploy/checks/pravilo11_trevoga.py --self-test | tail -1
+          python3 deploy/checks/pravilo11_trevoga.py "$OUT_FILE" > /tmp/p11_tg.txt
+          if [ "$(tr -d '[:space:]' < /tmp/p11_tg.txt)" = "" ]; then
+            echo "trevog net -- stroka v TG ne nuzhna"
+            exit 0
+          fi
+          head -c 300 /tmp/p11_tg.txt; echo
+          # ТОКЕН ОСТАЁТСЯ НА ХОСТЕ: читается внутри удалённой оболочки из
+          # /etc/bloom-executor/env, в журнал прогона идёт только код ответа.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/p11_tg.txt" < /tmp/p11_tg.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; if [ -z \"\$TELEGRAM_BOT_TOKEN\" ] || [ -z \"\$TELEGRAM_CHAT_ID\" ]; then echo 'Telegram ne nastroen na hoste -- stroka ne ushla'; exit 0; fi; code=\$(curl -s -o /tmp/p11_tg.out -w '%{http_code}' -X POST \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/sendMessage\" --data-urlencode chat_id=\"\$TELEGRAM_CHAT_ID\" --data-urlencode text@/tmp/p11_tg.txt); echo \"telegram http \$code\"; head -c 200 /tmp/p11_tg.out; echo; rm -f /tmp/p11_tg.out /tmp/p11_tg.txt"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Pravilo 11 po cepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
