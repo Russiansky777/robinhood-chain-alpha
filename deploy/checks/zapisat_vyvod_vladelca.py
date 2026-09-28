@@ -56,7 +56,15 @@ def main() -> int:
                     help="без него только показывает, что записал бы")
     а = р.parse_args()
 
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    # МОДУЛИ СЛУЖБЫ ЛЕЖАТ В ЕЁ КАТАЛОГЕ, А НЕ РЯДОМ С ПРОГОНОМ. Прогон
+    # доставляется в /tmp, и PYTHONPATH через sudo не всегда доезжает (sudo
+    # чистит окружение): 23:43:37Z из-за этого вышло ModuleNotFoundError на
+    # bloom_exec_state. Поэтому каталог кода службы добавляется здесь явно.
+    for путь in (os.environ.get("BLOOM_CODE_DIR") or "",
+                  "/home/bot/bloom_executor",
+                  os.path.dirname(os.path.abspath(__file__))):
+        if путь and os.path.isdir(путь) and путь not in sys.path:
+            sys.path.insert(0, путь)
     import bloom_exec_state as ST  # noqa: PLC0415
     import bloom_own_send as OSW  # noqa: PLC0415
     import helius_client as helius  # noqa: PLC0415
