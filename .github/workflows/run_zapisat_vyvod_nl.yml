@@ -1,0 +1,90 @@
+name: "Записать вывод владельца с кошелька полосы (по подписи, сумма с цепи)"
+
+# ЗАЧЕМ (слово владельца 28.09 ночью, п.4): "Вывод средств владельца ... записать
+# как вывод, не как убыток; подпись владелец пришлёт". Порог "просадка от 00:00"
+# иначе считает вывод потерей и ставит рубильник на ровном месте.
+#
+# На вход идёт ТОЛЬКО подпись: сумма берётся с цепи как нативная дельта кошелька
+# полосы в этой транзакции. Напечатанное человеком число здесь не принимается --
+# ошибка в нём прямо ослабляла бы рубильник.
+#
+# Ничего не подписывает и не отправляет: чтение транзакции и запись в файл
+# состояния службы.
+on:
+  workflow_dispatch:
+    inputs:
+      podpis:
+        description: "подпись транзакции вывода"
+        required: true
+      primechanie:
+        description: "примечание к записи"
+        required: false
+        default: "вывод владельца"
+      zapisat:
+        description: "'yes' -- записать; иначе только показать"
+        required: false
+        default: "no"
+
+concurrency:
+  group: zapisat-vyvod
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  RABOTA: /tmp/zapisat_vyvod
+  OUT_FILE: data/lane_vyvody.txt
+
+jobs:
+  zapis:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Сборка модуля"
+        run: python3 -m py_compile deploy/checks/zapisat_vyvod_vladelca.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Запись на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zapisat_vyvod_vladelca.py" < deploy/checks/zapisat_vyvod_vladelca.py
+          ZAP=""
+          [ "${{ inputs.zapisat }}" = "yes" ] && ZAP="--zapisat"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && PYTHONPATH=$CODE_DIR sudo -u bot -E python3 $RABOTA/zapisat_vyvod_vladelca.py --podpis '${{ inputs.podpis }}' --primechanie '${{ inputs.primechanie }}' $ZAP" | tee /tmp/vyvod.txt
+          cp /tmp/vyvod.txt "$OUT_FILE"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Vyvod vladelca s koshelka polosy: zapis [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
