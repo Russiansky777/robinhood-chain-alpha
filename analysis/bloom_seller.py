@@ -1164,6 +1164,48 @@ class Seller:
                                             doklad_sell_ok=bool(отправка.get("ok")))
             except Exception:  # noqa: BLE001
                 pass
+        # BUY НЕ УШЁЛ К МОМЕНТУ ПРОДАЖИ -- ДОСЫЛАЕМ ЕГО ПОСЛЕ SELL.
+        # Слово владельца 28.09: два сообщения независимы, ни одно не ждёт
+        # другого; SELL уходит сразу, а BUY, если его ещё не было, идёт следом.
+        # 28.09 три продажи ушли без строки покупки вовсе (7h4MPA 06:37,
+        # BM2k8m 08:33, GJKZgT 08:36): ожидание доклада ставила только ветка
+        # "наша транзакция увидена в потоке", а у полосы она часто не
+        # срабатывает. Здесь -- последний рубеж: даже если детектор промолчал,
+        # покупка не пропадёт из чата.
+        self._дослать_покупку(cid, свежая)
+        return отправка or {"ok": True}
+
+    def _дослать_покупку(self, cid, поз: dict) -> dict:
+        """Строка BUY после SELL, если BUY по этой сделке так и не ушёл."""
+        if self.оповещатель is None or DK is None:
+            return {"ok": False, "why_not": "оповещателя или докладчика нет"}
+        свежая = поз
+        try:
+            if cid:
+                свежая = self.state.positions().get(cid) or поз
+        except Exception:  # noqa: BLE001
+            свежая = поз
+        if not (свежая or {}).get("lane"):
+            return {"ok": False, "why_not": "строки площадки в чат не идут"}
+        if (свежая or {}).get("doklad_buy_sent"):
+            return {"ok": True, "why_not": "BUY по этой сделке уже послан"}
+        try:
+            доложено = DK.доложить_покупку(свежая, оповещатель=self.оповещатель)
+        except Exception as exc:  # noqa: BLE001
+            self.log({"stage": "doklad_buy_dosylka_ne_ushla", "cid": cid,
+                       "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"})
+            return {"ok": False, "why_not": type(exc).__name__}
+        отправка = (доложено or {}).get("отправка") or {}
+        if cid:
+            try:
+                self.state.update_position(
+                    cid, doklad_buy_sent=True,
+                    doklad_buy_ok=bool(отправка.get("ok")),
+                    doklad_buy_dosylkoy=True)
+            except Exception:  # noqa: BLE001
+                pass
+        self.log({"stage": "doklad_buy_doslan_posle_sell", "cid": cid,
+                   "ok": bool(отправка.get("ok"))})
         return отправка or {"ok": True}
 
     def доложить_прошлую_попытку(self, pos: dict, *, читатель_tx=None) -> dict:
@@ -3405,16 +3447,27 @@ def self_test() -> None:
                               ts_closed=time.time(),
                               last_sell_signatures=["П" * 88])
         сторож_з._сказать_о_продаже("cid-lane")
-        chk("сделка полосы: ровно одно сообщение SELL новым форматом",
-            len(оп_з.послано) == 1 and оп_з.послано[0].startswith("🔴")
+        # SELL ПЕРВЫМ, а BUY -- ДОСЫЛКОЙ ЗА НИМ. Слово владельца 28.09: два
+        # сообщения независимы, SELL уходит сразу, а BUY, если его не было,
+        # идёт следом. У этой позиции doklad_buy_sent не стоял, значит строка
+        # покупки обязана появиться -- и именно второй, а не вместо SELL.
+        chk("сделка полосы: SELL уходит первым, новым форматом, без дописок",
+            len(оп_з.послано) == 2 and оп_з.послано[0].startswith("🔴")
             and " SELL " in оп_з.послано[0] and not оп_з.дописано,
             (оп_з.послано, оп_з.дописано))
+        chk("и BUY дослан следом, потому что его не было",
+            оп_з.послано[1].startswith("🟢") and " BUY " in оп_з.послано[1],
+            оп_з.послано)
         chk("в сообщении есть вошло → вышло и процент, и нет «издержки»",
             "→" in оп_з.послано[0] and "%" in оп_з.послано[0]
             and "издержки" not in оп_з.послано[0], оп_з.послано[0])
+        chk("и в записи стоит, что BUY ушёл досылкой",
+            st_з.positions()["cid-lane"].get("doklad_buy_sent") is True
+            and st_з.positions()["cid-lane"].get("doklad_buy_dosylkoy") is True,
+            st_з.positions()["cid-lane"].get("doklad_buy_dosylkoy"))
         сторож_з._сказать_о_продаже("cid-lane")
-        chk("второй раз SELL по той же сделке не уходит",
-            len(оп_з.послано) == 1, оп_з.послано)
+        chk("второй раз ни SELL, ни BUY по той же сделке не уходят",
+            len(оп_з.послано) == 2, оп_з.послано)
         chk("и пометка «SELL послан» лежит в записи позиции",
             st_з.positions()["cid-lane"].get("doklad_sell_sent") is True,
             st_з.positions()["cid-lane"].get("doklad_sell_sent"))

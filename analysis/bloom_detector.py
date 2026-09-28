@@ -4365,6 +4365,17 @@ class Детектор:
                 поля["chain_ok"] = True
                 итог["filled"] += 1
                 self.полос_куплено_догнано += 1
+                # ОЖИДАНИЕ ДОКЛАДА BUY СТАВИТСЯ И ЗДЕСЬ. Раньше его ставила
+                # ТОЛЬКО ветка "наша транзакция увидена в потоке", а у полосы
+                # она часто не срабатывает вовсе: покупку добирает этот догон по
+                # RPC. Из-за этого 28.09 три продажи ушли БЕЗ строки BUY
+                # (7h4MPA 06:37, BM2k8m 08:33, GJKZgT 08:36) -- у всех трёх в
+                # записи нет ни own_tx_seen_ts, ни doklad_buy_wait_since, зато
+                # есть doklad_sell_sent. Слово владельца: BUY уходит через 3 с
+                # после посадки ВСЕГДА, с тем, что известно.
+                if not поз.get("doklad_buy_sent") and not isinstance(
+                        поз.get("doklad_buy_wait_since"), (int, float)):
+                    поля["doklad_buy_wait_since"] = time.time()
             else:
                 поля["lane_bought_why_not"] = (причина or куплено.get("why_not"))
                 if куплено.get("chain_ok") is False:
@@ -9639,6 +9650,70 @@ def self_test() -> int:
                 (поз_мб3.get("lane_landed_slot") or 0)
                 - (поз_мб3.get("source_slot") or 0) == 1,
                 (поз_мб3.get("lane_landed_slot"), поз_мб3.get("source_slot")))
+
+        # ---- ОЖИДАНИЕ ДОКЛАДА BUY СТАВИТ И ДОГОН ПО RPC ----
+        # 28.09 три продажи ушли БЕЗ строки BUY (7h4MPA 06:37, BM2k8m 08:33,
+        # GJKZgT 08:36): ожидание ставила только ветка "наша транзакция увидена
+        # в потоке", а покупку добирал догон по RPC. Слово владельца: BUY уходит
+        # через 3 с после посадки ВСЕГДА.
+        with _врем_каталог() as d_дг:
+            st_дг = ST.ExecState(base=Path(d_дг) / "s", kill=Path(d_дг) / "k")
+
+            class _УзелДогона(Helius):
+                def __init__(self):
+                    super().__init__(key="нет", служба="")
+
+                def севшая_подпись(self, варианты):  # noqa: D102
+                    return {"signature": варианты[0], "slot": 777, "err": None}
+
+                def транзакция(self, подпись):  # noqa: D102
+                    return {"slot": 777, "meta": {"err": None}}
+
+            дет_дг = Детектор(источники={"SRC": "lane_s0"}, состояние=st_дг,
+                               helius=_УзелДогона(), курс=КурсSOL(), режим="dry")
+            st_дг.write_intent(client_order_id="дг1", mint="МИНТ", source_sig="СИ",
+                                source_slot=776, sol_in=0.3, pool=None, program=None,
+                                taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                                sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ,
+                                lane_group="lane_s0")
+            st_дг.update_position("дг1", state="bought",
+                                   lane_signature="ПД" * 44)
+            # Полоса в самопроверке выключена по умолчанию, а догон купленного
+            # без неё выходит сразу ("полоса выключена").
+            дет_дг.полоса_включена = True
+            # Количество куплено -- подменяем разбор покупки: сеть тут не при чём.
+            было_куп = OS.купленное_raw
+            OS.купленное_raw = lambda tx, кош, минт: {"ok": True, "raw": 12345}
+            было_нат = OS.натив_покупки
+            OS.натив_покупки = lambda tx, кош: {"ok": False}
+            try:
+                итог_дг = дет_дг.догнать_купленное_полосы()
+            finally:
+                OS.купленное_raw = было_куп
+                OS.натив_покупки = было_нат
+            поз_дг = st_дг.positions()["дг1"]
+            chk(f"догон по RPC ставит ожидание доклада BUY "
+                f"({поз_дг.get('doklad_buy_wait_since') is not None}), "
+                f"куплено {поз_дг.get('lane_bought_raw')}",
+                isinstance(поз_дг.get("doklad_buy_wait_since"), (int, float))
+                and поз_дг.get("lane_bought_raw") == 12345, (итог_дг, поз_дг))
+            chk("и позиция попадает в список ждущих доклада",
+                any(cid == "дг1" for cid, _ in дет_дг.ждущие_доклада()),
+                дет_дг.ждущие_доклада())
+            # Второй проход ожидание НЕ переставляет: срок считается от первого.
+            было_когда = поз_дг.get("doklad_buy_wait_since")
+            st_дг.update_position("дг1", lane_bought_raw=None)
+            OS.купленное_raw = lambda tx, кош, минт: {"ok": True, "raw": 12345}
+            OS.натив_покупки = lambda tx, кош: {"ok": False}
+            try:
+                дет_дг.догнать_купленное_полосы()
+            finally:
+                OS.купленное_raw = было_куп
+                OS.натив_покупки = было_нат
+            chk("повторный догон срок ожидания не сдвигает",
+                st_дг.positions()["дг1"].get("doklad_buy_wait_since") == было_когда,
+                (было_когда,
+                 st_дг.positions()["дг1"].get("doklad_buy_wait_since")))
 
         # ---- ИМЯ ТОКЕНА В ЗАПИСЬ НА ПУТИ ДОКЛАДА ----
         # За ночь 27->28.09 ни у одной из семнадцати сделок не оказалось
