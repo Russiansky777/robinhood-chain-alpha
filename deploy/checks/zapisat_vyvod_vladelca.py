@@ -24,6 +24,32 @@ import json
 import os
 import sys
 
+HELIUS = "https://mainnet.helius-rpc.com"
+
+
+def урл() -> str:
+    к = (os.environ.get("HELIUS_API_KEY") or os.environ.get("HELIUS_API") or "").strip()
+    return f"{HELIUS}/?api-key={к}"
+
+
+def зов(метод: str, параметры, *, таймаут: float = 30.0) -> dict:
+    """Один вызов узла. Отдельно от модулей службы: на хосте их состав другой,
+    и 23:46:40Z прогон упал на отсутствующем helius_client."""
+    import urllib.request  # noqa: PLC0415
+
+    тело = json.dumps({"jsonrpc": "2.0", "id": 1, "method": метод,
+                        "params": параметры}).encode()
+    зпр = urllib.request.Request(урл(), data=тело,
+                                  headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(зпр, timeout=таймаут) as отв:  # noqa: S310
+            о = json.loads(отв.read().decode())
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
+    if "error" in о:
+        return {"ok": False, "why_not": f"RPC: {str(о['error'])[:160]}"}
+    return {"ok": True, "result": о.get("result")}
+
 
 def дельта_кошелька(tx: dict, кошелёк: str) -> dict:
     """Нативная дельта кошелька в транзакции: (до, после, дельта) в лампортах."""
@@ -67,20 +93,22 @@ def main() -> int:
             sys.path.insert(0, путь)
     import bloom_exec_state as ST  # noqa: PLC0415
     import bloom_own_send as OSW  # noqa: PLC0415
-    import helius_client as helius  # noqa: PLC0415
 
     кошелёк = (а.koshelek or os.environ.get("OWN_SEND_WALLET")
                 or os.environ.get("BLOOM_LANE_WALLET") or "")
     if not кошелёк:
         print("СБОЙ: кошелёк полосы не задан")
         return 2
-    tx = helius.call("getTransaction",
-                      [а.podpis, {"encoding": "jsonParsed",
-                                   "maxSupportedTransactionVersion": 1,
-                                   "commitment": "finalized"}], таймаут=30.0)
-    tx = (tx or {}).get("result") if isinstance(tx, dict) and "result" in tx else tx
+    о = зов("getTransaction",
+             [а.podpis, {"encoding": "jsonParsed",
+                          "maxSupportedTransactionVersion": 1,
+                          "commitment": "finalized"}])
+    if not о.get("ok"):
+        print(f"СБОЙ: транзакция не прочиталась: {о.get('why_not')}")
+        return 3
+    tx = о.get("result")
     if not tx:
-        print("СБОЙ: транзакция не прочиталась")
+        print("СБОЙ: узел вернул пустую транзакцию (подпись не найдена)")
         return 3
     д = дельта_кошелька(tx, кошелёк)
     if not д["ok"]:
