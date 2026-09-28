@@ -2000,10 +2000,25 @@ class Seller:
                          taker=кошелёк_позиции(pos), вход_sol=pos.get("sol_in"),
                          живьём=self.live, секрет=ключ_позиции(pos),
                          мин_доля_от_входа=(0.0 if любая else None))
+        # ДОШЛА ЛИ ПОПЫТКА ДО СЕТИ. Пауза между попытками (45 с) существует
+        # ровно для одного: не продать дважды, пока отправленная транзакция
+        # может ещё сесть. Если отказ случился ДО отправки -- заказ не вышел,
+        # пол не пройден, подпись не удалась -- в сети не было ничего, и ждать
+        # нечего.
+        #
+        # ЦЕНА ОШИБКИ ИЗМЕРЕНА 28.09 НА ЖИВОЙ ПРОДАЖЕ. Позиция Ai66LHZG9M
+        # (batch5): срок продажи 11:52:24Z, первая попытка 11:52:26Z упала на
+        # подписи (SignerError, в сеть не ушло ничего), и сторож 45 секунд
+        # печатал "пауза между попытками полосы", хотя круг у него 3 с. Продажа
+        # села в 11:53:11Z -- через 46.6 с после срока, то есть удержание вышло
+        # 74.8 с вместо 28.8. Отказ до отправки больше паузу не ставит.
+        шаги_r = r.get("steps") or []
+        дошло_до_сети = bool(r.get("signature")) or any(
+            (ш or {}).get("step") == "execute" for ш in шаги_r)
         поля = {"jup_amount_raw": сколько,
                  "jup_any_quote": любая,
                  "jup_attempts": int(pos.get("jup_attempts") or 0) + 1,
-                 "ts_jup_attempt": now,
+                 "jup_reached_network": дошло_до_сети,
                  "jup_floor": (r.get("floor") or {}).get("checks"),
                  # Каким путём шли и каким вышло -- в позицию. Без этого по
                  # журналу не отличить продажу через Swap V2 от продажи через
@@ -2012,6 +2027,13 @@ class Seller:
                  "jup_api_used": r.get("api_used"),
                  "jup_api_tried": r.get("api_tried"),
                  "jup_why_not": r.get("why_not")}
+        # Отметку времени попытки ставим ТОЛЬКО когда в сети что-то было: по ней
+        # считается пауза. Отказ до отправки оставляет прежнюю отметку, и
+        # следующий круг (3 с) попробует снова.
+        if дошло_до_сети:
+            поля["ts_jup_attempt"] = now
+        else:
+            поля["ts_jup_bez_seti"] = now
         if r.get("signature"):
             поля["jup_signature"] = r["signature"]
             поля["last_sell_signatures"] = [r["signature"]]
@@ -3208,6 +3230,50 @@ def self_test() -> None:
             "Ultra отказала" in
             (st_л.positions()["l_отказ"].get("jup_why_not") or ""),
             st_л.positions()["l_отказ"].get("jup_why_not"))
+
+        # 7б. ОТКАЗ ДО ОТПРАВКИ НЕ СТАВИТ ПАУЗУ 45 с. Цена ошибки измерена
+        # 28.09: подпись упала (SignerError, в сеть не ушло ничего), и сторож
+        # ждал 45 секунд при круге 3 с -- позиция провисела 74.8 с вместо 28.8.
+        зовы.clear()
+        JL.продать = lambda **kw: (зовы.append(kw) or
+                                    {"ok": False,
+                                     "why_not": "подпись не удалась: SignerError",
+                                     "steps": [{"step": "order", "ok": True},
+                                                {"step": "floor", "ok": True},
+                                                {"step": "sign", "ok": False}]})
+        без_сети = полосу_в_состояние("l_bez_seti", "MINT_L8Б", куплено=1_000_000)
+        sl.handle(без_сети, balance_reader=читатель(50_000_000))
+        поз_бс = st_л.positions()["l_bez_seti"]
+        chk("отказ до отправки: отметки попытки НЕТ, паузу не ставим",
+            поз_бс.get("ts_jup_attempt") is None
+            and поз_бс.get("jup_reached_network") is False
+            and isinstance(поз_бс.get("ts_jup_bez_seti"), (int, float)),
+            {к: поз_бс.get(к) for к in ("ts_jup_attempt", "jup_reached_network",
+                                         "ts_jup_bez_seti")})
+        # И следующий круг пробует СНОВА, а не ждёт 45 с.
+        зовы.clear()
+        sl.handle(st_л.positions()["l_bez_seti"], balance_reader=читатель(50_000_000))
+        chk(f"следующий круг пробует снова ({len(зовы)} зов)", len(зовы) == 1, зовы)
+        # А вот отказ ПОСЛЕ отправки паузу ставит: транзакция могла сесть.
+        зовы.clear()
+        JL.продать = lambda **kw: (зовы.append(kw) or
+                                    {"ok": False, "why_not": "сеть не ответила",
+                                     "steps": [{"step": "order", "ok": True},
+                                                {"step": "sign", "ok": True},
+                                                {"step": "execute", "ok": False}]})
+        с_сетью = полосу_в_состояние("l_s_setyu", "MINT_L8В", куплено=1_000_000)
+        sl.handle(с_сетью, balance_reader=читатель(50_000_000))
+        поз_сс = st_л.positions()["l_s_setyu"]
+        chk("отказ ПОСЛЕ отправки ставит отметку: транзакция могла сесть",
+            isinstance(поз_сс.get("ts_jup_attempt"), (int, float))
+            and поз_сс.get("jup_reached_network") is True,
+            {к: поз_сс.get(к) for к in ("ts_jup_attempt", "jup_reached_network")})
+        зовы.clear()
+        r_пауза = sl.handle(st_л.positions()["l_s_setyu"],
+                             balance_reader=читатель(50_000_000))
+        chk(f"и следующий круг ждёт паузу: {str(r_пауза.get('action'))[:48]}",
+            not зовы and "пауза между попытками" in (r_пауза.get("action") or ""),
+            (зовы, r_пауза.get("action")))
 
         # 7а. ПОЛОСА ПРОДАЁТСЯ ПРИ ЛЮБОЙ КОТИРОВКЕ, Bloom -- нет. Это денежное
         # место: у полосы 0.01-0.05 SOL, и правило 30 % от входа держало её
