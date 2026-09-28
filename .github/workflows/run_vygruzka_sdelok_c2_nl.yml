@@ -41,8 +41,11 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "Модуль разбирается"
-        run: python3 -m py_compile deploy/checks/sdelki_polosy_vygruzka.py
+      - name: "Модуль разбирается и самопроверка счёта"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/sdelki_polosy_vygruzka.py
+          python3 deploy/checks/sdelki_polosy_vygruzka.py --self-test
 
       - name: "Окно суток"
         env:
@@ -75,8 +78,12 @@ jobs:
           set -o pipefail
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/vygr"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vygr/sdelki_polosy_vygruzka.py" < deploy/checks/sdelki_polosy_vygruzka.py
+          # env хоста нужен ради HELIUS_API_KEY: место в блоке дозаполняется
+          # по цепи (getSignatureStatuses + getBlock уровня signatures), и без
+          # ключа столбец остался бы пустым, как он и был до 28.09.
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
+            set -a; . /etc/bloom-executor/env; set +a
             BLOOM_CODE_DIR='$CODE_DIR' python3 /tmp/vygr/sdelki_polosy_vygruzka.py \
               --state-dir '$STATE_DIR' \
               --s '$S_OKNA' --do '$DO_OKNA' --polnye \
