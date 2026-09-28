@@ -133,7 +133,7 @@ def одна(уз: S.Узел, с: dict) -> dict:
     из_.update(налог_токена_bps=нал_т.get("bps"), налог_q_bps=нал_q.get("bps"))
     до = max(ts["slot"], s0 + ГОРИЗОНТ)
     ист = S.история_пула(уз, пул["pool_vault"], src, s0,
-                         опора=(S.подпись_после_слота(уз, до + 1) if уз.текущий == "helius" else None),
+                         опора=S.подпись_после_слота(уз, до + 1)   # и на Shyft: иначе листание от вершины,
                          до_слота=до)
     if ист["why_not"] or ист["предел"]:
         return {**из_, "why_not": f"история пула: {ист['why_not'] or 'предел страниц'}"}
@@ -292,7 +292,7 @@ def кривая(уз, с: dict, из_: dict, tb: dict, ts: dict, наш: str, �
         return {**из_, "why_not": "кривая: выход нашей продажи не читается (миграция или другой пул)"}
     до = max(ts["slot"], s0 + ГОРИЗОНТ)
     ист = S.история_пула(уз, пул["pool_vault"], src, s0,
-                         опора=(S.подпись_после_слота(уз, до + 1) if уз.текущий == "helius" else None),
+                         опора=S.подпись_после_слота(уз, до + 1)   # и на Shyft: иначе листание от вершины,
                          до_слота=до)
     if ист["why_not"] or ист["предел"]:
         return {**из_, "why_not": f"история пула: {ист['why_not'] or 'предел страниц'}"}
@@ -347,9 +347,16 @@ def строки_входа(вход: str) -> list:
     if isinstance(д, dict):
         д = д.get("sdelki") or д.get("позиции") or []
     из_ = []
+    имена: dict = {}
+    гп = КОРЕНЬ / "data" / "podbivka" / "gruppy_code1.json"
+    if гп.exists():
+        for г in json.loads(гп.read_text(encoding="utf-8"))["groups"].values():
+            for а, y in г["addresses"].items():
+                имена[y.get("name") or а[:8]] = а
     for x in д:
         if "polya" in x:                       # отчёт Code-1 data/peresborka_sdelok.json
             п = x["polya"]
+            п = {**п, "имя_источника": имена.get(п.get("имя_источника"), п.get("имя_источника"))}
             из_.append({"группа": п.get("группа"), "наш_кошелёк": None, "источник": п.get("имя_источника"),
                         "mint": п.get("минт"), "buy_sig": п.get("подпись_покупки"), "sell_sig": п.get("подпись_продажи"),
                         "src_sig": п.get("подпись_источника"), "buy_ts": None,   # в отчёте только ЧЧ:ММ:СС; сутки -- Shyft
