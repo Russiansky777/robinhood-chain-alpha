@@ -207,6 +207,32 @@ def транзакция(подпись: str) -> dict | None:
     return о.get("result") if о.get("ok") else None
 
 
+def причина_ошибки(tx: dict | None) -> str | None:
+    """Почему покупка ничего не купила -- словами самой цепи.
+
+    Берём err как есть и последнюю строку журнала программ, где сказано про
+    ошибку. Ничего не додумываем: если цепь молчит, возвращаем None.
+    """
+    мета = (tx or {}).get("meta") or {}
+    куски = []
+    err = мета.get("err")
+    if err is not None:
+        куски.append(json.dumps(err, ensure_ascii=False)[:120]
+                      if not isinstance(err, str) else err[:120])
+    журнал = мета.get("logMessages") or []
+    строка = None
+    for стр in журнал:
+        низ = str(стр).lower()
+        if ("error" in низ or "failed" in низ or "panicked" in низ
+                or "slippage" in низ or "exceeded" in низ):
+            строка = str(стр)
+    if строка is None and журнал:
+        строка = str(журнал[-1])
+    if строка:
+        куски.append(строка[:160])
+    return " | ".join(куски) or None
+
+
 def счёт_минта(кошелёк: str, минт: str) -> str | None:
     """ATA нашего кошелька под этот минт -- через тот же модуль, что и сборка."""
     try:
@@ -316,7 +342,8 @@ def сделка_по_цепи(п: dict, *, кошелёк: str) -> dict:
                     итог_sol=round(д_пок["lamports"] / ЛАМПОРТОВ_В_SOL, 9),
                     расход_минус_возврат_sol=round(
                         -д_пок["lamports"] / ЛАМПОРТОВ_В_SOL, 9),
-                    вернулось_sol=0.0, тревога=True)
+                    вернулось_sol=0.0, тревога=True,
+                    причина_цепи=причина_ошибки(tx_пок))
         return из_
     if not прод:
         # ПОИСК ПРОДАЖИ ПО ЦЕПИ. Подписи в записи может не быть вовсе (выход
@@ -512,6 +539,16 @@ def self_test() -> int:
     д3 = дельта_наших(tx_пусто, НАШ)
     chk("ушла ровно комиссия -- дельта равна комиссии со знаком минус",
         д3["lamports"] == -1_005_000 and д3["fee"] == 1_005_000, д3)
+    # ПРИЧИНА СЛОВАМИ ЦЕПИ: err как есть плюс последняя строка про ошибку.
+    chk("причина берётся из err и журнала программ",
+        причина_ошибки({"meta": {"err": {"InstructionError": [3, {"Custom": 6002}]},
+                                  "logMessages": ["Program log: start",
+                                                  "Program log: Error: slippage"]}})
+        == '{"InstructionError": [3, {"Custom": 6002}]} | Program log: Error: slippage',
+        причина_ошибки({"meta": {"err": {"InstructionError": [3, {"Custom": 6002}]},
+                                  "logMessages": ["Program log: Error: slippage"]}}))
+    chk("без ошибки и без журнала причины нет",
+        причина_ошибки({"meta": {"err": None, "logMessages": []}}) is None)
     chk("окно читается как UTC",
         разобрать_время("2026-09-28T00:21:00Z") == 1790554860.0)
     print(f"самопроверка Правила 11 по цепи: {пройдено}/{пройдено + провалено} пройдено")
