@@ -550,15 +550,31 @@ def main() -> int:
             расп = (json.loads(путь_расп.read_text(encoding="utf-8")) or {}).get("schedule")
         except Exception:  # noqa: BLE001
             расп = None
+    # ИМЕНА ФАЙЛОВ -- ТЕ ЖЕ, ЧТО ПИШЕТ ЗОНД (путь_суток в
+    # triton_preconfs_probe): у каждого фида свой файл (два процесса на один
+    # файл теряли обновления друг друга), общий остался от прежних прогонов.
+    # Берём большее по каждому числу -- потраченное за сутки не обнуляется.
     расход = None
-    # ИМЯ ФАЙЛА -- ТО ЖЕ, ЧТО ПИШЕТ ЗОНД (путь_суток в triton_preconfs_probe):
-    # своё имя означало бы вечное "файл расхода не передан".
-    путь_расхода = Path(а.katalog) / "triton_preconfs_day.json"
-    if путь_расхода.exists():
+    for имя in ("triton_preconfs_day_bam.json",
+                 "triton_preconfs_day_harmonic.json",
+                 "triton_preconfs_day.json"):
+        путь_расхода = Path(а.katalog) / имя
+        if not путь_расхода.exists():
+            continue
         try:
-            расход = json.loads(путь_расхода.read_text(encoding="utf-8"))
+            з = json.loads(путь_расхода.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
-            расход = None
+            continue
+        расход = расход or {"day": з.get("day"), "bam_messages": 0,
+                             "harmonic_slots": 0, "harmonic_seconds": 0.0,
+                             "файлов": 0}
+        расход["файлов"] += 1
+        расход["bam_messages"] = max(int(расход["bam_messages"]),
+                                      int(з.get("bam_messages") or 0))
+        расход["harmonic_slots"] = max(int(расход["harmonic_slots"]),
+                                        int(з.get("harmonic_slots") or 0))
+        расход["harmonic_seconds"] = max(float(расход["harmonic_seconds"]),
+                                          float(з.get("harmonic_seconds") or 0.0))
     журналы = [ж.strip() for ж in (а.zhurnaly or "").split(",") if ж.strip()]
     if а.lidery_fida:
         пре = преконфы_из_журнала(журналы)["preconfs"]
