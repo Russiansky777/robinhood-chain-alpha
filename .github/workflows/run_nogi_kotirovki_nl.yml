@@ -39,6 +39,10 @@ on:
         description: "подписи через запятую: разобрать их инструкции и сохранить образцы по видам"
         required: false
         default: ""
+      konfigi_clmm:
+        description: "счета amm_config Raydium CLMM через запятую: прочитать ставку комиссии и шаг тика (пусто -- обычный сбор)"
+        required: false
+        default: ""
 
 concurrency:
   group: nogi-kotirovki
@@ -53,6 +57,7 @@ env:
   OUT_SHABLONY: data/nogi_shablony.json
   OUT_OTCHET: data/nogi_pokrytie.json
   OUT_VIDY: data/obrazcy_vidov_instrukciy.json
+  OUT_KONFIGI: data/clmm_konfigi.json
 
 jobs:
   sbor:
@@ -86,6 +91,9 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/nogi"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/nogi_vse_kotirovki.py" < deploy/checks/nogi_vse_kotirovki.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/kotirovki_grupp.json" < data/podbivka/kotirovki_grupp.json
+          # МОДУЛЬ ЦЕНЫ -- СВЕЖИЙ, РЯДОМ С ПРОГОНОМ. Раскладку счёта amm_config
+          # проверяет именно новый разбор, а не развёрнутая на хосте версия.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/c2_cl_quote.py" < analysis/c2_cl_quote.py
           # ПРЕЖНИЙ ФАЙЛ -- САМЫЙ СВЕЖИЙ, А НЕ ОТ 24.09. Прогон с --tolko считает
           # одну котировку, а пишет файл целиком: со старым файлом он потерял бы
           # все найденные ранее ноги (так и вышло 28.09 в 02:47 -- 109 -> 57).
@@ -104,6 +112,8 @@ jobs:
               --glubokiy-poisk '${{ inputs.glubokiy_poisk }}' \
               --razbor-pula '${{ inputs.razbor_pula }}' \
               --razbor-podpisi '${{ inputs.razbor_podpisi }}' \
+              --konfigi-clmm '${{ inputs.konfigi_clmm }}' \
+              --out-konfigi /tmp/nogi/clmm_konfigi.json \
               --sohranit-obrazcy /tmp/nogi/obrazcy_vidov.json \
               --out-pools /tmp/nogi/pools.json \
               --out-shablony /tmp/nogi/shablony.json \
@@ -113,7 +123,7 @@ jobs:
           # файл 109 котировок пустотой (28.09, 03:47). Теперь каждый файл
           # сначала кладётся рядом, проверяется на разбор JSON и только потом
           # заменяет прежний.
-          for para in "pools.json:$OUT_POOLS" "shablony.json:$OUT_SHABLONY" "otchet.json:$OUT_OTCHET" "obrazcy_vidov.json:$OUT_VIDY"; do
+          for para in "pools.json:$OUT_POOLS" "shablony.json:$OUT_SHABLONY" "otchet.json:$OUT_OTCHET" "obrazcy_vidov.json:$OUT_VIDY" "clmm_konfigi.json:$OUT_KONFIGI"; do
             imya="${para%%:*}"; kuda="${para##*:}"
             ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/$imya 2>/dev/null || true" > "/tmp/nogi_$imya" || true
             if python3 -c "import json,sys; json.load(open('/tmp/nogi_$imya'))" 2>/dev/null; then
@@ -129,7 +139,7 @@ jobs:
         if: always()
         run: |
           set -e
-          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET" "$OUT_VIDY"; do
+          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET" "$OUT_VIDY" "$OUT_KONFIGI"; do
             [ -f "$f" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$f" || true
           done
 
@@ -139,7 +149,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET" "$OUT_VIDY"; do
+          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET" "$OUT_VIDY" "$OUT_KONFIGI"; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }

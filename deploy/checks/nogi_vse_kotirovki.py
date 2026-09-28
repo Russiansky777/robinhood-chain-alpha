@@ -39,6 +39,7 @@ c2_shadow_build.LegCache._template_from): образец, который зде�
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -302,12 +303,21 @@ def main() -> int:
                         "(зачем: у Pump AMM встречается 25 счетов вместо 26)")
     р.add_argument("--tolko", default="",
                    help="считать только эти котировки (минты через запятую)")
+    р.add_argument("--konfigi-clmm", default="",
+                   help="счета amm_config Raydium CLMM через запятую: прочитать "
+                         "и разобрать ставку комиссии и шаг тика (только чтение)")
+    р.add_argument("--out-konfigi", default="",
+                   help="куда положить разбор счетов amm_config")
     р.add_argument("--out-pools", required=True)
     р.add_argument("--out-shablony", required=True)
     р.add_argument("--out-otchet", required=True)
     а = р.parse_args()
 
     sys.path.insert(0, а.code_dir)
+    # СВОЙ КАТАЛОГ ПЕРВЫМ: рядом с прогоном лежат свежие модули, доставленные
+    # тем же ssh. Без этого хост брал бы РАЗВЁРНУТУЮ версию, и проверка новой
+    # раскладки проверяла бы старый код (так уже вышло 28.09 с докладчиком).
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
     import c2_common as C  # noqa: PLC0415
     import c2_shadow_build as SB  # noqa: PLC0415
     import c2_swap_build as B  # noqa: PLC0415
@@ -317,6 +327,51 @@ def main() -> int:
     программы = {B.PUMP_AMM, B.CPMM, B.DAMM2, B.LAUNCHLAB, B.DLMM, B.CLMM, B.DBC}
     global программы_разных_владельцев
     программы_разных_владельцев = {B.DLMM, B.DAMM2, B.CLMM, B.DBC}
+
+    # СЧЕТА amm_config RAYDIUM CLMM: только чтение, печать и выход.
+    #
+    # ЗАЧЕМ. Ставка комиссии пула CLMM НЕ ЛЕЖИТ В СОБЫТИИ СВОПА: программа
+    # читает её из счёта amm_config (счёт 1 самой инструкции свопа). По одной
+    # сделке ставку решить нельзя -- у сделки, перешедшей границу диапазона
+    # ликвидности, решённая доля уходит на проценты в сторону. Поэтому минимум
+    # выхода CLMM без этой ставки отказывает, и раскладку счёта надо
+    # ПОДТВЕРДИТЬ, а не заявить: у каждого конфига, чью ставку удалось решить
+    # по живым сделкам (1000, 2500, 10000, 40000 миллионных), прочитанный
+    # trade_fee_rate обязан совпасть с решённым числом.
+    if а.konfigi_clmm:
+        import c2_cl_quote as CL  # noqa: PLC0415
+        список_к = [x.strip() for x in а.konfigi_clmm.split(",") if x.strip()]
+        из_к = {"снято_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                 "зачем": ("ставка комиссии и шаг тика пулов Raydium CLMM из "
+                            "счетов amm_config -- денежный путь минимума выхода"),
+                 "смещения": CL.СХЕМА_КОНФИГА_CLMM, "конфиги": {}}
+        for i in range(0, len(список_к), 100):
+            часть = список_к[i:i + 100]
+            о = rpc("getMultipleAccounts", [часть, {"encoding": "base64"}])
+            значения = (о or {}).get("value") or [] if isinstance(о, dict) else []
+            for адрес, v in zip(часть, значения):
+                данные_b64 = (((v or {}).get("data") or [None])[0])
+                if not данные_b64:
+                    из_к["конфиги"][адрес] = {"why_not": "счёта нет или он пуст"}
+                    continue
+                сырое = base64.b64decode(данные_b64)
+                разбор = CL.конфиг_clmm(сырое)
+                из_к["конфиги"][адрес] = {
+                    "владелец": (v or {}).get("owner"),
+                    "байт": len(сырое),
+                    "разбор": разбор or None,
+                    "why_not": None if разбор else "раскладка не подтвердилась",
+                    # ПЕРВЫЕ 96 БАЙТ -- чтобы раскладку можно было вывести
+                    # офлайн, если заявленные смещения окажутся не те. Это
+                    # ОБЩЕДОСТУПНОЕ состояние счёта настроек, не ключ.
+                    "начало_hex": сырое[:96].hex()}
+        куда = а.out_konfigi or а.out_otchet
+        Path(куда).write_text(json.dumps(из_к, ensure_ascii=False, indent=1),
+                               encoding="utf-8")
+        print(json.dumps({адрес: (з.get("разбор") or з.get("why_not"))
+                           for адрес, з in из_к["конфиги"].items()},
+                          ensure_ascii=False)[:2000])
+        return 0
 
     # РАЗБОР ОДНОГО ПУЛА: только чтение, печать и выход. Нужен, чтобы понять
     # РАЗНИЦУ между раскладками счетов одной и той же инструкции.
