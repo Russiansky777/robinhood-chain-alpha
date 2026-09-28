@@ -1,15 +1,18 @@
 {
  "файл": "/home/bot/data/sources_2026-09-25.json",
- "группа": "log_only",
- "поле": "subscribe",
- "было": false,
+ "группа": "sniper_src",
+ "поле": "lane_trades",
+ "было": true,
  "вся_политика_группы": {
-  "lane_size": null,
-  "lane_trades": false,
+  "lane_size": 0.3,
+  "lane_trades": true,
   "bloom_trades": false,
-  "bloom_sol": null,
-  "fanout": false,
-  "note": "Все прочие адреса, на которые служба подписана. Слово владельца: lane_trades=false, только лог сигналов со всеми полями. Из файла их убирать нельзя -- пропала бы подписка, а с ней и лог.",
-  "subscribe": false
+  "min_target_sol": 2,
+  "max_slots_from_source": 1,
+  "slippage": 0.2,
+  "hold_slots": 12,
+  "lane_open_max": 3,
+  "stop_loss_sol": 0.45,
+  "note": "Три снайпера из docs/podbivka_2026-09-28_snaipery.md (Code-2). Решение владельца 28.09: размер 0.3, порог входа 2 SOL, только первая покупка на пару источник+минт, не дальше S+1, проскальзывание 0.2, удержание 12 слотов, до 3 открытых, стоп 0.45."
  }
 }
