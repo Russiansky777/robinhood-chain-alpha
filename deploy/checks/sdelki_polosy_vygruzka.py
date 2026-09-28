@@ -121,6 +121,12 @@ def из_решений(state_dir: str, cids: set, *, с_ts: float = 0.0) -> dic
             нал = з.get("route_tax") or {}
             if isinstance(нал, dict) and нал.get("token_fee_bps") is not None:
                 в["nalog_tokena_bps"] = нал["token_fee_bps"]
+            # FREEZE AUTHORITY -- В ВЫГРУЗКУ. Полоса его перед покупкой не
+            # проверяет (ответ на вопрос владельца 28.09, п.4б); число попадает
+            # в журнал решений тем же чтением счёта минта, что и налог.
+            if isinstance(нал, dict) and "freeze_authority" in нал:
+                в["freeze_authority"] = нал.get("freeze_authority")
+                в["freeze_authority_otozvan"] = нал.get("freeze_authority_revoked")
             if isinstance(нал, dict) and нал.get("route_transfer_fee_bps") is not None:
                 в["nalog_marshruta_bps"] = нал["route_transfer_fee_bps"]
             if з.get("pool_fee_share") is not None:
@@ -272,6 +278,8 @@ def main() -> int:
             "nalog_tokena_bps": п.get("tax_bps"),
             "nalog_marshruta_bps": None,
             "komissiya_pula_pct": None,
+            "freeze_authority": None,
+            "freeze_authority_otozvan": None,
             "state": п.get("state"),
             "closed_reason": п.get("closed_reason"),
             "итог_sol": None, "расход_sol": None,
@@ -300,7 +308,8 @@ def main() -> int:
     for ряд in ряды:
         д = решения.get(ряд["cid"]) or {}
         for поле in ("nalog_tokena_bps", "nalog_marshruta_bps",
-                      "komissiya_pula_pct"):
+                      "komissiya_pula_pct", "freeze_authority",
+                      "freeze_authority_otozvan"):
             if ряд.get(поле) is None and д.get(поле) is not None:
                 ряд[поле] = д[поле]
                 добрано_чисел += 1

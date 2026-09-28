@@ -1571,6 +1571,14 @@ class Helius:
         if not isinstance(info, dict):
             info = {}
         out["decimals"] = info.get("decimals")
+        # FREEZE И MINT AUTHORITY -- БЕСПЛАТНО, ОДНИМ И ТЕМ ЖЕ ОТВЕТОМ. Тот же
+        # запрос, который читает налог минта перед покупкой, несёт и эти два
+        # поля; мы их просто выбрасывали. Владелец 28.09 (п.4б) спросил,
+        # проверяет ли полоса freeze authority: НЕ проверяет и решения по нему
+        # не принимает -- поле идёт в запись и в выгрузку, не в гейт.
+        out["freeze_authority"] = info.get("freezeAuthority")
+        out["freeze_authority_revoked"] = info.get("freezeAuthority") is None
+        out["mint_authority"] = info.get("mintAuthority")
         for e in info.get("extensions") or []:
             if isinstance(e, dict) and e.get("extension") == "transferFeeConfig":
                 st = (e.get("state") or {})
@@ -1637,6 +1645,14 @@ class Helius:
         if not isinstance(info, dict):
             info = {}
         out["decimals"] = info.get("decimals")
+        # FREEZE И MINT AUTHORITY -- БЕСПЛАТНО, ОДНИМ И ТЕМ ЖЕ ОТВЕТОМ. Тот же
+        # запрос, который читает налог минта перед покупкой, несёт и эти два
+        # поля; мы их просто выбрасывали. Владелец 28.09 (п.4б) спросил,
+        # проверяет ли полоса freeze authority: НЕ проверяет и решения по нему
+        # не принимает -- поле идёт в запись и в выгрузку, не в гейт.
+        out["freeze_authority"] = info.get("freezeAuthority")
+        out["freeze_authority_revoked"] = info.get("freezeAuthority") is None
+        out["mint_authority"] = info.get("mintAuthority")
         for e in info.get("extensions") or []:
             if isinstance(e, dict) and e.get("extension") == "transferFeeConfig":
                 st = (e.get("state") or {})
