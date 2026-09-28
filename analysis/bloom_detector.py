@@ -3576,16 +3576,52 @@ class Детектор:
             # севшей подписи. Один getTransaction это закрывает, и слот
             # сохраняется в запись -- второй раз спрашивать не придётся.
             if not isinstance(слот, int):
-                слот_цепи = None
+                # СЛОТ СПРАШИВАЕМ ПО ВСЕМ ВАРИАНТАМ СРАЗУ, А НЕ ПО ПРИНЯТОМУ.
+                # Полоса шлёт до шести вариантов на одном nonce, садится один, а
+                # в lane_signature лежит тот, чей сервис первым сказал "принял".
+                # 28.09 у сделки sniper_src 12:12:31Z (zVbJ3e) севшего варианта в
+                # записи не оказалось вовсе -- ни lane_landed_signature, ни
+                # lane_landed_slot, -- и место в блоке не добралось НИКОГДА: в
+                # записи так и не появилось ни одного block_tries.
+                # getSignatureStatuses берёт все шесть ОДНИМ вызовом и отдаёт
+                # слот сразу, дешевле getTransaction по одной подписи.
+                варианты = [подпись, p_.get("lane_signature"),
+                            p_.get("lane_signature_accepted_first")]
+                варианты += list(p_.get("lane_pool_candidates") or [])
+                варианты.append(p_.get("lane_signature_local"))
+                варианты = list(dict.fromkeys([в for в in варианты if в]))
+                села = {}
                 try:
-                    свой = self.helius.транзакция(подпись)
-                    слот_цепи = (свой or {}).get("slot")
-                except Exception:  # noqa: BLE001
-                    слот_цепи = None
+                    села = self.helius.севшая_подпись(варианты) or {}
+                except Exception as exc:  # noqa: BLE001
+                    села = {"why_not": f"{type(exc).__name__}: {str(exc)[:80]}"}
+                слот_цепи = села.get("slot")
+                откуда_слота = "слот севшей подписи"
                 if not isinstance(слот_цепи, int):
+                    try:
+                        свой = self.helius.транзакция(подпись)
+                        слот_цепи = (свой or {}).get("slot")
+                        откуда_слота = "слот транзакции по цепи"
+                    except Exception:  # noqa: BLE001
+                        слот_цепи = None
+                if not isinstance(слот_цепи, int):
+                    # ПОПЫТКУ СЧИТАЕМ И ПРИЧИНУ ПИШЕМ. Без этого позиция без
+                    # слота крутилась в догоне каждый пульс до конца жизни
+                    # службы, и в записи не было ни следа -- почему места нет.
+                    try:
+                        self.состояние.update_position(
+                            cid, block_tries=int(p_.get("block_tries") or 0) + 1,
+                            block_why_not=str(села.get("why_not")
+                                               or "слот посадки не определился")[:200])
+                    except Exception:  # noqa: BLE001
+                        pass
                     continue
-                слот, откуда = слот_цепи, "слот транзакции по цепи"
-                self.состояние.update_position(cid, lane_landed_slot=слот_цепи)
+                слот, откуда = слот_цепи, откуда_слота
+                поля_слота = {"lane_landed_slot": слот_цепи}
+                if села.get("signature"):
+                    поля_слота["lane_landed_signature"] = села["signature"]
+                    подпись = села["signature"]
+                self.состояние.update_position(cid, **поля_слота)
             кандидаты.append((cid, подпись, слот, откуда))
         кандидаты.sort(key=lambda x: x[0])
         for cid, подпись, слот, откуда in кандидаты[:предел]:
@@ -10066,6 +10102,66 @@ def self_test() -> int:
                 (поз_мб3.get("lane_landed_slot") or 0)
                 - (поз_мб3.get("source_slot") or 0) == 1,
                 (поз_мб3.get("lane_landed_slot"), поз_мб3.get("source_slot")))
+
+            # ---- СЕЛА НЕ ПРИНЯТАЯ, А ДРУГОЙ ВАРИАНТ ----
+            # 28.09 у сделки sniper_src 12:12:31Z (zVbJ3e) в записи не оказалось
+            # ни lane_landed_signature, ни lane_landed_slot, ни одного
+            # block_tries: спрашивали только принятую подпись, а села другая, из
+            # списка вариантов. Места в строке BUY не было вовсе.
+            st_мб.write_intent(client_order_id="мб4", mint="МИНТ4", source_sig="СИ4",
+                                source_slot=600, sol_in=0.3, pool=None, program=None,
+                                taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                                sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ,
+                                lane_group="sniper_src")
+            st_мб.update_position("мб4", lane_signature="Н" * 88,
+                                   lane_pool_candidates=["Н" * 88, "В" * 88])
+            блоки_мб[601] = {"signatures": ["Ч" * 88, "Э" * 88, "В" * 88]}
+
+            class _УзелВариантов(_УзелМБ):
+                def севшая_подпись(self, подписи):  # noqa: D102
+                    if "В" * 88 in (подписи or []):
+                        return {"signature": "В" * 88, "slot": 601, "err": None}
+                    return {"signature": None, "slot": None, "err": None,
+                             "why_not": "ни одна из подписей в цепи не найдена"}
+
+                def транзакция(self, подпись):  # noqa: D102
+                    return None
+
+            дет_мб4 = Детектор(источники={"SRC": "тест"}, состояние=st_мб,
+                                helius=_УзелВариантов(), курс=КурсSOL(), режим="dry")
+            дет_мб4.догнать_место_в_блоке()
+            поз_мб4 = st_мб.positions()["мб4"]
+            chk(f"севший вариант находится среди всех вариантов, слот и подпись "
+                f"легли в запись ({поз_мб4.get('lane_landed_slot')}, откуда "
+                f"{поз_мб4.get('block_slot_from')}), место "
+                f"{поз_мб4.get('block_index')}/{поз_мб4.get('block_total')}",
+                поз_мб4.get("lane_landed_slot") == 601
+                and поз_мб4.get("lane_landed_signature") == "В" * 88
+                and поз_мб4.get("block_slot_from") == "слот севшей подписи"
+                and поз_мб4.get("block_index") == 2
+                and поз_мб4.get("block_total") == 3, поз_мб4)
+
+            # ---- НЕ НАШЛОСЬ НИЧЕГО: ПОПЫТКА СЧИТАЕТСЯ, ПРИЧИНА ПИШЕТСЯ ----
+            st_мб.write_intent(client_order_id="мб5", mint="МИНТ5", source_sig="СИ5",
+                                source_slot=700, sol_in=0.3, pool=None, program=None,
+                                taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                                sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ,
+                                lane_group="sniper_src")
+            st_мб.update_position("мб5", lane_signature="Я" * 88)
+            дет_мб5 = Детектор(источники={"SRC": "тест"}, состояние=st_мб,
+                                helius=_УзелВариантов(), курс=КурсSOL(), режим="dry")
+            дет_мб5.догнать_место_в_блоке()
+            поз_мб5 = st_мб.positions()["мб5"]
+            chk(f"слот не определился -- попытка сосчитана ({поз_мб5.get('block_tries')}) "
+                f"и причина записана: «{поз_мб5.get('block_why_not')}»",
+                int(поз_мб5.get("block_tries") or 0) == 1
+                and поз_мб5.get("block_why_not"), поз_мб5)
+            for _ in range(ПОПЫТОК_МЕСТА_В_БЛОКЕ + 2):
+                дет_мб5.догнать_место_в_блоке()
+            chk("и вечно она не крутится: попытки кончаются",
+                int(st_мб.positions()["мб5"].get("block_tries") or 0)
+                <= ПОПЫТОК_МЕСТА_В_БЛОКЕ,
+                st_мб.positions()["мб5"].get("block_tries"))
 
         # ---- ОЖИДАНИЕ ДОКЛАДА BUY СТАВИТ И ДОГОН ПО RPC ----
         # 28.09 три продажи ушли БЕЗ строки BUY (7h4MPA 06:37, BM2k8m 08:33,
