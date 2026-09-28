@@ -1,0 +1,122 @@
+name: "Поток PumpApi против Helius WS: кто раньше (только чтение)"
+
+# ЗАЧЕМ (п.7 владельца 28.09). Полоса копирует сделку источника, и всё решает
+# момент, когда мы узнали о ней. Сейчас источник узнаётся из Helius WS. Прогон
+# сводит два времени по ОДНИМ И ТЕМ ЖЕ транзакциям источников: когда сделку
+# принёс wss://stream.pumpapi.io и когда её принёс Helius WS (время прихода
+# лежит в журнале решений детектора, поле t_recv_ts -- то есть сравниваются
+# двое часов одного хоста, без поправок).
+#
+# ТОЛЬКО ЧТЕНИЕ: одно соединение к потоку PumpApi, приём сообщений, чтение
+# журнала решений. Ни подписи, ни отправки, ни единого ордера. Кредиты Helius
+# прогон не тратит вовсе -- сторона Helius берётся из уже написанного журнала.
+on:
+  workflow_dispatch:
+    inputs:
+      shag:
+        description: "'docs' -- вычитать документацию потока с хоста; 'zamer' -- сам замер"
+        required: false
+        default: "docs"
+      minut:
+        description: "сколько минут слушать поток (шаг zamer; слово владельца -- час)"
+        required: false
+        default: "60"
+
+concurrency:
+  group: pumpapi-zamer
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+  OUT_FILE: data/pumpapi_vs_helius.json
+
+jobs:
+  zamer:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Документация потока -- с хоста, своими глазами"
+        if: ${{ github.event.inputs.shag == 'docs' }}
+        run: |
+          set -e
+          python3 deploy/checks/stranica_v_tekst.py --self-test
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pvh"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pvh/stranica_v_tekst.py" < deploy/checks/stranica_v_tekst.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST 'set -e
+            for u in https://pumpapi.io/stream https://pumpapi.io/FAQ https://pumpapi.io/docs; do
+              echo "===== $u ====="
+              curl -sS --max-time 25 -A Mozilla/5.0 "$u" | python3 /tmp/pvh/stranica_v_tekst.py | head -300 || echo "stranica ne prochitalas"
+            done
+            /home/bot/robinhood-chain-alpha/venv/bin/python -c "import websockets; print(\"websockets\", websockets.__version__)"'
+
+      - name: "Модуль замера разбирается и самопроверка счёта"
+        if: ${{ github.event.inputs.shag == 'zamer' }}
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/pumpapi_vs_helius.py
+          python3 deploy/checks/pumpapi_vs_helius.py --self-test
+
+      - name: "Замер: одно соединение, только приём"
+        if: ${{ github.event.inputs.shag == 'zamer' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pvh"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pvh/pumpapi_vs_helius.py" < deploy/checks/pumpapi_vs_helius.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/pvh/pumpapi_vs_helius.py \
+              --minut '${{ inputs.minut }}' \
+              --zhurnal $STATE_DIR/decisions.jsonl \
+              --gruppy /home/bot/data/sources_2026-09-25.json \
+              --out /tmp/pvh/itog.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pvh/itog.json 2>/dev/null || true" > /tmp/pvh_itog.json || true
+          if python3 -c "import json; json.load(open('/tmp/pvh_itog.json'))" 2>/dev/null; then
+            cp /tmp/pvh_itog.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: zamer ne napisal itog"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/pvh"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: ${{ always() && github.event.inputs.shag == 'zamer' }}
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Potok PumpApi protiv Helius WS: zamer [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
