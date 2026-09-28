@@ -181,6 +181,40 @@ def длина_слота_с(state_dir: str) -> dict:
     return {"с": 0.274, "откуда": "константа 0.274 (замер не найден)"}
 
 
+_БЛОКИ: dict = {}
+
+
+def место_в_блоке(слот: int, подпись: str) -> dict:
+    """Индекс подписи источника в его блоке и число транзакций в блоке.
+
+    В записях полосы поля source_block_index у вечерних сделок не оказалось ни
+    у одной, поэтому место берётся ПО ЦЕПИ: getBlock со списком подписей (без
+    тел транзакций) -- один вызов на слот, с кэшем.
+    """
+    if not isinstance(слот, int) or not подпись:
+        return {"ok": False, "why_not": "нет слота или подписи источника"}
+    if слот in _БЛОКИ:
+        блок = _БЛОКИ[слот]
+    else:
+        о = зов("getBlock", [слот, {"encoding": "json",
+                                     "transactionDetails": "signatures",
+                                     "rewards": False,
+                                     "maxSupportedTransactionVersion": 1,
+                                     "commitment": "confirmed"}])
+        блок = ({"ok": True, "подписи": (о["result"] or {}).get("signatures") or []}
+                 if о["ok"] else {"ok": False, "why_not": о["why_not"]})
+        _БЛОКИ[слот] = блок
+    if not блок.get("ok"):
+        return {"ok": False, "why_not": блок.get("why_not")}
+    подписи = блок["подписи"]
+    try:
+        индекс = подписи.index(подпись)
+    except ValueError:
+        return {"ok": False, "why_not": "подписи источника в этом блоке нет",
+                 "всего": len(подписи)}
+    return {"ok": True, "индекс": индекс, "всего": len(подписи)}
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
@@ -227,6 +261,16 @@ def main() -> int:
         # РОВНОГО наполнения блока, а не по метке времени -- её в блоке нет.
         индекс = п.get("source_block_index")
         всего_в_блоке = п.get("source_block_total")
+        место_откуда = "запись" if isinstance(индекс, int) else None
+        место_почему = None
+        if not isinstance(индекс, int):
+            м_ = место_в_блоке(слот if isinstance(слот, int) else -1,
+                                п.get("source_sig") or "")
+            if м_.get("ok"):
+                индекс, всего_в_блоке = м_["индекс"], м_["всего"]
+                место_откуда = "цепь"
+            else:
+                место_почему = м_.get("why_not")
         доля = None
         из_индекса = None
         остаток = None
@@ -242,6 +286,8 @@ def main() -> int:
             "группа": п.get("lane_group"), "слот_источника": слот,
             "лидер": личность, "регион": регион, "why_not": почему,
             "индекс_в_блоке": индекс, "транзакций_в_блоке": всего_в_блоке,
+            "место_откуда": место_откуда, "место_почему": место_почему,
+            "подпись_источника": п.get("source_sig"),
             "доля_блока": доля, "из_индекса_мс": из_индекса,
             "остаток_мс": остаток,
             "увидели_мс": п.get("seen_lag_ms"),
