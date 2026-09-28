@@ -77,7 +77,10 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/nogi"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/nogi_vse_kotirovki.py" < deploy/checks/nogi_vse_kotirovki.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/kotirovki_grupp.json" < data/podbivka/kotirovki_grupp.json
-          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/leg_pools_prezhnie.json" < data/c2_leg_pools_2026-09-24.json
+          # ПРЕЖНИЙ ФАЙЛ -- САМЫЙ СВЕЖИЙ, А НЕ ОТ 24.09. Прогон с --tolko считает
+          # одну котировку, а пишет файл целиком: со старым файлом он потерял бы
+          # все найденные ранее ноги (так и вышло 28.09 в 02:47 -- 109 -> 57).
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/nogi/leg_pools_prezhnie.json" < "$(ls -1 data/c2_leg_pools_2*.json | tail -1)"
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             set -a; . $ENV_DIR/env; set +a
