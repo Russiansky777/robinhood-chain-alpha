@@ -35,6 +35,10 @@ on:
         description: "адрес пула: разобрать раскладки счетов его сделок (только чтение, пусто -- обычный сбор)"
         required: false
         default: ""
+      razbor_podpisi:
+        description: "подписи через запятую: разобрать их инструкции и сохранить образцы по видам"
+        required: false
+        default: ""
 
 concurrency:
   group: nogi-kotirovki
@@ -48,6 +52,7 @@ env:
   OUT_POOLS: data/c2_leg_pools_2026-09-28.json
   OUT_SHABLONY: data/nogi_shablony.json
   OUT_OTCHET: data/nogi_pokrytie.json
+  OUT_VIDY: data/obrazcy_vidov_instrukciy.json
 
 jobs:
   sbor:
@@ -98,6 +103,8 @@ jobs:
               --tolko '${{ inputs.tolko }}' \
               --glubokiy-poisk '${{ inputs.glubokiy_poisk }}' \
               --razbor-pula '${{ inputs.razbor_pula }}' \
+              --razbor-podpisi '${{ inputs.razbor_podpisi }}' \
+              --sohranit-obrazcy /tmp/nogi/obrazcy_vidov.json \
               --out-pools /tmp/nogi/pools.json \
               --out-shablony /tmp/nogi/shablony.json \
               --out-otchet /tmp/nogi/otchet.json" | tail -25
@@ -106,7 +113,7 @@ jobs:
           # файл 109 котировок пустотой (28.09, 03:47). Теперь каждый файл
           # сначала кладётся рядом, проверяется на разбор JSON и только потом
           # заменяет прежний.
-          for para in "pools.json:$OUT_POOLS" "shablony.json:$OUT_SHABLONY" "otchet.json:$OUT_OTCHET"; do
+          for para in "pools.json:$OUT_POOLS" "shablony.json:$OUT_SHABLONY" "otchet.json:$OUT_OTCHET" "obrazcy_vidov.json:$OUT_VIDY"; do
             imya="${para%%:*}"; kuda="${para##*:}"
             ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/nogi/$imya 2>/dev/null || true" > "/tmp/nogi_$imya" || true
             if python3 -c "import json,sys; json.load(open('/tmp/nogi_$imya'))" 2>/dev/null; then
@@ -122,7 +129,7 @@ jobs:
         if: always()
         run: |
           set -e
-          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET"; do
+          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET" "$OUT_VIDY"; do
             [ -f "$f" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$f" || true
           done
 
@@ -132,7 +139,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET"; do
+          for f in "$OUT_POOLS" "$OUT_SHABLONY" "$OUT_OTCHET" "$OUT_VIDY"; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
