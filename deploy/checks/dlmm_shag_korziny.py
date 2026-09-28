@@ -190,7 +190,10 @@ def подписи_из_журнала(путь: Path, *, сколько: int, �
     with путь.open(encoding="utf-8", errors="replace") as ф:
         for строка in ф:
             строка = строка.strip()
-            if not строка.startswith("{") or DLMM not in строка:
+            # В строке решения программа стоит ИМЕНЕМ (dex_programs), а не
+            # адресом: фильтр ловит оба вида, иначе журнал молчит.
+            if not строка.startswith("{") or (
+                    DLMM not in строка and "Meteora DLMM" not in строка):
                 continue
             try:
                 з = json.loads(строка)
