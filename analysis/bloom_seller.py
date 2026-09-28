@@ -60,6 +60,15 @@ try:
 except ImportError:  # pragma: no cover
     JUP = None
 
+# ОДИН ДОКЛАДЧИК НА ВСЕ ПУТИ (слово владельца 27.09, вечер). Строку позиции
+# рисует он, а не этот модуль: иначе своя продажа и продажа через Jupiter
+# докладывают по-разному, и в чате появляются прочерки там, где число есть в
+# записи позиции.
+try:
+    import bloom_doklad as DK
+except ImportError:  # pragma: no cover
+    DK = None
+
 # ПОЛОСА ЖИВЁТ НА СВОЁМ КОШЕЛЬКЕ (решение владельца 25.09). Отсюда сторож
 # берёт её адрес и её ключ: читать остаток и подписывать продажу надо тем
 # кошельком, который покупал. Модуль может не загрузиться (у сторожа нет
@@ -881,10 +890,26 @@ class Seller:
                             стоимость = None
                     if isinstance(чисто, (int, float)) and стоимость:
                         чистый_проц = (float(чисто) / float(стоимость) - 1.0) * 100.0
-                    self._сказать_о_продаже(cid, NT.строка_продажи(
-                        ok=True, код=None, через=через, секунды=секунды,
-                        sol_вернулось=sol, подпись=подпись,
-                        вход_sol=стоимость, процент_чистый=чистый_проц))
+                    # ДОКЛАДЧИК -- ЕДИНСТВЕННЫЙ ПУТЬ. Он сам решает: дописать
+                    # строку продажи к сообщению покупки или, если того нет,
+                    # послать полную строку покупка+продажа (слово владельца,
+                    # п.3). Числа он берёт из ЗАПИСИ ПОЗИЦИИ, теми же
+                    # правилами, что и выгрузка nashi_sdelki.
+                    доложено = None
+                    if DK is not None and свежая_п.get("lane"):
+                        try:
+                            доложено = DK.доложить(свежая_п,
+                                                    оповещатель=self.оповещатель)
+                        except Exception as exc:  # noqa: BLE001
+                            self.log({"stage": "doklad_ne_ushel",
+                                       "cid": cid,
+                                       "why_not": f"{type(exc).__name__}"})
+                            доложено = None
+                    if доложено is None:
+                        self._сказать_о_продаже(cid, NT.строка_продажи(
+                            ok=True, код=None, через=через, секунды=секунды,
+                            sol_вернулось=sol, подпись=подпись,
+                            вход_sol=стоимость, процент_чистый=чистый_проц))
                 else:
                     self.оповещатель.послать(NT.строка_продажи_не_подтверждена(
                         через=через, секунды=секунды, почему=почему_нет,
@@ -909,6 +934,71 @@ class Seller:
                     self.оповещатель.послать(текст_круга)
                 self.state.update_position(cid, circle_reported=True)
         return запись
+
+    def _тревога(self, вид: str, подробно: str) -> dict:
+        """Одна строка тревоги владельцу. Молчание тут хуже лишней строки."""
+        if self.оповещатель is None or NT is None:
+            return {"ok": False, "why_not": "оповещателя нет"}
+        try:
+            return self.оповещатель.послать(NT.строка_тревоги(вид, подробно))
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "why_not": f"{type(exc).__name__}"}
+
+    def _тревога_продажа_не_собралась(self, pos: dict, *, своя_почему=None,
+                                       jup_почему=None) -> dict:
+        """Ни свой путь, ни Jupiter. Одна тревога на позицию."""
+        cid = pos.get("client_order_id")
+        if not cid or pos.get("alarm_sell_failed_sent"):
+            return {"ok": False, "skipped": True}
+        подробно = (f"{str(pos.get('mint'))[:10]} группа "
+                     f"{pos.get('lane_group') or '?'}: свой путь -- "
+                     f"{своя_почему or 'не пробовался'}; Jupiter -- "
+                     f"{jup_почему or 'причина не названа'}")
+        итог = self._тревога("продажа не собралась", подробно)
+        try:
+            self.state.update_position(cid, alarm_sell_failed_sent=True)
+        except Exception:  # noqa: BLE001
+            pass
+        return итог
+
+    def тревога_нет_продажи(self, *, now: float | None = None,
+                             порог_с: float = 60.0) -> dict:
+        """Покупка села, продажи нет через 60 с (слово владельца, п.4).
+
+        Зовётся с пульса. Одна тревога на позицию: метка в записи, иначе каждый
+        круг повторял бы одну строку.
+        """
+        now = now if now is not None else time.time()
+        из_ = {"смотрели": 0, "тревог": 0}
+        try:
+            позиции = self.state.lane_positions()
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"позиции не прочитаны ({type(exc).__name__})"
+            return из_
+        for pos in позиции:
+            из_["смотрели"] += 1
+            if pos.get("alarm_no_sell_sent") or pos.get("state") == STATE_CLOSED:
+                continue
+            if pos.get("last_sell_reported") or pos.get("closed_signature"):
+                continue
+            села = pos.get("lane_landed_signature")
+            когда = pos.get("ts_sent") or pos.get("ts_intent")
+            if not села or not isinstance(когда, (int, float)):
+                continue
+            прошло = now - float(когда)
+            if прошло < порог_с:
+                continue
+            self._тревога("нет продажи",
+                           f"{str(pos.get('mint'))[:10]} группа "
+                           f"{pos.get('lane_group') or '?'}: покупка села "
+                           f"{прошло:.0f} с назад, продажи нет")
+            из_["тревог"] += 1
+            try:
+                self.state.update_position(pos.get("client_order_id"),
+                                            alarm_no_sell_sent=True)
+            except Exception:  # noqa: BLE001
+                pass
+        return из_
 
     def _сказать_о_продаже(self, cid, текст: str) -> dict:
         """Одно сообщение на сделку: в формате 3 строка продажи ДОПИСЫВАЕТСЯ.
@@ -1466,6 +1556,11 @@ class Seller:
             итог["action"] = "продажа полосы отправлена"
             return итог
         итог["action"] = "Jupiter полосе не продал"
+        # ТРЕВОГА (слово владельца 27.09, вечер, п.4): "продажа не собралась ни
+        # своим путём, ни Jupiter". Одна на позицию: круг повторяется каждые
+        # несколько секунд, и без метки чат залило бы одной и той же строкой.
+        self._тревога_продажа_не_собралась(pos, своя_почему=итог.get(
+            "two_step_sell_why_not"), jup_почему=r.get("why_not"))
         # UNSOLD по числу попыток у полосы больше НЕ ставится: позиция остаётся
         # в работе и продаётся следующим кругом. Причина отказа записана в
         # позицию (jup_why_not) и в журнал этой же попыткой.
@@ -1829,6 +1924,12 @@ class Seller:
                   for p in открытые]
         итог = {"positions": len(открытые), "mode": "live" if self.live else "dry-run",
                  "rows": строки}
+        # ТРЕВОГА "ПОКУПКА СЕЛА, ПРОДАЖИ НЕТ ЧЕРЕЗ 60 с" -- с пульса, вне пути
+        # продажи: она не должна ни задерживать продажу, ни падать вместе с ней.
+        try:
+            итог["тревога_нет_продажи"] = self.тревога_нет_продажи(now=now)
+        except Exception as exc:  # noqa: BLE001
+            итог["тревога_нет_продажи"] = {"why_not": f"{type(exc).__name__}"}
         self.heartbeat(итог)
         return итог
 
@@ -3146,6 +3247,68 @@ def self_test() -> None:
     for n, ok_, got in checks:
         print(f"  [{'ok  ' if ok_ else 'СБОЙ'}] {n}" + (f"  -> {got}" if got and not ok_ else ""))
         bad += (not ok_)
+    # --- ТРЕВОГИ ВЛАДЕЛЬЦА (п.4 от 27.09, вечер). Это не деньги, но молчание
+    # здесь стоит денег: покупка села, а продажи нет -- и никто не знает.
+    if True:
+        import tempfile as _tf  # noqa: PLC0415
+
+        d_т = _tf.mkdtemp()
+        st_т = ExecState(base=Path(d_т) / "s", kill=Path(d_т) / "kill")
+        s_т = Seller.__new__(Seller)
+        s_т.state = st_т
+        s_т.live = False
+        послано: list = []
+
+        class ОповТ:
+            def послать(self, текст, *, ключ=None, куда=None):
+                послано.append(текст)
+                return {"ok": True, "message_id": 1}
+
+        s_т.оповещатель = ОповТ()
+        сейчас = time.time()
+        st_т.write_intent(client_order_id="t1", mint="MT", source_sig="ST",
+                           source_slot=1, sol_in=0.3, pool=None, program=None,
+                           taxed=None, tax_bps=None, mode="live",
+                           sell_after_s=30.0, lane=МЕТКА_ПОЛОСЫ,
+                           lane_group="batch5", source="SRC")
+        st_т.update_position("t1", state="bought",
+                              lane_landed_signature="ПОДПИСЬ_ПОКУПКИ",
+                              ts_sent=сейчас - 30.0)
+        р1 = s_т.тревога_нет_продажи(now=сейчас)
+        chk("через 30 с тревоги о непроданном ещё нет",
+            р1.get("тревог") == 0 and not послано, (р1, послано))
+        р2 = s_т.тревога_нет_продажи(now=сейчас + 40.0)
+        chk("через 70 с тревога ушла и названа словом",
+            р2.get("тревог") == 1 and послано
+            and "продажи нет" in послано[0], (р2, послано))
+        р3 = s_т.тревога_нет_продажи(now=сейчас + 200.0)
+        chk("вторая тревога по той же позиции НЕ уходит",
+            р3.get("тревог") == 0 and len(послано) == 1, (р3, послано))
+        st_т.update_position("t1", last_sell_reported="ПОДПИСЬ_ПРОДАЖИ")
+        послано.clear()
+        st_т.write_intent(client_order_id="t2", mint="MT2", source_sig="ST2",
+                           source_slot=1, sol_in=0.3, pool=None, program=None,
+                           taxed=None, tax_bps=None, mode="live",
+                           sell_after_s=30.0, lane=МЕТКА_ПОЛОСЫ,
+                           lane_group="leader", source="SRC2")
+        st_т.update_position("t2", state="bought",
+                              lane_landed_signature="ПОДПИСЬ_2",
+                              ts_sent=сейчас, last_sell_reported="ПРОДАНА")
+        р4 = s_т.тревога_нет_продажи(now=сейчас + 300.0)
+        chk("по проданной позиции тревоги нет", р4.get("тревог") == 0, р4)
+        # Ни свой путь, ни Jupiter: одна тревога на позицию, с обеими причинами.
+        послано.clear()
+        поз_н = st_т.positions().get("t2") or {}
+        s_т._тревога_продажа_не_собралась(поз_н, своя_почему="нет шаблона ноги",
+                                           jup_почему="котировки нет")
+        chk("тревога о несобранной продаже называет ОБЕ причины",
+            послано and "нет шаблона ноги" in послано[0]
+            and "котировки нет" in послано[0], послано)
+        s_т._тревога_продажа_не_собралась(st_т.positions().get("t2") or {},
+                                           своя_почему="x", jup_почему="y")
+        chk("вторая такая тревога по той же позиции не уходит",
+            len(послано) == 1, послано)
+
     print(f"самопроверка сторожа продаж: {len(checks) - bad}/{len(checks)} пройдено")
     if bad:
         raise SystemExit(f"самопроверка не пройдена: {bad} из {len(checks)}")
