@@ -142,12 +142,20 @@ def разбор(tx: dict) -> dict | None:
     fee = int(meta.get("fee") or 0)
     приор_плата = max(0, fee - базовая)
     награда = приор_плата + (базовая - базовая * 50 // 100)
-    return {"подпись": (t.get("signatures") or [None])[0], "подписей": nsig, "записываемых": запис, "байт": байт,
+    return {"подпись": (t.get("signatures") or [None])[0], "версия": tx.get("version"), "подписей": nsig, "записываемых": запис, "байт": байт,
             "лимит_cu": cu, "лимит_cu_задан": лимит_cu is not None, "цена_мкл": цена, "стоимость": стоим,
             "плата_приор": приор_плата, "базовая": базовая, "награда": награда,
             "приоритет": награда * 1_000_000 // (стоим + 1), "ошибка": meta.get("err") is not None,
             "чаевые_на": sorted({к for к in все if к in ЧАЕВЫЕ} & переводы(tx, все, прог)),
             "_параметры": (nsig, п_ed, п_k1, п_r1, запис, байт, загр)}
+
+
+def разбор_б(tx: dict) -> dict | None:
+    try:
+        return разбор(tx)
+    except Exception as exc:  # noqa: BLE001 -- формат не разобран: пометка, не падение
+        return {"не_разобрана": f"{type(exc).__name__}: {exc}"[:120], "версия": tx.get("version"),
+                "подпись": ((tx.get("transaction") or {}).get("signatures") or [None])[0]}
 
 
 def переводы(tx: dict, все: list, прог: list) -> set:
@@ -171,6 +179,7 @@ def загрузить_чаевые() -> dict:
 
 
 ЧАЕВЫЕ: dict = {}
+ОБРАЗЦЫ: dict = {"версии": {}}
 
 
 def стоимость_при(р: dict, cu: int) -> int:
@@ -181,8 +190,13 @@ def стоимость_при(р: dict, cu: int) -> int:
 
 def блок(уз, слот: int) -> list:
     б = уз.вызов("getBlock", [слот, {"encoding": "json", "transactionDetails": "full", "rewards": False,
-                                     "maxSupportedTransactionVersion": 0, "commitment": "confirmed"}], срок=60.0)
-    return (б or {}).get("transactions") or []
+                                     "maxSupportedTransactionVersion": 1, "commitment": "confirmed"}], срок=60.0)
+    тт = (б or {}).get("transactions") or []
+    for т in тт:                         # образец транзакции v1 -- как есть, для проверки разбора
+        if т.get("version") not in (None, "legacy", 0) and "v1" not in ОБРАЗЦЫ:
+            ОБРАЗЦЫ["v1"] = т
+        ОБРАЗЦЫ["версии"][str(т.get("version"))] = ОБРАЗЦЫ["версии"].get(str(т.get("version")), 0) + 1
+    return тт
 
 
 def сделка(уз, r: dict, кэш: dict) -> dict:
@@ -193,7 +207,7 @@ def сделка(уз, r: dict, кэш: dict) -> dict:
         return {**из_, "why_not": "нет севшей подписи или слота"}
     for s in {из_["s_src"], из_["s_наш"]}:
         if s not in кэш:
-            кэш[s] = [разбор(т) for т in блок(уз, s)]
+            кэш[s] = [разбор_б(т) for т in блок(уз, s)]
     бс, бн = кэш[из_["s_src"]], кэш[из_["s_наш"]]
     i_src = next((i for i, x in enumerate(бс) if x and x.get("подпись") == из_["src_sig"]), None)
     i_наш = next((i for i, x in enumerate(бн) if x and x.get("подпись") == из_["наша_sig"]), None)
@@ -202,8 +216,11 @@ def сделка(уз, r: dict, кэш: dict) -> dict:
     if i_src is None or i_наш is None:
         return {**из_, "why_not": "подпись не найдена в блоке"}
     мы, ист = бн[i_наш], бс[i_src]
+    if мы.get("не_разобрана") or ист.get("не_разобрана"):
+        return {**из_, "why_not": "наша или источника транзакция не разобрана: " + str(мы.get("не_разобрана") or ист.get("не_разобрана"))}
     между = (бн[i_src + 1:i_наш] if из_["слотов"] == 0 else бс[i_src + 1:] + бн[:i_наш])
-    между = [x for x in между if x and not x.get("голос")]
+    из_["между_не_разобрано"] = sum(1 for x in между if x and x.get("не_разобрана"))
+    между = [x for x in между if x and not x.get("голос") and not x.get("не_разобрана")]
     P = мы["приоритет"]
     ниже = [x for x in между if x["приоритет"] < P]
     выше = [x for x in между if x["приоритет"] > P]
@@ -257,12 +274,16 @@ def md(ряды: list, метка: str, контроль: dict | None) -> str:
                 "|---|---|---|---|---|---|---|"]
         for i, x in контроль.items():
             out.append(f"| {i} | {x['подпись'][:8]} | {x['плата_приор'] / 1e9:.6f} | {x['лимит_cu']} | "
-                       f"{x['цена_мкл']} | {x['стоимость']} | {x['приоритет']:,} |" if x else f"| {i} | -- |||||| ")
+                       f"{x['цена_мкл']} | {x['стоимость']} | {x['приоритет']:,} |" if x and "приоритет" in x
+                       else f"| {i} | {(x or {}).get('не_разобрана', '--')} |||||| ")
         out.append("")
     out += ["## По сделкам", "",
             "| время | слот ист. | слотов до нас | i ист. | i наш | наш приоритет | N между | ниже | выше | "
             "плата выше всех, SOL | при 0.0002/140k вперёд | с чаевыми (выше нас) |",
             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    нр = sum(r.get("между_не_разобрано") or 0 for r in ряды)
+    if нр:
+        out.insert(len(out) - 3, f"Транзакций между источником и нами, не разобранных (формат): {нр} -- в счёт не вошли.\n")
     for r in ряды:
         if r.get("why_not"):
             out.append(f"| {r['utc']} | {r.get('s_src')} | -- | | | | | | | | | {r['why_not']} |")
@@ -302,6 +323,7 @@ def md(ряды: list, метка: str, контроль: dict | None) -> str:
         out += ["", "Транзакции между источником и нами с переводом на известные счета чаевых (data/senders.json), "
                     "по отправителю: " + (", ".join(f"{k} {n}" for k, n in sorted(по.items(), key=lambda kv: -kv[1]))
                                           or "нет") + ". Чаевые в формулу приоритета не входят."]
+    out += ["", "Версии транзакций в прочитанных блоках: " + ", ".join(f"{k} {n}" for k, n in ОБРАЗЦЫ["версии"].items()) + "."]
     return "\n".join(out) + "\n"
 
 
@@ -327,7 +349,7 @@ def main() -> int:
     with уз.на("helius"):
         контроль = None
         if а.kontrol:
-            б = [разбор(т) for т in блок(уз, 451134500)]
+            б = [разбор_б(т) for т in блок(уз, 451134500)]
             контроль = {i: ({k: v for k, v in б[i].items() if not k.startswith("_")} if i < len(б) and б[i] else None)
                         for i in (648, 709, 720, 982)}
         for r in ряды_вх:
@@ -342,7 +364,7 @@ def main() -> int:
                     del кэш[k]
     П.mkdir(parents=True, exist_ok=True)
     out = П / f"mesto_{а.metka}.json"
-    out.write_text(json.dumps({"контроль": контроль, "ряды": рез, "расход": уз.расход()}, ensure_ascii=False),
+    out.write_text(json.dumps({"контроль": контроль, "ряды": рез, "образцы": ОБРАЗЦЫ, "расход": уз.расход()}, ensure_ascii=False),
                    encoding="utf-8")
     doc = КОРЕНЬ / "docs" / f"podbivka_{а.metka}_mesto_v_bloke.md"
     doc.write_text(md(рез, а.metka, контроль), encoding="utf-8")
