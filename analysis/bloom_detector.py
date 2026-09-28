@@ -3395,6 +3395,26 @@ class Детектор:
                      "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
             поля = {"block_tries": попытки, "block_slot": слот,
                      "block_slot_from": откуда}
+            # НАШЕЙ ПОДПИСИ В ЭТОМ БЛОКЕ НЕТ -- значит слот взят не тот. Слот
+            # посадки у полосы приходит из ЗАМЕРНОЙ подписки (processed), а
+            # окончательный может отличаться: по трём живым сделкам из четырёх
+            # (28.09, 04:30-05:32) место в блоке из-за этого не находилось.
+            # Спрашиваем слот у самой транзакции и пробуем ещё раз -- это один
+            # getTransaction, и только когда первый заход не сошёлся.
+            if not м.get("known") and "в этом блоке нет" in str(м.get("why_not")):
+                try:
+                    свой = self.helius.транзакция(подпись)
+                    слот_цепи = (свой or {}).get("slot")
+                except Exception:  # noqa: BLE001
+                    слот_цепи = None
+                if isinstance(слот_цепи, int) and слот_цепи != слот:
+                    try:
+                        м = BP.место_по_подписям(self.helius, слот_цепи, подпись)
+                        поля.update(block_slot=слот_цепи,
+                                     block_slot_from="слот транзакции по цепи")
+                    except Exception as exc:  # noqa: BLE001
+                        м = {"known": False,
+                             "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"}
             if м.get("known"):
                 поля.update(block_index=м.get("index"),
                              block_total=м.get("total"),
@@ -9225,6 +9245,12 @@ def self_test() -> int:
             st_мб.update_position("мб1", lane_landed_slot=501,
                                    lane_signature="П" * 88)
             итог_мб = дет_мб.догнать_место_в_блоке()
+            поз_мб0 = st_мб.positions()["мб1"]
+            chk("при «нашей подписи в блоке нет» слот спрашивается у самой "
+                f"транзакции (откуда: {поз_мб0.get('block_slot_from')})",
+                поз_мб0.get("block_slot_from") in
+                ("lane_landed_slot", "слот транзакции по цепи"),
+                поз_мб0.get("block_slot_from"))
             поз_мб = st_мб.positions()["мб1"]
             chk("место в блоке у сделки полосы берётся по lane_landed_slot "
                 f"(смотрели {итог_мб['looked']}, слот {поз_мб.get('block_slot')}, "
