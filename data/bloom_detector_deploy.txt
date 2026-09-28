@@ -1,4 +1,3 @@
-  "buy_sol": 0.2,
   "slippage_pct": 35.0,
   "priority_fee": 0.001,
   "processor_tip": 0.001,
@@ -43,11 +42,12 @@
       "api_error_last_ts": 1790381356.4951322
     },
     "day_pnl": {
-      "realized_sol": 0.0,
-      "spent_sol": 0.0,
+      "realized_sol": 0.119978208,
+      "spent_sol": 0.02672984,
       "buys": 0,
-      "sells": 0,
-      "tz_unavailable": false
+      "sells": 6,
+      "tz_unavailable": false,
+      "updated_utc": "2026-09-28T00:13:28Z"
     },
     "bloom_request_budget": {
       "limit_week": 10000,
@@ -81,9 +81,9 @@ Traceback (most recent call last):
 UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-27T22:20:47Z",
-  "updated_ts": 1790547647.200284,
-  "alive_since_utc": "2026-09-27T22:20:36Z",
+  "updated_utc": "2026-09-28T00:33:49Z",
+  "updated_ts": 1790555629.6309457,
+  "alive_since_utc": "2026-09-28T00:33:38Z",
   "mode": "live",
   "sources": 589,
   "source_groups": {
@@ -254,32 +254,32 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "astralane": {
         "age_s": 0.2,
         "last_use_s": null,
-        "last_ping_s": 0.1,
+        "last_ping_s": 0.2,
         "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "blockrazor": {
-        "age_s": 0.1,
+        "age_s": 0.2,
         "last_use_s": null,
-        "last_ping_s": 0.1,
+        "last_ping_s": 0.2,
         "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "helius": {
-        "age_s": 0.1,
+        "age_s": 0.2,
         "last_use_s": null,
-        "last_ping_s": 0.1,
+        "last_ping_s": 0.2,
         "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "jito": {
-        "age_s": 0.1,
+        "age_s": 0.2,
         "last_use_s": null,
         "last_ping_s": 0.1,
         "pings_ok": 1,
@@ -318,13 +318,13 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "sources_generation": 0,
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 46,
+  "signals_seen": 37,
   "to_buy": 0,
   "by_code": {
-    "TARGET_AMOUNT_OUT_OF_RANGE": 4,
-    "NOT_A_BUY": 37,
-    "INSUFFICIENT_BALANCE": 1,
-    "TOKEN_RECEIVED_NOT_BOUGHT": 4
+    "NOT_A_BUY": 25,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 8,
+    "TOKEN_RECEIVED_NOT_BOUGHT": 3,
+    "SKIP_TARGET_INCREASE_POSITION": 1
   },
   "by_code_test_source": {},
   "test_sources": [
@@ -335,7 +335,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "test_min_sol": 0.05,
   "max_tx_version": 1,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 121.64114122788165,
+  "rate_usd_sol": 122.22595068630137,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -346,21 +346,21 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
   "kill_bloom_active": false,
   "kill_bloom_note": "",
-  "net_slot": 451129451,
-  "slot_notifications": 40,
-  "net_slot_age_s": 0.16,
+  "net_slot": 451159124,
+  "slot_notifications": 38,
+  "net_slot_age_s": 0.19,
   "balance_sol": 0.000810942,
-  "balance_age_s": 0.4,
-  "rpc_calls": 75,
+  "balance_age_s": 0.46,
+  "rpc_calls": 81,
   "rpc_by_method": {
-    "getMultipleAccounts": 6,
+    "getMultipleAccounts": 11,
     "getBalance": 4,
     "getLatestBlockhash": 1,
     "getAccountInfo": 1,
     "getTransaction": 60,
-    "simulateTransaction": 3
+    "simulateTransaction": 4
   },
-  "session_credits": 771,
+  "session_credits": 429,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -412,32 +412,33 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   },
   "shadow": {
     "enabled": true,
-    "built": 5,
+    "built": 9,
     "would_pass": 0,
     "over_cap": 0,
     "failed": 0,
     "module_loaded": true,
     "module_why_not": "",
     "passed_in_row_by_pool": {
-      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0,
-      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 0,
-      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 0
+      "MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms": 0,
+      "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": 0,
+      "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0,
+      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0
     },
     "hour": {
-      "since_ts": 1790547636.5475855,
-      "since_utc": "2026-09-27T22:20:36Z",
-      "signals": 5,
-      "built": 3,
-      "sim_failed": 3,
+      "since_ts": 1790555618.9234455,
+      "since_utc": "2026-09-28T00:33:38Z",
+      "signals": 9,
+      "built": 4,
+      "sim_failed": 4,
       "not_built": {
-        "шаблон: разновидность инструкции кривой не известна: b817ee6167c5d33d": 1,
-        "шаблон: у источника инструкция 33e685a4017f83ad, не buy_exact_quote_in": 1
+        "тип пула не покрыт сборщиком: MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms": 1,
+        "котировка не SOL: шаблона SOL -> Q в кэше нет": 4
       },
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 3,
+    "credits_day": 4689,
     "credits_write_why_not": ""
   },
   "route_tax_filter": {
@@ -454,13 +455,11 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
     "live": true,
     "module_loaded": true,
     "module_why_not": "",
-    "paths": 1,
-    "starts": 1,
+    "paths": 0,
+    "starts": 0,
     "threads_alive": 0,
     "sent": 0,
-    "by_stage": {
-      "gate": 1
-    },
+    "by_stage": {},
     "bought_backfilled": 0,
     "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
     "own_wallet": true,
@@ -470,39 +469,32 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "ok": true,
       "why_not": null
     },
-    "balance_sol": 6.07907666,
+    "balance_sol": 6.19905487,
     "balance_day_threshold": {
       "ok": true,
       "kill": false,
-      "why": "просадка от 00:00 0.0 SOL при пороге 2.0",
+      "why": "просадка от 00:00 -0.119978 SOL при пороге 2.0",
       "threshold_sol": 2.0,
       "day": "20260928",
       "open_sol": 6.07907666,
-      "balance_sol": 6.07907666,
-      "drop_sol": 0.0
+      "balance_sol": 6.19905487,
+      "drop_sol": -0.11997821
     },
     "lane_daily_stop": {
       "threshold_sol": 1.5,
-      "pnl_all_groups_sol": 0.0,
+      "pnl_all_groups_sol": 0.119978208,
       "stopped": false,
       "why_not": null
     },
-    "balance_age_s": 0.4,
+    "balance_age_s": 0.5,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 10.4,
+    "blockhash_age_s": 10.5,
     "blockhash_updates": 1,
     "blockhash_why_not": "",
-    "last": {
-      "stage": "gate",
-      "ok": false,
-      "why_not": "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)",
-      "signature": null,
-      "pool_program": null,
-      "ts_utc": "2026-09-27T22:20:38Z"
-    },
+    "last": {},
     "lane_kill": [
       false,
       ""
@@ -518,6 +510,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
         "off": 1
       },
       "size_sol": 0.05,
+      "ceiling_sol": 0.5,
       "stop_failed_in_row": 5,
       "stop_loss_sol": 0.3
     },
@@ -527,20 +520,25 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "day": "20260928",
       "day_start_ts": 1790546400.0,
       "day_how": "Europe/Madrid",
-      "pnl_all_groups_sol": 0.0,
-      "today_all_groups": 0,
-      "today": 0,
+      "pnl_all_groups_sol": 0.119978208,
+      "today_all_groups": 6,
+      "today": 6,
       "failed_in_row": 0,
-      "pnl_sol": 0.0,
-      "pnl_trade_sol": 0.0,
-      "spend_sol": 0.0,
-      "uncountable_today": 0,
+      "pnl_sol": 0.119978208,
+      "pnl_trade_sol": 0.146708048,
+      "spend_sol": 0.02672984,
+      "uncountable_today": 4,
       "no_result_today": 0,
-      "uncountable_why": [],
-      "total": 42,
+      "uncountable_why": [
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+        "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
+      ],
+      "total": 48,
       "group": "деньги (все группы кроме скорости)",
-      "day_turnover_sol": 0,
-      "day_spend_sol": 0.0
+      "day_turnover_sol": 1.81203,
+      "day_spend_sol": 0.02672984
     },
     "lane_state_by_group": {
       "money": {
@@ -549,20 +547,25 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
         "day": "20260928",
         "day_start_ts": 1790546400.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": 0.0,
-        "today_all_groups": 0,
-        "today": 0,
+        "pnl_all_groups_sol": 0.119978208,
+        "today_all_groups": 6,
+        "today": 6,
         "failed_in_row": 0,
-        "pnl_sol": 0.0,
-        "pnl_trade_sol": 0.0,
-        "spend_sol": 0.0,
-        "uncountable_today": 0,
+        "pnl_sol": 0.119978208,
+        "pnl_trade_sol": 0.146708048,
+        "spend_sol": 0.02672984,
+        "uncountable_today": 4,
         "no_result_today": 0,
-        "uncountable_why": [],
-        "total": 42,
+        "uncountable_why": [
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька",
+          "количество, купленное полосой, так и не добралось -- продажа по остатку кошелька"
+        ],
+        "total": 48,
         "group": "деньги (все группы кроме скорости)",
-        "day_turnover_sol": 0,
-        "day_spend_sol": 0.0
+        "day_turnover_sol": 1.81203,
+        "day_spend_sol": 0.02672984
       },
       "speed_only": {
         "open": 0,
@@ -570,8 +573,8 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
         "day": "20260928",
         "day_start_ts": 1790546400.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": 0.0,
-        "today_all_groups": 0,
+        "pnl_all_groups_sol": 0.119978208,
+        "today_all_groups": 6,
         "today": 0,
         "failed_in_row": 0,
         "pnl_sol": 0.0,
@@ -590,12 +593,12 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "enabled": false,
       "senders_seen": 0,
       "spent_today": {
-        "day": "20260927",
-        "n": 42,
-        "signals": 7,
-        "spent_lamports": 28917000,
+        "day": "20260928",
+        "n": 0,
+        "signals": 0,
+        "spent_lamports": 0,
         "why_not": null,
-        "spent_sol": 0.028917
+        "spent_sol": 0.0
       },
       "limits": {
         "signals_per_day": 20,
@@ -608,9 +611,9 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "enabled": true,
       "tip_cap_sol": 0.005,
       "winners": {
-        "astralane": 22,
-        "nozomi": 14,
-        "blockrazor": 1,
+        "astralane": 25,
+        "nozomi": 15,
+        "blockrazor": 3,
         "jito": 1,
         "helius": 4
       }
@@ -625,7 +628,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
       "shift_signature": null,
       "warm": {
         "есть": true,
-        "возраст_с": 10.41,
+        "возраст_с": 10.47,
         "почему": "",
         "обновлений": 1,
         "взят_тёплым": 0,
@@ -638,60 +641,101 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
     "enabled": true,
     "pools": 57,
     "templates": {
-      "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
-        "age_s": 0.0,
+      "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx": {
+        "age_s": 0.1,
         "flipped": false,
-        "sig": "n2BfiZe86A6x2QwedmVeg4WMFBnQ1vMBKktcPFcRPTaToVKusFa3rVX79HYXc1ZX8DxHkXwCwpaT2qYD9WRcKG5"
+        "sig": "2DcKrPpQ7QpjDj6FvCW9n2K67tTyihhMVujWp4TyVuod6oAn928JUCdqnxwgM5Y8rfLSnyE8NiPfUDZiUxWxYFiY"
+      },
+      "DJTu7vi8norVzdVAffgvb39VP7wjKeTsgaMBJrzfxvoF": {
+        "age_s": 3.2,
+        "flipped": false,
+        "sig": "3NqXPd3D9wHxRz9cCATLCTN1WU3W2d1yPihGmXzvFVYVzspczW9TEQMwGnRGn6ziXmncceSfUrnw54ogko8TWW7L"
       },
       "METvsvVRapdj9cFLzq4Tr43xK4tAjQfwX76z3n6mWQL": {
-        "age_s": 9.4,
-        "flipped": true,
-        "sig": "4N2Lk5Y8zCi1hKQPZfvbgvj7chRe7oKyCxPSb7Qb4G6tgKdvsmzVhZtBGi4TjF7NBsNuGTC6n3RDfBQDpXVBrqix"
-      },
-      "LMT3i1BHgixFqPUgcyteJhnEz2dpy9i3cYy4pi9BoeV": {
-        "age_s": 8.2,
+        "age_s": 3.1,
         "flipped": false,
-        "sig": "3nrv5fWpXTKnaVqrfzMxeqV4QPdc6AY5nt1Sdgg8i6YbtmSPB5KchkpLHLFjo7BqzUiMFKW5YFVcjLnCU4XAKSU9"
+        "sig": "5yJRoeadmEy1h69ZaTiZWbh7JXLaaxJoD4gPPztGiWneKRayvTXkVPGRKq1bcTAKaTmpwYddptUbCcG7h9isFyAn"
+      },
+      "RBLXDGRD64AtRamHMFVcjqne3Ar7NLWtFtYNtsrf1cE": {
+        "age_s": 3.8,
+        "flipped": false,
+        "sig": "3mEY9XdzNWR7cj6ivYpMaGRZ4ozdMKvCqU9QKGbzHqi47SCNXJLXM36Ti3qXbnEvbCRYKbt6vhpkaqdN2LW853rx"
+      },
+      "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw": {
+        "age_s": 0.6,
+        "flipped": false,
+        "sig": "445JnhtZ7EGtugEu5Uk6AKdsECNVguiffWgLf7r2ppDithoHAue8Vk4L3KeWvYRnwJu3N1UqGzhZ1FFc5PCviWgB"
+      },
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
+        "age_s": 4.2,
+        "flipped": false,
+        "sig": "5dsEEa69yYEd1KpHSQ3X8FLfKuMnf8Q1meYBar3Jmoxi2X7xvj3ddsF2vLVngUetyJZ7m1jHqL1S2GFTZAxS8k3z"
+      },
+      "AMD8XwJXgQ9WV45Wyj9yFLejxzf2J6VM1PJY8bJEjeES": {
+        "age_s": 4.9,
+        "flipped": false,
+        "sig": "3jtW3iCbCKCc4eaDzM3rDFhNw5F2Su7nVoGeAxAsycCwAYHn7NVa5pznv17Btc2ju2uFjoSNTrhj11SJ2Wa5qPuC"
+      },
+      "Grass7B4RdKfBCjTKgSqnXkqjwiGvQyFbuSCUJr3XXjs": {
+        "age_s": 6.4,
+        "flipped": false,
+        "sig": "6351mjfu1jzMaUVK6eULP1YCxL8e5AfuVcdvPKBRCLxWgNvdLsBzc227DDy68nvZ7Vmm61ZEAd2v2KaQRJYqoqVe"
+      },
+      "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF": {
+        "age_s": 5.7,
+        "flipped": true,
+        "sig": "2wV9b4eNqTPQD4mDh8wU4MStGvAHirfjModjWZjTNWJQWtqxi8JukzexUUjLFJrrkrffRfFYSiVUmR6EYv5bvk2U"
       },
       "SNAPcESrvnH8yUdgeMF6xm1hym9b6hW6s8YeqeHdZFz": {
-        "age_s": 6.0,
+        "age_s": 2.7,
         "flipped": false,
-        "sig": "n4a3XFpaUsQhLTWZ7kg6L8duyBf2YoAQnZ29kRmTXzbRuBz5j9GVtdUquFzJzTrkoYidUQXffBasbSP3rfHSQgB"
+        "sig": "3gFobRzNPpuBPV1mTk1q1HfWHfnGma394QddCKAFrX9dvNSbuYbKmFyYHauwPq5FKvE6kEo9KSmperq2Gko7rjvW"
       },
-      "SiLVFMgD3eD2rgK628NbTBq9MnuJF5FW2CRaVyTB35L": {
-        "age_s": 5.5,
+      "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp": {
+        "age_s": 1.9,
         "flipped": false,
-        "sig": "4RMHapBo7y9WWFAKxeZArQxYUVYmgUxp5aMxmMwiR7Bk2hgdzAYY6aBxH7zgDASEgqTiqZgEEmup57apSj3UmxVf"
+        "sig": "2bSiuzshX9P4xtLy3o4kL76hCmznbGPcSVcQZeFyGBRFTqjpJ1W4V4N2hMZG6y3YPZGW72wL8L69JKVrsdhR1HZ3"
       },
       "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ": {
-        "age_s": 0.1,
+        "age_s": 1.4,
         "flipped": true,
-        "sig": "UN7iKaZBqVq3CNnozyeDkfin9f3VSP8FrTQo3zD8hKdVVpE4yXthJvbn4qbP3dMdMph2TxcqhvGs1W5KTUvQCF3"
+        "sig": "2CcSSzCMsseGAEQoMiR1AU7tVaKx2H45YdfzdQP8WLLBMDqfb7FZPSUeyHpV4dFGiz5QjKZVXJH6VcsZ4xy4GPUH"
+      },
+      "7ga6rtE9qSb3wdEiDCpTu2kHqoGVfT52jD8ign1rYTvx": {
+        "age_s": 1.7,
+        "flipped": false,
+        "sig": "2CGoo7t2QeH3sesJ67c6HzftG8uGSFasRQ8EWU9UmLnbUFAwFq9QDgEJYWFaxR1zLbYMUAXXnJydNhJM942GsEEU"
+      },
+      "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
+        "age_s": 0.9,
+        "flipped": false,
+        "sig": "2TJE7i57GhsdCDNoW33G5atsYqr16DozzWfcjy7cyB6DeUanQJCfXKKBMq9vH9fmjrBG2pd3Fe3BqYuu88wxui8Q"
       }
     },
-    "fed": 653,
+    "fed": 283,
     "no_tx": 0,
     "failed": 0,
-    "luts": 32,
-    "luts_pending": 12,
+    "luts": 37,
+    "luts_pending": 66,
     "luts_warmed": 32,
     "warm_why_not": "",
     "luts_topped_up": 0,
     "top_up_why_not": "",
-    "bytes": 15451133,
-    "credits": 296,
-    "credits_day": 296,
-    "credits_before_start": 0,
+    "bytes": 6480396,
+    "credits": 124,
+    "credits_day": 92724,
+    "credits_before_start": 92600,
     "credits_write_why_not": "",
     "credit_budget": 0,
     "credit_cap": "нет потолка",
     "dropped": false,
     "dropped_why": "",
     "ingest_stats": {
-      "шаблона нет": 352,
-      "новый шаблон": 4,
-      "не своп / счета не зависят от цены -- шаблон подтверждён": 295,
-      "новый шаблон (из продажи, перевёрнут)": 4
+      "шаблона нет": 16,
+      "новый шаблон (из продажи, перевёрнут)": 12,
+      "не своп / счета не зависят от цены -- шаблон подтверждён": 212,
+      "новый шаблон": 42,
+      "своп без шаблона -- шаблон не подтверждён": 1
     }
   },
   "two_step": {
@@ -719,7 +763,7 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-09-27T22:20:36Z",
+    "last_utc": "2026-09-28T00:33:39Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -746,12 +790,12 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid 
   "credits_logged": true,
   "credits_log_error": "",
   "decide_latency_ms": {
-    "n": 46,
+    "n": 37,
     "median": 0.8,
     "min": 0.3,
-    "max": 16.2
+    "max": 25.8
   }
 }--- решений в журнале ---
-8488
+53795
 --- позиций в журнале (должно быть 0: покупать нечем) ---
-5
+71
