@@ -138,5 +138,63 @@
    ],
    "docs": "data/docs/senders/astralane_submit_transactions.html"
   }
+ },
+ "tip_scheta_spravochnik": {
+  "зачем": "Только для РАЗБОРА ЧУЖИХ транзакций: по этим счетам замер называет канал, которым конкурент купил место. На нашу отправку раздел не влияет -- белый список чаевых полосы читается из senders[*].tip_accounts и здесь не меняется.",
+  "откуда": "Вендорская документация из сети этой машины недоступна (egress закрыт на astralane.gitbook.io и docs.nozomi), поэтому счета взяты ИЗ ЦЕПИ прогоном run_istoriya_pula_nl.yml (--iskat-tip) по окну слота 451134500 28.09: мелкий системный перевод от нескольких плательщиков либо вензельное начало адреса. По каждому счёту записана подпись-доказательство.",
+  "счета": [
+   {
+    "счёт": "AsTRAEoyMofR3vUPpf9k68Gsfb6ymTZttEtsAbv8Bk4d",
+    "служба": "Astralane",
+    "как_узнан": "вензельное начало AsTRAE",
+    "видно_в_цепи": "e7q8ohab62WfEYVMFjamsLzjoMU6rkXuVg995V7WZKguv1QVG4cGnXZ49NApYYspx6F5WUhYt2M1CnDq9jokmED",
+    "сумма_sol": 0.000100029
+   },
+   {
+    "счёт": "AStrAJv2RN2hKCHxwUMtqmSxgdcNZbihCwc1mCSnG83W",
+    "служба": "Astralane",
+    "как_узнан": "вензельное начало AStrAJ, два разных плательщика",
+    "видно_в_цепи": "5E5NbfeuFdYDW8g2AWELopQ2BAzx4kos6HexsZF7xHB4oN5hBZaWTokYFynJneeomzigL2RKikoZecqYuKza6FvL",
+    "сумма_sol": 0.001
+   },
+   {
+    "счёт": "nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne",
+    "служба": "Nozomi (Temporal)",
+    "как_узнан": "вензельное начало noz",
+    "видно_в_цепи": "2t5mPnMPRDjwg9GWSnGwpJZo7WrBggWyZcAkqFwPWBawNrA97LWo8i74hjJ3DgggBkL5ZWNpDbcitztDevaN1L8Q",
+    "сумма_sol": 0.001650846
+   },
+   {
+    "счёт": "n6BTPZCAUwE7599ZTcrcGBTH5FRU8PxnRJ5c5kSHARK",
+    "служба": "служба не названа: вензель SHARK, два разных плательщика по 0.05 SOL",
+    "как_узнан": "два плательщика, ровные 0.05 SOL",
+    "видно_в_цепи": "23neaBCUXyDKJbqMmpkfADQaf4iqZTqMRH1GiUq27C35LvNiihXtwRC2tw9umaSZTY92uUyUoxqv89ndCkfV39uP",
+    "сумма_sol": 0.05
+   },
+   {
+    "счёт": "7HeD6sLLqAnKVRuSfc1Ko3BSPMNKWgGTiWLKXJF31vKM",
+    "служба": "служба не названа: два разных плательщика, 0.0208-0.0312 SOL",
+    "как_узнан": "два плательщика, мелкие системные переводы",
+    "видно_в_цепи": "4eEQKHnYNUphW1hvbxfW9q2rp4FxHrzo51Gg19yqf2LuF49FNz5Mm5qR2DC2J1SJcd9mBsFF6VMDeK3hAaMBvVz8",
+    "сумма_sol": 0.0312
+   }
+  ],
+  "живые_из_белого_списка": [
+   {
+    "счёт": "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+    "служба": "Helius Sender",
+    "видно_в_цепи": "4kdsowGjh5W3dFFwWLtkG4CPWnEnKRNZso7eagPpyKKx95WfcELoFJvSXbgthtfa9R7nbKMWUjFKGJPjwXuFW6z9"
+   },
+   {
+    "счёт": "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
+    "служба": "Helius Sender",
+    "видно_в_цепи": "2w3wEGMFzbvFzBtGLMf8g9v2Z7RCWhirWR3mvywCG5qP3x6s4djxfeCw7WFVijLcZRW8zpvh6uEj41J18s8RXvqj"
+   },
+   {
+    "счёт": "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+    "служба": "Astralane",
+    "видно_в_цепи": "4LmNfJiSzJhL8XQngSczG1dZV8bVABWK1EeipaLc5ZNqq7ndEhZjxHntbVGmHn3hTD5NndNmRKJ1JtHa1qd93XaA"
+   }
+  ]
  }
 }

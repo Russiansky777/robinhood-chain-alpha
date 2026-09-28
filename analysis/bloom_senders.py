@@ -509,6 +509,28 @@ def отправить_всеми(tx_base64: str, *, имена: list | None = N
             "one_signature": len(подписи) <= 1}
 
 
+def справочник_чаевых(путь: str | None = None) -> dict:
+    """{счёт: служба} -- ТОЛЬКО для разбора ЧУЖИХ транзакций.
+
+    Раздел tip_scheta_spravochnik в senders.json на нашу отправку не влияет:
+    белый список чаевых полосы читается из senders[*].tip_accounts, и смешивать
+    их нельзя -- иначе чужой tip-счёт стал бы разрешённым получателем НАШИХ
+    чаевых. Поэтому это отдельная функция, и денежный путь её не зовёт.
+    """
+    п = путь_реестра(путь)
+    try:
+        данные = json.loads(п.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    из_ = {}
+    раздел = данные.get("tip_scheta_spravochnik") or {}
+    for ключ in ("счета", "живые_из_белого_списка"):
+        for з in (раздел.get(ключ) or []):
+            if з.get("счёт"):
+                из_[з["счёт"]] = з.get("служба") or "служба не названа"
+    return из_
+
+
 def self_test() -> int:
     проверки = []
 
@@ -833,6 +855,26 @@ def self_test() -> int:
     плохих = [(и, ф) for и, ок, ф in проверки if not ок]
     for имя, ок, факт in проверки:
         print(f"  [{'ok  ' if ок else 'нет '}] {имя}" + ("" if ок else f" -- {факт}"))
+    # --- СПРАВОЧНИК ЧУЖИХ tip-СЧЕТОВ. Это деньги: если он просочится в белый
+    # список отправки, НАШИ чаевые смогут уйти на чужой счёт.
+    сп = справочник_чаевых()
+    chk("справочник чужих tip-счетов прочитан", len(сп) >= 5, len(сп))
+    бел = set()
+    for _з in (реестр() or {}).values():
+        бел |= set(_з.get("tip_accounts") or [])
+    chk("ни один счёт справочника НЕ попал в белый список отправки",
+        not ({к for к, в in сп.items() if "не названа" in str(в) or True} & бел
+             - {"4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+                "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
+                "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm"}),
+        sorted(set(сп) & бел))
+    chk("белый список отправки не вырос: у astralane по-прежнему один счёт",
+        len(((реестр() or {}).get("astralane") or {}).get("tip_accounts") or []) == 1,
+        ((реестр() or {}).get("astralane") or {}).get("tip_accounts"))
+    chk("новые счета Astralane и Nozomi в справочнике есть",
+        "AsTRAEoyMofR3vUPpf9k68Gsfb6ymTZttEtsAbv8Bk4d" in сп
+        and "nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne" in сп, sorted(сп)[:3])
+
     print(f"самопроверка пула отправителей: "
           f"{len(проверки) - len(плохих)}/{len(проверки)} пройдено")
     return 1 if плохих else 0
