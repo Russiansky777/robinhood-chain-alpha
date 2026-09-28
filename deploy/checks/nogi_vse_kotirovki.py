@@ -182,6 +182,55 @@ def пулы_ноги_в_tx(tx: dict, C, B, программы) -> list:
 программы_разных_владельцев: set = set()
 
 
+def пул_через_jupiter(q: str, лампорты: int = 300_000_000) -> dict:
+    """Адрес пула SOL -> Q у Jupiter (только УКАЗАТЕЛЬ, проверка -- по цепи).
+
+    ЗАЧЕМ. Пул с постоянным произведением для USDC по истории минта не находится:
+    подписи минта USDC -- это переводы и агрегаторы, а не свопы конкретного пула
+    (замер 28.09: 300 транзакций, 19 пулов, ни одного CPMM или Pump AMM).
+    Jupiter на прямом маршруте называет ammKey -- адрес пула. Дальше мы читаем
+    ЕГО СОБСТВЕННЫЕ сделки по цепи и разбираем их теми же функциями, что полоса:
+    ни одного числа от Jupiter в деньги не идёт, он только показывает, куда
+    смотреть.
+    """
+    из_ = {"ok": False, "pools": [], "why_not": None}
+    базы = ("https://lite-api.jup.ag/swap/v1", "https://api.jup.ag/swap/v1")
+    запрос = (f"/quote?inputMint={WSOL}&outputMint={q}&amount={лампорты}"
+              f"&slippageBps=50&onlyDirectRoutes=true")
+    for база in базы:
+        try:
+            req = urllib.request.Request(база + запрос,
+                                         headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                о = json.loads(r.read().decode())
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"{база.split('//')[1].split('/')[0]}: {type(exc).__name__}"
+            continue
+        for шаг in (о.get("routePlan") or []):
+            инф = шаг.get("swapInfo") or {}
+            if инф.get("ammKey"):
+                из_["pools"].append({"pool": инф["ammKey"],
+                                      "label": инф.get("label"),
+                                      "outAmount": инф.get("outAmount")})
+        из_["ok"] = bool(из_["pools"])
+        из_["from"] = база
+        return из_
+    return из_
+
+
+def образцы_пула(адрес: str, сколько: int, C, B, программы) -> list:
+    """Пулы SOL<->Q из сделок КОНКРЕТНОГО пула (адрес -- указатель, не число)."""
+    найдено = []
+    for sg in подписи(адрес, сколько):
+        tx = транзакция(sg)
+        if tx is None:
+            continue
+        for прог, qv, wv, q2 in пулы_ноги_в_tx(tx, C, B, программы):
+            if (прог, qv, wv, q2) not in найдено:
+                найдено.append((прог, qv, wv, q2))
+    return найдено
+
+
 def глубокий_поиск_пула(q: str, сколько: int, C, B, программы) -> tuple:
     """Пулы SOL<->Q по ИСТОРИИ минта страницами. (кандидаты, прочитано).
 
@@ -352,6 +401,18 @@ def main() -> int:
                                                         программы)
             глубокий_итог[q] = {"транзакций": прочитано_г,
                                  "кандидатов": len(найдено)}
+            if not any(k[0] in РЕЗЕРВНЫЕ for k in найдено):
+                # УКАЗАТЕЛЬ ОТ JUPITER: адрес пула, дальше только цепь.
+                чз = пул_через_jupiter(q)
+                глубокий_итог.setdefault(q, {})["jupiter"] = {
+                    "ok": чз.get("ok"), "why_not": чз.get("why_not"),
+                    "pools": [п.get("pool") for п in чз.get("pools") or []],
+                    "labels": [п.get("label") for п in чз.get("pools") or []]}
+                for п_ in (чз.get("pools") or []):
+                    for прог_, qv_, wv_, q2_ in образцы_пула(п_["pool"], 8, C, B,
+                                                              программы):
+                        if q2_ == q and (прог_, qv_, wv_) not in найдено:
+                            найдено.append((прог_, qv_, wv_))
             if найдено:
                 новые_хранилища = sorted({v for k in найдено for v in (k[1], k[2])}
                                           - set(бал))
