@@ -72,6 +72,35 @@ def раздел(d2: dict, к1: dict, отчёт, sv) -> list:
         md += [f"Лента FROINK в архиве PumpApi: {len(лента_а)} событий, "
                f"{SV.чч(лента_а[0]['timestamp'] / 1000)} – {SV.чч(лента_а[-1]['timestamp'] / 1000)}; по пулам: "
                + ", ".join(f"{p} {sum(1 for e in лента_а if str(e.get('pool')) == p)}" for p in sorted({str(e.get('pool')) for e in лента_а})) + ".", ""]
+    # б) по архиву: подъём за 5 мин до покупки источника (цепная лента начинается за 5 слотов до нас)
+    ист_а = [e for e in лента_а if e.get("txSigner") == d2.get("источник") and e.get("action") == "buy"
+             and e.get("pool") == "pump-amm" and abs((e.get("block") or 0) - d2["покупка"]["slot"]) <= 3]
+    if ист_а:
+        иа = ист_а[0]
+        t0 = иа["timestamp"]
+        адр = json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
+        до_ = [e for e in лента_а if e.get("pool") == "pump-amm" and t0 - 300_000 <= (e.get("timestamp") or 0) < t0
+               and e.get("quoteInPool") and e.get("tokensInPool")]
+        цена = lambda e: float(e["quoteInPool"]) / float(e["tokensInPool"])  # noqa: E731
+        if до_:
+            дно = min(до_, key=цена)
+            пок_ = [e for e in до_ if (e.get("timestamp") or 0) > дно["timestamp"] and e.get("action") == "buy"]
+            прод_ = [e for e in до_ if (e.get("timestamp") or 0) > дно["timestamp"] and e.get("action") == "sell"]
+            об = lambda сс: sum(float(e.get("quoteAmount") or 0) for e in сс)  # noqa: E731
+            md += ["### б) Ступени до пика -- по архиву PumpApi (пул Pump AMM)", "",
+                   f"Цепная лента FROINK начинается за 5 слотов до нашей покупки, поэтому подъём -- по архиву. Покупка источника "
+                   f"в архиве: {SV.чч(t0 / 1000)}, {float(иа.get('quoteAmount') or 0):.2f} SOL (Pump AMM), рост цены пула перед ней "
+                   f"за 750 слотов -- {иа.get('рост_до_750')} %. Дно -- наименьшая цена за 5 мин до неё: {SV.чч(дно['timestamp'] / 1000)}; "
+                   f"рост от дна до цены перед покупкой источника {(цена(до_[-1]) / цена(дно) - 1) * 100:+.1f} % за "
+                   f"{(t0 - дно['timestamp']) / 1000:.0f} с. От дна до источника: покупок {len(пок_)} от "
+                   f"{len({e.get('txSigner') for e in пок_})} кошельков, {об(пок_):.2f} SOL; продаж {len(прод_)}, {об(прод_):.2f} SOL "
+                   "(архив не видит часть свопов через сторонние программы).", "",
+                   "Покупки от 1 SOL:", "", "| время | кошелёк | SOL | в наших списках |", "|---|---|---|---|"]
+            for e in пок_:
+                if float(e.get("quoteAmount") or 0) >= 1:
+                    г = ", ".join((адр.get(e.get("txSigner")) or {}).get("группы") or [])
+                    md.append(f"| {SV.чч(e['timestamp'] / 1000)} | `{(e.get('txSigner') or '')[:8]}` | {float(e['quoteAmount']):.2f} | {г or '—'} |")
+            md.append("")
     # ---------- сравнение
     s1, s2 = к1["src"], к2["src"]
     пад1, пад2 = {x["кошелёк"] for x in к1["пад"]}, {x["кошелёк"] for x in к2["пад"]}
