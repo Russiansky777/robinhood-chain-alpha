@@ -47,6 +47,9 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Самопроверка ДО правки (без сети)"
+        run: python3 deploy/checks/politika_gruppy.py --self-test
+
       - name: "SSH key"
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
