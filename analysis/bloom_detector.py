@@ -2458,6 +2458,42 @@ class Детектор:
         self._двухшаговый_свод = из_
         return из_
 
+    def кредиты_по_часам(self) -> dict:
+        """Кредиты Helius за текущий и прошлый час -- из своего же осколка учёта.
+
+        Читается файл, который пишет CreditMeter: своего счётчика по часам в
+        памяти нет, а держать второй значило бы иметь два разных числа об одном
+        расходе. Это не горячий путь: признак жизни пишется раз в минуту.
+        """
+        из_ = {"за_сеанс": None, "за_час": None, "за_прошлый_час": None,
+                "за_сутки": None, "бюджет_за_сутки": None, "why_not": None}
+        метр = getattr(self, "метр", None) or getattr(
+            getattr(self, "helius", None), "метр", None)
+        if метр is None:
+            из_["why_not"] = "счётчика кредитов нет"
+            return из_
+        из_["за_сеанс"] = getattr(метр, "session_credits", None)
+        try:
+            путь = getattr(метр, "path", None)
+            if not путь or not Path(путь).exists():
+                из_["why_not"] = "осколка учёта ещё нет"
+                return из_
+            д = json.loads(Path(путь).read_text(encoding="utf-8"))
+            служба = getattr(метр, "service", "")
+            день = time.strftime("%Y-%m-%d", time.gmtime())
+            з = ((д.get("дни") or {}).get(день) or {}).get(служба) or {}
+            из_["за_сутки"] = з.get("кредитов_за_день")
+            из_["бюджет_за_сутки"] = з.get("бюджет_за_день")
+            часы = з.get("по_часам") or {}
+            сейчас = time.strftime("%Y-%m-%dT%HZ", time.gmtime())
+            прошлый = time.strftime("%Y-%m-%dT%HZ",
+                                     time.gmtime(time.time() - 3600))
+            из_["за_час"] = (часы.get(сейчас) or {}).get("кредитов")
+            из_["за_прошлый_час"] = (часы.get(прошлый) or {}).get("кредитов")
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        return из_
+
     def признак_жизни(self) -> dict:
         st = {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
                "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -2477,6 +2513,13 @@ class Детектор:
                "bloom_skipped_by_group": self.bloom_не_зван,
                "sources_from": self.откуда_источники,
                "sources_generation": self.поколение,
+               # СКОЛЬКО АДРЕСОВ ПОДПИСАНО ЖИВЬЁМ И СКОЛЬКО СНЯТО (слово
+               # владельца 28.09 к пункту про кредиты). Раньше в отчёте стояло
+               # только число источников в файле, и снятие группы с подписки
+               # ничем бы не подтвердилось.
+               "subscribed_addresses": len(адреса_подписки(self)),
+               "unsubscribed_addresses": len(набор_без_подписки()),
+               "credits": self.кредиты_по_часам(),
                "subscribe_method": self.способ,
                "subscribe_drops": self.обрывов,
                "signals_seen": self.обработано,
@@ -5817,8 +5860,34 @@ def адреса_подписки(детектор: "Детектор") -> list:
     хранилища = (set() if getattr(детектор, "ног_отключён", False)
                   else set(детектор.кэш_ног_адреса))
     полоса = {OS.кошелёк_полосы()} if OS is not None else set()
-    return sorted(set(детектор.источники) | {ST.EXECUTOR_WALLET} | полоса
-                  | хранилища)
+    # ГРУППА МОЖЕТ БЫТЬ СНЯТА С ЖИВОЙ ПОДПИСКИ (subscribe=false в файле групп).
+    # Кредиты Helius идут за ТРАФИКОМ: 28.09 расход дошёл до 1.73 млн за сутки
+    # при бюджете 1 млн и 45.9 ГБ, и перелом совпал с ростом log_only до ~591
+    # адреса. Слово владельца 28.09: подписаны только торгующие группы и
+    # кандидаты, лог по остальным считает Code-2 из архива PumpApi.
+    #
+    # НАШ КОШЕЛЁК, КОШЕЛЁК ПОЛОСЫ И ХРАНИЛИЩА СНЯТЬ НЕЛЬЗЯ: это не источники,
+    # а замер круга и корм кэшу шаблонов, и без них не видно ни посадки, ни
+    # купленного количества.
+    без_подписки = набор_без_подписки()
+    источники = {а for а in детектор.источники if а not in без_подписки}
+    return sorted(источники | {ST.EXECUTOR_WALLET} | полоса | хранилища)
+
+
+def набор_без_подписки() -> set:
+    """Адреса, снятые с живой подписки по файлу групп. Ошибка -- пустое множество.
+
+    Отказ читателя групп НЕ должен снимать подписку ни с кого: пустое множество
+    значит "подписываемся на всё", то есть прежнее поведение.
+    """
+    try:
+        import bloom_source_groups as SG  # noqa: PLC0415
+
+        return set(SG.адреса_без_подписки())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("список снятых с подписки не прочитан: %s: %s",
+                    type(exc).__name__, str(exc)[:160])
+        return set()
 
 
 async def _подписка_транзакций(ws, адреса: list) -> None:
@@ -9515,6 +9584,67 @@ def self_test() -> int:
                 (поз_мб3.get("lane_landed_slot") or 0)
                 - (поз_мб3.get("source_slot") or 0) == 1,
                 (поз_мб3.get("lane_landed_slot"), поз_мб3.get("source_slot")))
+
+        # ---- ПОДПИСКА: ГРУППА СО subscribe=false НЕ ПОДПИСЫВАЕТСЯ ----
+        # Это денежный путь наоборот: снять с подписки торгующую группу значит
+        # перестать видеть её сигналы. Поэтому проверяется и что снятое не
+        # подписывается, и что торгующее подписано, и что отказ читателя групп
+        # НИКОГО не снимает.
+        with _врем_каталог() as d_п:
+            файл_п = Path(d_п) / "groups.json"
+            файл_п.write_text(json.dumps({"groups": {
+                "lane_s0": {"lane_size": 0.3, "lane_trades": True,
+                             "addresses": {"ТОРГУЕТ": {}}},
+                "kandidaty": {"lane_trades": False,
+                               "addresses": {"КАНДИДАТ": {}}},
+                "log_only": {"lane_trades": False, "subscribe": False,
+                              "addresses": {"ЛОГ1": {}, "ЛОГ2": {}}},
+            }}, ensure_ascii=False), encoding="utf-8")
+            import bloom_source_groups as SGп  # noqa: PLC0415
+
+            было_файл = os.environ.get("BLOOM_SOURCE_GROUPS")
+            os.environ["BLOOM_SOURCE_GROUPS"] = str(файл_п)
+            SGп.загрузить(заново=True)
+            try:
+                снятые = набор_без_подписки()
+                chk(f"снятые с подписки адреса найдены по файлу: {sorted(снятые)}",
+                    снятые == {"ЛОГ1", "ЛОГ2"}, снятые)
+                st_п = ST.ExecState(base=Path(d_п) / "s", kill=Path(d_п) / "k")
+                дет_п = Детектор(источники={"ТОРГУЕТ": "lane_s0",
+                                             "КАНДИДАТ": "kandidaty",
+                                             "ЛОГ1": "log_only", "ЛОГ2": "log_only"},
+                                  состояние=st_п, helius=Helius(key="нет"),
+                                  курс=КурсSOL(), режим="dry")
+                дет_п.ног_отключён = True
+                адреса_п = адреса_подписки(дет_п)
+                chk(f"торгующий и кандидат подписаны, log_only снят "
+                    f"({len(адреса_п)} адресов)",
+                    "ТОРГУЕТ" in адреса_п and "КАНДИДАТ" in адреса_п
+                    and "ЛОГ1" not in адреса_п and "ЛОГ2" not in адреса_п,
+                    адреса_п)
+                chk("наш кошелёк остаётся в подписке при любом файле групп",
+                    ST.EXECUTOR_WALLET in адреса_п, адреса_п)
+                жп = дет_п.признак_жизни()
+                chk(f"в признаке жизни числа подписки: подписано "
+                    f"{жп.get('subscribed_addresses')}, снято "
+                    f"{жп.get('unsubscribed_addresses')}",
+                    жп.get("subscribed_addresses") == len(адреса_п)
+                    and жп.get("unsubscribed_addresses") == 2, жп)
+                chk("и блок кредитов есть, пусть и с причиной вместо чисел",
+                    isinstance(жп.get("credits"), dict)
+                    and "за_час" in жп["credits"], жп.get("credits"))
+                # ОТКАЗ ЧИТАТЕЛЯ ГРУПП НИКОГО НЕ СНИМАЕТ.
+                файл_п.write_text("{ это не json", encoding="utf-8")
+                SGп.загрузить(заново=True)
+                chk("битый файл групп подписку не трогает",
+                    набор_без_подписки() in ({"ЛОГ1", "ЛОГ2"}, set()),
+                    набор_без_подписки())
+            finally:
+                if было_файл is None:
+                    os.environ.pop("BLOOM_SOURCE_GROUPS", None)
+                else:
+                    os.environ["BLOOM_SOURCE_GROUPS"] = было_файл
+                SGп.загрузить(заново=True)
 
         # ---- СТАТИЧНЫЕ ШАБЛОНЫ НОГИ: ПРИЗНАК ЖИЗНИ И ПОРОГ ГЛУБИНЫ ----
         with _врем_каталог() as d_с:
