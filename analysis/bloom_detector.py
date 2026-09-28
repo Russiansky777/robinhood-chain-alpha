@@ -4295,8 +4295,35 @@ class Детектор:
             return max(размеры)
         return ST.env_float("BLOOM_OWN_SEND_SOL", 0.01)
 
-    def ждущие_доклада(self) -> list:
+    @staticmethod
+    def посадка_покупки_ts(p: dict) -> float | None:
+        """От чего считать срок доклада BUY: время посадки нашей покупки.
+
+        ОТМЕТКА ОЖИДАНИЯ НЕ ОБЯЗАТЕЛЬНА. Её ставили только две ветки -- "наша
+        транзакция увидена в потоке" и "количество покупки добралось", -- а у
+        сделки, где количество так и не добралось, не срабатывала ни одна: BUY
+        не уходил вовсе, и строку досылал сторож уже после SELL. Поэтому срок
+        считается от самой посадки, а отметка -- только уточнение.
+        """
+        for поле in ("own_tx_seen_ts", "ts_accepted", "ts_sent", "ts_intent"):
+            з = (p or {}).get(поле)
+            if isinstance(з, (int, float)) and з:
+                return float(з)
+        return None
+
+    def срок_доклада_от(self, p: dict, *, сейчас: float) -> float | None:
+        """Момент, от которого идёт срок доклада BUY, или None -- если поздно."""
+        когда = (p or {}).get("doklad_buy_wait_since")
+        if isinstance(когда, (int, float)) and когда:
+            return float(когда)
+        когда = self.посадка_покупки_ts(p)
+        if когда is None or сейчас - когда > ДОКЛАД_ОКНО_S:
+            return None
+        return когда
+
+    def ждущие_доклада(self, *, сейчас: float | None = None) -> list:
         """Сделки полосы, по которым BUY ещё не ушёл. [(cid, позиция)]."""
+        now = сейчас if сейчас is not None else time.time()
         try:
             позиции = self.состояние.positions()
         except Exception:  # noqa: BLE001
@@ -4305,7 +4332,10 @@ class Детектор:
         for cid, p_ in (позиции or {}).items():
             if not (p_ or {}).get("lane") or p_.get("doklad_buy_sent"):
                 continue
-            if not isinstance(p_.get("doklad_buy_wait_since"), (int, float)):
+            # СУХИЕ ПОЗИЦИИ НЕ ДОКЛАДЫВАЮТСЯ: строка BUY -- про деньги.
+            if not ST.is_real_mode(p_.get("mode")):
+                continue
+            if self.срок_доклада_от(p_, сейчас=now) is None:
                 continue
             из_.append((cid, p_))
         return из_
@@ -4365,12 +4395,12 @@ class Детектор:
         if self.оповещатель is None or DK is None:
             итог["why_not"] = "оповещатель или докладчик не подключён"
             return итог
-        for cid, p_ in self.ждущие_доклада():
+        for cid, p_ in self.ждущие_доклада(сейчас=now):
             итог["waiting"] += 1
-            try:
-                возраст = now - float(p_["doklad_buy_wait_since"])
-            except (TypeError, ValueError):
+            начало = self.срок_доклада_от(p_, сейчас=now)
+            if начало is None:
                 continue
+            возраст = now - начало
             собраны = self.данные_цепи_собраны(p_)
             if not собраны and возраст < ждать_с:
                 continue
@@ -6393,6 +6423,13 @@ def причина_обрыва(exc: Exception) -> str:
 # (2 попытки) ровно эти секунды, а не сжигает их за полтора мгновения.
 ДОКЛАД_ЖДАТЬ_S = ST.env_float("BLOOM_DOKLAD_WAIT_S", 3.0)
 ДОКЛАД_КРУГ_S = ST.env_float("BLOOM_DOKLAD_LOOP_S", 1.0)
+# ОКНО, ЗА КОТОРОЕ ДОКЛАД BUY ЕЩЁ ИМЕЕТ СМЫСЛ. Срок доклада считается от
+# ПОСАДКИ покупки, а не от отметки ожидания: отметку ставили только те две
+# ветки, где количество покупки добралось, и сделки без количества уходили
+# совсем без строки BUY (28.09: zVbJ3e 12:12:31Z и 12:14:47Z -- у обеих
+# lane_bought_raw пуст). Окно нужно, чтобы перезапуск службы не выслал строки
+# по вчерашним сделкам: старше окна -- молчим, как молчали.
+ДОКЛАД_ОКНО_S = ST.env_float("BLOOM_DOKLAD_OKNO_S", 900.0)
 # КАК ЧАСТО ЧИТАТЬ ОСТАТКИ ХРАНИЛИЩ ДЛЯ СТАТИЧНЫХ ШАБЛОНОВ НОГИ. Предел
 # возраста шаблона у двухшаговой сборки -- 30 с (SB.LEG_MAX_AGE_S), поэтому
 # пять секунд дают шестикратный запас при одном вызове узла за круг.
@@ -11262,6 +11299,39 @@ def self_test() -> int:
                 st_л.positions()["лп1"].get("doklad_buy_sent") is True
                 and st_л.positions()["лп1"].get("doklad_buy_full") is False,
                 st_л.positions()["лп1"].get("doklad_buy_full"))
+            # BUY БЕЗ ОТМЕТКИ ОЖИДАНИЯ: СРОК ИДЁТ ОТ ПОСАДКИ. 28.09 две сделки
+            # (zVbJ3e 12:12:31Z и 12:14:47Z) ушли совсем без строки BUY: отметку
+            # ставили только ветки "видели в потоке" и "количество добралось", а
+            # у обеих сделок lane_bought_raw остался пуст. Строку досылал сторож
+            # уже после SELL.
+            st_л.write_intent(client_order_id="лп2", mint="МИНТ_БЕЗ_ОТМЕТКИ",
+                              source_sig="ИСТ_ПОДПИСЬ_2", source_slot=200,
+                              sol_in=0.05, pool=None, program=None, taxed=None,
+                              tax_bps=None, mode=ST.MODE_LIVE, sell_after_s=4.8,
+                              lane=ST.МЕТКА_ПОЛОСЫ, lane_group="sniper_src")
+            st_л.update_position("лп2", source="SRC", state="bought",
+                                 ts_accepted=time.time() - 10.0)
+            chk("сделка без отметки ожидания всё равно ждёт доклада BUY",
+                any(cid == "лп2" for cid, _ in дет_л.ждущие_доклада()),
+                дет_л.ждущие_доклада())
+            итог_б = дет_л.доложить_покупки_полосы()
+            строки_б = [т for т, _ in посланные_л]
+            chk("строка BUY по ней уходит по сроку от посадки, с прочерками",
+                итог_б["sent"] == 1 and len(строки_б) == 2
+                and DK.НЕТ_ДАННЫХ in строки_б[1], (итог_б, строки_б))
+            # А ВОТ ПОСАДКА ВНЕ ОКНА МОЛЧИТ. Перезапуск службы не имеет права
+            # высыпать строки BUY по вчерашним покупкам.
+            st_л.write_intent(client_order_id="лп3", mint="МИНТ_СТАРЫЙ",
+                              source_sig="ИСТ_ПОДПИСЬ_3", source_slot=300,
+                              sol_in=0.05, pool=None, program=None, taxed=None,
+                              tax_bps=None, mode=ST.MODE_LIVE, sell_after_s=4.8,
+                              lane=ST.МЕТКА_ПОЛОСЫ, lane_group="sniper_src")
+            st_л.update_position("лп3", source="SRC", state="bought",
+                                 ts_accepted=time.time() - ДОКЛАД_ОКНО_S - 60.0)
+            chk("посадка старше окна доклада строку не рождает",
+                not any(cid == "лп3" for cid, _ in дет_л.ждущие_доклада())
+                and дет_л.доложить_покупки_полосы()["sent"] == 0,
+                дет_л.ждущие_доклада())
     finally:
         if было_ф3 is None:
             os.environ.pop("BLOOM_TG_FORMAT", None)
