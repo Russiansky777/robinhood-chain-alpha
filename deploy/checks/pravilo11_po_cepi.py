@@ -207,6 +207,35 @@ def транзакция(подпись: str) -> dict | None:
     return о.get("result") if о.get("ok") else None
 
 
+СЛУЖЕБНЫЕ_ПРОГРАММЫ = {
+    "11111111111111111111111111111111",
+    "ComputeBudget111111111111111111111111111111",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+}
+
+
+def программы_сделки(tx: dict | None) -> list:
+    """Программы пула в транзакции: чем именно покупали.
+
+    Поле pool_program в записи бывает пустым (у части сделок его не пишут),
+    а вопрос "каким строителем" отвечается по самой транзакции: берём все
+    программы инструкций, кроме системных и токеновых.
+    """
+    сооб = ((tx or {}).get("transaction") or {}).get("message") or {}
+    все = list(сооб.get("instructions") or [])
+    for г in ((tx or {}).get("meta") or {}).get("innerInstructions") or []:
+        все += list(г.get("instructions") or [])
+    из_ = []
+    for и in все:
+        пид = и.get("programId") if isinstance(и, dict) else None
+        if not пид or пид in СЛУЖЕБНЫЕ_ПРОГРАММЫ or пид in из_:
+            continue
+        из_.append(пид)
+    return из_
+
+
 def имена_инструкций(tx: dict | None) -> list:
     """Имена инструкций из журнала программ: чем именно покупали.
 
@@ -362,6 +391,7 @@ def сделка_по_цепи(п: dict, *, кошелёк: str) -> dict:
     из_["слот_покупки"] = д_пок.get("slot")
     из_["покупка_с_ошибкой"] = bool(д_пок.get("err"))
     из_["инструкции_покупки"] = имена_инструкций(tx_пок)
+    из_["программы_покупки"] = программы_сделки(tx_пок)
     из_["комиссия_покупки_sol"] = round((д_пок.get("fee") or 0) / ЛАМПОРТОВ_В_SOL, 9)
     # ПОКУПКА, КОТОРАЯ НИЧЕГО НЕ КУПИЛА. Если с кошелька ушла ровно комиссия
     # (или транзакция села с ошибкой), токенов у нас нет, и продажи не будет
@@ -574,6 +604,12 @@ def self_test() -> int:
     chk("ушла ровно комиссия -- дельта равна комиссии со знаком минус",
         д3["lamports"] == -1_005_000 and д3["fee"] == 1_005_000, д3)
     # ПРИЧИНА СЛОВАМИ ЦЕПИ: err как есть плюс последняя строка про ошибку.
+    chk("программы сделки -- без системных и токеновых",
+        программы_сделки({"transaction": {"message": {"instructions": [
+            {"programId": "ComputeBudget111111111111111111111111111111"},
+            {"programId": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"},
+            {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"}]}}})
+        == ["pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"])
     chk("имена инструкций читаются из журнала без повторов подряд",
         имена_инструкций({"meta": {"logMessages": [
             "Program log: Instruction: BuyExactQuoteInV2",
