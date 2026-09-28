@@ -43,6 +43,11 @@ import sys
 import time
 from pathlib import Path
 
+try:  # Модуль валидаторов нужен только признаку жизни: без него зонд идёт.
+    import triton_validators as ВАЛ
+except Exception:  # noqa: BLE001
+    ВАЛ = None
+
 ТОЧКА_ВХОДА = "preconfs.rpcpool.com:443"
 ССЫЛКА_ДОКОВ = "https://docs.triton.one/chains/solana/preconfirmations-grpc"
 ИМЯ_СЕКРЕТА = "TRITON_X_TOKEN"
@@ -107,11 +112,23 @@ def регион_фида(фид: str, регион: str) -> dict:
 
 
 def собрать_запрос(*, фид: str, регион: str, аккаунты: list,
-                   имя_фильтра: str = "istochniki") -> dict:
+                   подписанты: list | None = None,
+                   имя_фильтра: str = "istochniki",
+                   имя_фильтра_подписантов: str = "podpisanty") -> dict:
     """SubscribeRequest ровно как в документации.
 
     Фильтр обязан задать хотя бы один отбор: полный поток подписке недоступен,
     и просить его -- значит получить INVALID_ARGUMENT и потратить попытку.
+
+    ДВА ИМЕНОВАННЫХ ФИЛЬТРА, А НЕ ДВА УСЛОВИЯ В ОДНОМ (владелец 28.09:
+    "фильтр signer_include = все адреса торгующих групп, дополнительно
+    account_include те же адреса"). В preconfs.proto сказано прямо: внутри
+    ОДНОГО фильтра транзакция обязана удовлетворить КАЖДОМУ заданному
+    условию, а доставляется она, если подошла ХОТЯ БЫ ОДНОМУ фильтру, и
+    имена подошедших фильтров возвращаются в обновлении. Значит два условия
+    в одном фильтре дали бы пересечение (подписал И есть в статических
+    ключах) -- то есть просто signer_include, а два фильтра дают
+    объединение И ОТВЕТ НА ВОПРОС, каким из двух поймано.
     """
     из_ = {"ok": False, "why_not": None, "request": None}
     р = регион_фида(фид, регион)
@@ -119,20 +136,32 @@ def собрать_запрос(*, фид: str, регион: str, аккаун�
         из_["why_not"] = р["why_not"]
         return из_
     адреса = [а for а in (аккаунты or []) if а]
-    if not адреса:
-        из_["why_not"] = ("фильтр без отбора: account_include пуст, а полный "
-                           "поток подписке недоступен")
+    подп = [а for а in (подписанты or []) if а]
+    if not адреса and not подп:
+        из_["why_not"] = ("фильтр без отбора: account_include и signer_include "
+                           "пусты, а полный поток подписке недоступен")
         return из_
-    if len(адреса) > ПРЕДЕЛ_АККАУНТОВ:
-        из_["why_not"] = (f"{len(адреса)} аккаунтов при пределе "
-                           f"{ПРЕДЕЛ_АККАУНТОВ}")
+    for ряд, имя in ((адреса, "account_include"), (подп, "signer_include")):
+        if len(ряд) > ПРЕДЕЛ_АККАУНТОВ:
+            из_["why_not"] = (f"{len(ряд)} адресов в {имя} при пределе "
+                               f"{ПРЕДЕЛ_АККАУНТОВ}")
+            return из_
+    фильтры: dict = {}
+    if подп:
+        if len(имя_фильтра_подписантов.encode()) > 64:
+            из_["why_not"] = "имя фильтра подписантов длиннее 64 байт"
+            return из_
+        фильтры[имя_фильтра_подписантов] = {"signer_include": подп}
+    if адреса:
+        if len(имя_фильтра.encode()) > 64:
+            из_["why_not"] = "имя фильтра длиннее 64 байт"
+            return из_
+        фильтры[имя_фильтра] = {"account_include": адреса}
+    if len(фильтры) > ПРЕДЕЛ_ФИЛЬТРОВ:
+        из_["why_not"] = f"{len(фильтры)} фильтров при пределе {ПРЕДЕЛ_ФИЛЬТРОВ}"
         return из_
-    if len(имя_фильтра.encode()) > 64:
-        из_["why_not"] = "имя фильтра длиннее 64 байт"
-        return из_
-    из_.update(ok=True, request={
-        "transactions": {имя_фильтра: {"account_include": адреса}},
-        р["field"]: р["value"]})
+    из_.update(ok=True, request={"transactions": фильтры,
+                                  р["field"]: р["value"]})
     return из_
 
 
@@ -315,25 +344,35 @@ class Счёт:
 # ОДИН ПОТОК НА ХОЗЯЙСТВО. Владелец: "BAM и Harmonic одновременно в двух
 # потоках не держать". Замок -- файл в каталоге состояния: два прогона на
 # одном хосте не увидят друг друга иначе.
-def путь_замка(каталог: str | None = None) -> Path:
+def путь_замка(каталог: str | None = None, фид: str | None = None) -> Path:
+    """Замок ПО ФИДУ.
+
+    25.09 владелец запрещал держать BAM и Harmonic сразу, и замок был один на
+    зонд. 28.09 слово другое: "подписка BAM + Harmonic" одним прогоном в 24
+    часа. Поэтому замок теперь свой у каждого фида: второй BAM всё так же не
+    поднимется, а BAM вместе с Harmonic -- поднимется.
+    """
     д = каталог or os.environ.get("TRITON_STATE_DIR") or "/tmp"
-    return Path(д) / "triton_preconfs.lock"
+    if not фид:
+        return Path(д) / "triton_preconfs.lock"
+    return Path(д) / f"triton_preconfs_{фид}.lock"
 
 
 def занять_замок(*, фид: str, каталог: str | None = None,
-                  сейчас: float | None = None) -> dict:
-    п = путь_замка(каталог)
+                  сейчас: float | None = None, окно_s: float | None = None) -> dict:
+    п = путь_замка(каталог, фид)
     сейчас = сейчас if сейчас is not None else time.time()
     try:
         if п.exists():
             было = json.loads(п.read_text(encoding="utf-8") or "{}")
             # Замок старше двух часов плюс запас -- это след упавшего прогона,
             # а не живой поток: держать зонд закрытым из-за него нельзя.
-            if сейчас - float(было.get("ts") or 0) < ОКНО_HARMONIC_S + 600:
+            срок = float(окно_s if окно_s else ОКНО_HARMONIC_S) + 600
+            if сейчас - float(было.get("ts") or 0) < срок:
                 return {"ok": False, "why_not":
                         (f"поток {было.get('feed')} уже открыт с "
-                          f"{было.get('utc')} -- два потока сразу владелец "
-                          "запретил"), "held": было}
+                          f"{было.get('utc')} -- второй поток того же фида не "
+                          "поднимаем"), "held": было}
         п.parent.mkdir(parents=True, exist_ok=True)
         п.write_text(json.dumps(
             {"feed": фид, "ts": сейчас,
@@ -344,19 +383,27 @@ def занять_замок(*, фид: str, каталог: str | None = None,
         return {"ok": False, "why_not": f"{type(exc).__name__}: {str(exc)[:160]}"}
 
 
-def снять_замок(каталог: str | None = None) -> None:
+def снять_замок(каталог: str | None = None, фид: str | None = None) -> None:
     try:
-        путь_замка(каталог).unlink(missing_ok=True)
+        путь_замка(каталог, фид).unlink(missing_ok=True)
     except Exception:  # noqa: BLE001, S110
         pass
 
 
 def событие_в_строку(событие: dict, *, фид: str, регион: str,
-                      t_recv: float) -> dict:
-    """Одна строка журнала зонда: то, что реально пришло, без домыслов."""
+                      t_recv: float, t_mono: float | None = None) -> dict:
+    """Одна строка журнала зонда: то, что реально пришло, без домыслов.
+
+    ВРЕМЯ ПРИХОДА -- ДВУМЯ ЧАСАМИ (владелец 28.09: "время прихода преконфа
+    (моно-часы)"). t_recv -- стенные часы: только по ним можно свести преконф
+    с журналом решений детектора, где время тоже стенное. t_mono -- моно-часы
+    того же процесса: они не прыгают от поправки NTP, и разница между двумя
+    событиями ОДНОГО прогона считается по ним.
+    """
     вид = событие.get("kind")
     из_ = {"feed": фид, "region": регион, "kind": вид,
             "t_recv": round(t_recv, 6),
+            "t_mono": (round(t_mono, 6) if t_mono is not None else None),
             "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t_recv))}
     if вид == "transaction":
         из_.update(signature=событие.get("signature"),
@@ -422,13 +469,14 @@ def событие_из_обновления(обновление, *, имя_р�
 
 def слушать(*, поток, фид: str, регион: str, журнал=None, счёт: Счёт | None = None,
              сейчас_фн=None, признак_каждые: int = 200,
-             признак_фн=None) -> dict:
+             признак_фн=None, моно_фн=None) -> dict:
     """Читать поток, писать журнал, считать и ЗАКРЫТЬ по пределу.
 
     Поток подаётся снаружи (итератор событий) -- поэтому самопроверка гоняет
     ровно эту логику без сети и без оплаченных слотов.
     """
     часы = сейчас_фн or time.time
+    моно = моно_фн or time.monotonic
     с = счёт if счёт is not None else Счёт(фид=фид, начало=часы())
     из_ = {"feed": фид, "region": регион, "rows": 0, "stopped_why": None,
             "counters": None}
@@ -436,7 +484,7 @@ def слушать(*, поток, фид: str, регион: str, журнал=N
         for событие in поток:
             t = часы()
             стр = событие_в_строку(событие or {}, фид=фид, регион=регион,
-                                    t_recv=t)
+                                    t_recv=t, t_mono=моно())
             if журнал is not None:
                 журнал.write(json.dumps(стр, ensure_ascii=False) + "\n")
                 журнал.flush()
@@ -707,6 +755,43 @@ def адреса_источников(*, снимок: str, задачи: tuple 
     return из_
 
 
+def адреса_торгующих_групп(*, файл: str | None = None,
+                            группы: tuple | None = None) -> dict:
+    """Адреса торгующих групп -- РАЗБОРОМ bloom_source_groups, не своим.
+
+    Владелец 28.09: "фильтр signer_include = все адреса торгующих групп
+    (leader, batch5, lane_s0, sniper_src, kandidaty)". Файл групп читает тот же
+    модуль, что читает его в бою: второй разбор когда-нибудь разошёлся бы с
+    первым молча. Группы, которых в файле нет, возвращаются отдельным списком
+    -- это ответ, а не пустота.
+    """
+    из_ = {"ok": False, "accounts": [], "by_group": {}, "why_not": None,
+            "groups_missing": [], "file": файл}
+    хотим = tuple(группы or ("leader", "batch5", "lane_s0", "sniper_src",
+                               "kandidaty"))
+    try:
+        import bloom_source_groups as BSG  # noqa: PLC0415
+
+        по_адресу = BSG.адреса_всех_групп(файл)
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        return из_
+    счёт: dict = {}
+    адреса: list = []
+    for адрес, группа_ in (по_адресу or {}).items():
+        if группа_ not in хотим:
+            continue
+        адреса.append(адрес)
+        счёт[группа_] = счёт.get(группа_, 0) + 1
+    if not адреса:
+        из_["why_not"] = (f"в файле групп нет адресов групп "
+                           f"{', '.join(хотим)}")
+        return из_
+    из_.update(ok=True, accounts=sorted(set(адреса)), by_group=счёт,
+                groups_missing=[г for г in хотим if г not in счёт])
+    return из_
+
+
 def self_test() -> int:
     import selftest_guard as _SG  # noqa: PLC0415
 
@@ -754,6 +839,23 @@ def self_test() -> int:
             собрать_запрос(фид=ФИД_BAM, регион="ams",
                             аккаунты=["А"] * (ПРЕДЕЛ_АККАУНТОВ + 1))["ok"]
             is False)
+        # ДВА ИМЕНОВАННЫХ ФИЛЬТРА (владелец 28.09): подписанты И счета.
+        зп2 = собрать_запрос(фид=ФИД_BAM, регион="ams",
+                              аккаунты=["ИСТ1"], подписанты=["ИСТ1"])
+        chk("подписанты и счета идут ДВУМЯ фильтрами, а не двумя условиями",
+            зп2["ok"]
+            and зп2["request"]["transactions"]["podpisanty"]["signer_include"] == ["ИСТ1"]
+            and зп2["request"]["transactions"]["istochniki"]["account_include"] == ["ИСТ1"]
+            and "account_include" not in зп2["request"]["transactions"]["podpisanty"],
+            зп2)
+        зп3 = собрать_запрос(фид=ФИД_BAM, регион="ams", аккаунты=[],
+                              подписанты=["ИСТ1"])
+        chk("один signer_include -- законный отбор сам по себе",
+            зп3["ok"] and list(зп3["request"]["transactions"]) == ["podpisanty"],
+            зп3)
+        chk("оба списка пусты -- запрос не собирается",
+            собрать_запрос(фид=ФИД_BAM, регион="ams", аккаунты=[],
+                            подписанты=[])["ok"] is False)
 
         # 4. ПРЕДЕЛЫ ВЛАДЕЛЬЦА -- то, что стоит денег. Каталог расхода у
         # каждой проверки СВОЙ временный: суточный счёт на то и суточный, что
@@ -819,22 +921,42 @@ def self_test() -> int:
             (с2.сообщений, закрыт["stopped_why"]))
         _вр_дни.cleanup()
 
-        # 5. ДВА ПОТОКА СРАЗУ -- ЗАПРЕЩЕНЫ.
+        # 5. ЗАМОК -- ПО ФИДУ. 25.09 два потока сразу были запрещены; 28.09
+        # владелец просит ровно обратное: "подписка BAM + Harmonic". Значит
+        # второй поток ТОГО ЖЕ фида не поднимается, а другой фид -- поднимается.
         import tempfile as _t  # noqa: PLC0415
 
         with _t.TemporaryDirectory() as вр:
             chk("первый поток замок берёт",
                 занять_замок(фид=ФИД_BAM, каталог=вр, сейчас=5000.0)["ok"])
-            второй = занять_замок(фид=ФИД_HARMONIC, каталог=вр, сейчас=5001.0)
-            chk("второй поток не запускается, пока первый жив",
-                второй["ok"] is False and "два потока" in (второй["why_not"] or ""),
-                второй)
+            второй_bam = занять_замок(фид=ФИД_BAM, каталог=вр, сейчас=5001.0)
+            chk("второй поток ТОГО ЖЕ фида не запускается",
+                второй_bam["ok"] is False
+                and "второй поток того же фида" in (второй_bam["why_not"] or ""),
+                второй_bam)
+            chk("другой фид рядом поднимается (BAM + Harmonic, слово 28.09)",
+                занять_замок(фид=ФИД_HARMONIC, каталог=вр, сейчас=5001.0)["ok"])
             chk("замок старого упавшего прогона не держит зонд навсегда",
-                занять_замок(фид=ФИД_HARMONIC, каталог=вр,
+                занять_замок(фид=ФИД_BAM, каталог=вр,
                               сейчас=5000.0 + ОКНО_HARMONIC_S + 601)["ok"])
-            снять_замок(вр)
+            снять_замок(вр, ФИД_BAM)
             chk("после снятия замка поток снова можно открыть",
                 занять_замок(фид=ФИД_BAM, каталог=вр, сейчас=6000.0)["ok"])
+            chk("замок Harmonic снятием BAM не тронут",
+                путь_замка(вр, ФИД_HARMONIC).exists())
+
+        # 5б. ВРЕМЯ ПРИХОДА -- ДВУМЯ ЧАСАМИ: стенным для сведения с журналом
+        # решений и моно для разниц внутри прогона.
+        стр_мс = событие_в_строку({"kind": "transaction", "signature": "П"},
+                                   фид=ФИД_BAM, регион="ams", t_recv=1000.5,
+                                   t_mono=77.25)
+        chk("в строке журнала есть и стенное время, и моно-часы",
+            стр_мс["t_recv"] == 1000.5 and стр_мс["t_mono"] == 77.25, стр_мс)
+        сл_мс = слушать(поток=[{"kind": "transaction", "signature": "П1"}],
+                         фид=ФИД_BAM, регион="ams",
+                         счёт=Счёт(фид=ФИД_BAM, начало=1.0, каталог=None),
+                         сейчас_фн=lambda: 1.0, моно_фн=lambda: 42.0)
+        chk("слушать берёт моно-часы своим источником", сл_мс["rows"] == 1)
 
         # 6. Строка журнала: что пришло, то и записано.
         стр = событие_в_строку(
@@ -1056,14 +1178,15 @@ def self_test() -> int:
 
 
 def _поток_grpc(*, фид: str, регион: str, аккаунты: list, ключ: str,
-                 таймаут_s: float):
+                 таймаут_s: float, подписанты: list | None = None):
     """Настоящий поток gRPC. Стабы генерируются из preconfs.proto ДО запуска
     (это делает прогон), модуль их только импортирует."""
     import grpc  # noqa: PLC0415
     import preconfs_pb2  # noqa: PLC0415
     import preconfs_pb2_grpc  # noqa: PLC0415
 
-    зп = собрать_запрос(фид=фид, регион=регион, аккаунты=аккаунты)
+    зп = собрать_запрос(фид=фид, регион=регион, аккаунты=аккаунты,
+                         подписанты=подписанты)
     if not зп["ok"]:
         raise RuntimeError(зп["why_not"])
     канал = grpc.secure_channel(ТОЧКА_ВХОДА, grpc.ssl_channel_credentials())
@@ -1151,6 +1274,16 @@ def main() -> int:
     р.add_argument("--accounts", default="",
                     help="адреса источников через запятую")
     р.add_argument("--accounts-file", default=None)
+    р.add_argument("--signers", default="",
+                    help="адреса для signer_include через запятую")
+    р.add_argument("--signers-file", default=None)
+    р.add_argument("--groups-file", default=None,
+                    help=("файл групп: адреса торгующих групп идут И в "
+                          "signer_include, И в account_include (владелец 28.09)"))
+    р.add_argument("--iz-grupp", action="store_true",
+                    help="брать адреса из файла групп, путь -- из BLOOM_SOURCE_GROUPS")
+    р.add_argument("--gruppy", default="leader,batch5,lane_s0,sniper_src,kandidaty",
+                    help="какие группы брать из файла групп")
     р.add_argument("--accounts-from-snapshot", default=None,
                     help="снимок konfig.json: адреса источников разбором детектора")
     р.add_argument("--accounts-out", default=None,
@@ -1225,6 +1358,25 @@ def main() -> int:
         аккаунты += [с.strip() for с in
                       Path(а.accounts_file).read_text(encoding="utf-8").split()
                       if с.strip()]
+    подписанты = [с.strip() for с in (а.signers or "").split(",") if с.strip()]
+    if а.signers_file:
+        подписанты += [с.strip() for с in
+                        Path(а.signers_file).read_text(encoding="utf-8").split()
+                        if с.strip()]
+    if а.groups_file or а.iz_grupp:
+        гр = адреса_торгующих_групп(
+            файл=а.groups_file or None,
+            группы=tuple(г.strip() for г in (а.gruppy or "").split(",")
+                          if г.strip()))
+        if not гр["ok"]:
+            print(f"СБОЙ: {гр['why_not']}")
+            return 1
+        print(json.dumps({"gruppy": гр["by_group"],
+                           "adresov": len(гр["accounts"]),
+                           "gruppy_bez_adresov": гр["groups_missing"]},
+                          ensure_ascii=False))
+        подписанты = sorted(set(подписанты) | set(гр["accounts"]))
+        аккаунты = sorted(set(аккаунты) | set(гр["accounts"]))
     # ВСЕ РЕГИОНЫ ФИДА одним словом all (владелец 25.09 про BAM: "подписаться
     # на ВСЕ регионы"). Регионы -- из сохранённой документации, не из памяти:
     # у BAM их пятнадцать, у Harmonic семь.
@@ -1233,11 +1385,13 @@ def main() -> int:
     else:
         регионы = [с.strip() for с in (а.region or "").split(",") if с.strip()]
     for р_ in регионы:
-        зп = собрать_запрос(фид=а.feed, регион=р_, аккаунты=аккаунты)
+        зп = собрать_запрос(фид=а.feed, регион=р_, аккаунты=аккаунты,
+                             подписанты=подписанты)
         if not зп["ok"]:
             print(f"СБОЙ: {зп['why_not']}")
             return 1
-    замок = занять_замок(фид=а.feed, каталог=а.state_dir)
+    замок = занять_замок(фид=а.feed, каталог=а.state_dir,
+                          окно_s=(а.seconds if а.seconds else None))
     if not замок["ok"]:
         print(f"СБОЙ: {замок['why_not']}")
         return 1
@@ -1245,13 +1399,36 @@ def main() -> int:
                  предел_сообщений=а.limit_messages,
                  каталог=а.state_dir)
     путь_признака = а.status
+    # ДОЛЯ СЛОТОВ BAM/HARMONIC -- В ПРИЗНАК ЖИЗНИ, РАЗ В ЧАС (владелец 28.09,
+    # п.2). Считает это отдельный фоновый поток, а не признак: сеть внутри
+    # записи признака означала бы, что признак жизни висит на чужом ответе.
+    # Денежный путь не тронут: снимок лежит в каталоге зонда.
+    валидаторы: dict = {"why_not": "снимок ещё не считан"}
+
+    def часы_валидаторов():
+        while True:
+            try:
+                сн = ВАЛ.свежий(каталог=а.state_dir)
+                валидаторы.clear()
+                валидаторы.update(ВАЛ.доля_слотов(сн))
+            except Exception as exc:  # noqa: BLE001
+                валидаторы.clear()
+                валидаторы["why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+            time.sleep(ВАЛ.ЧАС_S)
+
+    if ВАЛ is not None and а.state_dir:
+        import threading as _thr  # noqa: PLC0415
+
+        _thr.Thread(target=часы_валидаторов, name="triton-validatory",
+                     daemon=True).start()
 
     def признак(з):
         if путь_признака:
             with open(путь_признака, "w", encoding="utf-8") as ф:
                 json.dump({"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                                  time.gmtime()),
-                            "region": ",".join(регионы), **з}, ф,
+                            "region": ",".join(регионы),
+                            "validatory": dict(валидаторы), **з}, ф,
                            ensure_ascii=False, indent=2)
 
     журнал = open(а.out, "a", encoding="utf-8") if а.out else None  # noqa: SIM115
@@ -1259,6 +1436,7 @@ def main() -> int:
     try:
         if len(регионы) > 1:
             потоки = {р_: _поток_grpc(фид=а.feed, регион=р_, аккаунты=аккаунты,
+                                       подписанты=подписанты,
                                        ключ=токен(), таймаут_s=окно)
                        for р_ in регионы}
             итог = слушать_много(потоки=потоки, фид=а.feed, журнал=журнал,
@@ -1266,13 +1444,14 @@ def main() -> int:
                                   ждать_s=окно + 30)
         else:
             поток = _поток_grpc(фид=а.feed, регион=регионы[0], аккаунты=аккаунты,
+                                 подписанты=подписанты,
                                  ключ=токен(), таймаут_s=окно)
             итог = слушать(поток=поток, фид=а.feed, регион=регионы[0],
                             журнал=журнал, счёт=счёт, признак_фн=признак)
     finally:
         if журнал is not None:
             журнал.close()
-        снять_замок(а.state_dir)
+        снять_замок(а.state_dir, а.feed)
     print(json.dumps({к: v for к, v in итог.items()}, ensure_ascii=False,
                       indent=2))
     # ОБРЫВ -- ЭТО СБОЙ, А НЕ ТИШИНА ФИДА. 25.09 зонд упал на первом
