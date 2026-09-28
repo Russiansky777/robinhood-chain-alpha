@@ -235,6 +235,70 @@ def длина_слота_замер(*, окно_с: float = 30.0) -> dict:
     return из_
 
 
+def таблица_по_источникам(state_dir: str, с_ts: float | None) -> dict:
+    """Правило 11: по КАЖДОМУ источнику торгующих групп -- сколько заработал.
+
+    Спрос владельца 28.09: n закрытых, сумма SOL, лучшая сделка, доля в плюсе,
+    накопительно с начала окна. Считается по ГОТОВОМУ числу службы
+    (pnl_counted_sol): вторая формула рядом разъехалась бы с первой на
+    округлении, а позиции без счёта считаются отдельной графой -- их итог
+    неизвестен, и выдавать его за ноль нельзя.
+    """
+    из_ = {"с": (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(с_ts))
+                  if с_ts else None),
+            "источников": 0, "по_источникам": {}, "несчитаемых": 0,
+            "всего_закрытых": 0, "всего_sol": 0.0}
+    по_cid: dict = {}
+    for путь in sorted(glob.glob(os.path.join(state_dir, "positions.jsonl*"))):
+        for r in (UI.строки(путь) if UI is not None else []):
+            cid = r.get("client_order_id")
+            if not cid:
+                continue
+            в = по_cid.setdefault(cid, {})
+            for к, зн in r.items():
+                if зн is not None:
+                    в[к] = зн
+    сырое: dict = {}
+    for п_ in по_cid.values():
+        if not п_.get("lane"):
+            continue
+        т_ = п_.get("ts_sent") or п_.get("ts_intent")
+        if с_ts and (not isinstance(т_, (int, float)) or float(т_) < float(с_ts)):
+            continue
+        if п_.get("state") not in ("closed", "CLOSED"):
+            continue
+        ключ = п_.get("source_name") or п_.get("source") or "источника в записи нет"
+        с_ = сырое.setdefault(ключ, {"n_закрытых": 0, "сумма_sol": 0.0,
+                                      "лучшая_sol": None, "в_плюсе": 0,
+                                      "несчитаемых": 0, "группы": {},
+                                      "адрес": п_.get("source")})
+        с_["n_закрытых"] += 1
+        из_["всего_закрытых"] += 1
+        гр = п_.get("lane_group") or "?"
+        с_["группы"][гр] = int(с_["группы"].get(гр, 0)) + 1
+        итог = п_.get("pnl_counted_sol")
+        if not isinstance(итог, (int, float)):
+            с_["несчитаемых"] += 1
+            из_["несчитаемых"] += 1
+            continue
+        итог = float(итог)
+        с_["сумма_sol"] = round(с_["сумма_sol"] + итог, 9)
+        из_["всего_sol"] = round(из_["всего_sol"] + итог, 9)
+        if с_["лучшая_sol"] is None or итог > с_["лучшая_sol"]:
+            с_["лучшая_sol"] = round(итог, 9)
+        if итог > 0:
+            с_["в_плюсе"] += 1
+    for ключ, с_ in сырое.items():
+        считанных = с_["n_закрытых"] - с_["несчитаемых"]
+        с_["доля_в_плюсе"] = (round(с_["в_плюсе"] / считанных, 4)
+                               if считанных else None)
+        с_["считанных"] = считанных
+    из_["по_источникам"] = dict(sorted(сырое.items(),
+                                        key=lambda т_: -т_[1]["сумма_sol"]))
+    из_["источников"] = len(сырое)
+    return из_
+
+
 def cu_по_строителям(state_dir: str, с_ts: float, предел: int) -> dict:
     """CU по строителям: p50/p99 и падения по лимиту. Тем же модулем, что прогон."""
     if CU is None:
@@ -320,6 +384,9 @@ def main() -> int:
     по_группам = (о["сделки_полосы"] or {}).get("по_группам") or {}
     о["сделки_полосы"]["sniper_src_отдельно"] = по_группам.get("sniper_src")
     о["место_в_блоке"] = место_в_блоке_заполнено(а.state_dir, since_ts)
+    # ПРАВИЛО 11: таблица по источникам всех торгующих групп (спрос владельца
+    # 28.09, постоянно в вечернем отчёте).
+    о["по_источникам"] = таблица_по_источникам(а.state_dir, since_ts)
     # СИГНАЛЫ ПО СТРОИТЕЛЯМ -- ЧИСЛОМ, ПО ГРУППАМ. Очередь строителей владельца
     # требует знать, сколько ждать первую живую сделку: сколько сигналов по
     # пулам этого строителя прошло за сутки и по каким группам.
@@ -366,7 +433,8 @@ def main() -> int:
     краткое = {к: о.get(к) for к in
                 ("окно_с", "сделки_полосы", "метрики_сторожа", "cu_по_строителям",
                  "место_в_блоке", "отказы_по_комиссии_пула", "кредиты_по_дням",
-                 "freeze_authority", "сигналы_по_строителям", "длина_слота")}
+                 "freeze_authority", "сигналы_по_строителям", "длина_слота",
+                 "по_источникам")}
     print(json.dumps(краткое, ensure_ascii=False, indent=1)[:6000])
     return 0
 
@@ -444,6 +512,41 @@ def self_test() -> int:
             м["сделок"] == 2 and м["с_местом"] == 1 and м["без_места"] == 1, м)
         chk("причина отсутствия места названа",
             "слот посадки не определился" in "".join(м["причины"]), м["причины"])
+    with tempfile.TemporaryDirectory() as d:
+        п_ = Path(d) / "positions.jsonl"
+        строки_ = [
+            json.dumps({"client_order_id": "и1", "lane": "own_send",
+                         "ts_sent": 2000.0, "state": "closed",
+                         "source_name": "dreamloader", "source": "АДР1",
+                         "lane_group": "batch5", "pnl_counted_sol": 0.05},
+                        ensure_ascii=False),
+            json.dumps({"client_order_id": "и2", "lane": "own_send",
+                         "ts_sent": 2001.0, "state": "closed",
+                         "source_name": "dreamloader", "source": "АДР1",
+                         "lane_group": "batch5", "pnl_counted_sol": -0.02},
+                        ensure_ascii=False),
+            json.dumps({"client_order_id": "и3", "lane": "own_send",
+                         "ts_sent": 2002.0, "state": "closed",
+                         "source_name": "другой", "source": "АДР2",
+                         "lane_group": "lane_s0"}, ensure_ascii=False),
+            json.dumps({"client_order_id": "и4", "lane": "own_send",
+                         "ts_sent": 10.0, "state": "closed",
+                         "source_name": "старый", "pnl_counted_sol": 9.0},
+                        ensure_ascii=False),
+        ]
+        п_.write_text("\n".join(строки_) + "\n", encoding="utf-8")
+        ти = таблица_по_источникам(d, 1000.0)
+        dl = (ти["по_источникам"] or {}).get("dreamloader") or {}
+        chk(f"по источнику сложились сумма {dl.get('сумма_sol')} и лучшая "
+            f"{dl.get('лучшая_sol')}",
+            dl.get("n_закрытых") == 2 and abs(dl.get("сумма_sol") - 0.03) < 1e-9
+            and abs(dl.get("лучшая_sol") - 0.05) < 1e-9, dl)
+        chk(f"доля в плюсе {dl.get('доля_в_плюсе')} считается по СЧИТАННЫМ",
+            dl.get("доля_в_плюсе") == 0.5, dl)
+        chk(f"несчитаемая сделка отдельной графой ({ти.get('несчитаемых')})",
+            ти.get("несчитаемых") == 1
+            and (ти["по_источникам"]["другой"]["доля_в_плюсе"] is None), ти)
+        chk("сделка вне окна не взята", "старый" not in ти["по_источникам"], ти)
     print(f"самопроверка вечернего итога: {пройдено}/{пройдено + провалено} пройдено")
     return 0 if провалено == 0 else 1
 
