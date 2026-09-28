@@ -9,7 +9,10 @@
   * сигнал -- первая покупка (баланс токена после = купленному, допуск 1 %) от
     --porog SOL-экв. в SOL-пуле поддержанного типа; с сигнала пул «активен»
     --okno слотов: все его события пишутся в ряд;
-  * цели (--celi, подписи): их события пишутся целиком -- для сверок.
+  * цели (--celi, подписи): их события пишутся целиком -- для сверок;
+  * --dop-adresa -- ещё адреса (события и сигналы по --porog); --istochniki -- адреса
+    с порогом сигнала --porog-dop; у каждого сигнала -- рисунок (рост к s0+30,
+    падение от пика к s0+75, продавцы после пика).
 Модель режима 1 на ряду пула (всё в SOL и токенах, UI-единицы):
   * состояние после события: x*y=k (pump-amm, raydium-cpmm, meteora-damm-v1) --
     quoteInPool / tokensInPool; кривая (pump, raydium-launchpad) -- виртуальные
@@ -168,13 +171,14 @@ def рисунок(сигнал: dict, ряд: list, вверх: int = 30, вн�
 
 
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
-           доп: set | None = None, porog_доп: float | None = None) -> Path:
+           доп: set | None = None, porog_доп: float | None = None, ист: set | None = None) -> Path:
     import requests  # noqa: PLC0415
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
     import zstandard  # noqa: PLC0415
     адр = dict(json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"])
     доп = доп or set()
-    for a in доп:
+    ист = ист or set()
+    for a in доп | ист:
         адр.setdefault(a, {"группы": ["доп"]})
     наши_события, сигналы, цели_события = [], [], []
     активные: dict = {}          # poolId -> до_слота
@@ -235,7 +239,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                              "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
                                              "первая": первая, "block": e.get("block"), "timestamp": e.get("timestamp"),
                                              "priorityFee": e.get("priorityFee")})
-                        порог_t = porog_доп if (t in доп and porog_доп is not None) else porog
+                        порог_t = porog_доп if (t in ист and porog_доп is not None) else porog
                         if (e["action"] == "buy" and первая and sol is not None and sol >= порог_t and q == WSOL
                                 and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
                             сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
@@ -280,13 +284,15 @@ def main() -> int:
     р.add_argument("--celi", default="", help="json со списком подписей-целей")
     р.add_argument("--metka", required=True)
     р.add_argument("--dop-adresa", default="", help="json: список доп. адресов (события и сигналы)")
-    р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для доп. адресов, SOL")
+    р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
+    р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
     а = р.parse_args()
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
     доп = set(json.loads(Path(а.dop_adresa).read_text(encoding="utf-8"))) if а.dop_adresa else set()
-    out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop)
+    ист = {x for x in а.istochniki.split(",") if x}
+    out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop, ист)
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
     R.пуш(f"Podbivka-2: arhiv den {а.metka} [automated]", [str(out)])
