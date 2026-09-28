@@ -682,6 +682,62 @@ def dbc_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     return из_
 
 
+def clmm_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float,
+                  ставка_1e6: int | None = None,
+                  шаг_тика: int | None = None) -> dict:
+    """Минимум выхода в Raydium CLMM: L и цена -- из события свопа в ЛОГАХ.
+
+    Отличие от DAMM v2: событие CLMM отдаёт ликвидность L прямо, поэтому кривая
+    не решается из пары "вход/выход", а ПРОВЕРЯЕТСЯ -- сделка источника обязана
+    воспроизвестись при ставке комиссии пула. Не воспроизвелась -- сделка
+    источника перешла границу диапазона ликвидности, и наша L неизвестна.
+
+    ставка_1e6 -- ставка комиссии пула в миллионных долях, из счёта amm_config
+    (он стоит в самой инструкции свопа под индексом 1). Её НЕЛЬЗЯ решить по
+    одной сделке: у сделки, перешедшей границу диапазона, решённая доля уходит
+    на проценты в сторону (измерено: у одной живой сделки конфига с 0.25 %
+    решается 10 %). Поэтому без ставки -- отказ, а не догадка.
+    """
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        return {"ok": False, "why_not": "минты и хранилища не восстановились"}
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
+    if not qv or not bv:
+        return {"ok": False, "why_not": "хранилищ пула нет в балансах транзакции"}
+    вход = qv["post"] - qv["pre"]
+    выход = bv["pre"] - bv["post"]
+    if вход <= 0 or выход <= 0:
+        return {"ok": False,
+                "why_not": "сделка источника не покупка по этим хранилищам"}
+    try:
+        import c2_cl_quote as CL  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"нет модуля цены ({type(exc).__name__})"}
+    пул = (tpl["accounts"][CL.СМ_ПУЛ_В_ИНСТРУКЦИИ_CLMM]
+           if len(tpl["accounts"]) > CL.СМ_ПУЛ_В_ИНСТРУКЦИИ_CLMM else None)
+    if not пул:
+        return {"ok": False, "why_not": "в инструкции CLMM нет счёта пула"}
+    тела = CL.тела_событий_clmm(tx)
+    тело = b""
+    for т_ in тела:
+        if b58encode(CL.событие_clmm(т_)["пул"]) == пул:
+            тело = т_
+            break
+    из_ = CL.минимум_clmm(тело=тело, вход_источника=вход, выход_источника=выход,
+                           аргумент_входа=tpl.get("arg0") or 0,
+                           наш_вход=amount_in, проскальзывание=slippage,
+                           ставка_1e6=ставка_1e6, шаг_тика=шаг_тика)
+    if из_.get("ok"):
+        из_["source_in"] = вход
+        из_["source_out"] = выход
+        из_["pool"] = пул
+        # Счёт amm_config -- чтобы вызывающий знал, чью ставку кэшировать.
+        из_["amm_config"] = (tpl["accounts"][1] if len(tpl["accounts"]) > 1
+                             else None)
+    return из_
+
+
 def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     """Минимум токенов по резервам ПОСЛЕ сделки источника, x*y=k.
 
@@ -693,7 +749,11 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
         return damm2_min_out(tpl, tx, amount_in, slippage)
     if tpl["program"] == DBC:
         return dbc_min_out(tpl, tx, amount_in, slippage)
-    if tpl["program"] in (DLMM, CLMM):
+    if tpl["program"] == CLMM:
+        # Кривая CLMM считается, но ставка комиссии живёт в amm_config:
+        # пока её не передали, денежный путь честно отказывает.
+        return clmm_min_out(tpl, tx, amount_in, slippage)
+    if tpl["program"] == DLMM:
         return {"ok": False, "why_not": "сосредоточенная ликвидность: резервы цену не дают"}
     if tpl["program"] == LAUNCHLAB:
         return launchlab_min_out(tx, amount_in, slippage)
@@ -1013,6 +1073,141 @@ def self_test() -> int:
                                f"и цена после сделки ({с1['цена_после']}) -- решать L "
                                f"из входа и выхода, как у DAMM v2, не нужно",
                                с1["ликвидность"] > 0 and с1["цена_после"] > 0))
+
+        # --- ТИК CLMM: номер тика из события против номера, посчитанного из
+        # цены того же события. Это проверка тик-математики на ЦЕПИ, а не на
+        # придуманных числах: своих констант из чужого кода здесь нет.
+        сошлось_тик = всего_тик = 0
+        for x in обр_clmm:
+            tx_ = x.get("tx") or {}
+            for т_ in _CL.тела_событий_clmm(tx_):
+                с_ = _CL.событие_clmm(т_)
+                if с_["цена_после"] <= 0:
+                    continue
+                всего_тик += 1
+                сошлось_тик += int(_CL.цена_по_тику(с_["тик"]) <= с_["цена_после"]
+                                   < _CL.цена_по_тику(с_["тик"] + 1)
+                                   and _CL.тик_по_цене(с_["цена_после"]) == с_["тик"])
+        checks.append((f"CLMM: номер тика из цены сошёлся с номером из события у "
+                       f"{сошлось_тик} из {всего_тик} событий",
+                       всего_тик >= 30 and сошлось_тик == всего_тик))
+
+        # --- МИНИМУМ ВЫХОДА CLMM. Ставку комиссии пула модель НЕ УГАДЫВАЕТ:
+        # здесь она берётся из самих образцов -- у одного и того же счёта
+        # amm_config доля комиссии, решённая по сделке, повторяется ТОЧНО на
+        # разных пулах, и это повторяющееся значение и есть ставка конфига.
+        # В боевом пути ставка придёт из счёта amm_config; этот подбор -- только
+        # чтобы проверить математику на живых сделках.
+        import collections as _кол  # noqa: PLC0415
+        по_конфигу = _кол.defaultdict(list)
+        for x in обр_clmm:
+            tx_ = x.get("tx") or {}
+            tpl_ = extract_template(tx_, CLMM, x.get("pool_vault"))
+            if not tpl_.get("ok") or len(tpl_["accounts"]) < 3:
+                continue
+            из_ = clmm_min_out(tpl_, tx_, 10_000_000, 0.02)
+            if из_.get("why_not") != "ставка комиссии пула CLMM неизвестна (нет amm_config)":
+                continue
+            mv_ = mints_and_vaults(tpl_, tx_)
+            строки_ = {r["account"]: r for r in C.token_rows(tx_).values()}
+            qv_ = строки_.get((mv_ or {}).get("quote_vault"))
+            bv_ = строки_.get((mv_ or {}).get("base_vault"))
+            if not qv_ or not bv_:
+                continue
+            вх_, вых_ = qv_["post"] - qv_["pre"], bv_["pre"] - bv_["post"]
+            тело_ = b""
+            for т2 in _CL.тела_событий_clmm(tx_):
+                if b58encode(_CL.событие_clmm(т2)["пул"]) == tpl_["accounts"][2]:
+                    тело_ = т2
+                    break
+            if not тело_ or вх_ <= 0 or вых_ <= 0:
+                continue
+            с2 = _CL.событие_clmm(тело_)
+            база_a = not с2["сторона_0_вход"]
+            P1_ = _CL.цена_до_по_выходу(выход=вых_, цена_после=с2["цена_после"],
+                                        L=с2["ликвидность"], база_это_a=база_a)
+            if P1_ is None or P1_ <= 0:
+                continue
+            Д = _CL.D
+            if база_a:
+                чист = Д(с2["ликвидность"]) * (Д(с2["цена_после"]) - P1_) / Д(_CL.Q)
+            else:
+                чист = (Д(с2["ликвидность"]) * Д(_CL.Q) * (P1_ - Д(с2["цена_после"]))
+                        / (P1_ * Д(с2["цена_после"])))
+            доля = 1 - чист / Д(вх_)
+            по_конфигу[tpl_["accounts"][1]].append(
+                (round(float(доля), 6), tpl_, tx_, x.get("pool_vault")))
+        ставки = {}
+        for конфиг_, лист_ in по_конфигу.items():
+            счёт_ = _кол.Counter(з[0] for з in лист_)
+            знач_, сколько_ = счёт_.most_common(1)[0]
+            пулов_ = {з[3] for з in лист_ if з[0] == знач_}
+            if сколько_ >= 2 and len(пулов_) >= 2 and знач_ > 0:
+                ставки[конфиг_] = int(round(знач_ * 1_000_000))
+        checks.append((f"CLMM: ставка комиссии повторилась точно у {len(ставки)} "
+                       f"конфигов на разных пулах: "
+                       f"{sorted(ставки.values())} миллионных",
+                       len(ставки) >= 3))
+        сошлось_ = отказ_границы_ = прочий_отказ_ = 0
+        худшее_ = 0.0
+        for конфиг_, лист_ in по_конфигу.items():
+            ставка_ = ставки.get(конфиг_)
+            if ставка_ is None:
+                continue
+            for _, tpl_, tx_, _пв in лист_:
+                р = clmm_min_out(tpl_, tx_, 10_000_000, 0.02, ставка_1e6=ставка_)
+                if р.get("ok"):
+                    сошлось_ += 1
+                    худшее_ = max(худшее_, р["model_error"])
+                elif "перешла границу диапазона" in (р.get("why_not") or ""):
+                    отказ_границы_ += 1
+                else:
+                    прочий_отказ_ += 1
+        checks.append((f"CLMM: минимум выхода посчитан у {сошлось_} живых сделок "
+                       f"(наибольшее расхождение модели {худшее_:.2e}), отказ "
+                       f"«перешла границу диапазона» у {отказ_границы_}, прочих "
+                       f"отказов {прочий_отказ_}",
+                       сошлось_ >= 15 and прочий_отказ_ == 0
+                       and худшее_ < float(_CL.ПРЕДЕЛ_РАСХОЖДЕНИЯ_CLMM)))
+        # Минимум обязан быть НИЖЕ ожидания ровно на проскальзывание, а ожидание
+        # -- расти с входом: это проверка самой кривой, а не разбора.
+        for конфиг_, лист_ in по_конфигу.items():
+            ставка_ = ставки.get(конфиг_)
+            if ставка_ is None:
+                continue
+            пара = None
+            for _, tpl_, tx_, _пв in лист_:
+                м1 = clmm_min_out(tpl_, tx_, 10_000_000, 0.02, ставка_1e6=ставка_)
+                м2 = clmm_min_out(tpl_, tx_, 20_000_000, 0.02, ставка_1e6=ставка_)
+                if м1.get("ok") and м2.get("ok"):
+                    пара = (м1, м2)
+                    break
+            if пара:
+                м1, м2 = пара
+                checks.append((f"CLMM: вдвое больший вход даёт больший выход "
+                               f"({м1['expected_out']} -> {м2['expected_out']}), "
+                               f"минимум ниже ожидания на проскальзывание "
+                               f"({м1['min_out']} < {м1['expected_out']})",
+                               м2["expected_out"] > м1["expected_out"]
+                               and м1["min_out"] < м1["expected_out"]
+                               and м1["min_out"] >= int(м1["expected_out"] * 0.97)))
+                checks.append((f"CLMM: без ставки комиссии -- отказ, а не догадка: "
+                               f"{clmm_min_out(пара[0] and tpl_, tx_, 10_000_000, 0.02).get('why_not')}",
+                               clmm_min_out(tpl_, tx_, 10_000_000, 0.02).get("ok")
+                               is False))
+                break
+        # Раскладка amm_config -- ЗАЯВКА: проверяется, что разбор отвергает
+        # мусор и что нули не проходят за ставку.
+        checks.append(("CLMM: разбор amm_config отвергает пустой счёт и короткий",
+                       _CL.конфиг_clmm(bytes(57)) == {}
+                       and _CL.конфиг_clmm(b"\x00" * 10) == {}))
+        _д = bytearray(60)
+        _д[47:51] = (2500).to_bytes(4, "little")
+        _д[51:53] = (60).to_bytes(2, "little")
+        checks.append((f"CLMM: разбор amm_config даёт ставку и шаг тика "
+                       f"{_CL.конфиг_clmm(bytes(_д))}",
+                       _CL.конфиг_clmm(bytes(_д)).get("ставка_1e6") == 2500
+                       and _CL.конфиг_clmm(bytes(_д)).get("шаг_тика") == 60))
 
     # --- ПРОДАЖА PUMP AMM: раскладка выведена по НАШЕЙ СОБСТВЕННОЙ продаже.
     # Файл образцов собирает прогон deploy/checks/nogi_vse_kotirovki.py по
