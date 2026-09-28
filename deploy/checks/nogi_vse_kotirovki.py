@@ -182,6 +182,38 @@ def пулы_ноги_в_tx(tx: dict, C, B, программы) -> list:
 программы_разных_владельцев: set = set()
 
 
+def глубокий_поиск_пула(q: str, сколько: int, C, B, программы) -> tuple:
+    """Пулы SOL<->Q по ИСТОРИИ минта страницами. (кандидаты, прочитано).
+
+    Читаем подписи минта страницами по 100 (before=последняя) и разбираем те же
+    инструкции, что и в основном проходе. Останавливаемся, как только нашёлся
+    пул с постоянным произведением: больше нам и не нужно.
+    """
+    найдено, прочитано, before = [], 0, None
+    while прочитано < сколько:
+        параметры = {"limit": min(100, сколько - прочитано), "commitment": "confirmed"}
+        if before:
+            параметры["before"] = before
+        о = rpc("getSignaturesForAddress", [q, параметры])
+        стр = о if isinstance(о, list) else []
+        if not стр:
+            break
+        before = стр[-1].get("signature")
+        for x in стр:
+            if x.get("err") is not None or not x.get("signature"):
+                continue
+            tx = транзакция(x["signature"])
+            прочитано += 1
+            if tx is None:
+                continue
+            for прог, qv, wv, q2 in пулы_ноги_в_tx(tx, C, B, программы):
+                if q2 == q and (прог, qv, wv) not in найдено:
+                    найдено.append((прог, qv, wv))
+            if any(k[0] in РЕЗЕРВНЫЕ for k in найдено):
+                return найдено, прочитано
+    return найдено, прочитано
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--code-dir", default="/home/bot/bloom_executor",
@@ -195,6 +227,11 @@ def main() -> int:
                    help="сколько котировок по частоте считать главными (плюс USDC, USDT, GP)")
     р.add_argument("--podpisey-na-obrazec", type=int, default=25,
                    help="сколько сделок канонического пула перебрать в поисках образца шаблона")
+    р.add_argument("--glubokiy-poisk", type=int, default=200,
+                   help="для главных котировок без пула с постоянным произведением -- "
+                        "сколько сделок минта пролистать страницами")
+    р.add_argument("--tolko", default="",
+                   help="считать только эти котировки (минты через запятую)")
     р.add_argument("--out-pools", required=True)
     р.add_argument("--out-shablony", required=True)
     р.add_argument("--out-otchet", required=True)
@@ -212,7 +249,10 @@ def main() -> int:
     программы_разных_владельцев = {B.DLMM, B.DAMM2, B.CLMM, B.DBC}
 
     список = котировки_из_файла(а.kotirovki)
-    if а.skolko_kotirovok > 0:
+    если_только = [x.strip() for x in (а.tolko or "").split(",") if x.strip()]
+    if если_только:
+        список = [(q, ч) for q, ч in список if q in если_только]
+    elif а.skolko_kotirovok > 0:
         список = список[:а.skolko_kotirovok]
     прежние = {}
     if а.leg_pools and Path(а.leg_pools).exists():
@@ -250,9 +290,20 @@ def main() -> int:
 
     пулы: dict = {}
     отчёт_котировок = []
+
+    def ключ_выбора(k):
+        """Сначала пулы с постоянным произведением, потом по глубине WSOL.
+
+        ПОЧЕМУ НЕ ПРОСТО ПО ГЛУБИНЕ. Слово владельца 28.09: собираем ноги
+        только через CPMM и Pump AMM. У USDC самый глубокий пул -- DLMM
+        (9655 SOL), и выбор по глубине отдавал бы ногу, которую мы не соберём,
+        при живом пуле CPMM рядом.
+        """
+        return (0 if k[0] in РЕЗЕРВНЫЕ else 1,
+                -((бал.get(k[2]) or {}).get("ui") or 0))
+
     for q, ч in список:
-        сорт = sorted(кандидаты.get(q, {}),
-                      key=lambda k: -((бал.get(k[2]) or {}).get("ui") or 0))
+        сорт = sorted(кандидаты.get(q, {}), key=ключ_выбора)
         строка = {"quote_mint": q, "покупок": ч, "транзакций_прочитано": прочитано.get(q, 0),
                    "кандидатов": len(сорт)}
         if сорт:
@@ -289,9 +340,30 @@ def main() -> int:
 
     шаблоны: dict = {}
     отчёт_главных = []
+    глубокий_итог: dict = {}
     for q in главные:
         сорт = sorted([k for k in кандидаты.get(q, {}) if k[0] in РЕЗЕРВНЫЕ],
                       key=lambda k: -((бал.get(k[2]) or {}).get("ui") or 0))
+        if not сорт and а.glubokiy_poisk > 0:
+            # ГЛУБОКИЙ ПОИСК СТРАНИЦАМИ. Двенадцати свежих сделок минта хватает
+            # редким котировкам, а у USDC они все через DLMM и агрегаторы:
+            # пул CPMM встречается дальше по истории.
+            найдено, прочитано_г = глубокий_поиск_пула(q, а.glubokiy_poisk, C, B,
+                                                        программы)
+            глубокий_итог[q] = {"транзакций": прочитано_г,
+                                 "кандидатов": len(найдено)}
+            if найдено:
+                новые_хранилища = sorted({v for k in найдено for v in (k[1], k[2])}
+                                          - set(бал))
+                if новые_хранилища:
+                    бал.update(остатки(новые_хранилища))
+                кандидаты.setdefault(q, {}).update({k: 1 for k in найдено})
+                сорт = sorted([k for k in найдено if k[0] in РЕЗЕРВНЫЕ],
+                              key=lambda k: -((бал.get(k[2]) or {}).get("ui") or 0))
+                if сорт and (q not in пулы or пулы[q].get("program") not in РЕЗЕРВНЫЕ):
+                    прог_г, qv_г, wv_г = сорт[0]
+                    пулы[q] = {"program": прог_г, "q_vault": qv_г, "w_vault": wv_г,
+                                "sol_depth": (бал.get(wv_г) or {}).get("ui")}
         имя = имена_всех.get(q) or {}
         стр = {"quote_mint": q, "символ": имя.get("символ"), "имя": имя.get("имя"),
                 "покупок": dict(список).get(q)}
@@ -358,7 +430,8 @@ def main() -> int:
              "главных_котировок": len(главные),
              "статичных_шаблонов": len(шаблоны),
              "по_котировкам": отчёт_котировок,
-             "главные": отчёт_главных}
+             "главные": отчёт_главных,
+             "глубокий_поиск": глубокий_итог}
     Path(а.out_otchet).write_text(json.dumps(итог, ensure_ascii=False, indent=1),
                                    encoding="utf-8")
     print(json.dumps({k: v for k, v in итог.items()
