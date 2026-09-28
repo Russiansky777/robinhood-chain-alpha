@@ -1,0 +1,103 @@
+name: "Образцы настоящих покупок по типу пула (только чтение)"
+
+# ЗАЧЕМ. Раскладка счетов у каждого типа пула устанавливается ТОЛЬКО по живым
+# сделкам: так сделаны все работающие строители (кривая -- 5 сделок, DAMM v2 --
+# 17, продажа CPMM -- 34). Прогон берёт из журнала решений подписи сделок
+# источников по нужной программе пула, читает их и определяет хранилище и
+# котировку теми же функциями, что полоса. Дальше по этим образцам пишется
+# сборщик следующего строителя из очереди владельца.
+#
+# Только чтение: журнал потоком, getTransaction по подписям. Ни одной отправки.
+on:
+  workflow_dispatch:
+    inputs:
+      program:
+        description: "адрес программы пула"
+        required: true
+        default: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+      skolko:
+        description: "сколько образцов собрать"
+        required: false
+        default: "12"
+      since_utc:
+        description: "с какого времени искать (пусто -- весь журнал)"
+        required: false
+        default: ""
+
+concurrency:
+  group: obrazcy-pula
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  CODE_DIR: /home/bot/bloom_executor
+  PYBIN: /home/bot/robinhood-chain-alpha/venv/bin/python
+  TARGET_HOST: 127.0.0.1
+  OUT: data/c2_pool_samples_new.json
+
+jobs:
+  zamer:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Модуль разбирается"
+        run: python3 -m py_compile deploy/checks/obrazcy_pula.py
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить замер и посчитать"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/pyl"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pyl/obrazcy_pula.py" < deploy/checks/obrazcy_pula.py
+          # Реестр отправителей везём С РАННЕРА: на хосте он лежит не рядом с
+          # кодом службы, и путь к нему угадывать нельзя -- иначе каналы чаевых
+          # назовутся "счёта нет в реестре" при живом реестре в репозитории.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pyl/senders.json" < data/senders.json
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            $PYBIN /tmp/pyl/obrazcy_pula.py --state-dir '$STATE_DIR' \
+              --program '${{ inputs.program }}' \
+              --skolko '${{ inputs.skolko }}' \
+              --since-utc '${{ inputs.since_utc }}' \
+              --out /tmp/pyl/out.json" | tail -5
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/pyl/out.json" > "$OUT"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/pyl"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Obrazcy pokupok po tipu pula [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
