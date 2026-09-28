@@ -4,6 +4,129 @@
 
 ## 54uaRuJEc9BHY7uVMXtcf9JWcYDtB75hUeFJWeCxEkBE
 
+Окно: 168 ч с 2026-09-21T01:41:44Z; подписей 3256; покупок 279, продаж 2417; поступлений токена без оплаты (не покупки) 12; переводов SOL > 1 SOL (не чаевые) 26.19 SOL.
+
+### 1. Покупки
+
+| показатель | значение |
+|---|---|
+| размер SOL-экв., медиана / сумма | 4.002 / 1380.58 |
+| программы пулов | 6EF8rrec 188, pAMMBay6 55, LanMV9sA 35, CPMMoo8L 1 |
+| котировка пула | native 160, So1111 49, BPxxfR 8, 98kfF7 8 |
+| приоритет, лампорты: медиана / p90 | 5000000 / 10000000 |
+| чаевые (оценка), SOL: медиана / сумма за окно | 0.18800 / 76.6180 |
+| индекс в блоке: медиана / доля в первых 50 | 313 / 14 % |
+| получатели чаевых (оценка), топ | AsTRAEoy 1646, LandX6Rs 411, DiTmWENJ 203, ste11eZv 158, D2L6yPZ2 26 |
+
+Покупки (первые 40 по времени):
+
+| слот | минт | SOL-экв. | программа | приоритет | чаевые (оценка) | индекс / в блоке |
+|---|---|---|---|---|---|---|
+| 450222805 | 12LNHtZH | 9.005 | 6EF8rrec | 5000000 | 0.90000 | 21 / 1049 |
+| 450227143 | 8K33tS49 | 13.679 | LanMV9sA | 2000000 | 0.00000 | 1 / 1143 |
+| 450229265 | 2zjuzyAJ | 4.002 | 6EF8rrec | 2000000 | 0.18801 | 999 / 1065 |
+| 450229819 | AXpERbBd | 3.502 | 6EF8rrec | 2000000 | 0.24400 | 367 / 1300 |
+| 450233115 | CUh9nnRS | 12.002 | 6EF8rrec | 5000000 | 0.99000 | 701 / 1451 |
+| 450233922 | 2zmAUt3H | 4.002 | 6EF8rrec | 2000000 | 0.18801 | 517 / 1241 |
+| 450240066 | 2RVDnBV2 | 7.502 | pAMMBay6 | 10000000 | 0.60000 | 956 / 1146 |
+| 450247907 | 8R19hWra | 3.002 | 6EF8rrec | 6000000 | 0.16600 | 624 / 973 |
+| 450250429 | BJjJJCYD | 3.012 | 6EF8rrec | 5000000 | 0.05601 | 799 / 1138 |
+| 450255469 | EMP4NwMh | 7.502 | pAMMBay6 | 10000000 | 0.56601 | 729 / 1062 |
+| 450260037 | 5jErUfzi | 3.802 | 6EF8rrec | 5000000 | 0.24000 | 714 / 1079 |
+| 450266414 | 8Af4TnJJ | 6.004 | LanMV9sA | 12000000 | 0.51001 | 745 / 1089 |
+| 450309224 | 7TtMjXiY | 3.005 | LanMV9sA | 2000000 | 0.04401 | 105 / 1118 |
+| 450317855 | EaxoYw8V | 3.002 | 6EF8rrec | 6000000 | 0.16600 | 258 / 1078 |
+| 450319263 | Er1XkDFN | 3.988 | 6EF8rrec | 5000000 | 0.38800 | 681 / 1033 |
+| 450322088 | 2Su1mp2y | 5.002 | 6EF8rrec | 5000000 | 0.38800 | 1112 / 1282 |
+| 450325071 | BfUe1edy | 3.002 | 6EF8rrec | 7000000 | 0.10000 | 365 / 1136 |
+| 450326413 | 8KQ8errU | 4.008 | 6EF8rrec | 5000000 | 0.36600 | 51 / 1176 |
+| 450332546 | BQrawv7f | 4.004 | pAMMBay6 | 5000000 | 0.18800 | 17 / 1012 |
+| 450339545 | 6Z28Vggw | 3.002 | 6EF8rrec | 6000000 | 0.14400 | 834 / 970 |
+| 450341479 | F9PvspnW | 8.030 | LanMV9sA | 5000000 | 0.68000 | 682 / 978 |
+| 450346540 | ATqKVVa4 | 4.005 | LanMV9sA | 2000000 | 0.22000 | 1188 / 1245 |
+| 450350184 | 2mqtUu6y | 3.004 | LanMV9sA | 2000000 | 0.13400 | 450 / 1509 |
+| 450353935 | 8g93zr9B | 3.002 | 6EF8rrec | 5000000 | 0.22001 | 876 / 1267 |
+| 450357315 | Fp6HaV5e | 4.033 | LanMV9sA | 2000000 | 0.22000 | 712 / 990 |
+| 450359128 | CXjk1R53 | 5.002 | pAMMBay6 | 2000000 | 0.24400 | 987 / 1202 |
+| 450364244 | ubfPpHws | 11.202 | pAMMBay6 | 2000000 | 0.00000 | 1159 / 1334 |
+| 450364553 | EP7emgw8 | 4.014 | LanMV9sA | 5000000 | 0.30000 | 92 / 941 |
+| 450367069 | Fhz9RGRM | 3.483 | LanMV9sA | 5000000 | 0.14401 | 228 / 1384 |
+| 450369891 | 3yn8DeEQ | 6.964 | LanMV9sA | 5000000 | 0.88000 | 553 / 1184 |
+| 450369969 | 4huhGfSZ | 3.002 | 6EF8rrec | 2000000 | 0.08800 | 1429 / 1524 |
+| 450369984 | 2AyVdXQN | 3.486 | LanMV9sA | 5000000 | 0.14401 | 163 / 1658 |
+| 450378721 | 3jMKiyae | 2.999 | LanMV9sA | 5000000 | 0.22000 | 16 / 556 |
+| 450381273 | CmABWLf7 | 3.012 | LanMV9sA | 2000000 | 0.07701 | 1239 / 1355 |
+| 450382558 | 8KeW6EZ9 | 3.004 | LanMV9sA | 40000000 | 0.04400 | 822 / 1140 |
+| 450384686 | GWLwPFDy | 3.004 | LanMV9sA | 40000000 | 0.04401 | 187 / 1101 |
+| 450390725 | 6Bk7dr9x | 3.002 | 6EF8rrec | 2000000 | 0.08800 | 1 / 1597 |
+| 450391916 | 6HUEbkgG | 3.005 | 6EF8rrec | 2000000 | 0.08800 | 191 / 1273 |
+| 450394063 | 6p9L2fnx | 3.502 | 6EF8rrec | 5000000 | 0.15500 | 1062 / 1332 |
+| 450394177 | AjJWCqfC | 3.493 | 6EF8rrec | 5000000 | 0.15500 | 145 / 1263 |
+
+### 2. Кого копируют
+
+Покупок с покупателем того же минта в s0−3 .. s0 до снайпера: 279 из 279 (без такого покупателя -- 0). «Ближайший» -- последний перед ним.
+
+| источник | ближайший, раз | всего в окне, раз | наши списки | слотов до, медиана | позиций до в том же слоте, медиана |
+|---|---|---|---|---|---|
+| 6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy | 17 | 34 | лог 555 | 0 | 63 |
+| JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG | 10 | 12 | нет | 0 | 97 |
+| 387FRwow6MKDhSwuMULhKjqeXuxoBY4BbbaSntdk9LaH | 10 | 16 | лог 555 | 0 | 84 |
+| BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu | 9 | 10 | лог 555 | 0 | 71 |
+| 4S9Vbao13SjpeXsCaUE3nG7DA3oqi73mGEgmwqkRPy9g | 9 | 13 | нет | 0 | 64 |
+| DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC | 6 | 6 | лог 555 | 0 | 29 |
+| AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy | 6 | 7 | нет | 0 | 68 |
+| 9emXYGUF7cYtX2uyuZavDhhxZ65wHcYZgRv5AHVAHGSp | 5 | 6 | нет | 0 | 75 |
+| DNreL4DMJ7xraNunLNxTVbM22aTtTAB2CoWogWoL5ph8 | 4 | 4 | нет | 0 | 35 |
+| DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o | 4 | 5 | лог 555 | 0 | 50 |
+| 7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da | 4 | 5 | нет | 0 | 58 |
+| 2CQgjcdNEo7WtbQLpJTAVcC3Ga61pNvRDTgP5grzctFG | 4 | 5 | нет | 0 | 78 |
+| 5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij | 4 | 6 | лог 555 | 0 | 85 |
+| CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw | 3 | 5 | лог 555 | 0 | 32 |
+| Fuw8N9qSnhRTKDpezFHdKS1ymvyNXxmtYay2g36AubNi | 3 | 3 | нет | 0 | 61 |
+| 5dzH7gh5FjtrxUwtfBufJyTBA4fyCUGheZsdYQsE9vag | 3 | 4 | нет | 0 | 84 |
+| 5t4fzb85DYYXqHMXPjFUKBSxLQisSciu1eYLpRDUKkQB | 3 | 3 | нет | 0 | 2 |
+| 4nBNtRX6Q3NAhtcaXfV5R2okHr2Cd6iur7EDQvNedujV | 3 | 3 | лог 555 | 0 | 56 |
+| 3xEgQCqNhJGHqavQzEFpmet8Vtc6o1L43snhRFeVLE1w | 3 | 3 | нет | 0 | 75 |
+| 3GzBLpxTWWTPWwBYQ8Jgrz5XLUCg9aY6HiB3GEBUBAv6 | 3 | 6 | нет | 1 | 361 |
+| 9LXWa7V3AE15VfBupcx5gDts2ix3Y9NzbcKZKjkkq6hV | 3 | 3 | нет | 0 | 74 |
+| JEBy7VuMsCqZDdprhmUNjB1MHTmt5dUFDeMXytbhTLdR | 3 | 5 | лог 555 | 0 | 237 |
+| 8WpSLDwsGnd3DEZXWSeShXzvFbAUFfACmCya434uPUH9 | 3 | 3 | нет | 0 | 22 |
+| GfhYK5H4PV5KDw1nDXbbFkjsRhHVyf93394Rw7ND9yUu | 3 | 3 | нет | 0 | 306 |
+| CxgPWvH2GoEDENELne2XKAR2z2Fr4shG2uaeyqZceGve | 3 | 3 | нет | 0 | 59 |
+| прочие (119 адресов) | 151 | | | | |
+
+### 3. Заработок (минты окна, полностью проданные)
+
+| показатель | значение |
+|---|---|
+| закрыто / открыто на конец окна / продажи без покупки в окне | 273 / 0 / 6 |
+| SOL вошло / вышло | 1381.598 / 1530.921 |
+| итог до чаевых и комиссий, SOL | +149.323 |
+| итог после чаевых (оценка) и комиссий, SOL | +71.140 |
+| закрыто в плюс (до / после издержек) | 199 / 165 из 273 |
+| удержание до первой продажи: медиана, слотов / секунд | 13 / 3 |
+| доля проданного в слоте покупки: медиана / доля минтов с продажей в том же слоте | 0.00 / 10 % |
+| минтов со стейблом без курса (SOL-экв. занижен) | 10 |
+
+### 4. Экономика места
+
+| показатель | значение |
+|---|---|
+| чаевые (оценка) / размер покупки, %: медиана / p90 | 5.20 / 9.62 |
+| в том же слоте, что ближайший источник | 229 из 279 |
+| Спирмен: чаевые ↔ слотов от источника | +0.07 (n 279) |
+| Спирмен: чаевые ↔ позиций от источника в том же слоте | +0.10 (n 229) |
+
+| чаевые, четверть | чаевые, SOL (медиана) | слотов от источника, медиана | в том же слоте, % |
+|---|---|---|---|
+| 1 | 0.05100 | 0 | 87 |
+| 2 | 0.14401 | 0 | 80 |
+| 3 | 0.26900 | 0 | 83 |
+| 4 | 0.61200 | 0 | 79 |
+
+## 54uaRuJEc9BHY7uVMXtcf9JWcYDtB75hUeFJWeCxEkBE
+
 Окно: 24 ч с 2026-09-27T01:24:29Z; подписей 1007; покупок 82, продаж 715; поступлений токена без оплаты (не покупки) 29; переводов SOL > 1 SOL (не чаевые) 5.75 SOL.
 
 ### 1. Покупки
@@ -127,6 +250,129 @@
 
 ## BomGAZnAGwnjs3oaqNHm4Wk5sKctQi83PKVxjRuGGbrm
 
+Окно: 168 ч с 2026-09-21T01:41:36Z; подписей 334; покупок 50, продаж 147; сделок с несколькими минтами (не разбирались) 73; поступлений токена без оплаты (не покупки) 90; переводов SOL > 1 SOL (не чаевые) 418.10 SOL.
+
+### 1. Покупки
+
+| показатель | значение |
+|---|---|
+| размер SOL-экв., медиана / сумма | 8.752 / 441.25 |
+| программы пулов | CPMMoo8L 22, pAMMBay6 12, LanMV9sA 6, LBUZKhRx 4, cpamdpZC 3, 6EF8rrec 2 |
+| котировка пула | So1111 15, 4rkGWJ 8, HTmQz7 3, 3NZ9JM 2 |
+| приоритет, лампорты: медиана / p90 | 50000000 / 300000000 |
+| чаевые (оценка), SOL: медиана / сумма за окно | 0.13382 / 17.7474 |
+| индекс в блоке: медиана / доля в первых 50 | 338 / 12 % |
+| получатели чаевых (оценка), топ | n6BTPZCA 168, ASTZHpta 38, AStZiY6E 33, ASTzWqJ1 32, AStzprSD 30 |
+
+Покупки (первые 40 по времени):
+
+| слот | минт | SOL-экв. | программа | приоритет | чаевые (оценка) | индекс / в блоке |
+|---|---|---|---|---|---|---|
+| 448940351 | B8WvjPmz | 10.002 | pAMMBay6 | 52065404 | 0.20000 | 899 / 1027 |
+| 449005503 | 5dvXTZ5q | 25.001 | LBUZKhRx | 30000000 | 0.19500 | 853 / 1258 |
+| 449055756 | AP5YnCZR | 3.005 | CPMMoo8L | 29995000 | 0.08000 | 2 / 1287 |
+| 449071121 | AhGvakNc | 9.502 | CPMMoo8L | 162424850 | 0.08000 | 4 / 1339 |
+| 449090596 | 9DdHxVe1 | 15.002 | pAMMBay6 | 30000000 | 0.12500 | 235 / 1348 |
+| 449113467 | FeDrozMM | 3.005 | CAMMCzo5 | 29995000 | 0.08000 | 958 / 1623 |
+| 449115417 | ExjkD5rv | 4.806 | LanMV9sA | 50000000 | 0.14803 | 767 / 1567 |
+| 449116261 | 3bLPQPLp | 15.003 | CPMMoo8L | 300000000 | 0.50000 | 1156 / 1307 |
+| 449117173 | ExjkD5rv | 5.945 | LanMV9sA | 100000000 | 0.35945 | 218 / 1514 |
+| 449144182 | 7GSVfYo7 | 3.003 | CPMMoo8L | 29995000 | 0.08000 | 883 / 1027 |
+| 449160602 | 5kepRxgA | 12.458 | cpamdpZC | 300000000 | 0.47457 | 738 / 1155 |
+| 449168329 | HhcfXbZ2 | 3.005 | CPMMoo8L | 29995000 | 0.08000 | 511 / 708 |
+| 449422046 | DCgPcq6D | 0.458 | CPMMoo8L | 226536 | 0.01977 | 313 / 1328 |
+| 449428155 | DXLzxcDb | 10.003 | CPMMoo8L | 100000000 | 0.60000 | 983 / 1901 |
+| 449462257 | 4wgANxxQ | 3.006 | LanMV9sA | 29995000 | 0.08000 | 851 / 1275 |
+| 449505914 | CmQnBhUC | 10.002 | CPMMoo8L | 50000000 | 0.20000 | 103 / 1180 |
+| 449674225 | 26d5rwV5 | 20.001 | cpamdpZC | 100000000 | 1.20000 | 843 / 867 |
+| 449692477 | 9XeLTsQG | 10.003 | CPMMoo8L | 99999999 | 0.60000 | 566 / 1056 |
+| 449718960 | 65dw58ug | 9.503 | CPMMoo8L | 310000000 | 0.08000 | 243 / 1368 |
+| 449739165 | 65dw58ug | 3.001 | CPMMoo8L | 29995000 | 0.08000 | 785 / 1252 |
+| 449743953 | CcxugZKP | 0.001 | pAMMBay6 | 1000000 | 0.10150 | 356 / 1264 |
+| 449761344 | B6f5Gc88 | 1.067 | LanMV9sA | 1090000 | 0.01891 | 1803 / 2662 |
+| 449768479 | 7nTAA8U8 | 3.003 | CPMMoo8L | 29999999 | 0.06500 | 659 / 1171 |
+| 449942475 | GNAgBwuw | 3.915 | pAMMBay6 | 50000000 | 0.13914 | 810 / 1136 |
+| 450024133 | A8WGag2M | 7.067 | cpamdpZC | 100000000 | 0.37065 | 458 / 845 |
+| 450084167 | 49bQM45J | 13.003 | CPMMoo8L | 300000000 | 1.13000 | 633 / 1302 |
+| 450086841 | G2KB6Yvh | 10.003 | CPMMoo8L | 49999999 | 0.20000 | 159 / 1185 |
+| 450090340 | 5rzMk1M2 | 13.002 | LanMV9sA | 99999999 | 1.13000 | 745 / 1290 |
+| 450093049 | DAfkzSx4 | 10.003 | LanMV9sA | 100000000 | 0.50000 | 961 / 1212 |
+| 450127580 | 2QcWKocE | 12.745 | CPMMoo8L | 300000000 | 0.47742 | 480 / 1384 |
+| 450156503 | 6gxc6ZWC | 3.002 | LBUZKhRx | 30000000 | 0.06500 | 653 / 1288 |
+| 450156530 | 6wUEFWYB | 3.002 | CPMMoo8L | 30000000 | 0.06500 | 321 / 1168 |
+| 450156560 | MYQZzuii | 3.002 | CPMMoo8L | 30000000 | 0.06500 | 44 / 1133 |
+| 450156589 | 65dw58ug | 3.000 | CPMMoo8L | 30000000 | 0.06500 | 979 / 1007 |
+| 450166824 | Z9bXVTdQ | 5.002 | CPMMoo8L | 30000000 | 0.07500 | 1302 / 1330 |
+| 450333978 | Ekfbe93y | 12.002 | CPMMoo8L | 100000000 | 0.42000 | 23 / 1242 |
+| 450365674 | 6BZY2Bge | 20.003 | CPMMoo8L | 99999999 | 1.20000 | 193 / 1203 |
+| 450372327 | sEkzZ2YR | 5.002 | CPMMoo8L | 30000000 | 0.07500 | 284 / 1562 |
+| 450453965 | 74QqbxgS | 17.003 | pAMMBay6 | 199999999 | 0.15000 | 221 / 223 |
+| 450454876 | 5PiBn5Jd | 20.001 | LBUZKhRx | 100000000 | 1.20000 | 220 / 328 |
+
+### 2. Кого копируют
+
+Покупок с покупателем того же минта в s0−3 .. s0 до снайпера: 45 из 50 (без такого покупателя -- 5). «Ближайший» -- последний перед ним.
+
+| источник | ближайший, раз | всего в окне, раз | наши списки | слотов до, медиана | позиций до в том же слоте, медиана |
+|---|---|---|---|---|---|
+| HttjoPHbWwMtK5ZUmqxouwzGtwynJsHC9Ztsm5YwbNQm | 4 | 6 | нет | 0 | 6 |
+| 3HxvTCvBwQNXsyortzrryQeBoJCRd5QwUJJPVoZbS7SL | 4 | 7 | нет | 0 | 21 |
+| AxtZoNYhAxvpv416hW7yzpTdcJeY45t8JyGUYMJXL9G | 3 | 4 | лог 555 | 0 | 62 |
+| 49nvFkUxnxd4wXY5W9XygB93rzDUvugaxK5AkMqqxmgS | 3 | 3 | нет | 0 | 86 |
+| 6BFyW8EJWbhZx12RBn5tqvSEwVWaFWknEZLaQSBgEkQA | 2 | 3 | нет | 0 | 286 |
+| 7jNRZuKsEXBEp8JSBbEKHsL42mw8WxveriEBthURg3oF | 2 | 2 | нет | 0 | 490 |
+| H2Y8BrxU8wRDzXK2idwHu3H5DG2DBqZrAuPkpsv8kmuB | 2 | 3 | нет | 0 | 111 |
+| HNhuE4Y3RNCx5tPBkNsCTWKT14542NxnGi9aXEyN1x8E | 2 | 4 | нет | 0 | 2 |
+| JUWYu6WL3QiCfgRCaAzZgFvM7v7UfimiNvNMvu5P3u1 | 1 | 1 | нет | 2 | — |
+| 7DAGQqeVzenmi2UnWdymHobBM9fuRHFBpTYJqwddy4Pd | 1 | 1 | нет | 1 | — |
+| 2CQgjcdNEo7WtbQLpJTAVcC3Ga61pNvRDTgP5grzctFG | 1 | 2 | нет | 0 | 3 |
+| DdqHe96ogUJuPdzwVcPtXvLEpZRTFrPqESrTF1H8K5gL | 1 | 1 | нет | 1 | — |
+| DyXg3Xp6BoMq5K6Nmdb7hEzPMpkRWH2aXHHZhUgN1gd6 | 1 | 5 | лог 555 | 0 | 274 |
+| EsRjHyw4nkNMPdYDF3HE6Y3W1VjSQMuNMSp53tesbt2W | 1 | 1 | нет | 0 | 22 |
+| MMMkhDRfNXpyE8ZZzEFAnaRubLxKsUrADwLNAevnMMM | 1 | 1 | нет | 0 | 65 |
+| 6yJ31rTuwegHvbrdyunsBnjtgTHkQrw6NrvMrrQaL8AV | 1 | 1 | нет | 0 | 281 |
+| 6GYCARF8VxkVQgoekq6k1YEL5divJwTM7C2r5VmRUfu3 | 1 | 1 | нет | 0 | 26 |
+| 4vgKuiktnNfXsoa9YTCUz9fRpfYDpDko4cBG15nkqazo | 1 | 1 | нет | 0 | 114 |
+| 2avbra2ua3E8u94GSZdzTxTHGWHzjoH18YWDFrVX2Buu | 1 | 1 | нет | 1 | — |
+| 9Lsuq7ur72ejVLxZyt1zw2biGRRc1xdJUckGHb1Nru3r | 1 | 1 | нет | 0 | 17 |
+| 4U9s6ktkZVD6W9K5X1RRVG89Mm9ZGznrPhhPhXezNedm | 1 | 1 | нет | 0 | 41 |
+| Bra5EH8vqm5bmGupdEHWcwNepetuvSuW2z4excQR5yNs | 1 | 1 | лог 555 | 0 | 584 |
+| CigQMfS81SVVbRRthYUkswhKUWQQncegCT7DBK4Q5gnH | 1 | 1 | нет | 0 | 57 |
+| 9W1SEk8D4FQRUtUx5LBAb95LjBMbbLGDARRLfBWWFTLa | 1 | 1 | нет | 0 | 20 |
+| GUiSJYdAs5nyPcTkyZbnnEsL4R6VJKzemcUQgnHWBCgq | 1 | 1 | нет | 0 | 264 |
+| прочие (6 адресов) | 6 | | | | |
+
+### 3. Заработок (минты окна, полностью проданные)
+
+| показатель | значение |
+|---|---|
+| закрыто / открыто на конец окна / продажи без покупки в окне | 25 / 20 / 15 |
+| SOL вошло / вышло | 220.606 / 238.892 |
+| итог до чаевых и комиссий, SOL | +18.286 |
+| итог после чаевых (оценка) и комиссий, SOL | +8.693 |
+| закрыто в плюс (до / после издержек) | 15 / 14 из 25 |
+| удержание до первой продажи: медиана, слотов / секунд | 211 / 57 |
+| доля проданного в слоте покупки: медиана / доля минтов с продажей в том же слоте | 0.00 / 0 % |
+| минтов со стейблом без курса (SOL-экв. занижен) | 0 |
+
+### 4. Экономика места
+
+| показатель | значение |
+|---|---|
+| чаевые (оценка) / размер покупки, %: медиана / p90 | 2.66 / 6.05 |
+| в том же слоте, что ближайший источник | 34 из 45 |
+| Спирмен: чаевые ↔ слотов от источника | -0.12 (n 45) |
+| Спирмен: чаевые ↔ позиций от источника в том же слоте | +0.35 (n 34) |
+
+| чаевые, четверть | чаевые, SOL (медиана) | слотов от источника, медиана | в том же слоте, % |
+|---|---|---|---|
+| 1 | 0.06500 | 0 | 82 |
+| 2 | 0.10150 | 0 | 64 |
+| 3 | 0.20000 | 0 | 64 |
+| 4 | 0.84000 | 0 | 92 |
+
+## BomGAZnAGwnjs3oaqNHm4Wk5sKctQi83PKVxjRuGGbrm
+
 Окно: 24 ч с 2026-09-27T01:24:27Z; подписей 35; покупок 5, продаж 8; поступлений токена без оплаты (не покупки) 19; переводов SOL > 1 SOL (не чаевые) 34.38 SOL.
 
 ### 1. Покупки
@@ -194,28 +440,42 @@
 
 ## Источники снайперов, которых нет ни в торгующих, ни в логе
 
-| адрес | раз «ближайшим» (оба снайпера) |
+| адрес | раз «ближайшим» (оба снайпера, самое длинное окно) |
 |---|---|
-| 9emXYGUF7cYtX2uyuZavDhhxZ65wHcYZgRv5AHVAHGSp | 3 |
-| JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG | 3 |
-| 7g5CJ754NboeY6D44MDdGwQmVX4Fvu59Q47c9ZKLPMkE | 3 |
-| 4S9Vbao13SjpeXsCaUE3nG7DA3oqi73mGEgmwqkRPy9g | 2 |
-| GENuYcB1qM279ruLuYgQjox5srG8vLh3LRQnZ2ip5nRh | 2 |
-| 8pisMPgQvkTc1x6jYtqCubVpASKGHAovN87m7XLtbbd5 | 2 |
-| 9LXWa7V3AE15VfBupcx5gDts2ix3Y9NzbcKZKjkkq6hV | 2 |
-| FNcrF6nt9BXswJrHom4hNmXCeW9no2C8wKh5UqdP8ueu | 2 |
-| DNreL4DMJ7xraNunLNxTVbM22aTtTAB2CoWogWoL5ph8 | 2 |
-| AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy | 2 |
-| 4xM5t84MsqMwPCA2goEzaaMywQZi6hAbMu8n7LZApppi | 1 |
-| YHbLDY8CySJ5ANfGKsgtmNzn4MSyBtKJkYTWXzPp53Y | 1 |
-| CBKgS8Nj714YomoPPxhVLUWos7vSrWnuL2cVKnJqWo2s | 1 |
-| AeeT8wTGMnQRz2jM5zk13NCq97Ng1Q2XgCnpVgFWJbqj | 1 |
-| 37V1znU2AxgHM67xjwHdvtg7ASKEii7nQU9kp5FM8PXN | 1 |
-| AfiLERLeXYWZ59PWVBkYrDwbMGQKjmpdagpH3Up6xuik | 1 |
-| EBWkQGHPc4teggp5ok1oUmoGnbyx4W4bSYTo2ynMVw2z | 1 |
-| 2CQgjcdNEo7WtbQLpJTAVcC3Ga61pNvRDTgP5grzctFG | 1 |
-| 7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da | 1 |
-| HNhuE4Y3RNCx5tPBkNsCTWKT14542NxnGi9aXEyN1x8E | 1 |
-| BUvQ1aNANRFUVNxskfiNyDG3MPfdhsjd8ePQMMYXXMS7 | 1 |
-| 6BFyW8EJWbhZx12RBn5tqvSEwVWaFWknEZLaQSBgEkQA | 1 |
-| 54uaRuJEc9BHY7uVMXtcf9JWcYDtB75hUeFJWeCxEkBE | 1 |
+| JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG | 10 |
+| 4S9Vbao13SjpeXsCaUE3nG7DA3oqi73mGEgmwqkRPy9g | 9 |
+| AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy | 6 |
+| 9emXYGUF7cYtX2uyuZavDhhxZ65wHcYZgRv5AHVAHGSp | 5 |
+| 2CQgjcdNEo7WtbQLpJTAVcC3Ga61pNvRDTgP5grzctFG | 5 |
+| DNreL4DMJ7xraNunLNxTVbM22aTtTAB2CoWogWoL5ph8 | 4 |
+| 7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da | 4 |
+| HttjoPHbWwMtK5ZUmqxouwzGtwynJsHC9Ztsm5YwbNQm | 4 |
+| 3HxvTCvBwQNXsyortzrryQeBoJCRd5QwUJJPVoZbS7SL | 4 |
+| Fuw8N9qSnhRTKDpezFHdKS1ymvyNXxmtYay2g36AubNi | 3 |
+| 5dzH7gh5FjtrxUwtfBufJyTBA4fyCUGheZsdYQsE9vag | 3 |
+| 5t4fzb85DYYXqHMXPjFUKBSxLQisSciu1eYLpRDUKkQB | 3 |
+| 3xEgQCqNhJGHqavQzEFpmet8Vtc6o1L43snhRFeVLE1w | 3 |
+| 3GzBLpxTWWTPWwBYQ8Jgrz5XLUCg9aY6HiB3GEBUBAv6 | 3 |
+| 9LXWa7V3AE15VfBupcx5gDts2ix3Y9NzbcKZKjkkq6hV | 3 |
+| 8WpSLDwsGnd3DEZXWSeShXzvFbAUFfACmCya434uPUH9 | 3 |
+| GfhYK5H4PV5KDw1nDXbbFkjsRhHVyf93394Rw7ND9yUu | 3 |
+| CxgPWvH2GoEDENELne2XKAR2z2Fr4shG2uaeyqZceGve | 3 |
+| 49nvFkUxnxd4wXY5W9XygB93rzDUvugaxK5AkMqqxmgS | 3 |
+| 6BFyW8EJWbhZx12RBn5tqvSEwVWaFWknEZLaQSBgEkQA | 2 |
+| 7jNRZuKsEXBEp8JSBbEKHsL42mw8WxveriEBthURg3oF | 2 |
+| H2Y8BrxU8wRDzXK2idwHu3H5DG2DBqZrAuPkpsv8kmuB | 2 |
+| HNhuE4Y3RNCx5tPBkNsCTWKT14542NxnGi9aXEyN1x8E | 2 |
+| JUWYu6WL3QiCfgRCaAzZgFvM7v7UfimiNvNMvu5P3u1 | 1 |
+| 7DAGQqeVzenmi2UnWdymHobBM9fuRHFBpTYJqwddy4Pd | 1 |
+| DdqHe96ogUJuPdzwVcPtXvLEpZRTFrPqESrTF1H8K5gL | 1 |
+| EsRjHyw4nkNMPdYDF3HE6Y3W1VjSQMuNMSp53tesbt2W | 1 |
+| MMMkhDRfNXpyE8ZZzEFAnaRubLxKsUrADwLNAevnMMM | 1 |
+| 6yJ31rTuwegHvbrdyunsBnjtgTHkQrw6NrvMrrQaL8AV | 1 |
+| 6GYCARF8VxkVQgoekq6k1YEL5divJwTM7C2r5VmRUfu3 | 1 |
+| 4vgKuiktnNfXsoa9YTCUz9fRpfYDpDko4cBG15nkqazo | 1 |
+| 2avbra2ua3E8u94GSZdzTxTHGWHzjoH18YWDFrVX2Buu | 1 |
+| 9Lsuq7ur72ejVLxZyt1zw2biGRRc1xdJUckGHb1Nru3r | 1 |
+| 4U9s6ktkZVD6W9K5X1RRVG89Mm9ZGznrPhhPhXezNedm | 1 |
+| CigQMfS81SVVbRRthYUkswhKUWQQncegCT7DBK4Q5gnH | 1 |
+| 9W1SEk8D4FQRUtUx5LBAb95LjBMbbLGDARRLfBWWFTLa | 1 |
+| GUiSJYdAs5nyPcTkyZbnnEsL4R6VJKzemcUQgnHWBCgq | 1 |
