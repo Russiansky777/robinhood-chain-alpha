@@ -5026,6 +5026,107 @@ def self_test() -> int:
         chk("образца Raydium CLMM с котировкой SOL и посчитанным минимумом нет -- "
             "строитель проверять нечем", False)
 
+    # --- METEORA DLMM В ПОЛОСЕ (очередь строителей владельца 28.09, N4).
+    # Цена у DLMM живёт в корзинах, и считается по событию свопа плюс шаг
+    # корзины из счёта пула (см. docs/dlmm_sobytie_i_cena.md). Здесь
+    # проверяется ДЕНЕЖНОЕ: без флага не берём, по флагу собираем с
+    # положительным минимумом, по чужой группе не берём, и без прочитанного
+    # шага корзины не берём даже при поднятом флаге.
+    try:
+        обр_dl = B_ж.load_samples(B_ж.DLMM)
+    except Exception:  # noqa: BLE001
+        обр_dl = []
+    B_ж.загрузить_ступени_dlmm()
+
+    def _dl_годный(x):
+        t_ = B_ж.extract_template(x["tx"], B_ж.DLMM, x["pool_vault"])
+        if not t_.get("ok") or not (t_.get("accounts") or []):
+            return False
+        mv_ = B_ж.mints_and_vaults(t_, x["tx"])
+        if not mv_ or mv_["quote_mint"] != C_ж.WSOL:
+            return False
+        return bool(B_ж.min_out_from_reserves(t_, x["tx"], 10_000_000, 0.35).get("ok"))
+
+    образец_dl = next((x for x in обр_dl if _dl_годный(x)), None)
+    if образец_dl is not None:
+        хран_dl = образец_dl["pool_vault"]
+
+        class МодулиDL:
+            class C:
+                WSOL = C_ж.WSOL
+                NATIVE_QUOTE = getattr(C_ж, "NATIVE_QUOTE", "native_sol")
+
+                @staticmethod
+                def identify_pool(*a, **kw):
+                    return {"ok": True, "pool_vault": хран_dl, "quote_mint": C_ж.WSOL}
+
+        было_мdl = globals()["_модули"]
+        было_фdl = os.environ.get("LANE_DLMM")
+        globals()["_модули"] = lambda: (МодулиDL.C, PP_ж, SB_ж, B_ж)
+        try:
+            os.environ.pop("LANE_DLMM_GROUPS", None)
+            os.environ["LANE_DLMM"] = "0"
+            dl_выкл = собрать(tx_источника=образец_dl["tx"],
+                               источник=образец_dl["source"],
+                               минт=образец_dl["mint"], наш_кошелёк=кошелёк_полосы(),
+                               лампорты=10_000_000)
+            chk("Meteora DLMM без флага -- отказ, полоса его не берёт",
+                dl_выкл["ok"] is False and "вне полосы" in (dl_выкл["why_not"] or ""),
+                dl_выкл)
+            os.environ["LANE_DLMM"] = "1"
+            dl_вкл = собрать(tx_источника=образец_dl["tx"],
+                              источник=образец_dl["source"],
+                              минт=образец_dl["mint"], наш_кошелёк=кошелёк_полосы(),
+                              лампорты=10_000_000)
+            chk("Meteora DLMM по флагу -- собран, минимум положителен и ниже ожидания",
+                dl_вкл["ok"] is True and isinstance(dl_вкл.get("min_out"), int)
+                and 0 < dl_вкл["min_out"] < int(dl_вкл.get("expected_out") or 0),
+                dl_вкл)
+            os.environ["LANE_DLMM_GROUPS"] = "speed_only"
+            dl_чужая = собрать(tx_источника=образец_dl["tx"],
+                                источник=образец_dl["source"],
+                                минт=образец_dl["mint"], наш_кошелёк=кошелёк_полосы(),
+                                лампорты=10_000_000)
+            chk("Meteora DLMM только для speed_only: по источнику другой группы -- отказ",
+                dl_чужая["ok"] is False and "вне полосы" in (dl_чужая["why_not"] or ""),
+                dl_чужая)
+            os.environ.pop("LANE_DLMM_GROUPS", None)
+            # ШАГ КОРЗИНЫ НЕ ПРОЧИТАН -- НЕ ПОКУПАЕМ. Главный денежный запрет
+            # строителя: без шага корзины цена не считается, а догадка означала
+            # бы минимум ниже настоящего.
+            t_dl = B_ж.extract_template(образец_dl["tx"], B_ж.DLMM, хран_dl)
+            пул_dl = t_dl["accounts"][0]
+            был_шаг = B_ж.СТУПЕНИ_DLMM.pop(пул_dl, None)
+            было_бш = set(B_ж.ПУЛЫ_БЕЗ_СТУПЕНИ)
+            B_ж.ПУЛЫ_БЕЗ_СТУПЕНИ.clear()
+            try:
+                dl_без_шага = собрать(tx_источника=образец_dl["tx"],
+                                       источник=образец_dl["source"],
+                                       минт=образец_dl["mint"],
+                                       наш_кошелёк=кошелёк_полосы(),
+                                       лампорты=10_000_000)
+                chk(f"Meteora DLMM без прочитанного шага корзины -- отказ: "
+                    f"{str(dl_без_шага.get('why_not'))[:70]}",
+                    dl_без_шага["ok"] is False, dl_без_шага.get("why_not"))
+                chk("и адрес пула лёг заданием фоновому чтению",
+                    пул_dl in B_ж.НУЖНЫ_ПУЛЫ_DLMM)
+            finally:
+                if был_шаг is not None:
+                    B_ж.СТУПЕНИ_DLMM[пул_dl] = был_шаг
+                B_ж.НУЖНЫ_ПУЛЫ_DLMM.discard(пул_dl)
+                B_ж.ПУЛЫ_БЕЗ_СТУПЕНИ.clear()
+                B_ж.ПУЛЫ_БЕЗ_СТУПЕНИ.update(было_бш)
+        finally:
+            globals()["_модули"] = было_мdl
+            os.environ.pop("LANE_DLMM_GROUPS", None)
+            if было_фdl is None:
+                os.environ.pop("LANE_DLMM", None)
+            else:
+                os.environ["LANE_DLMM"] = было_фdl
+    else:
+        chk("образца Meteora DLMM с котировкой SOL и посчитанным минимумом нет -- "
+            "строитель проверять нечем", False)
+
     # --- RAYDIUM LAUNCHLAB В ПОЛОСЕ (очередь строителей владельца 28.09, N3).
     # Сборка сверена на живых сделках источников (buy_exact_in, 18 счетов),
     # цена -- по событию TradeEvent из ЛОГОВ: у кривой запуска резервы
