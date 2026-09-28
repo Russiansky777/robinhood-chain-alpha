@@ -4206,6 +4206,38 @@ class Детектор:
                 and isinstance(p.get("block_index"), int)
                 and bool(p.get("slot_peers_done")))
 
+    def имя_токена_в_запись(self, cid: str, поз: dict) -> dict:
+        """Имя токена и имя источника -- в запись позиции, если их там нет.
+
+        Возвращает свежую запись. Спрашивать повторно не будет: причина отказа
+        тоже пишется, и по ней видно, что имя уже спрашивали и его нет.
+        """
+        if поз.get("token_name") or поз.get("token_name_why_not"):
+            return поз
+        минт = поз.get("mint")
+        имя = почему = None
+        if not минт:
+            почему = "минта в записи позиции нет"
+        else:
+            try:
+                имя = self.имя_токена(минт)
+                if not имя:
+                    почему = "в цепи имени нет (Metaplex и DAS молчат)"
+            except Exception as exc:  # noqa: BLE001
+                почему = f"запрос имени упал: {type(exc).__name__}"
+        поля = {"token_name": имя, "token_name_why_not": почему}
+        if not поз.get("source_name"):
+            try:
+                поля["source_name"] = self.имя_источника(поз.get("source"))
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            self.состояние.update_position(cid, **поля)
+            return (self.состояние.positions() or {}).get(cid) or поз
+        except Exception as exc:  # noqa: BLE001
+            log.warning("имя токена в запись не легло: %s", type(exc).__name__)
+            return поз
+
     def доложить_покупки_полосы(self, *, ждать_с: float | None = None,
                                  сейчас: float | None = None) -> dict:
         """BUY одним сообщением, когда данные по цепи собраны (или вышел срок).
@@ -4228,6 +4260,16 @@ class Детектор:
             собраны = self.данные_цепи_собраны(p_)
             if not собраны and возраст < ждать_с:
                 continue
+            # ИМЯ ТОКЕНА -- ЗДЕСЬ, ПЕРЕД ОТПРАВКОЙ СТРОКИ. Раньше его спрашивала
+            # только ветка "наша транзакция увидена в потоке", а она у полосы
+            # часто не срабатывает вовсе: за ночь 27->28.09 ни у одной из
+            # семнадцати сделок не оказалось ни own_tx_seen_ts, ни token_name --
+            # покупку добирал догон по RPC, а не поток. В строке из-за этого
+            # стояли первые шесть знаков минта вместо имени.
+            #
+            # ЭТО НЕ ГОРЯЧИЙ ПУТЬ: доклад и так отложен на 1-3 с после посадки,
+            # а имя кэшируется по минту -- второй запрос сети не касается.
+            p_ = self.имя_токена_в_запись(cid, p_)
             try:
                 доложено = DK.доложить_покупку(p_, оповещатель=self.оповещатель)
             except Exception as exc:  # noqa: BLE001
@@ -9584,6 +9626,55 @@ def self_test() -> int:
                 (поз_мб3.get("lane_landed_slot") or 0)
                 - (поз_мб3.get("source_slot") or 0) == 1,
                 (поз_мб3.get("lane_landed_slot"), поз_мб3.get("source_slot")))
+
+        # ---- ИМЯ ТОКЕНА В ЗАПИСЬ НА ПУТИ ДОКЛАДА ----
+        # За ночь 27->28.09 ни у одной из семнадцати сделок не оказалось
+        # token_name: имя спрашивала только ветка "наша транзакция увидена в
+        # потоке", а покупку добирал догон по RPC. В строке стояли первые шесть
+        # знаков минта вместо имени.
+        with _врем_каталог() as d_и:
+            st_и = ST.ExecState(base=Path(d_и) / "s", kill=Path(d_и) / "k")
+
+            class _УзелИмени(Helius):
+                def __init__(self):
+                    super().__init__(key="нет", служба="")
+                    self.спрошено = []
+
+                def call(self, метод, параметры=None, **кв):  # noqa: D102
+                    self.спрошено.append(метод)
+                    if метод == "getAccountInfo":
+                        д = base64.b64encode(
+                            bytes(65) + (4).to_bytes(4, "little") + b"MOON").decode()
+                        return {"value": {"data": [д, "base64"]}}
+                    raise RuntimeError(метод)
+
+            уи = _УзелИмени()
+            дет_и = Детектор(источники={"SRC": "lane_s0"}, состояние=st_и,
+                              helius=уи, курс=КурсSOL(), режим="dry")
+            st_и.write_intent(client_order_id="ин1",
+                               mint="So11111111111111111111111111111111111111112",
+                               source_sig="СИ", source_slot=1, sol_in=0.3, pool=None,
+                               program=None, taxed=None, tax_bps=None,
+                               mode=ST.MODE_LIVE, sell_after_s=28.8,
+                               lane=ST.МЕТКА_ПОЛОСЫ, lane_group="lane_s0")
+            поз_и = дет_и.имя_токена_в_запись("ин1", st_и.positions()["ин1"])
+            chk(f"имя токена спрошено и легло в запись: {поз_и.get('token_name')!r}",
+                поз_и.get("token_name") == "MOON", поз_и.get("token_name"))
+            было_вызовов = len(уи.спрошено)
+            дет_и.имя_токена_в_запись("ин1", поз_и)
+            chk("второй раз имя не спрашивается", len(уи.спрошено) == было_вызовов,
+                уи.спрошено)
+            # НЕТ ИМЕНИ -- ПРИЧИНА В ЗАПИСЬ, и тоже один раз.
+            st_и.write_intent(client_order_id="ин2", mint="", source_sig="СИ2",
+                               source_slot=1, sol_in=0.3, pool=None, program=None,
+                               taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                               sell_after_s=28.8, lane=ST.МЕТКА_ПОЛОСЫ,
+                               lane_group="lane_s0")
+            поз_и2 = дет_и.имя_токена_в_запись("ин2", st_и.positions()["ин2"])
+            chk(f"без минта причина названа словами: "
+                f"{поз_и2.get('token_name_why_not')!r}",
+                поз_и2.get("token_name_why_not") == "минта в записи позиции нет",
+                поз_и2.get("token_name_why_not"))
 
         # ---- ПОДПИСКА: ГРУППА СО subscribe=false НЕ ПОДПИСЫВАЕТСЯ ----
         # Это денежный путь наоборот: снять с подписки торгующую группу значит
