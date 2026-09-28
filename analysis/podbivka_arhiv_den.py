@@ -10,6 +10,9 @@
     --porog SOL-экв. в SOL-пуле поддержанного типа; с сигнала пул «активен»
     --okno слотов: все его события пишутся в ряд;
   * цели (--celi, подписи): их события пишутся целиком -- для сверок;
+  * рост перед покупкой: у каждого события наших адресов и сигнала -- цена пула перед
+    ним к наименьшей цене пула за 750 и 150 слотов до него (история цены всех пулов,
+    скользящая; цена -- по полям резервов события);
   * --dop-adresa -- ещё адреса (события и сигналы по --porog); --istochniki -- адреса
     с порогом сигнала --porog-dop; у каждого сигнала -- рисунок (рост к s0+30,
     падение от пика к s0+75, продавцы после пика).
@@ -31,6 +34,7 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import calendar
 import io
 import json
@@ -58,6 +62,9 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 р_sig = re.compile(r'"signature":\s*"([1-9A-HJ-NP-Za-km-z]{64,90})"')
 р_pool = re.compile(r'"poolId":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_signer = re.compile(r'"txSigner":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
+р_block = re.compile(r'"block":\s*(\d+)')
+р_q = re.compile(r'"(quoteInPool|tokensInPool|vQuoteInBondingCurve|vTokensInBondingCurve)":\s*"?([0-9.eE+-]+)')
+НАЗАД = 750            # слотов истории цены пула до события (≈ 5 мин) -- рост перед покупкой
 р_trader = re.compile(r'"trader":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 
 
@@ -184,6 +191,8 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     активные: dict = {}          # poolId -> до_слота
     ряды: dict = {}              # poolId -> [события]
     счёт = {"строк": 0, "файлов": 0, "ошибки": []}
+    история_цены: dict = {}      # poolId -> deque[(слот, цена)] за НАЗАД слотов
+    счёт_ист = 0
     for ч in часы:
         url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
         try:
@@ -197,6 +206,35 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                     счёт["строк"] += 1
                     пм = р_pool.search(стр)
                     pid = пм.group(1) if пм else None
+                    бм = р_block.search(стр)
+                    блок = int(бм.group(1)) if бм else None
+                    цена_до = None
+                    if pid and блок:
+                        поля = dict(р_q.findall(стр))
+                        x_ = поля.get("vQuoteInBondingCurve") or поля.get("quoteInPool")
+                        y_ = поля.get("vTokensInBondingCurve") or поля.get("tokensInPool")
+                        try:
+                            цена = float(x_) / float(y_) if x_ and y_ and float(y_) > 0 else None
+                        except ValueError:
+                            цена = None
+                        if цена:
+                            дк = история_цены.setdefault(pid, collections.deque())
+                            рост = None
+                            if дк:
+                                пр_ц = дк[-1][1]
+                                мин750 = min(c for b, c in дк)
+                                мин150 = min((c for b, c in дк if b >= блок - 150), default=пр_ц)
+                                рост = (round((пр_ц / мин750 - 1) * 100, 2), round((пр_ц / мин150 - 1) * 100, 2))
+                            дк.append((блок, цена))
+                            while дк and дк[0][0] < блок - НАЗАД:
+                                дк.popleft()
+                            цена_до = рост
+                        else:
+                            цена_до = None
+                        счёт_ист += 1
+                        if счёт_ист % 2_000_000 == 0:
+                            for k in [k for k, v in история_цены.items() if not v or v[-1][0] < блок - НАЗАД]:
+                                del история_цены[k]
                     в_активе = pid in активные
                     sn = р_signer.search(стр)
                     трейдеры = set(р_trader.findall(стр))
@@ -238,13 +276,17 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                              "pool": e.get("pool"), "poolId": pid, "mint": e.get("mint"),
                                              "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
                                              "первая": первая, "block": e.get("block"), "timestamp": e.get("timestamp"),
-                                             "priorityFee": e.get("priorityFee")})
+                                             "priorityFee": e.get("priorityFee"),
+                                             "рост_до_750": цена_до[0] if цена_до else None,
+                                             "рост_до_150": цена_до[1] if цена_до else None})
                         порог_t = porog_доп if (t in ист and porog_доп is not None) else porog
                         if (e["action"] == "buy" and первая and sol is not None and sol >= порог_t and q == WSOL
                                 and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
                             сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
                                             "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
-                                            "sol": sol, "timestamp": e.get("timestamp")})
+                                            "sol": sol, "timestamp": e.get("timestamp"),
+                                            "рост_до_750": цена_до[0] if цена_до else None,
+                                            "рост_до_150": цена_до[1] if цена_до else None})
                             if pid not in активные:
                                 ряды.setdefault(pid, [])
                                 if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
