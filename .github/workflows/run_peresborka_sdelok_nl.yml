@@ -73,6 +73,9 @@ jobs:
         run: |
           set -e
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/peresborka_sdelok.py" < deploy/checks/peresborka_sdelok.py
+          # СВЕЖИЙ ДОКЛАДЧИК -- РЯДОМ С ПРОГОНОМ. Иначе прогон берёт тот, что
+          # развёрнут на хосте, и падает на новых функциях формата.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/bloom_doklad.py" < analysis/bloom_doklad.py
 
       - name: "Печать строк на хосте (без отправки)"
         run: |
