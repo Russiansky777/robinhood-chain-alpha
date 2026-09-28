@@ -96,9 +96,13 @@ on:
         required: false
         default: "0"
       keep_env:
-        description: "'yes' -- env на хосте НЕ трогать вовсе (доставить код и перезапустить)"
+        description: "env на хосте НЕ трогать: ТОЛЬКО 'yes'. Иное значение требует perepisat_env"
         required: false
-        default: "no"
+        default: "yes"
+      perepisat_env:
+        description: "ПЕРЕПИСАТЬ env целиком -- ровно слово PEREPISAT, иначе деплой откажется"
+        required: false
+        default: ""
       pool_send:
         description: "'1' -- БОЕВОЙ ПУЛ шаг 1: одна подписанная покупка уходит ВСЕМИ подключёнными сервисами, чаевые всем <= 0.005 SOL на сделку (включено по решению владельца 25.09)"
         required: false
@@ -132,6 +136,31 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: claude/nifty-sagan-r0polg
+
+      - name: "ГЕЙТ: переписывать env можно только по явному слову"
+        # ЗАЧЕМ (слово владельца 28.09 ночью, п.3): "keep_env=yes сделать
+        # умолчанием деплоя; вход без него невозможен. Два раза за два дня гейт
+        # спасал ключи -- третьего не должно быть". Деплой с пустыми входами
+        # 23:15:31Z начал переписывать env и потерял бы 34 строки, включая
+        # ключи кошельков: спас только гейт сверки ключей. Теперь умолчание --
+        # НЕ ТРОГАТЬ env, а перезапись требует отдельного слова.
+        run: |
+          set -e
+          KEEP="${{ inputs.keep_env }}"
+          SLOVO="${{ inputs.perepisat_env }}"
+          if [ "$KEEP" = "yes" ]; then
+            echo "env ne trogaem -- eto umolchanie"
+            exit 0
+          fi
+          if [ "$SLOVO" = "PEREPISAT" ]; then
+            echo "VNIMANIE: env budet perepisan celikom po yavnomu slovu vladelca"
+            exit 0
+          fi
+          echo "DEPLOJ OTMENJON: keep_env='$KEEP' bez slova PEREPISAT v perepisat_env."
+          echo "Perezapis env teryaet stroki, kotoryh net vo vhodah: 28.09 tak"
+          echo "poteryalis by 34 klyucha, sredi nih klyuchi koshelkov."
+          exit 1
+
 
       - name: "Адрес хоста и питон"
         run: |
@@ -382,7 +411,7 @@ jobs:
           done
 
       - name: "env: ключи отправителей пула (значения только через stdin)"
-        if: ${{ github.event.inputs.keep_env != 'yes' }}
+        if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         env:
           BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
           ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
@@ -421,7 +450,7 @@ jobs:
             echo "состояние пула не прочитано (модуль ещё не доставлен) -- не страшно"
 
       - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
-        if: ${{ github.event.inputs.keep_env != 'yes' }}
+        if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         env:
           DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
         run: |
