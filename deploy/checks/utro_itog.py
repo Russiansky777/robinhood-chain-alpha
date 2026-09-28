@@ -32,8 +32,15 @@ import time
 from pathlib import Path
 
 КОД = os.environ.get("BLOOM_CODE_DIR", "/home/bot/bloom_executor")
-if КОД and Path(КОД).exists():
-    sys.path.insert(0, КОД)
+# ПРОВЕРКА СУЩЕСТВОВАНИЯ МОЖЕТ САМА УПАСТЬ. На раннере GitHub каталог службы
+# принадлежит другому пользователю, и Path.exists() бросает PermissionError, а
+# не возвращает False: самопроверка счётной части падала на этом до чтения
+# любого журнала.
+try:
+    if КОД and Path(КОД).exists():
+        sys.path.insert(0, КОД)
+except OSError:
+    pass
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 ПОРОГ_СЛОТОВ = 3
