@@ -208,6 +208,27 @@ SPECS = {
 }
 
 
+# РАСКЛАДКА ПРОДАЖИ. Пока здесь только Pump AMM: у него продажа -- ДРУГАЯ
+# инструкция (sell, дискриминатор 33e685a4017f83ad), а не та же с обратными
+# счетами. Раскладка выведена по НАШЕЙ СОБСТВЕННОЙ продаже 22:21:42Z
+# (teg1M4QY..., 24 счёта, продажа 6XnC2Y -> SOL через Jupiter, внутри которой
+# лежит настоящая инструкция пула):
+#   0 пул, 1 наш кошелёк (подписант), 2 общая настройка, 3 минт токена,
+#   4 минт котировки (WSOL), 5 НАШ счёт токена, 6 НАШ счёт WSOL,
+#   7 хранилище токена пула, 8 хранилище котировки пула, 9 получатель комиссии,
+#   10 его счёт WSOL, 11 программа токена базы, 12 программа токена котировки,
+#   13 системная, 14 программа ATA, 15 event_authority, 16 сама программа,
+#   17..23 счета создателя и комиссий -- переносятся как есть.
+# ОТ ПОКУПКИ ОТЛИЧАЕТСЯ отсутствием user_volume_accumulator (он только у
+# покупки) -- поэтому счетов 24, а не 26, и pda здесь пустой.
+SPECS_ПРОДАЖИ = {
+    PUMP_AMM: {"label": "Pump AMM продажа", "ix": "sell", "alt": [],
+               "n_accounts": None, "min_accounts": 23, "max_accounts": 24,
+               "user": [1], "user_ata": [(5, 3, 11), (6, 4, 12)], "pda": [],
+               "base_mint": 3, "quote_mint": 4, "base_vault": 7, "quote_vault": 8},
+}
+
+
 def spec_of(tpl: dict) -> dict:
     """Раскладка счетов для ЭТОГО шаблона: у кривой она зависит от разновидности.
 
@@ -215,6 +236,8 @@ def spec_of(tpl: dict) -> dict:
     отдельный минт котировки; спутать её с 18-счётной значило бы подставить наш
     кошелёк не туда, то есть подписать покупку с чужими счетами.
     """
+    if tpl.get("продажа"):
+        return dict(SPECS_ПРОДАЖИ[tpl["program"]])
     s = dict(SPECS[tpl["program"]])
     if tpl.get("program") == BONDING:
         вар = BONDING_DISCS.get(tpl.get("ix")) or {}
@@ -247,11 +270,20 @@ def pda(seeds: list, user: str, program: str) -> str:
     return str(Pubkey.find_program_address(raw, Pubkey.from_string(program))[0])
 
 
-def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
-    """Инструкция пула в транзакции источника: счета, данные, аргументы."""
-    spec = SPECS.get(program)
+def extract_template(tx: dict, program: str, pool_vault: str, *,
+                     продажа: bool = False) -> dict:
+    """Инструкция пула в транзакции: счета, данные, аргументы.
+
+    продажа=True берёт раскладку ПРОДАЖИ (SPECS_ПРОДАЖИ): у Pump AMM это другая
+    инструкция, и путать её с покупкой нельзя -- аргументы стоят на тех же
+    местах, но смысл обратный (сколько токена отдаём и сколько котировки хотим
+    минимум).
+    """
+    spec = (SPECS_ПРОДАЖИ if продажа else SPECS).get(program)
     if spec is None:
-        return {"ok": False, "why_not": "тип пула не покрыт"}
+        return {"ok": False,
+                "why_not": ("продажа этого типа пула не покрыта" if продажа
+                             else "тип пула не покрыт")}
     want = disc(spec["ix"])
     for ix in all_instructions(tx):
         if ix.get("programId") != program or pool_vault not in ix["accounts"]:
@@ -274,8 +306,9 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
             return {"ok": True, "program": program, "ix": ключ, "accounts": list(ix["accounts"]),
                     "data": data, "arg0": a0_, "arg1": a1_, "writable": writable_map(tx),
                     "signers": sorted(C.signers(tx)), "exact_out": bool(вид["exact_out"])}
-        name = next((n for n in (spec["ix"], "buy", "swap2", "swap_base_output", "swap")
-                     if data[:8] == disc(n)), data[:8].hex())
+        кандидаты = [spec["ix"], *list(spec.get("alt") or []),
+                     "swap2", "swap_base_output", "swap"]
+        name = next((n for n in кандидаты if data[:8] == disc(n)), data[:8].hex())
         if data[:8] != want and name not in spec["alt"]:
             return {"ok": False, "why_not": f"у источника инструкция {name}, не {spec['ix']}"}
         ждём = spec["n_accounts"]
@@ -298,7 +331,7 @@ def extract_template(tx: dict, program: str, pool_vault: str) -> dict:
             return {"ok": False, "why_not": "у источника CLMM не «точный вход без лимита цены»"}
         return {"ok": True, "program": program, "ix": name, "accounts": list(ix["accounts"]),
                 "data": data, "arg0": a0, "arg1": a1, "writable": writable_map(tx),
-                "signers": sorted(C.signers(tx))}
+                "signers": sorted(C.signers(tx)), "продажа": bool(продажа)}
     return {"ok": False, "why_not": "инструкция пула с этим хранилищем не найдена"}
 
 
@@ -900,6 +933,48 @@ def rebuild_check(s: dict, program: str) -> dict:
 
 def self_test() -> int:
     checks = []
+    # --- ПРОДАЖА PUMP AMM: раскладка выведена по НАШЕЙ СОБСТВЕННОЙ продаже.
+    # Файл образцов собирает прогон deploy/checks/nogi_vse_kotirovki.py по
+    # подписям наших продаж: внутри транзакции Jupiter лежит настоящая
+    # инструкция пула, и именно её раскладку мы обязаны воспроизвести.
+    ф_прод = C.DATA / "obrazcy_vidov_instrukciy.json"
+    if ф_прод.exists():
+        try:
+            обр_прод = json.loads(ф_прод.read_text(encoding="utf-8"))["obrazcy"]
+        except Exception as exc:  # noqa: BLE001
+            обр_прод = {}
+            checks.append((f"файл образцов видов инструкций не читается: "
+                            f"{type(exc).__name__}", False))
+        продажи = [x for x in обр_прод.values()
+                   if x.get("program") == PUMP_AMM and x.get("disc") == disc("sell").hex()]
+        checks.append((f"настоящих продаж Pump AMM в образцах: {len(продажи)}",
+                       len(продажи) >= 1))
+        for з in продажи:
+            tpl = extract_template(з["tx"], PUMP_AMM, з["accounts"][7], продажа=True)
+            checks.append((f"продажа Pump AMM разбирается как шаблон: {tpl.get('ok')} "
+                           f"({tpl.get('ix')}, счетов {len(tpl.get('accounts') or [])})",
+                           bool(tpl.get("ok")) and tpl.get("ix") == "sell"))
+            if not tpl.get("ok"):
+                continue
+            mv = mints_and_vaults(tpl, з["tx"])
+            checks.append((f"у продажи роли на своих местах: база {str(mv.get('base_mint'))[:6]}, "
+                           f"котировка {str(mv.get('quote_mint'))[:6]}, хранилища "
+                           f"{str(mv.get('base_vault'))[:6]} / {str(mv.get('quote_vault'))[:6]}",
+                           mv.get("quote_mint") == C.WSOL
+                           and mv.get("base_mint") not in (None, C.WSOL)
+                           and mv.get("base_vault") == з["accounts"][7]
+                           and mv.get("quote_vault") == з["accounts"][8]))
+            checks.append((f"аргументы продажи: отдаём {tpl['arg0']} сырых токена, "
+                           f"минимум котировки {tpl['arg1']}",
+                           isinstance(tpl["arg0"], int) and tpl["arg0"] > 0))
+            как_покупка = extract_template(з["tx"], PUMP_AMM, з["accounts"][7])
+            checks.append(("та же транзакция как ПОКУПКА не разбирается (инструкции "
+                           "не путаются): " + str(как_покупка.get("why_not"))[:60],
+                           как_покупка.get("ok") is False))
+    else:
+        checks.append(("файла образцов видов инструкций нет -- продажу Pump AMM "
+                        "проверять нечем (соберётся прогоном по подписям продаж)",
+                        True))
     for program, spec in SPECS.items():
         sm = load_samples(program)
         res = [rebuild_check(s, program) for s in sm]
