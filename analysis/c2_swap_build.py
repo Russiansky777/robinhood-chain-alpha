@@ -791,6 +791,173 @@ def clmm_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float,
     return из_
 
 
+# ---------------------------------------------------------- Meteora DLMM
+# ЦЕНА У DLMM ЖИВЁТ В КОРЗИНАХ, а не в хранилищах: у каждой корзины своя цена, и
+# по остаткам хранилищ активную корзину не увидеть. Найдено 28.09 по девяти
+# живым сделкам (docs/dlmm_sobytie_i_cena.md, разбор analysis/c2_dlmm_recon.py):
+#   * события DLMM НЕТ в "Program data:" вовсе -- оно уходит по CPI, внутренней
+#     инструкцией к самой программе DLMM с дискриминатором Anchor
+#     e445a52e51cb9a1d, дальше дискриминатор события и тело;
+#   * раскладка тела подтверждена фактом: lb_pair совпал со счётом 0 вызова
+#     свопа 12 из 12 шагов, amount_in и amount_out -- с переводами того же
+#     вызова 12 из 12;
+#   * цена корзины в СЫРЫХ единицах равна (1 + bin_step/10000)^bin: проверено
+#     двумя независимыми способами (отношением цен двух сделок одного пула и
+#     шагом корзины из счёта пула).
+DLMM_CPI_ДИСК = bytes.fromhex("e445a52e51cb9a1d")
+DLMM_СВОП_ДИСК = bytes.fromhex("516ce3becdd00ac4")
+DLMM_ДЛИНА_СВОПА = 145
+# Шаг корзины лежит в счёте пула (смещения 73 и 80, согласны у 11 пулов из 11),
+# и его читает отдельный прогон -- в горячем пути счетов не спрашиваем. Пул без
+# прочитанного шага -- ОТКАЗ, как у CLMM отказ без ставки комиссии.
+СТУПЕНИ_DLMM: dict = {}
+НУЖНЫ_ПУЛЫ_DLMM: set = set()
+ПУЛЫ_БЕЗ_СТУПЕНИ: set = set()
+ФАЙЛ_СТУПЕНЕЙ_DLMM = "dlmm_shag_korziny.json"
+# Запас на одну корзину с каждой стороны при проверке модели: цена сделки
+# считается по целым лампортам, а границы -- точные степени.
+ЗАПАС_КОРЗИН_DLMM = 1
+
+
+def загрузить_ступени_dlmm(файл=None) -> int:
+    """Шаги корзин из файла прогона вывода. Вернёт, сколько пулов взято."""
+    п = Path(файл) if файл else (C.DATA / ФАЙЛ_СТУПЕНЕЙ_DLMM)
+    if not п.exists():
+        return 0
+    try:
+        д = json.loads(п.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return 0
+    по_пулам = д.get("шаг_корзины_по_пулам") or {}
+    if not по_пулам:
+        # Старый вид отчёта: согласие смещений там ещё не сведено в одно поле.
+        годные = д.get("годные_смещения") or []
+        if годные and all(г.get("шаги_корзин") == годные[0].get("шаги_корзин")
+                          for г in годные):
+            по_пулам = годные[0].get("шаги_корзин") or {}
+    взято = 0
+    for пул, шк in по_пулам.items():
+        try:
+            шк = int(шк)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= шк <= 2000:
+            СТУПЕНИ_DLMM[пул] = шк
+            взято += 1
+    return взято
+
+
+def событие_dlmm(данные: bytes) -> dict | None:
+    """Событие свопа DLMM из данных внутренней инструкции или None."""
+    if (len(данные) != DLMM_ДЛИНА_СВОПА or данные[:8] != DLMM_CPI_ДИСК
+            or данные[8:16] != DLMM_СВОП_ДИСК):
+        return None
+    т = данные[16:]
+    начало, конец = struct.unpack_from("<ii", т, 64)
+    вошло, вышло = struct.unpack_from("<QQ", т, 72)
+    комиссия, протокол = struct.unpack_from("<QQ", т, 89)
+    return {"пул": b58encode(т[0:32]), "start_bin_id": начало,
+            "end_bin_id": конец, "amount_in": вошло, "amount_out": вышло,
+            "swap_for_y": т[88], "fee": комиссия, "protocol_fee": протокол}
+
+
+def события_dlmm(tx: dict) -> list:
+    """Все события свопа DLMM транзакции. Роутер трогает по нескольку пулов."""
+    из_ = []
+    for группа in ((tx or {}).get("meta") or {}).get("innerInstructions") or []:
+        for их in группа.get("instructions") or []:
+            if (их.get("programId") or их.get("program")) != DLMM:
+                continue
+            с_ = событие_dlmm(b58decode(их.get("data") or ""))
+            if с_ is not None:
+                из_.append(с_)
+    return из_
+
+
+def цена_корзины_dlmm(шаг_корзины: int, корзина: int) -> D:
+    """Цена корзины в СЫРЫХ единицах: (1 + bin_step/10000)^bin."""
+    return (D(1) + D(int(шаг_корзины)) / D(10000)) ** int(корзина)
+
+
+def dlmm_min_out(tpl: dict, tx: dict, amount_in: int, slippage: float,
+                  шаг_корзины: int | None = None) -> dict:
+    """Минимум выхода в Meteora DLMM: цена -- по КОНЕЧНОЙ корзине сделки.
+
+    Наша покупка идёт сразу после сделки источника, то есть с той корзины, на
+    которой он остановился. Цена конечной корзины -- худшая из тех, что получил
+    он, и именно она наша. Кончится корзина -- минимум выхода не выполнится и
+    цепь откажет: это промах, а не потеря.
+
+    БЕЗ ШАГА КОРЗИНЫ -- ОТКАЗ. Он лежит в счёте пула и читается отдельным
+    прогоном; догадка о нём означала бы минимум ниже настоящего.
+    """
+    пул = tpl["accounts"][0] if (tpl.get("accounts") or []) else None
+    if not пул:
+        return {"ok": False, "why_not": "в инструкции DLMM нет счёта пула"}
+    события = [с for с in события_dlmm(tx) if с["пул"] == пул]
+    if not события:
+        return {"ok": False, "why_not": "нет события свопа DLMM по нашему пулу"}
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        return {"ok": False, "why_not": "минты и хранилища не восстановились"}
+    rows = {r["account"]: r for r in C.token_rows(tx).values()}
+    qv, bv = rows.get(mv["quote_vault"]), rows.get(mv["base_vault"])
+    if not qv or not bv:
+        return {"ok": False, "why_not": "хранилищ пула нет в балансах транзакции"}
+    вход = qv["post"] - qv["pre"]
+    выход = bv["pre"] - bv["post"]
+    if вход <= 0 or выход <= 0:
+        return {"ok": False,
+                "why_not": "сделка источника не покупка по этим хранилищам"}
+    # СОБЫТИЕ ОБЯЗАНО ОБЪЯСНЯТЬ ХРАНИЛИЩА. Роутер заходит в один пул и дважды;
+    # тогда движение хранилищ -- сумма двух шагов, и к одному событию не
+    # относится. Такую сделку не считаем вовсе.
+    событие = next((с for с in события
+                    if с["amount_in"] == вход and с["amount_out"] == выход), None)
+    if событие is None:
+        return {"ok": False,
+                "why_not": "событие DLMM не сходится с хранилищами: сделка "
+                           "источника прошла этот пул не один раз"}
+    if шаг_корзины is None:
+        шаг_корзины = СТУПЕНИ_DLMM.get(пул)
+    if not шаг_корзины:
+        if пул not in ПУЛЫ_БЕЗ_СТУПЕНИ:
+            НУЖНЫ_ПУЛЫ_DLMM.add(пул)
+        return {"ok": False,
+                "why_not": f"шаг корзины DLMM неизвестен: пул {пул} ещё не "
+                           f"прочитан", "pool": пул}
+    низ_к = min(событие["start_bin_id"], событие["end_bin_id"])
+    верх_к = max(событие["start_bin_id"], событие["end_bin_id"])
+    ставка = (D(событие["fee"]) / D(событие["amount_in"])
+              if событие["amount_in"] else D(0))
+    if not (D(0) <= ставка < D(1)):
+        return {"ok": False, "why_not": "доля комиссии из события вне смысла"}
+    средняя = D(событие["amount_in"] - событие["fee"]) / D(событие["amount_out"])
+    низ = цена_корзины_dlmm(шаг_корзины, низ_к - ЗАПАС_КОРЗИН_DLMM)
+    верх = цена_корзины_dlmm(шаг_корзины, верх_к + ЗАПАС_КОРЗИН_DLMM)
+    # МОДЕЛЬ ОБЯЗАНА ВОСПРОИЗВЕСТИ СДЕЛКУ ИСТОЧНИКА. Средняя цена сделки лежит
+    # между ценами первой и последней корзины -- иначе прочитан не тот шаг или
+    # не то событие, и считать нашу цену нечем.
+    if not (низ <= средняя <= верх):
+        return {"ok": False,
+                "why_not": f"модель корзин не воспроизвела сделку источника "
+                           f"(шаг {шаг_корзины}, корзины {низ_к}..{верх_к})",
+                "pool": пул}
+    цена_нам = цена_корзины_dlmm(шаг_корзины, верх_к)
+    if цена_нам <= 0:
+        return {"ok": False, "why_not": "цена конечной корзины не считается"}
+    ожидаем = D(amount_in) * (D(1) - ставка) / цена_нам
+    минимум = int(ожидаем * (D(1) - D(str(slippage))))
+    if минимум <= 0:
+        return {"ok": False, "why_not": "минимум выхода вышел нулевым"}
+    return {"ok": True, "pool": пул, "bin_step": int(шаг_корзины),
+            "start_bin_id": событие["start_bin_id"],
+            "end_bin_id": событие["end_bin_id"],
+            "fee_share": float(ставка), "source_in": вход, "source_out": выход,
+            "bin_price": float(цена_нам), "expected_out": int(ожидаем),
+            "min_out": минимум}
+
+
 def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) -> dict:
     """Минимум токенов по резервам ПОСЛЕ сделки источника, x*y=k.
 
@@ -807,7 +974,10 @@ def min_out_from_reserves(tpl: dict, tx: dict, amount_in: int, slippage: float) 
         # пока её не передали, денежный путь честно отказывает.
         return clmm_min_out(tpl, tx, amount_in, slippage)
     if tpl["program"] == DLMM:
-        return {"ok": False, "why_not": "сосредоточенная ликвидность: резервы цену не дают"}
+        # Цена корзины, а не резервы: у DLMM резервы цену действительно не
+        # дают, и раньше здесь стоял честный отказ. Теперь считается по
+        # событию свопа и шагу корзины из счёта пула.
+        return dlmm_min_out(tpl, tx, amount_in, slippage)
     if tpl["program"] == LAUNCHLAB:
         return launchlab_min_out(tx, amount_in, slippage)
     if tpl["program"] == BONDING:
@@ -1402,6 +1572,64 @@ def self_test() -> int:
                    len(ll) >= 10 and max(ll) < 1e-6))
     checks.append((f"формула x*y=k с калибровкой воспроизводит сделку источника ({len(errs)} сделок, "
                    f"макс. отклонение {max(errs) if errs else None})", errs and max(errs) < 1e-9))
+    # ---- MEТEORA DLMM: цена корзины (строитель N4). Проверяется ДЕНЕЖНОЕ:
+    # минимум считается, он НЕ оптимистичнее сделки источника (наша цена не
+    # лучше его средней, потому что мы идём следом), без шага корзины отказ,
+    # при неверном шаге отказ, и событие обязано сходиться с хранилищами.
+    взято_dlmm = загрузить_ступени_dlmm()
+    dl_ок = dl_хуже = 0
+    dl_отказы = []
+    for s in load_samples(DLMM):
+        t_ = extract_template(s["tx"], DLMM, s["pool_vault"])
+        if not t_.get("ok"):
+            continue
+        р = min_out_from_reserves(t_, s["tx"], 10_000_000, 0.35)
+        if not р.get("ok"):
+            dl_отказы.append(р.get("why_not"))
+            continue
+        dl_ок += 1
+        # Наша цена -- цена КОНЕЧНОЙ корзины, то есть не лучше средней цены
+        # источника: иначе минимум был бы выше настоящего.
+        средняя = (р["source_in"] * (1 - р["fee_share"])) / р["source_out"]
+        if р["bin_price"] >= средняя * 0.999999:
+            dl_хуже += 1
+    checks.append((f"DLMM: минимум выхода посчитан по {dl_ок} живым сделкам "
+                   f"(шагов корзин из файла {взято_dlmm}), отказов "
+                   f"{len(dl_отказы)} {sorted(set(dl_отказы))[:2]}",
+                   dl_ок >= 8 and взято_dlmm >= 8))
+    checks.append((f"DLMM: наша цена не оптимистичнее средней цены источника "
+                   f"({dl_хуже} из {dl_ок})", dl_ок and dl_хуже == dl_ок))
+    обр_dl = load_samples(DLMM)
+    if обр_dl:
+        s0 = обр_dl[0]
+        t0 = extract_template(s0["tx"], DLMM, s0["pool_vault"])
+        пул0 = t0["accounts"][0]
+        был = СТУПЕНИ_DLMM.pop(пул0, None)
+        НУЖНЫ_ПУЛЫ_DLMM.discard(пул0)
+        без_шага = min_out_from_reserves(t0, s0["tx"], 10_000_000, 0.35)
+        checks.append((f"DLMM без прочитанного шага корзины -- отказ: "
+                       f"{str(без_шага.get('why_not'))[:60]}",
+                       без_шага.get("ok") is False
+                       and пул0 in НУЖНЫ_ПУЛЫ_DLMM))
+        if был is not None:
+            СТУПЕНИ_DLMM[пул0] = был
+        НУЖНЫ_ПУЛЫ_DLMM.discard(пул0)
+        # НЕВЕРНЫЙ ШАГ КОРЗИНЫ модель обязана отвергнуть: средняя цена сделки
+        # источника перестаёт лежать между ценами его корзин.
+        неверный = dlmm_min_out(t0, s0["tx"], 10_000_000, 0.35, шаг_корзины=20)
+        checks.append((f"DLMM при неверном шаге корзины -- отказ: "
+                       f"{str(неверный.get('why_not'))[:60]}",
+                       неверный.get("ok") is False))
+        # Событие без совпадения с хранилищами -- отказ (роутер прошёл пул дважды).
+        tx_чужое = json.loads(json.dumps(s0["tx"]))
+        for г in ((tx_чужое.get("meta") or {}).get("innerInstructions") or []):
+            г["instructions"] = [их for их in (г.get("instructions") or [])
+                                 if событие_dlmm(b58decode(их.get("data") or ""))
+                                 is None]
+        нет_события = min_out_from_reserves(t0, tx_чужое, 10_000_000, 0.35)
+        checks.append((f"DLMM без события по нашему пулу -- отказ: "
+                       f"{str(нет_события.get('why_not'))[:60]}",
+                       нет_события.get("ok") is False))
     # ---- кривая pump.fun: только денежный путь (цена, минимум, предел траты)
     pf_n = pf_exact = 0
     pf_откл = []
