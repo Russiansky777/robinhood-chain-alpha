@@ -3833,6 +3833,16 @@ class Детектор:
                     except Exception as exc:  # noqa: BLE001
                         log.warning("наценка входа полосы не досчитана: %s",
                                     type(exc).__name__)
+                        # ПРИЧИНА -- В ЗАПИСЬ, А НЕ ТОЛЬКО В ЖУРНАЛ СЛУЖБЫ.
+                        # Иначе строка сделки говорит "наценка не посчитана
+                        # (причина в записи не названа)" -- именно так и вышло
+                        # по шести сделкам 27.09 вечером.
+                        try:
+                            self.состояние.update_position(
+                                cid, entry_premium_why_not=(
+                                    f"расчёт упал: {type(exc).__name__}"))
+                        except Exception:  # noqa: BLE001
+                            pass
                 имя_ток_л = None
                 if пф_л.get("минт"):
                     try:
