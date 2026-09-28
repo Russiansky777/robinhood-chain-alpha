@@ -216,6 +216,50 @@ def транзакция(подпись: str) -> dict | None:
 }
 
 
+def cu_и_предел(tx: dict | None) -> dict:
+    """Сколько CU потрачено и какой предел стоял в самой транзакции.
+
+    Предел читается из инструкции ComputeBudget SetComputeUnitLimit (первый
+    байт данных 2, дальше четыре байта числа) -- это то, что мы поставили, а
+    не наша память о настройке. Потрачено -- computeUnitsConsumed из meta.
+    """
+    из_ = {"потрачено": None, "предел": None, "цена_микро": None}
+    мета = (tx or {}).get("meta") or {}
+    зн = мета.get("computeUnitsConsumed")
+    if isinstance(зн, int):
+        из_["потрачено"] = зн
+    сооб = ((tx or {}).get("transaction") or {}).get("message") or {}
+    for и in (сооб.get("instructions") or []):
+        if не_вычислитель(и):
+            continue
+        данные = и.get("data") or ""
+        сырое = b58_в_байты(данные)
+        if len(сырое) == 5 and сырое[0] == 2:
+            из_["предел"] = int.from_bytes(сырое[1:5], "little")
+        elif len(сырое) == 9 and сырое[0] == 3:
+            из_["цена_микро"] = int.from_bytes(сырое[1:9], "little")
+    return из_
+
+
+ВЫЧИСЛИТЕЛЬ = "ComputeBudget111111111111111111111111111111"
+_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def не_вычислитель(и: dict) -> bool:
+    return (и or {}).get("programId") != ВЫЧИСЛИТЕЛЬ
+
+
+def b58_в_байты(текст: str) -> bytes:
+    n = 0
+    for ч in текст or "":
+        if ч not in _B58:
+            return b""
+        n = n * 58 + _B58.index(ч)
+    сырое = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
+    ноли = len(текст) - len((текст or "").lstrip("1"))
+    return b"\x00" * ноли + сырое
+
+
 def программы_сделки(tx: dict | None) -> list:
     """Программы пула в транзакции: чем именно покупали.
 
@@ -397,6 +441,7 @@ def сделка_по_цепи(п: dict, *, кошелёк: str) -> dict:
     из_["покупка_с_ошибкой"] = bool(д_пок.get("err"))
     из_["инструкции_покупки"] = имена_инструкций(tx_пок)
     из_["программы_покупки"] = программы_сделки(tx_пок)
+    из_["cu_покупки"] = cu_и_предел(tx_пок)
     из_["комиссия_покупки_sol"] = round((д_пок.get("fee") or 0) / ЛАМПОРТОВ_В_SOL, 9)
     # ПОКУПКА, КОТОРАЯ НИЧЕГО НЕ КУПИЛА. Если с кошелька ушла ровно комиссия
     # (или транзакция села с ошибкой), токенов у нас нет, и продажи не будет
@@ -725,6 +770,20 @@ def self_test() -> int:
         разложить_разницу({"итог_sol": -0.01,
                             "счёт_службы": {"итог_sol": -0.009}},
                            {})["ветвь"].startswith("служба считала по полям"))
+    # CU И ПРЕДЕЛ ИЗ САМОЙ ТРАНЗАКЦИИ: предел -- из инструкции ComputeBudget,
+    # а не из нашей памяти о настройке. 140 000 = 0x00022360 в little-endian,
+    # первый байт данных 2 (SetComputeUnitLimit).
+    _данные_предел = bytes([2]) + (140_000).to_bytes(4, "little")
+    _b58 = ""
+    _n = int.from_bytes(_данные_предел, "big")
+    while _n:
+        _n, _о = divmod(_n, 58)
+        _b58 = _B58[_о] + _b58
+    _cu = cu_и_предел({"meta": {"computeUnitsConsumed": 139_999},
+                        "transaction": {"message": {"instructions": [
+                            {"programId": ВЫЧИСЛИТЕЛЬ, "data": _b58}]}}})
+    chk("CU и предел читаются из транзакции",
+        _cu["потрачено"] == 139_999 and _cu["предел"] == 140_000, _cu)
     chk("программы сделки -- без системных и токеновых",
         программы_сделки({"transaction": {"message": {"instructions": [
             {"programId": "ComputeBudget111111111111111111111111111111"},
