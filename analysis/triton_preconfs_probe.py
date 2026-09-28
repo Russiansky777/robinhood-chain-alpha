@@ -182,13 +182,24 @@ def собрать_запрос(*, фид: str, регион: str, аккаун�
     return из_
 
 
-def путь_суток(каталог: str | None = None) -> Path:
+def путь_суток(каталог: str | None = None, фид: str | None = None) -> Path:
+    """Файл суточного расхода -- СВОЙ У КАЖДОГО ФИДА.
+
+    Поймано на живом суточном прогоне 28.09: BAM и Harmonic идут двумя
+    процессами, а файл был один. Каждый при записи переносил чужое число из
+    того, что успел прочитать, и терял обновление соседа -- в счётчике
+    оказалось bam_messages 0 при 56 доставленных транзакциях. Счётчик -- это
+    деньги, терять в нём записи нельзя. Общий файл остаётся для старых
+    прогонов и как сумма при чтении.
+    """
     д = каталог or os.environ.get("TRITON_STATE_DIR") or "/tmp"
+    if фид:
+        return Path(д) / f"triton_preconfs_day_{фид}.json"
     return Path(д) / "triton_preconfs_day.json"
 
 
 def расход_суток(каталог: str | None = None,
-                  сейчас: float | None = None) -> dict:
+                  сейчас: float | None = None, фид: str | None = None) -> dict:
     """Что уже израсходовано СЕГОДНЯ (UTC): сообщения BAM и слоты Harmonic.
 
     Предел владельца у BAM -- "5 000 сообщений в СУТКИ". Считать его за прогон
@@ -198,22 +209,37 @@ def расход_суток(каталог: str | None = None,
     день = time.strftime("%Y%m%d", time.gmtime(сейчас if сейчас else time.time()))
     из_ = {"day": день, "bam_messages": 0, "harmonic_slots": 0,
             "harmonic_seconds": 0.0, "why_not": None}
-    п = путь_суток(каталог)
-    try:
-        if п.exists():
+    # ЧИТАЕМ И СВОЙ ФАЙЛ ФИДА, И ОБЩИЙ: общий остался от прежних прогонов, и
+    # выбросить его значило бы обнулить уже потраченное за эти сутки.
+    пути = [путь_суток(каталог, фид)] if фид else []
+    пути += [путь_суток(каталог, ф) for ф in (ФИД_BAM, ФИД_HARMONIC)
+             if not фид or ф != фид]
+    пути.append(путь_суток(каталог))
+    видели = set()
+    for п in пути:
+        if str(п) in видели:
+            continue
+        видели.add(str(п))
+        try:
+            if not п.exists():
+                continue
             было = json.loads(п.read_text(encoding="utf-8") or "{}")
-            if было.get("day") == день:
-                из_.update(bam_messages=int(было.get("bam_messages") or 0),
-                            harmonic_slots=int(было.get("harmonic_slots") or 0),
-                            harmonic_seconds=float(
-                                было.get("harmonic_seconds") or 0.0))
-    except Exception as exc:  # noqa: BLE001
-        из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            if было.get("day") != день:
+                continue
+            из_["bam_messages"] = max(из_["bam_messages"],
+                                       int(было.get("bam_messages") or 0))
+            из_["harmonic_slots"] = max(из_["harmonic_slots"],
+                                         int(было.get("harmonic_slots") or 0))
+            из_["harmonic_seconds"] = max(из_["harmonic_seconds"],
+                                           float(было.get("harmonic_seconds") or 0.0))
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
     return из_
 
 
-def записать_сутки(расход: dict, каталог: str | None = None) -> dict:
-    п = путь_суток(каталог)
+def записать_сутки(расход: dict, каталог: str | None = None,
+                   фид: str | None = None) -> dict:
+    п = путь_суток(каталог, фид)
     try:
         п.parent.mkdir(parents=True, exist_ok=True)
         п.write_text(json.dumps(расход, ensure_ascii=False), encoding="utf-8")
@@ -333,16 +359,20 @@ class Счёт:
             raise ПределДостигнут(почему)
 
     def сохранить(self, сейчас: float | None = None) -> dict:
-        return записать_сутки(
-            {"day": self.день, "bam_messages": self.всего_сообщений()
-              if self.фид == ФИД_BAM else
-              расход_суток(self.каталог, сейчас)["bam_messages"],
-              "harmonic_slots": self.всего_слотов() if self.фид == ФИД_HARMONIC
-              else расход_суток(self.каталог, сейчас)["harmonic_slots"],
-              "harmonic_seconds": (self.было_секунд + self.прошло_s(сейчас))
-              if self.фид == ФИД_HARMONIC else
-              расход_суток(self.каталог, сейчас)["harmonic_seconds"]},
-            self.каталог)
+        """Свой расход -- в СВОЙ файл фида, чужие числа не переписываем.
+
+        Прежде здесь чужое число переносилось из общего файла, и два процесса
+        теряли обновления друг друга: в счётчике стоял bam_messages 0 при 56
+        доставленных транзакциях. Теперь каждый пишет только своё.
+        """
+        своё = {"day": self.день, "feed": self.фид,
+                 "bam_messages": (self.всего_сообщений()
+                                   if self.фид == ФИД_BAM else 0),
+                 "harmonic_slots": (self.всего_слотов()
+                                     if self.фид == ФИД_HARMONIC else 0),
+                 "harmonic_seconds": ((self.было_секунд + self.прошло_s(сейчас))
+                                       if self.фид == ФИД_HARMONIC else 0.0)}
+        return записать_сутки(своё, self.каталог, self.фид)
 
     def признак(self, сейчас: float | None = None) -> dict:
         return {"feed": self.фид, "messages": self.сообщений,
@@ -1012,6 +1042,34 @@ def self_test() -> int:
                 занять_замок(фид=ФИД_BAM, каталог=вр, сейчас=6001.0))
             chk("жив_ли: свой pid жив, заведомо чужой номер -- нет",
                 жив_ли(os.getpid()) and not жив_ли(2 ** 22))
+
+        # 5а. СЧЁТЧИК РАСХОДА -- ПО ФИДУ, И ДВА ПРОЦЕССА НЕ ТЕРЯЮТ ДРУГ ДРУГА.
+        # Живой прогон 28.09: общий файл, два процесса, в счётчике bam_messages
+        # 0 при 56 доставленных транзакциях -- каждый переписывал чужое число.
+        import tempfile as _tр  # noqa: PLC0415
+
+        with _tр.TemporaryDirectory() as _др:
+            сб_ = Счёт(фид=ФИД_BAM, начало=1000.0, каталог=_др)
+            сб_.сообщений = 700
+            сб_.сохранить(1000.0)
+            сх_ = Счёт(фид=ФИД_HARMONIC, начало=1000.0, каталог=_др)
+            сх_.слотов = 345
+            сх_.сохранить(1000.0)
+            расх_ = расход_суток(_др, 1000.0)
+            chk("расход по двум фидам сложился, ничего не потеряно",
+                расх_["bam_messages"] == 700 and расх_["harmonic_slots"] == 345,
+                расх_)
+            chk("у каждого фида свой файл расхода",
+                путь_суток(_др, ФИД_BAM).exists()
+                and путь_суток(_др, ФИД_HARMONIC).exists()
+                and путь_суток(_др, ФИД_BAM) != путь_суток(_др, ФИД_HARMONIC))
+            # Общий файл прежних прогонов не теряется: берётся большее.
+            путь_суток(_др).write_text(json.dumps(
+                {"day": расх_["day"], "bam_messages": 900,
+                  "harmonic_slots": 10}), encoding="utf-8")
+            chk("число из старого общего файла не пропадает (берётся большее)",
+                расход_суток(_др, 1000.0)["bam_messages"] == 900
+                and расход_суток(_др, 1000.0)["harmonic_slots"] == 345)
 
         # 5б. ВРЕМЯ ПРИХОДА -- ДВУМЯ ЧАСАМИ: стенным для сведения с журналом
         # решений и моно для разниц внутри прогона.
