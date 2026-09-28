@@ -1,38 +1,241 @@
 {
- "since_utc": "2026-09-28T00:00:00Z",
- "generated_utc": "2026-09-28T01:10:49Z",
- "строк_прочитано": 759933,
- "двухшаговых_решений": 2,
+ "since_utc": "2026-09-27T20:00:00Z",
+ "generated_utc": "2026-09-28T04:06:02Z",
+ "строк_прочитано": 889849,
+ "двухшаговых_решений": 11,
  "причины_двухшагового": {
-  "шаблона SOL -> Xsa62P5m в кэше нет": 2
+  "шаблона SOL -> Xsa62P5m в кэше нет": 2,
+  "шаблона SOL -> DNUTsCvK в кэше нет": 2,
+  "шаблона SOL -> MGMuubtU в кэше нет": 2,
+  "шаблона SOL -> USNv3NkK в кэше нет": 2,
+  "шаблона SOL -> 8RNUw4N6 в кэше нет": 1,
+  "шаблона SOL -> 4qQeZ5Lw в кэше нет": 1,
+  "шаблона SOL -> cbLTC4T5 в кэше нет": 1
  },
  "стадии": {
-  "shadow": 3676,
-  "gate": 381,
-  "leg_cache": 40,
-  "skip_price": 31,
-  "lane_sim": 2,
-  "sent": 2,
-  "two_step_build": 2,
-  "build": 2,
-  "ws_hour": 1
+  "shadow": 22867,
+  "gate": 2287,
+  "leg_pool_skip": 554,
+  "leg_cache": 200,
+  "skip_price": 87,
+  "build": 28,
+  "two_step_build": 11,
+  "lane_sim": 10,
+  "sent": 10,
+  "ws_hour": 5,
+  "ws_break": 1
  },
  "коды": {
-  "NOT_A_BUY": 15134,
-  "TARGET_AMOUNT_OUT_OF_RANGE": 2962,
-  "TOKEN_RECEIVED_NOT_BOUGHT": 1228,
-  "INSUFFICIENT_BALANCE": 387,
-  "SKIP_TARGET_INCREASE_POSITION": 215,
-  "AMBIGUOUS_TX": 142,
-  "STALE": 69,
-  "THRESHOLD_EDGE": 63,
-  "SKIP_TAXED_ROUTE": 35
+  "NOT_A_BUY": 178403,
+  "TARGET_AMOUNT_OUT_OF_RANGE": 19180,
+  "TOKEN_RECEIVED_NOT_BOUGHT": 7864,
+  "INSUFFICIENT_BALANCE": 2336,
+  "STALE": 2320,
+  "SKIP_TARGET_INCREASE_POSITION": 829,
+  "AMBIGUOUS_TX": 412,
+  "THRESHOLD_EDGE": 292,
+  "SKIP_TAXED_ROUTE": 94,
+  "MAX_BUY_TIMES_PER_TOKEN_REACHED": 9,
+  "WS_BREAK": 1
  },
  "отказы_гейта": {
-  "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)": 367,
-  "предел полосы: по группе off полоса не торгует (lane_trades выключен)": 14
+  "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)": 2223,
+  "предел полосы: по группе off полоса не торгует (lane_trades выключен)": 63,
+  "от слота источника прошло 8 слотов при пределе 3 (группа lane_s0)": 1
  },
  "налоговые_отказы": [
+  {
+   "ts_utc": "2026-09-27T22:22:35Z",
+   "source": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+   "mint": "72yxYmhLgDGwdyi2b9GjDynBB6VuG3kDxNKqDbzXh5bi",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T22:23:10Z",
+   "source": "Aeg9rNNqNPw6qQ2RgzBHvz25AF1fPqiVBKupd6YQNZmT",
+   "mint": "AfFNCM32DRbGh2bgK1xaSNiQxVaTRrD2wGH3RbWsY4JN",
+   "reason": "налоговый промежуточный токен: DEW9dSN6Qp 100 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T22:32:13Z",
+   "source": "9BMzTpSo4URse1oN666pmexhdjpU1vA5p7LtroCFQdLU",
+   "mint": "HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T22:37:53Z",
+   "source": "Bra5EH8vqm5bmGupdEHWcwNepetuvSuW2z4excQR5yNs",
+   "mint": "EdtDfEnijpKQQjwp1HF1LT9WfYxDaW74hVhkz2Z1buK3",
+   "reason": "налоговый промежуточный токен: 4rkGWJNSUP 300 bps x2; покупаемый токен передан 2 раз(а): налог маршрута 1200 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T22:40:31Z",
+   "source": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+   "mint": "5JgioXRQSq1Nw4VJvpRyXxnvm8jVtLSUC7vbf1zzDg3L",
+   "reason": "налоговый промежуточный токен: TKLSidmLVt 20 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T22:42:39Z",
+   "source": "AQ46kfYT3hW28Xg5gWHrJkzFSz1oGWBHC3FsTbqgMEco",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T22:42:40Z",
+   "source": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T22:43:05Z",
+   "source": "Et9jbvxvwKrKW5ZYJudU6HxLpHfCBVR4dR3yzWDqH1Zo",
+   "mint": "72yxYmhLgDGwdyi2b9GjDynBB6VuG3kDxNKqDbzXh5bi",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T22:46:39Z",
+   "source": "9BMzTpSo4URse1oN666pmexhdjpU1vA5p7LtroCFQdLU",
+   "mint": "HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T22:56:34Z",
+   "source": "7gdo83WqcXvown8aHUrgma716BEwGdjRA9CtdUThBy5U",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T22:56:37Z",
+   "source": "Bi4rd5FH5bYEN8scZ7wevxNZyNmKHdaBcvewdPFxYdLt",
+   "mint": "48SvZH3XwxCHyKCvF8yEqHVziGZKrVobXVNV6h8Y6vAu",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T22:57:43Z",
+   "source": "39q2g5tTQn9n7KnuapzwS2smSx3NGYqBoea11tBjsGEt",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T22:58:08Z",
+   "source": "4A2GsbyNfQdqvf1Upz8GTXf6f3j5tcx8qko5yMbiFD8D",
+   "mint": "AGi2s9zPRPHs3zEDPhPTroumTEXK5ufymYSfEFndCSSW",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T22:58:48Z",
+   "source": "CHS87HauqSdrKTvCeHdv54XvepFAMWaucK9FwmYHmZu6",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T22:58:52Z",
+   "source": "9ABCPb1YwRSv5d543skgg1nGTgWN5u1jcVBVDy81vNcB",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T22:58:52Z",
+   "source": "4bkq7rLkyVYCdGozmnYKq931qPXXsUrV6LdXnFqZuLQ9",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T23:01:56Z",
+   "source": "AQ46kfYT3hW28Xg5gWHrJkzFSz1oGWBHC3FsTbqgMEco",
+   "mint": "94R5QVq7xj6jtQduGzWjkKju6w91kQsL7B8EruGYph43",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T23:01:57Z",
+   "source": "47odd1YEDEjCyw6wMooHuC28w4N6sh8Ma4tNZQerL9sJ",
+   "mint": "7Kojo2kSr5zAY8cKdV6dAsxxeckCkLy7D5FGPvt86veA",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T23:09:05Z",
+   "source": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+   "mint": "Ay3QU3Wq4fZ3bByMERRGadPaQ61z2qjyeScicR9UqRCc",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T23:09:17Z",
+   "source": "ardinRsN1mNYVeoJWTBsWeYeXvuR9UUDGMsCDKpb6AT",
+   "mint": "Ay3QU3Wq4fZ3bByMERRGadPaQ61z2qjyeScicR9UqRCc",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T23:10:59Z",
+   "source": "AbyHr27tbTEHH3VoKzafCCehCvj2DiiowYpcTcBV3SLT",
+   "mint": "Ay3QU3Wq4fZ3bByMERRGadPaQ61z2qjyeScicR9UqRCc",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T23:11:25Z",
+   "source": "5B79fMkcFeRTiwm7ehsZsFiKsC7m7n1Bgv9yLxPp9q2X",
+   "mint": "Ay3QU3Wq4fZ3bByMERRGadPaQ61z2qjyeScicR9UqRCc",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T23:12:03Z",
+   "source": "AbyHr27tbTEHH3VoKzafCCehCvj2DiiowYpcTcBV3SLT",
+   "mint": "tLY7FUjhqiQ2Nqfi5rXhbXQiVmGT8f3C8MtgE4pQSqV",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T23:13:00Z",
+   "source": "9ABCPb1YwRSv5d543skgg1nGTgWN5u1jcVBVDy81vNcB",
+   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T23:18:13Z",
+   "source": "9BMzTpSo4URse1oN666pmexhdjpU1vA5p7LtroCFQdLU",
+   "mint": "HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T23:24:21Z",
+   "source": "FRa5xvWrvgYBHEukozdhJPCJRuJZcTn2WKj2u6L75Rmj",
+   "mint": "BTZK1B3pCoBDD1vy5e4bDBM4bwvvhkKUMTuKABkGWwGp",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T23:25:24Z",
+   "source": "DU323DieHUGPmYamp6A4Ai1V4YSYgRi35mGpzJGrjf7k",
+   "mint": "E6FdAz9RjyQUV3cf1LTFRuktyFPd3PaKYu2diKaQXPuJ",
+   "reason": "налоговый промежуточный токен: PrekqLJvJ3 300 bps x3"
+  },
+  {
+   "ts_utc": "2026-09-27T23:25:49Z",
+   "source": "4A2GsbyNfQdqvf1Upz8GTXf6f3j5tcx8qko5yMbiFD8D",
+   "mint": "AGi2s9zPRPHs3zEDPhPTroumTEXK5ufymYSfEFndCSSW",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T23:26:32Z",
+   "source": "9BMzTpSo4URse1oN666pmexhdjpU1vA5p7LtroCFQdLU",
+   "mint": "HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T23:51:30Z",
+   "source": "JAj2wKJmW54nyBFYxUea7Nq3fYTE3G69iwaa8NLjTRFr",
+   "mint": "3L2xqdrNGg7yUti7wxbVBX5hiux8NTxMx82QKZSkmADE",
+   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
+  },
+  {
+   "ts_utc": "2026-09-27T23:53:42Z",
+   "source": "9BMzTpSo4URse1oN666pmexhdjpU1vA5p7LtroCFQdLU",
+   "mint": "HuAXPyDWDaMYFKuwQHpqL1oPnj93zdzWmtvFGzCeCUa7",
+   "reason": "покупаемый токен передан 3 раз(а): налог маршрута 900 bps больше налога токена 300 bps"
+  },
+  {
+   "ts_utc": "2026-09-27T23:54:49Z",
+   "source": "Hn5gVKAApv69t5HX7Q77uX7o5ayhEwArgYx7kukMLVGn",
+   "mint": "8RNUw4N655VSrZKuhGdywhbSMDTrheguFPfxbpE2NZHQ",
+   "reason": "покупаемый токен передан 2 раз(а): налог маршрута 600 bps больше налога токена 300 bps"
+  },
   {
    "ts_utc": "2026-09-28T00:00:21Z",
    "source": "9ABCPb1YwRSv5d543skgg1nGTgWN5u1jcVBVDy81vNcB",
@@ -200,120 +403,36 @@
    "source": "B32QbbdDAyhvUQzjcaM5j6ZVKwjCxAwGH5Xgvb9SJqnC",
    "mint": "Cbc847fUAuPSZhmu8VBHj6cyruxwXfxTNvzktPWxvYjC",
    "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
-  },
-  {
-   "ts_utc": "2026-09-28T01:05:29Z",
-   "source": "GijFWw4oNyh9ko3FaZforNsi3jk6wDovARpkKahPD4o5",
-   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
-   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
-  },
-  {
-   "ts_utc": "2026-09-28T01:06:33Z",
-   "source": "35ymPRRC1cPRt3XtwE46o79t734k8ZyCmXDbiibNd3M4",
-   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
-   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
-  },
-  {
-   "ts_utc": "2026-09-28T01:06:53Z",
-   "source": "9FEHWFjgbYnFCRRHkesJNq6znHjc5Aaq7TiKi1rCVSnH",
-   "mint": "AjxqTiS6TnK75xG6pWAMJgNQuhkip3LzN36uy2wBbwmH",
-   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2; покупаемый токен передан 2 раз(а): налог маршрута 800 bps больше налога токена 100 bps"
-  },
-  {
-   "ts_utc": "2026-09-28T01:07:04Z",
-   "source": "Bi4rd5FH5bYEN8scZ7wevxNZyNmKHdaBcvewdPFxYdLt",
-   "mint": "E2TjNtRUrusEfaS7ezCPf9Q64A6ajmyhLvwJdPGGyWF9",
-   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
-  },
-  {
-   "ts_utc": "2026-09-28T01:07:14Z",
-   "source": "AQ46kfYT3hW28Xg5gWHrJkzFSz1oGWBHC3FsTbqgMEco",
-   "mint": "2cYxyoULEELe3jahitx1y2T7HM5eg6cNygpJhFvzmMXd",
-   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x3"
-  },
-  {
-   "ts_utc": "2026-09-28T01:07:49Z",
-   "source": "GfXQesPe3Zuwg8JhAt6Cg8euJDTVx751enp9EQQmhzPH",
-   "mint": "Cbc847fUAuPSZhmu8VBHj6cyruxwXfxTNvzktPWxvYjC",
-   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
-  },
-  {
-   "ts_utc": "2026-09-28T01:09:10Z",
-   "source": "D9UiteKBjbVp8UYGRSKi4fJRsXYp8Csk7zcrnaCvq6LS",
-   "mint": "Cbc847fUAuPSZhmu8VBHj6cyruxwXfxTNvzktPWxvYjC",
-   "reason": "налоговый промежуточный токен: Pren1FvFX6 300 bps x2"
   }
  ],
  "возраст_сигнала_слотов": {
-  "решений": 20235,
+  "решений": 211738,
   "медиана": 0,
   "p90": 0,
-  "p99": 3,
-  "мин": -1,
-  "макс": 13,
-  "выше_3_слотов": 156,
-  "доля_выше_3": 0.007709,
-  "выше_10_слотов": 4,
-  "доля_выше_10": 0.000198
+  "p99": 9,
+  "мин": -9,
+  "макс": 59,
+  "выше_3_слотов": 4218,
+  "доля_выше_3": 0.019921,
+  "выше_10_слотов": 1839,
+  "доля_выше_10": 0.008685
  },
- "по_подписям": {
-  "5St4AmLThL2W": [
-   {
-    "ts_utc": "2026-09-28T00:18:04Z",
-    "signature": "5St4AmLThL2WiF4qDcvLLNhd6LBYJNYC6hYjYFd8nMr4M2sEPe3pyrC9uGBe3bpijiSV2vJxWa5a8f89kFMmVCuK",
-    "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
-    "mint": "7nG5dJxuuUFXqxE4J8LecUZwP2m2HD6m83Xhae6jpzU1",
-    "spend_sol_eq": 32.8365494429654,
-    "dokupka": false,
-    "dokupka_why": "предыдущей покупки этой пары источник+минт мы не видели",
-    "action": "skip",
-    "code": "INSUFFICIENT_BALANCE",
-    "reason": "баланса не хватает: 0.0008 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
-    "lane_allowed": true
-   },
-   {
-    "ts_utc": "2026-09-28T00:18:04Z",
-    "stage": "two_step_build",
-    "signature": null,
-    "mint": "7nG5dJxuuUFXqxE4J8LecUZwP2m2HD6m83Xhae6jpzU1",
-    "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
-    "ok": false,
-    "why_not": "котировка пула не SOL -- полоса только одношаговая",
-    "lane": "own_send",
-    "source_sig": "5St4AmLThL2WiF4qDcvLLNhd6LBYJNYC6hYjYFd8nMr4M2sEPe3pyrC9uGBe3bpijiSV2vJxWa5a8f89kFMmVCuK",
-    "group": "leader",
-    "lamports": 500000000,
-    "size_sol": 0.5,
-    "two_step_why_not": "шаблона SOL -> Xsa62P5m в кэше нет",
-    "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
-   },
-   {
-    "ts_utc": "2026-09-28T00:18:04Z",
-    "stage": "shadow",
-    "signature": "5St4AmLThL2WiF4qDcvLLNhd6LBYJNYC6hYjYFd8nMr4M2sEPe3pyrC9uGBe3bpijiSV2vJxWa5a8f89kFMmVCuK",
-    "mint": "7nG5dJxuuUFXqxE4J8LecUZwP2m2HD6m83Xhae6jpzU1",
-    "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
-    "ok": false,
-    "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
-    "why_not": "котировка не SOL: шаблона SOL -> Q в кэше нет"
-   }
-  ]
- },
+ "по_подписям": {},
  "последние": [
   {
-   "ts_utc": "2026-09-28T00:18:04Z",
+   "ts_utc": "2026-09-28T01:44:27Z",
    "stage": "two_step_build",
    "ok": false,
    "why_not": "котировка пула не SOL -- полоса только одношаговая",
-   "mint": "7nG5dJxuuUFXqxE4J8LecUZwP2m2HD6m83Xhae6jpzU1",
+   "mint": "7gYKUXFqbshpydGN6EQyMHUkeigak2J9MbfKCKyTWH73",
    "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
    "group": "leader",
    "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
    "two_step": {
     "ok": false,
-    "why_not": "шаблона SOL -> Xsa62P5m в кэше нет",
+    "why_not": "шаблона SOL -> DNUTsCvK в кэше нет",
     "leg1_pool_program": null,
-    "quote_mint": "Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu",
+    "quote_mint": "DNUTsCvKbKwu2RM72cUuW3TD9YpzArzACcqYQssjPLSk",
     "quote_fee_bps": null,
     "leg1_min_out": null,
     "leg2_amount_in": null,
@@ -330,22 +449,22 @@
     "slippage_why": null,
     "min_out_floor_absent": null
    },
-   "two_step_why_not": "шаблона SOL -> Xsa62P5m в кэше нет"
+   "two_step_why_not": "шаблона SOL -> DNUTsCvK в кэше нет"
   },
   {
-   "ts_utc": "2026-09-28T00:18:05Z",
+   "ts_utc": "2026-09-28T01:44:27Z",
    "stage": "two_step_build",
    "ok": false,
    "why_not": "котировка пула не SOL -- полоса только одношаговая",
-   "mint": "7nG5dJxuuUFXqxE4J8LecUZwP2m2HD6m83Xhae6jpzU1",
+   "mint": "7gYKUXFqbshpydGN6EQyMHUkeigak2J9MbfKCKyTWH73",
    "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
    "group": "lane_s0",
    "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
    "two_step": {
     "ok": false,
-    "why_not": "шаблона SOL -> Xsa62P5m в кэше нет",
+    "why_not": "шаблона SOL -> DNUTsCvK в кэше нет",
     "leg1_pool_program": null,
-    "quote_mint": "Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu",
+    "quote_mint": "DNUTsCvKbKwu2RM72cUuW3TD9YpzArzACcqYQssjPLSk",
     "quote_fee_bps": null,
     "leg1_min_out": null,
     "leg2_amount_in": null,
@@ -362,170 +481,334 @@
     "slippage_why": null,
     "min_out_floor_absent": null
    },
-   "two_step_why_not": "шаблона SOL -> Xsa62P5m в кэше нет"
+   "two_step_why_not": "шаблона SOL -> DNUTsCvK в кэше нет"
+  },
+  {
+   "ts_utc": "2026-09-28T01:46:21Z",
+   "stage": "two_step_build",
+   "ok": false,
+   "why_not": "котировка пула не SOL -- полоса только одношаговая",
+   "mint": "9swyN5J7fUQRYEJv46wHfZN5KHPSfQWctq31ZXHe5zqr",
+   "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+   "group": "leader",
+   "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+   "two_step": {
+    "ok": false,
+    "why_not": "шаблона SOL -> MGMuubtU в кэше нет",
+    "leg1_pool_program": null,
+    "quote_mint": "MGMuubtUEirmkhfEQdmGUh4pr7HuUdMWcZXFtpPbVJD",
+    "quote_fee_bps": null,
+    "leg1_min_out": null,
+    "leg2_amount_in": null,
+    "leg2_to_pool": null,
+    "min_out": null,
+    "expected_out": null,
+    "size": null,
+    "build_ms": null,
+    "leg1_template_age_s": null,
+    "pool_reserve_quote_raw": null,
+    "pool_reserve_sol_eq": null,
+    "slippage_thin": null,
+    "slippage_used": 0.2,
+    "slippage_why": null,
+    "min_out_floor_absent": null
+   },
+   "two_step_why_not": "шаблона SOL -> MGMuubtU в кэше нет"
+  },
+  {
+   "ts_utc": "2026-09-28T01:46:21Z",
+   "stage": "two_step_build",
+   "ok": false,
+   "why_not": "котировка пула не SOL -- полоса только одношаговая",
+   "mint": "9swyN5J7fUQRYEJv46wHfZN5KHPSfQWctq31ZXHe5zqr",
+   "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "group": "lane_s0",
+   "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+   "two_step": {
+    "ok": false,
+    "why_not": "шаблона SOL -> MGMuubtU в кэше нет",
+    "leg1_pool_program": null,
+    "quote_mint": "MGMuubtUEirmkhfEQdmGUh4pr7HuUdMWcZXFtpPbVJD",
+    "quote_fee_bps": null,
+    "leg1_min_out": null,
+    "leg2_amount_in": null,
+    "leg2_to_pool": null,
+    "min_out": null,
+    "expected_out": null,
+    "size": null,
+    "build_ms": null,
+    "leg1_template_age_s": null,
+    "pool_reserve_quote_raw": null,
+    "pool_reserve_sol_eq": null,
+    "slippage_thin": null,
+    "slippage_used": 0.4,
+    "slippage_why": null,
+    "min_out_floor_absent": null
+   },
+   "two_step_why_not": "шаблона SOL -> MGMuubtU в кэше нет"
+  },
+  {
+   "ts_utc": "2026-09-28T01:47:10Z",
+   "stage": "two_step_build",
+   "ok": false,
+   "why_not": "котировка пула не SOL -- полоса только одношаговая",
+   "mint": "YteuJZz7Rk7yL8ZZ5ixvPihoipq36jiSJPUjdtemZuD",
+   "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit",
+   "group": "leader",
+   "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+   "two_step": {
+    "ok": false,
+    "why_not": "шаблона SOL -> USNv3NkK в кэше нет",
+    "leg1_pool_program": null,
+    "quote_mint": "USNv3NkKA27Dh4nsHJDPhW4VoEcTQmjoZyJt2dqdwFu",
+    "quote_fee_bps": null,
+    "leg1_min_out": null,
+    "leg2_amount_in": null,
+    "leg2_to_pool": null,
+    "min_out": null,
+    "expected_out": null,
+    "size": null,
+    "build_ms": null,
+    "leg1_template_age_s": null,
+    "pool_reserve_quote_raw": null,
+    "pool_reserve_sol_eq": null,
+    "slippage_thin": null,
+    "slippage_used": 0.2,
+    "slippage_why": null,
+    "min_out_floor_absent": null
+   },
+   "two_step_why_not": "шаблона SOL -> USNv3NkK в кэше нет"
+  },
+  {
+   "ts_utc": "2026-09-28T01:47:10Z",
+   "stage": "two_step_build",
+   "ok": false,
+   "why_not": "котировка пула не SOL -- полоса только одношаговая",
+   "mint": "YteuJZz7Rk7yL8ZZ5ixvPihoipq36jiSJPUjdtemZuD",
+   "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "group": "lane_s0",
+   "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+   "two_step": {
+    "ok": false,
+    "why_not": "шаблона SOL -> USNv3NkK в кэше нет",
+    "leg1_pool_program": null,
+    "quote_mint": "USNv3NkKA27Dh4nsHJDPhW4VoEcTQmjoZyJt2dqdwFu",
+    "quote_fee_bps": null,
+    "leg1_min_out": null,
+    "leg2_amount_in": null,
+    "leg2_to_pool": null,
+    "min_out": null,
+    "expected_out": null,
+    "size": null,
+    "build_ms": null,
+    "leg1_template_age_s": null,
+    "pool_reserve_quote_raw": null,
+    "pool_reserve_sol_eq": null,
+    "slippage_thin": null,
+    "slippage_used": 0.4,
+    "slippage_why": null,
+    "min_out_floor_absent": null
+   },
+   "two_step_why_not": "шаблона SOL -> USNv3NkK в кэше нет"
   }
  ],
  "вне_размера_примеры": [
   {
-   "ts_utc": "2026-09-28T00:00:00Z",
-   "source": "Ar2Y6o1QmrRAskjii1cRfijeKugHH13ycxW5cd7rro1x",
-   "spend_sol_eq": 1.2991554459999999,
-   "mint": "FeeQF3ztg6CtCDY2ZaxMLJYoFQsbVztzvU83B9mk438o"
+   "ts_utc": "2026-09-27T22:00:03Z",
+   "source": "JAunzNqs3bVBcWDjDxfq9rgLzJMCadNXoaCgfzLGMtYs",
+   "spend_sol_eq": 1.3899762359999999,
+   "mint": "6Dfrh1myyF3LhfbAEbZ88raAywhTsGuE6W5AbeCAV4uc"
   },
   {
-   "ts_utc": "2026-09-28T00:00:01Z",
-   "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
-   "spend_sol_eq": 0.004,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
+   "ts_utc": "2026-09-27T22:00:04Z",
+   "source": "FxN3VZ4BosL5urG2yoeQ156JSdmavm9K5fdLxjkPmaMR",
+   "spend_sol_eq": 0.075333737,
+   "mint": "Cs1x6qaXV6pwRbanh2P58gjWm8jUfCvnFNxbdPrNkiPU"
   },
   {
-   "ts_utc": "2026-09-28T00:00:01Z",
-   "source": "Eh3q5AXnopCFULMLGv6QeVqpZhRvPgkWHBMKqNGQvQTX",
-   "spend_sol_eq": 0.001654068,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
+   "ts_utc": "2026-09-27T22:00:04Z",
+   "source": "7NAd2EpYGGeFofpyvgehSXhH5vg6Ry6VRMW2Y6jiqCu1",
+   "spend_sol_eq": 0.0775346,
+   "mint": "Cs1x6qaXV6pwRbanh2P58gjWm8jUfCvnFNxbdPrNkiPU"
   },
   {
-   "ts_utc": "2026-09-28T00:00:02Z",
-   "source": "HPiAxtK5UGhaNTjNPqDn9WijfQhZ6YEqgHc5MeLZUiba",
-   "spend_sol_eq": 0.651128288,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
+   "ts_utc": "2026-09-27T22:00:04Z",
+   "source": "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f",
+   "spend_sol_eq": 0.078424719,
+   "mint": "Cs1x6qaXV6pwRbanh2P58gjWm8jUfCvnFNxbdPrNkiPU"
   },
   {
-   "ts_utc": "2026-09-28T00:00:05Z",
-   "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
-   "spend_sol_eq": 0.004,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
+   "ts_utc": "2026-09-27T22:00:04Z",
+   "source": "suqh5sHtr8HyJ7q8scBimULPkPpA557prMG47xCHQfK",
+   "spend_sol_eq": 0.075092043,
+   "mint": "Cs1x6qaXV6pwRbanh2P58gjWm8jUfCvnFNxbdPrNkiPU"
   },
   {
-   "ts_utc": "2026-09-28T00:00:08Z",
+   "ts_utc": "2026-09-27T22:00:04Z",
+   "source": "8MaVa9kdt3NW4Q5HyNAm1X5LbR8PQRVDc1W8NMVK88D5",
+   "spend_sol_eq": 0.68790625,
+   "mint": "5dzsZyuvQ378GJ6u5VrSMx8voPUe46xuSdQ6mapvpump"
+  },
+  {
+   "ts_utc": "2026-09-27T22:00:04Z",
+   "source": "Gi5DyNkCLVQkcjykXVWUheM1EzCg8XjUPdcf7E8Gj2eh",
+   "spend_sol_eq": 0.02,
+   "mint": "5dzsZyuvQ378GJ6u5VrSMx8voPUe46xuSdQ6mapvpump"
+  },
+  {
+   "ts_utc": "2026-09-27T22:00:04Z",
    "source": "C8KsrrGXQ2bXkhGYfxQnnDtCp1c9XTKPoGb9wafWJKEp",
-   "spend_sol_eq": 0.4,
-   "mint": "CNzYh2rW5E95d6QJsgSawnQbNZiVk26DeDLNLiUnpump"
+   "spend_sol_eq": 0.049999999999999996,
+   "mint": "5dzsZyuvQ378GJ6u5VrSMx8voPUe46xuSdQ6mapvpump"
   },
   {
-   "ts_utc": "2026-09-28T00:00:08Z",
+   "ts_utc": "2026-09-27T22:00:05Z",
    "source": "AA3r25VTmVGWjQNCPZnuJkqGBcrCgtfkB6jZtDUSBYYt",
-   "spend_sol_eq": 0.809820341,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
+   "spend_sol_eq": 0.904294256,
+   "mint": "FPEXHVVFTex11kXiyTnFArC84B3oZkeYrZV57Kb6uu7Z"
   },
   {
-   "ts_utc": "2026-09-28T00:00:10Z",
-   "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
-   "spend_sol_eq": 0.004,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
-  },
-  {
-   "ts_utc": "2026-09-28T00:00:14Z",
-   "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
-   "spend_sol_eq": 0.004,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
-  },
-  {
-   "ts_utc": "2026-09-28T00:00:14Z",
-   "source": "FjUJgFT3YFxnVMFDm24k1C31jV6VJCfSpviz2kPWPLMH",
-   "spend_sol_eq": 0.2826428358437154,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
-  },
-  {
-   "ts_utc": "2026-09-28T00:00:15Z",
-   "source": "CkUZV387xnoGpF7wC2moMa6mPmAgCvTT4pWgzq4M9fCD",
-   "spend_sol_eq": 0.14575984,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
-  },
-  {
-   "ts_utc": "2026-09-28T00:00:16Z",
-   "source": "2z2q5gk8TDgqCidzkXkyevXH1aDaVjWL8cQwoRbMF1Jq",
+   "ts_utc": "2026-09-27T22:00:06Z",
+   "source": "C8KsrrGXQ2bXkhGYfxQnnDtCp1c9XTKPoGb9wafWJKEp",
    "spend_sol_eq": 0.1,
-   "mint": "DBorvZYRJMBHqrYGaVaLMhiRkQWe6BwP1Rth7SGysk6Q"
+   "mint": "HxNzaehXN56aJSF2yHRA3Wbxmav9QyvgtwJDZSmMpump"
+  },
+  {
+   "ts_utc": "2026-09-27T22:00:07Z",
+   "source": "5aLY85pyxiuX3fd4RgM3Yc1e3MAL6b7UgaZz6MS3JUfG",
+   "spend_sol_eq": 1.734384483,
+   "mint": "6GsRicHhaf1wG5ZAm4jT3Z6SLVagbJJUvvqJxhhFpump"
+  },
+  {
+   "ts_utc": "2026-09-27T22:00:07Z",
+   "source": "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f",
+   "spend_sol_eq": 0.072788797,
+   "mint": "Cs1x6qaXV6pwRbanh2P58gjWm8jUfCvnFNxbdPrNkiPU"
   }
  ],
  "скорость_сигнал_отправка_по_часам": {
+  "2026-09-27T22Z": {
+   "сделок": 3,
+   "медиана_мс": 7.4,
+   "мин_мс": 5.5,
+   "макс_мс": 31.4
+  },
+  "2026-09-27T23Z": {
+   "сделок": 2,
+   "медиана_мс": 7.0,
+   "мин_мс": 6.5,
+   "макс_мс": 7.6
+  },
   "2026-09-28T00Z": {
    "сделок": 2,
    "медиана_мс": 9.9,
    "мин_мс": 7.0,
    "макс_мс": 12.8
+  },
+  "2026-09-28T01Z": {
+   "сделок": 2,
+   "медиана_мс": 11.0,
+   "мин_мс": 6.5,
+   "макс_мс": 15.6
+  },
+  "2026-09-28T02Z": {
+   "сделок": 1,
+   "медиана_мс": 24.1,
+   "мин_мс": 24.1,
+   "макс_мс": 24.1
   }
  },
- "скорость_медиана_мс": 9.9,
- "скорость_сделок": 2,
+ "скорость_медиана_мс": 7.5,
+ "скорость_сделок": 10,
  "скорость_чем_мерили": {
-  "signal_recv_ts -> ts_sent (сигнал -> отправка)": 2
+  "signal_recv_ts -> ts_sent (сигнал -> отправка)": 10
  },
- "позиций_полосы_прочитано": 212,
+ "позиций_полосы_прочитано": 215,
  "поля_времени_в_позициях": {
-  "signal_recv_ts": 211,
-  "ts_intent": 212,
-  "ts_sent": 212,
-  "ts_accepted": 212,
-  "seen_lag_ms": 44
+  "signal_recv_ts": 214,
+  "ts_intent": 215,
+  "ts_sent": 215,
+  "ts_accepted": 215,
+  "seen_lag_ms": 47
  },
  "примеры_времени_свежих": [
   {
-   "ts_intent": 1790556866.921552,
-   "ts_intent_utc": "2026-09-28T00:54:26Z",
+   "ts_intent": 1790562277.215774,
+   "ts_intent_utc": "2026-09-28T02:24:37Z",
    "lane_group": "lane_s0",
-   "ts_update": 1790556913.3210459,
-   "ts_update_utc": "2026-09-28T00:55:13Z",
-   "ts_sent": 1790556866.896024,
-   "ts_accepted": 1790556873.627517,
-   "lane_variants_ms": 11.31,
+   "ts_update": 1790562328.6421237,
+   "ts_update_utc": "2026-09-28T02:25:28Z",
+   "ts_sent": 1790562277.1905854,
+   "ts_accepted": 1790562280.4786384,
+   "lane_variants_ms": 9.79,
    "lane_priority_lamports": 1000000,
-   "lane_ts_sent_buy": 1790556866.9151394,
-   "signal_recv_ts": 1790556866.889014,
-   "seen_lag_ms": 313.0,
+   "lane_ts_sent_buy": 1790562277.2086768,
+   "signal_recv_ts": 1790562277.166476,
+   "seen_lag_ms": 37.0,
    "slot_peers_wallets": [
+    "47du2vFgZhzXR2nk4xXtuKqE8dAWXXSWsNTHNx54jjWK",
+    "5HouNLrptmjJDQs4aqTTEFtskLJQcx23KLyog1WpWG3Y",
+    "6Ka3hMVvY3LXtKqvFoT3rrxiFw9ponrZLcBBdTUGwtdB",
+    "7tLsbsPW6XjPEn8hJS7KiA1vuHKbcLbS9cgeZXJae3yq",
+    "9Lsuq7ur72ejVLxZyt1zw2biGRRc1xdJUckGHb1Nru3r"
+   ],
+   "jup_attempts": 1,
+   "ts_jup_attempt": 1790562313.4326403,
+   "ts_last_sell_attempt": 1790562313.4326403,
+   "ts_closed": 1790562328.4327269
+  },
+  {
+   "ts_intent": 1790559671.4444687,
+   "ts_intent_utc": "2026-09-28T01:41:11Z",
+   "lane_group": "lane_s0",
+   "ts_update": 1790559726.73103,
+   "ts_update_utc": "2026-09-28T01:42:06Z",
+   "ts_sent": 1790559671.4265964,
+   "ts_accepted": 1790559674.6880913,
+   "lane_variants_ms": 5.82,
+   "lane_priority_lamports": 1000000,
+   "lane_ts_sent_buy": 1790559671.4406786,
+   "signal_recv_ts": 1790559671.420117,
+   "seen_lag_ms": 38.0,
+   "result_uncountable_ts": 1790559703.3061988,
+   "jup_attempts": 1,
+   "ts_jup_attempt": 1790559703.3046615,
+   "ts_last_sell_attempt": 1790559703.3046615,
+   "ts_closed": 1790559718.304755,
+   "slot_peers_wallets": [
+    "4JAnKFddd5fFTk5PxDj3PpTWJuTEfSWQEjZJcgKQ9KwW"
+   ]
+  },
+  {
+   "ts_intent": 1790558786.4231174,
+   "ts_intent_utc": "2026-09-28T01:26:26Z",
+   "lane_group": "lane_s0",
+   "ts_update": 1790558833.410135,
+   "ts_update_utc": "2026-09-28T01:27:13Z",
+   "ts_sent": 1790558786.407713,
+   "ts_accepted": 1790558789.6867945,
+   "lane_variants_ms": 5.57,
+   "lane_priority_lamports": 1000000,
+   "lane_ts_sent_buy": 1790558786.4214842,
+   "signal_recv_ts": 1790558786.392149,
+   "seen_lag_ms": 109.0,
+   "slot_peers_wallets": [
+    "2W88xbLGLGqhrhWPahg836G3p8qfCk3Bx6HjrhZyGJDW",
+    "4HceRuphVAq11BwFNwggJ7Hv6ft7e1NzPUm6iAbgvLp4",
     "4JAnKFddd5fFTk5PxDj3PpTWJuTEfSWQEjZJcgKQ9KwW",
-    "6yeApakhQi3gYB6TyBoCcv9cuFdvUUtmEd1RdKuMqzRH",
-    "7hCE2gsT2dK158WTdD7fgqzrY1YD6EYxbrftwdxAkFs8",
-    "Axe1NZPUHSXCLidjYRXCv75gdMFMAsyL1HSZPMZreBa5",
-    "BmahyU6MCQXXTjPXTG4awkSmaf9nnK2ohtSjyX8gN4Uf"
+    "4fvH46ajCnwsDxcdr9LWMMB4BfPnxtk8KLof9bTrBp9K",
+    "7bdhLmoiDH8hjQgUZpdP2qmykt3LtoYFDswH4AHUiPzv",
+    "BrqfyEZcwbXvGYtxgia1G67SwHyf7KQKiaUcg1C5MhHB",
+    "CMXQANFhdQj87koBCVRg5GJFnD6prxCBzg18Azx5HHGo",
+    "E3yE42dQZCmwzsGBCZfFYPU9SaQjT5uR4WATdXDcf6tu",
+    "FfLpuH4WPn2MR8Lqn1MpwQc1HtAPPqL3qvMWZjnFHGpv",
+    "HGnV94YqSPBwyuju4y95UFFZpMzKaBkZzeaHQbfNCaRw",
+    "W9F4Eq6ihi8UP4QrZfAQBaxHVspjN1PTVatFUQBdZPF"
    ],
    "jup_attempts": 1,
-   "ts_jup_attempt": 1790556898.2102072,
-   "ts_last_sell_attempt": 1790556898.2102072,
-   "ts_closed": 1790556913.2103329
-  },
-  {
-   "ts_intent": 1790554352.6709883,
-   "ts_intent_utc": "2026-09-28T00:12:32Z",
-   "lane_group": "lane_s0",
-   "ts_update": 1790554408.302376,
-   "ts_update_utc": "2026-09-28T00:13:28Z",
-   "ts_sent": 1790554352.6452088,
-   "ts_accepted": 1790554355.9218402,
-   "lane_variants_ms": 12.88,
-   "lane_priority_lamports": 1000000,
-   "lane_ts_sent_buy": 1790554352.6683352,
-   "signal_recv_ts": 1790554352.632414,
-   "seen_lag_ms": 162.0,
-   "slot_peers_wallets": [
-    "DqXXV4vcBjSf39TYCnC9uFUsohzhgScewXwoX4Q7XUzH"
-   ],
-   "jup_attempts": 1,
-   "ts_jup_attempt": 1790554393.1891177,
-   "ts_last_sell_attempt": 1790554393.1891177,
-   "ts_closed": 1790554408.1893847
-  },
-  {
-   "ts_intent": 1790553416.1934392,
-   "ts_intent_utc": "2026-09-27T23:56:56Z",
-   "lane_group": "lane_s0",
-   "ts_update": 1790553463.2990263,
-   "ts_update_utc": "2026-09-27T23:57:43Z",
-   "ts_sent": 1790553416.1707387,
-   "ts_accepted": 1790553419.4403987,
-   "lane_variants_ms": 9.45,
-   "lane_priority_lamports": 1000000,
-   "lane_ts_sent_buy": 1790553416.189547,
-   "signal_recv_ts": 1790553416.163162,
-   "seen_lag_ms": 183.0,
-   "result_uncountable_ts": 1790553448.1833003,
-   "jup_attempts": 1,
-   "ts_jup_attempt": 1790553448.1814868,
-   "ts_last_sell_attempt": 1790553448.1814868,
-   "slot_peers_wallets": [],
-   "ts_closed": 1790553463.1815917
+   "ts_jup_attempt": 1790558818.2986062,
+   "ts_last_sell_attempt": 1790558818.2986062,
+   "ts_closed": 1790558833.2986927
   }
  ]
 }
