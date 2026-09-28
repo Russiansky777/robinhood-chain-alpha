@@ -60,6 +60,27 @@ def файлы(каталог: str) -> list:
     return из_
 
 
+def удержание_в_слотах(п: dict):
+    """Слотов от посадки покупки до посадки продажи -- оба слота от цепи."""
+    покупка = (п.get("lane_landed_slot") or п.get("block_slot")
+               or п.get("own_tx_seen_slot") or п.get("our_slot"))
+    исход = п.get("last_sell_outcome") or {}
+    продажа = исход.get("slot") if isinstance(исход, dict) else None
+    if not isinstance(покупка, int) or not isinstance(продажа, int):
+        return None
+    return (продажа - покупка) if продажа >= покупка else None
+
+
+def удержание_в_секундах(п: dict):
+    """Секунд от отправки покупки до отправки продажи. То же, что в строке SELL."""
+    начало = п.get("ts_sent") or п.get("ts_accepted") or п.get("ts_intent")
+    конец = (п.get("ts_last_sell_attempt") or п.get("ts_jup_attempt")
+             or п.get("sell_landed_ts"))
+    if not isinstance(начало, (int, float)) or not isinstance(конец, (int, float)):
+        return None
+    return round(max(0.0, float(конец) - float(начало)), 3)
+
+
 def наши_подписи(п: dict) -> list:
     """Все подписи, под которыми наша покупка могла сесть: вариант на nonce даёт
     по подписи на отправителя, а сядет ровно одна."""
@@ -270,6 +291,14 @@ def main() -> int:
             # прочие доклады считали бы итог по-разному.
             "sol_in": п.get("sol_in"),
             "closed_sol_net": п.get("closed_sol_net"),
+            # УДЕРЖАНИЕ -- И В СЕКУНДАХ, И В СЛОТАХ ПО ФАКТУ (решение владельца
+            # 28.09): длина слота по замеру 0.2659 с, а не 0.4, и одни секунды
+            # скрывают, во сколько слотов уложилось удержание.
+            "hold_slots_plan": п.get("hold_slots"),
+            "hold_s_plan": п.get("sell_after_s"),
+            "slot_len_at_buy_s": п.get("slot_len_at_buy_s"),
+            "hold_slots_fact": удержание_в_слотах(п),
+            "hold_s_fact": удержание_в_секундах(п),
             "tips_sol": п.get("lane_tips_total_sol"),
             "priority_lamports": п.get("lane_priority_lamports"),
             # НАЛОГ ТОКЕНА И КОМИССИЯ ПУЛА -- ОТДЕЛЬНЫМИ ПОЛЯМИ (владелец
@@ -455,6 +484,17 @@ def самопроверка() -> int:
     chk("пустой блок в ноль не превращается",
         место_в_блоке([], "А")["index"] is None)
     chk("метка UTC разбирается", метка("2026-09-28T00:21") > 0)
+    chk("удержание в слотах: 172 - 100 = 72",
+        удержание_в_слотах({"lane_landed_slot": 100,
+                             "last_sell_outcome": {"slot": 172}}) == 72,
+        удержание_в_слотах({"lane_landed_slot": 100,
+                             "last_sell_outcome": {"slot": 172}}))
+    chk("нет слота продажи -- None, а не ноль",
+        удержание_в_слотах({"lane_landed_slot": 100}) is None)
+    chk("удержание в секундах считается до отправки продажи",
+        удержание_в_секундах({"ts_sent": 1000.0,
+                               "ts_last_sell_attempt": 1028.7}) == 28.7,
+        удержание_в_секундах({"ts_sent": 1000.0, "ts_last_sell_attempt": 1028.7}))
     chk("подписи варианта не двоятся",
         наши_подписи({"lane_signature": "A", "lane_pool_candidates": ["A", "B"]})
         == ["A", "B"])
