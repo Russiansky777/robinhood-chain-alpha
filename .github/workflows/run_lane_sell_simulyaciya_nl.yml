@@ -1,0 +1,115 @@
+name: "Своя продажа Pump AMM: сборка из нашей покупки и simulateTransaction (без отправки)"
+
+# ЗАЧЕМ (порядок владельца 28.09, п.1): "сборка из нашей покупки ->
+# simulateTransaction на хосте -> одна живая продажа 0.01 -> все группы".
+# Здесь ровно первый шаг: продажа собирается из НАШЕЙ ЖЕ покупки того же пула
+# (продажа = покупка без индексов 19 и 20 -- это измерено по цепи) и гоняется
+# через simulateTransaction.
+#
+# НИЧЕГО НЕ ОТПРАВЛЯЕТСЯ И НЕ ПОДПИСЫВАЕТСЯ: транзакция собирается
+# неподписанной, симуляция идёт с sigVerify=false и заменой blockhash. Ключа
+# полосы этот прогон не касается вовсе.
+on:
+  workflow_dispatch:
+    inputs:
+      podpis:
+        description: "подпись НАШЕЙ севшей покупки Pump AMM"
+        required: true
+      dolya:
+        description: "какую долю остатка базы продавать (1.0 -- весь)"
+        required: false
+        default: "1.0"
+      kolichestvo:
+        description: "сколько базы продать в сырых единицах (пусто -- по доле)"
+        required: false
+        default: ""
+      zapas:
+        description: "запас минимума выхода долей (пусто -- 0.25 по умолчанию)"
+        required: false
+        default: ""
+      cu:
+        description: "предел вычислений для продажи"
+        required: false
+        default: "170000"
+
+concurrency:
+  group: lane-sell-simulyaciya
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  RABOTA: /tmp/lane_sell
+  OUT_FILE: data/lane_sell_simulyaciya.json
+
+jobs:
+  simulyaciya:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка денежного пути ДО любой сети"
+        run: |
+          set -e
+          python3 -m py_compile analysis/bloom_lane_sell.py
+          cd analysis
+          python3 bloom_lane_sell.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Сборка и симуляция на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/bloom_lane_sell.py" < analysis/bloom_lane_sell.py
+          KOL=""
+          [ -n "${{ inputs.kolichestvo }}" ] && KOL="--kolichestvo ${{ inputs.kolichestvo }}"
+          ZAP=""
+          [ -n "${{ inputs.zapas }}" ] && ZAP="--zapas ${{ inputs.zapas }}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA python3 $RABOTA/bloom_lane_sell.py --podpis '${{ inputs.podpis }}' --dolya '${{ inputs.dolya }}' $KOL $ZAP --cu '${{ inputs.cu }}' --simulirovat yes --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/lane_sell_out.json || true
+          if python3 -c "import json; json.load(open('/tmp/lane_sell_out.json'))" 2>/dev/null; then
+            cp /tmp/lane_sell_out.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: sborka ne dala otvet"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Svoya prodazha Pump AMM: simulyaciya [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
