@@ -372,6 +372,10 @@ def main() -> int:
     р.add_argument("--zhurnaly", default="", help="журналы зонда через запятую")
     р.add_argument("--resheniya", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--katalog", default=os.environ.get("TRITON_STATE_DIR") or "/tmp")
+    р.add_argument("--katalog-validatorov", default="",
+                    help=("где лежит снимок валидаторов, если не в каталоге "
+                          "зонда (его пишет и отдельный прогон в каталог "
+                          "состояния исполнителя)"))
     р.add_argument("--chasov", type=float, default=24.0)
     р.add_argument("--predel-razbora", type=int, default=ПРЕДЕЛ_РАЗБОРА_КЛЮЧЕЙ)
     р.add_argument("--bez-seti", action="store_true")
@@ -408,15 +412,22 @@ def main() -> int:
         return 0
     с_ts = сейчас - а.chasov * 3600.0
     сн = TV.прочитать(а.katalog) or {}
+    каталог_вал = а.katalog
+    if not сн and а.katalog_validatorov:
+        сн = TV.прочитать(а.katalog_validatorov) or {}
+        if сн:
+            каталог_вал = а.katalog_validatorov
     расп = None
-    путь_расп = Path(а.katalog) / TV.ФАЙЛ_РАСПИСАНИЯ
+    путь_расп = Path(каталог_вал) / TV.ФАЙЛ_РАСПИСАНИЯ
     if путь_расп.exists():
         try:
             расп = (json.loads(путь_расп.read_text(encoding="utf-8")) or {}).get("schedule")
         except Exception:  # noqa: BLE001
             расп = None
     расход = None
-    путь_расхода = Path(а.katalog) / "triton_preconfs_rashod.json"
+    # ИМЯ ФАЙЛА -- ТО ЖЕ, ЧТО ПИШЕТ ЗОНД (путь_суток в triton_preconfs_probe):
+    # своё имя означало бы вечное "файл расхода не передан".
+    путь_расхода = Path(а.katalog) / "triton_preconfs_day.json"
     if путь_расхода.exists():
         try:
             расход = json.loads(путь_расхода.read_text(encoding="utf-8"))

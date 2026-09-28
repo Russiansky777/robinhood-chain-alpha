@@ -151,6 +151,12 @@ jobs:
           # может стоять как "export KEY=...", и grep по '^KEY=' отдавал пустоту
           # (поймано на первом живом прогоне 28.09 -- служба получила пустой путь).
           SRC=$(ssh -n $SSH_OPTS root@$TARGET_HOST 'set -a; . /etc/bloom-executor/env; set +a; printf "%s" "$BLOOM_SOURCE_GROUPS"')
+          # КЛЮЧ HELIUS НУЖЕН ФОНОВОМУ ЧАСУ ВАЛИДАТОРОВ (доля слотов BAM в
+          # признак жизни). Без него поток зонда идёт, а доля остаётся с
+          # причиной -- поймано на первом живом прогоне 28.09. Значение в файл,
+          # а не в argv.
+          ssh -n $SSH_OPTS root@$TARGET_HOST 'set -a; . /etc/bloom-executor/env; set +a; umask 077; printf "%s" "$HELIUS_API_KEY" > /home/bot/triton_zond/helius_key'
+          ssh -n $SSH_OPTS root@$TARGET_HOST "wc -c < $ZOND_DIR/helius_key"
           echo "fajl grupp: $SRC"
           for F in $(printf '%s' '${{ inputs.feeds }}' | tr ',' ' '); do
             LIM=""
@@ -162,7 +168,7 @@ jobs:
               SLOTY="--limit-slots ${{ inputs.predel_slotov_harmonic }}"
             fi
             ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl stop triton-zond-$F.service 2>/dev/null || true"
-            ssh -n $SSH_OPTS root@$TARGET_HOST "systemd-run --unit=triton-zond-$F --description='Triton zond $F' --setenv=TRITON_X_TOKEN_FILE=$ZOND_DIR/token --setenv=PYTHONPATH=$KOD_HOSTA:$ZOND_DIR --setenv=TRITON_STATE_DIR=$ZOND_DIR --setenv=BLOOM_SOURCE_GROUPS=$SRC --working-directory=$ZOND_DIR $VENV/bin/python $ZOND_DIR/triton_preconfs_probe.py --feed $F --region '${{ inputs.region }}' --accounts-file $ZOND_DIR/accounts.txt --signers-file $ZOND_DIR/accounts.txt --seconds '${{ inputs.seconds }}' $LIM $SLOTY --out $ZOND_DIR/preconfs_${F}_$STAMP.jsonl --status $ZOND_DIR/status_$F.json --state-dir $ZOND_DIR"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemd-run --unit=triton-zond-$F --description='Triton zond $F' --setenv=TRITON_X_TOKEN_FILE=$ZOND_DIR/token --setenv=PYTHONPATH=$KOD_HOSTA:$ZOND_DIR --setenv=TRITON_STATE_DIR=$ZOND_DIR --setenv=BLOOM_SOURCE_GROUPS=$SRC --setenv=HELIUS_API_KEY_FILE=$ZOND_DIR/helius_key --working-directory=$ZOND_DIR $VENV/bin/python $ZOND_DIR/triton_preconfs_probe.py --feed $F --region '${{ inputs.region }}' --accounts-file $ZOND_DIR/accounts.txt --signers-file $ZOND_DIR/accounts.txt --seconds '${{ inputs.seconds }}' $LIM $SLOTY --out $ZOND_DIR/preconfs_${F}_$STAMP.jsonl --status $ZOND_DIR/status_$F.json --state-dir $ZOND_DIR"
             echo "podnyat zond $F"
           done
           sleep 60

@@ -40,8 +40,26 @@ from pathlib import Path
 ЧАС_S = 3600.0
 
 
+def ключ_helius(окружение=None) -> str:
+    """Ключ из окружения, а если задан файл -- из файла.
+
+    ФАЙЛОМ -- ЧТОБЫ КЛЮЧ НЕ ПОПАЛ В КОМАНДНУЮ СТРОКУ временной службы
+    systemd: --setenv со значением виден в argv любому, кто смотрит ps.
+    """
+    ок = окружение if окружение is not None else os.environ
+    к = (ок.get("HELIUS_API_KEY") or "").strip()
+    if not к:
+        путь = (ок.get("HELIUS_API_KEY_FILE") or "").strip()
+        if путь:
+            try:
+                к = Path(путь).read_text(encoding="utf-8").strip()
+            except Exception:  # noqa: BLE001
+                к = ""
+    return к
+
+
 def урл(ключ: str | None = None) -> str:
-    к = ключ or os.environ.get("HELIUS_API_KEY") or ""
+    к = ключ or ключ_helius()
     return f"https://mainnet.helius-rpc.com/?api-key={к}"
 
 
@@ -338,6 +356,17 @@ def self_test() -> int:
             провалено += 1
             print(f"  [ПРОВАЛ] {что}: {факт}")
 
+    import tempfile as _tк  # noqa: PLC0415
+
+    with _tк.TemporaryDirectory() as _дк:
+        _фк = Path(_дк) / "k"
+        _фк.write_text("КЛЮЧ_ИЗ_ФАЙЛА\n", encoding="utf-8")
+        chk("ключ Helius читается файлом и в урл не подставляется пустота",
+            ключ_helius({"HELIUS_API_KEY_FILE": str(_фк)}) == "КЛЮЧ_ИЗ_ФАЙЛА"
+            and ключ_helius({"HELIUS_API_KEY": "ИЗ_ОКРУЖЕНИЯ",
+                              "HELIUS_API_KEY_FILE": str(_фк)}) == "ИЗ_ОКРУЖЕНИЯ")
+        chk("файла нет -- ключ пуст, а не исключение",
+            ключ_helius({"HELIUS_API_KEY_FILE": str(_фк) + ".нет"}) == "")
     пусто = правило_пометки({})
     chk("без окружения правила нет и это названо",
         (not пусто["задано"]) and bool(пусто["почему_нет"]), str(пусто))
