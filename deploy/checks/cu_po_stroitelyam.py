@@ -13,6 +13,7 @@ getTransaction по севшим подписям. Ни подписи, ни о�
 from __future__ import annotations
 
 import argparse
+import calendar
 import glob
 import json
 import os
@@ -243,10 +244,17 @@ def разобрать_момент(текст: str) -> float:
     if т.startswith("-") and т.endswith(("h", "m")):
         число = float(т[1:-1])
         return time.time() - число * (3600 if т.endswith("h") else 60)
-    try:
-        return time.mktime(time.strptime(т, "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
-    except ValueError:
-        return time.time() - 24 * 3600
+    # ВРЕМЯ UTC РАЗБИРАЕТСЯ КАК UTC. mktime считает строку местным временем
+    # хоста (Амстердам, летом +2), и окно уезжало на час-два: прогон, которому
+    # сказали "с 00:21Z", брал сделки с 23:21Z предыдущих суток.
+    for формат in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%MZ", "%Y-%m-%dT%H:%M:%S",
+                    "%Y-%m-%dT%H:%M"):
+        try:
+            return float(calendar.timegm(time.strptime(т, формат)))
+        except ValueError:
+            continue
+    print(f"moment ne razobran: {т!r} -- berem sutki")
+    return time.time() - 24 * 3600
 
 
 def самопроверка() -> int:
@@ -275,6 +283,9 @@ def самопроверка() -> int:
     chk("двухшаговая считается отдельно от пула",
         имя_строителя({"program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
                         "lane_two_step": True}) == "two_step")
+    chk("время UTC разбирается как UTC, а не как местное хоста",
+        разобрать_момент("2026-09-28T00:21:00Z") == 1790554860.0,
+        разобрать_момент("2026-09-28T00:21:00Z"))
     chk("варианты подписей не двоятся и без пустых",
         варианты_подписей({"lane_signature": "A", "lane_pool_candidates": ["A", "B"],
                             "lane_signature_local": None}) == ["A", "B"])
