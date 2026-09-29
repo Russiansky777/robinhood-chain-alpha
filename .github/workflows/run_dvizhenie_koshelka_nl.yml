@@ -63,7 +63,7 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dvizhenie_koshelka_okno.py" < deploy/checks/dvizhenie_koshelka_okno.py
           ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; W='${{ inputs.koshelek }}'; [ -n \"\$W\" ] || W=\"\$OWN_SEND_WALLET\"; [ -n \"\$W\" ] || W=\"\$BLOOM_LANE_WALLET\"; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR $VENV/python $RABOTA/dvizhenie_koshelka_okno.py --koshelek \"\$W\" --s '${{ inputs.s }}' --po '${{ inputs.po }}' --podpisej '${{ inputs.podpisej }}' --out $RABOTA/out.json" | tail -200
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > "$OUT_FILE" || true

@@ -55,7 +55,7 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/plan_test_krug.py" < deploy/checks/plan_test_krug.py
           # ОКРУЖЕНИЕ И ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ python3 ПОД root.
           # Прогон 02:58:34Z шёл системным питоном без env и открыл ПУСТОЕ
