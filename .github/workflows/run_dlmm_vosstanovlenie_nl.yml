@@ -31,6 +31,8 @@ env:
   ENV_DIR: /etc/bloom-executor
   TARGET_HOST: 127.0.0.1
   CODE_DIR: /home/bot/bloom_executor
+  # ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ: solders живёт только в её venv.
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
   STATE_DIR: /home/bot/bloom_executor_live_data
   RABOTA: /tmp/dlmm_vosst
   OUT_FILE: data/dlmm_vosstanovlenie.json
@@ -72,8 +74,8 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dlmm_vosstanovlenie.py" < deploy/checks/dlmm_vosstanovlenie.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/podbivka_dlmm_quote.py" < analysis/podbivka_dlmm_quote.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py" < analysis/c2_dlmm_tochnaya_kotirovka.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR python3 $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py --self-test"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR python3 $RABOTA/dlmm_vosstanovlenie.py --state-dir $STATE_DIR --skolko '${{ inputs.skolko }}' --simulyacij '${{ inputs.simulyacij }}' --lamportov '${{ inputs.lamportov }}' --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR $VENV/python $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py --self-test"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/dlmm_vosstanovlenie.py --state-dir $STATE_DIR --skolko '${{ inputs.skolko }}' --simulyacij '${{ inputs.simulyacij }}' --lamportov '${{ inputs.lamportov }}' --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/dlmm_vosst.json || true
           if python3 -c "import json; json.load(open('/tmp/dlmm_vosst.json'))" 2>/dev/null; then
             cp /tmp/dlmm_vosst.json "$OUT_FILE"

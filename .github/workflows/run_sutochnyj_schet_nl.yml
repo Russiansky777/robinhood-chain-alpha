@@ -25,6 +25,8 @@ env:
   ENV_DIR: /etc/bloom-executor
   TARGET_HOST: 127.0.0.1
   CODE_DIR: /home/bot/bloom_executor
+  # ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ: solders живёт только в её venv.
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
   STATE_DIR: /home/bot/bloom_executor_live_data
   RABOTA: /tmp/sutochnyj_schet
   OUT_FILE: data/sutochnyj_schet_polosy.json
@@ -60,7 +62,7 @@ jobs:
           set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/sutochnyj_schet_polosy.py" < deploy/checks/sutochnyj_schet_polosy.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR python3 $RABOTA/sutochnyj_schet_polosy.py --state-dir $STATE_DIR --podpisej '${{ inputs.podpisej }}' --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/sutochnyj_schet_polosy.py --state-dir $STATE_DIR --podpisej '${{ inputs.podpisej }}' --out $RABOTA/out.json" | tail -60
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/sutochnyj_schet.json || true
           if python3 -c "import json; json.load(open('/tmp/sutochnyj_schet.json'))" 2>/dev/null; then
             cp /tmp/sutochnyj_schet.json "$OUT_FILE"

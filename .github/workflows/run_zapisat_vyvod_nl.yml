@@ -33,6 +33,8 @@ env:
   ENV_DIR: /etc/bloom-executor
   TARGET_HOST: 127.0.0.1
   CODE_DIR: /home/bot/bloom_executor
+  # ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ: solders живёт только в её venv.
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
   RABOTA: /tmp/zapisat_vyvod
   OUT_FILE: data/lane_vyvody.txt
 
@@ -69,7 +71,7 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zapisat_vyvod_vladelca.py" < deploy/checks/zapisat_vyvod_vladelca.py
           ZAP=""
           [ "${{ inputs.zapisat }}" = "yes" ] && ZAP="--zapisat"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR python3 $RABOTA/zapisat_vyvod_vladelca.py --podpis '${{ inputs.podpis }}' --primechanie '${{ inputs.primechanie }}' $ZAP" | tee /tmp/vyvod.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/zapisat_vyvod_vladelca.py --podpis '${{ inputs.podpis }}' --primechanie '${{ inputs.primechanie }}' $ZAP" | tee /tmp/vyvod.txt
           cp /tmp/vyvod.txt "$OUT_FILE"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
 
