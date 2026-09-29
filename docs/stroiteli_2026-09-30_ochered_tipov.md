@@ -82,15 +82,37 @@ Whirlpool здесь первый с большим отрывом -- **368 сл
 
 По обоим счётам порядок один и тот же. Следующие три, у которых строителя нет НИГДЕ:
 
-1. **`ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch` -- 167 случаев.**
+1. **`ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch` (Scorch) -- 167 случаев.**
 2. **`675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8` (Raydium AMM v4) -- 103.**
-3. **`TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH` -- 66.**
+3. **`TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH` (TesseraV) -- 66.**
 
-**Названия я не придумываю.** Для `ojh19oja…`, `TessVdML…`, `BSwp6bEB…`, `9H6tua7j…`, `gatorLx9…`,
-`QUayE6ne…`, `REALQqNE…`, `MNFSTqtC…` имени биржи в репозитории нет (`bloom_detector.ПРОГРАММЫ_DEX` их не знает), в
-логах их сделок нет строки `Program log: Instruction: …`, и поиск по открытым источникам по адресу
-ничего не дал. Поэтому здесь они адресами. `675kPX9M…` назван Raydium AMM v4 -- так его зовёт сам
-репозиторий (`analysis/bloom_detector.py:183`, `deploy/checks/prosadka_polosy.py:44`).
+**СДЕЛАНО 30.09: строитель Raydium AMM v4** -- `analysis/c2_ammv4_stroitel.py`, подробно в
+`docs/ammv4_kak_vstroit.md`. Взят вторым, а не первым, по указанию владельца: Scorch (`ojh19oja…`) и
+прочие неопознанные не трогать до опознания Code-2, а у AMM v4 раскладка и цена восстанавливаются
+по живым сделкам, которые уже есть.
+
+**ИСПРАВЛЕНО (первая редакция этого раздела была неверна).** Я сперва написал, что имён этих программ
+в репозитории нет. Это моя ошибка поиска: я искал только по `*.py` и `*.md` и ИСКЛЮЧИЛ из поиска
+каталог `data/`, а карта меток лежит именно там --
+`data/solana_buyer_200/prior/current/buyer_100/dex_labels.json`, 107 записей. По ней:
+
+| адрес | метка в карте |
+|---|---|
+| `ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch` | **Scorch** |
+| `675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8` | Raydium (AMM v4 -- так его зовёт и `bloom_detector.py:183`) |
+| `TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH` | **TesseraV** |
+| `BSwp6bEBihVLdqJRKGgzjcGLHkcTuzmSo1TQkHepzH8p` | **Bonkswap** |
+| `9H6tua7jkLhdm3w8BvgpTn5LZNU7g4ZynDmCiNN3q6Rp` | **HumidiFi** |
+| `gatorLx9aC1e5ZWAXscv5QRKiLXnLPLXjftVc81h1Hr` | **GatorSwap** |
+| `MNFSTqtC93rEfYHB6hF82sKdZpUDFWkViLByLd1k1Ms` | **Manifest** |
+| `QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG` | **Quay** |
+| `REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2` | **Byreal** |
+
+Оговорка, которая от этого не снимается: **метка на карте -- это не опознание раскладки.** Имя
+говорит, чья это биржа, и ничего не говорит о тегах инструкций, числе счетов и математике цены; в
+логах их сделок строки `Program log: Instruction: …` нет, и по открытым источникам по адресу поиск
+ничего не дал. Указание владельца «неизвестные программы не трогать до опознания Code-2» остаётся в
+силе: опознание -- это раскладка и цена, а не название.
 
 Что про `ojh19oja…` известно фактом цепи (по одной живой сделке в `data/bloom_regression_txs.json`):
 

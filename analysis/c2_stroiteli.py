@@ -64,6 +64,7 @@ WSOL = "So11111111111111111111111111111111111111112"
     "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": "c2_clmm_stroitel",
     "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": "c2_whirlpool_stroitel",
     "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN": "c2_dbc_stroitel",
+    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": "c2_ammv4_stroitel",
 }
 # Программы, у которых ЕСТЬ раскладка в общем SPECS. На них переходники не
 # вмешиваются по умолчанию: денежный путь Code-1 их уже собирает, и менять его
@@ -178,6 +179,12 @@ def extract_template(tx: dict, program: str, pool_vault: str, *,
     pool_vault приёмка и полоса подают перебором по всем счетам инструкции;
     модулю нужен АДРЕС ПУЛА, и он же придёт в этом переборе -- на своём счёте
     шаблон соберётся, на прочих честно не соберётся.
+
+    А ЕЩЁ pool_vault БЫВАЕТ ИМЕННО ХРАНИЛИЩЕМ -- так его подаёт полоса, у которой
+    адреса пула нет вовсе (C.identify_pool отдаёт хранилище). Поэтому пробуем
+    дважды: сперва как адрес пула, потом как хранилище. Второй заход и решает
+    сделку роутера: у неё инструкций этой программы несколько, и по хранилищу
+    выбирается ТА, где стоит наш пул, а не первая по счёту.
     """
     м = модуль(program)
     if м is None:
@@ -185,6 +192,10 @@ def extract_template(tx: dict, program: str, pool_vault: str, *,
     if продажа:
         return {"ok": False, "why_not": "продажа этим строителем не покрыта"}
     т = м.шаблон(tx, pool_vault)
+    if not т.get("ok"):
+        по_хранилищу = м.шаблон(tx, None, хранилище=pool_vault)
+        if по_хранилищу.get("ok"):
+            т = по_хранилищу
     if not т.get("ok"):
         return т
     ш = м.шаблон_со_сторонами(т, tx)
