@@ -204,11 +204,16 @@ def свести(*, узлы: list, голоса, эпоха, расписани
     # расписании: остальные к лидерам фида отношения не имеют, а файл от них
     # раздувается на тысячи строк.
     версии_узлов: dict = {}
+    наборы_узлов: dict = {}
     for у in узлы or []:
         к = у.get("pubkey")
         версия_ = у.get("version")
         if к and слотов.get(к):
+            # РЯДОМ С ВЕРСИЕЙ -- featureSet: владелец просил смотреть обе
+            # величины (п.10, 28.09). Строка версии у разных клиентов
+            # совпадает по числам, а featureSet отличает сборку.
             версии_узлов[к] = версия_
+            наборы_узлов[к] = у.get("featureSet")
         м = пометить(версия_, правило)
         метки[к] = м
         стр = str(версия_)
@@ -253,6 +258,7 @@ def свести(*, узлы: list, голоса, эпоха, расписани
         "raspisaniya_net": почему_расписания,
         "v_raspisanii_bez_uzla": len(без_узла),
         "versii_uzlov": версии_узлов,
+        "featureset_uzlov": наборы_узлов,
         "metki": метки})
     return из_
 
@@ -350,7 +356,8 @@ def main() -> int:
     # versii_uzlov ровно потому, что файл писался из печати.
     в_файл = {к: зн for к, зн in с.items() if к != "metki"}
     в_файл["dolya_slotov"] = доля_слотов(с)
-    печать = {к: зн for к, зн in в_файл.items() if к != "versii_uzlov"}
+    печать = {к: зн for к, зн in в_файл.items()
+               if к not in ("versii_uzlov", "featureset_uzlov")}
     печать["versii_uzlov_shtuk"] = len(с.get("versii_uzlov") or {})
     if а.out:
         Path(а.out).write_text(json.dumps(в_файл, ensure_ascii=False, indent=1),
