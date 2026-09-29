@@ -74,7 +74,7 @@ def сверить(сн: dict) -> dict:
                расхождение_пп=round((q["amount_out"] - факт) / факт * 100, 6) if факт else None,
                цена_сошлась=q["sqrt_price_x64_после"] == e["sqrt_price_x64"], тик_сошёлся=q["tick_после"] == e["tick"],
                ликвидность_сошлась=q["liquidity_после"] == e["liquidity"], вход_потреблён=q["amount_in_consumed"],
-               тиков_пересечено=q["тиков_пересечено"], массивов_пройдено=len(q["массивы"]),
+               тиков_пересечено=q["тиков_пересечено"], массивов_пройдено=len(q["массивов"]),
                лимитных_ордеров=q["лимитных_ордеров"], fee_модель=q["fee"],
                fee_факт=(e.get("trade_fee_0", 0) + e.get("trade_fee_1", 0)) if "trade_fee_0" in e else None)
     return из_
@@ -85,7 +85,8 @@ def ev_ok(ixs: list, ев: list) -> bool:
 
 
 def main() -> int:
-    д = json.loads((КОРЕНЬ / "data" / "podbivka" / "clmm_sbor.json").read_text(encoding="utf-8"))
+    файлы = sys.argv[1:] or ["data/podbivka/clmm_sbor.json"]
+    д = {"снимки": [сн for ф in файлы for сн in json.loads((КОРЕНЬ / ф).read_text(encoding="utf-8")).get("снимки") or []]}
     итог, отсев = [], collections.Counter()
     for сн in д.get("снимки") or []:
         r = сверить(сн)

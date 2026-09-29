@@ -178,6 +178,31 @@ def снимок(уз, пул: str, массивов: int) -> dict:
             "расширение": адр[2], "массивы": dict(zip(map(str, старты), адр[3:])), "данные": счета}
 
 
+def снимок_по_карте(уз, пул: str, сколько: int = 3) -> dict:
+    """Массивы -- по битовой карте пула (и расширению), как их выбирает программа: сколько по каждому направлению."""
+    import podbivka_clmm_quote as Q  # noqa: PLC0415
+    ext_адр = адрес_расширения(пул)
+    r = уз.вызов("getMultipleAccounts", [[пул, ext_адр], {"encoding": "base64", "commitment": "confirmed"}])
+    val = (r or {}).get("value") or []
+    if not val or not val[0]:
+        raise RuntimeError("пул не читается")
+    pool = Q.разобрать_пул(base64.b64decode(val[0]["data"][0]))
+    ext = Q.разобрать_расширение(base64.b64decode(val[1]["data"][0])) if len(val) > 1 and val[1] else None
+    старты = []
+    for zfo in (True, False):
+        try:
+            старты += Q.нужные_массивы(pool, ext, zfo, сколько)
+        except Q.ОшибкаCLMM:
+            pass
+    старты = sorted(set(старты))
+    адр = [пул, pool["amm_config"], ext_адр] + [адрес_массива(пул, s) for s in старты]
+    r2 = уз.вызов("getMultipleAccounts", [адр, {"encoding": "base64", "commitment": "confirmed"}])
+    val2 = (r2 or {}).get("value") or []
+    return {"slot": ((r2 or {}).get("context") or {}).get("slot"), "пул": пул, "amm_config": pool["amm_config"],
+            "расширение": ext_адр, "массивы": dict(zip(map(str, старты), адр[3:])),
+            "данные": {a: (x["data"][0] if x else None) for a, x in zip(адр, val2)}}
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--s", default="2026-09-28T06:00:00Z", help="начало окна разбора сделок источников, UTC")
@@ -185,12 +210,15 @@ def main() -> int:
     р.add_argument("--cel", type=int, default=40, help="снимков «состояние → следующий своп»")
     р.add_argument("--massivov", type=int, default=4, help="tick arrays в каждую сторону от текущего")
     р.add_argument("--minut", type=float, default=80)
+    р.add_argument("--po-karte", action="store_true", help="tick arrays по битовой карте пула, 3 в каждую сторону")
+    р.add_argument("--puly-iz", default="", help="json прошлого сбора: пулы оттуда, часть 1 (сделки) не делать")
+    р.add_argument("--metka", default="", help="суффикс файла выхода")
     а = р.parse_args()
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
     сп = json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki_code1_kandidaty.json").read_text(encoding="utf-8"))
     кошельки = sorted(set(сп["группы_code1"]) | set(сп["кандидаты"]) | set(сп.get("снайперы") or []))
     уз = S.Узел()
-    out = КОРЕНЬ / "data" / "podbivka" / "clmm_sbor.json"
+    out = КОРЕНЬ / "data" / "podbivka" / f"clmm_sbor{('_' + а.metka) if а.metka else ''}.json"
     import podbivka_run as R  # noqa: PLC0415
     итог: dict = {"окно_с": а.s, "кошельков": len(кошельки), "покрытие": {}, "сделки": [], "версия": {},
                   "снимки": [], "отсев": {}}
@@ -215,7 +243,12 @@ def main() -> int:
         print("версия:", итог["версия"], flush=True)
         # 1. сделки источников
         пулы: dict = {}
-        for w in кошельки:
+        if а.puly_iz:
+            пулы = json.loads((КОРЕНЬ / а.puly_iz).read_text(encoding="utf-8")).get("пулы_источников") or {}
+            кошельки_1 = []
+        else:
+            кошельки_1 = кошельки
+        for w in кошельки_1:
             сп_w, до = [], None
             while len(сп_w) < а.podpisey:
                 try:
@@ -260,7 +293,7 @@ def main() -> int:
             пул = очередь[k % len(очередь)]
             k += 1
             try:
-                сн = снимок(уз, пул, а.massivov)
+                сн = снимок_по_карте(уз, пул) if а.po_karte else снимок(уз, пул, а.massivov)
             except RuntimeError as exc:
                 итог["отсев"][f"снимок: {S.чисто(str(exc))[:60]}"] = итог["отсев"].get(f"снимок: {S.чисто(str(exc))[:60]}", 0) + 1
                 очередь.remove(пул)
