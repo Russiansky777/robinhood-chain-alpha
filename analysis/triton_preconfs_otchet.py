@@ -393,7 +393,8 @@ def _счёт(ряд: list) -> dict:
 
 
 def лидеры_фида(преконфы: dict, карта: dict, расписание_: dict,
-                 метки: dict | None = None, версии: dict | None = None) -> dict:
+                 метки: dict | None = None, версии: dict | None = None,
+                 наборы: dict | None = None) -> dict:
     """Личности лидеров слотов, по которым фид отдал ХОТЬ ЧТО-ТО.
 
     Спрос владельца 28.09 (после закрытия Harmonic): список личностей и их доля
@@ -418,7 +419,8 @@ def лидеры_фида(преконфы: dict, карта: dict, распис
                                       "slotov_fida": set(),
                                       "slotov_epohi": len((расписание_ or {}).get(лидер) or []),
                                       "metka_po_versii": (метки or {}).get(лидер),
-                                      "versiya": (версии or {}).get(лидер)})
+                                      "versiya": (версии or {}).get(лидер),
+                                      "featureSet": (наборы or {}).get(лидер)})
         стр["soobshchenij"] += 1
         стр["slotov_fida"].add(int(слот))
     из_: dict = {"slotov_v_epohe": всего_слотов,
@@ -433,7 +435,8 @@ def лидеры_фида(преконфы: dict, карта: dict, распис
                          "dolya_epohi": (round(стр["slotov_epohi"] / всего_слотов, 6)
                                           if всего_слотов else None),
                          "metka_po_versii": стр["metka_po_versii"],
-                         "versiya": стр.get("versiya")})
+                         "versiya": стр.get("versiya"),
+                         "featureSet": стр.get("featureSet")})
         ряд.sort(key=lambda з: -з["slotov_epohi"])
         сумма = sum(з["slotov_epohi"] for з in ряд)
         из_["po_fidam"][ф] = {
@@ -473,9 +476,14 @@ def _по_версиям_лидеров(ряд: list) -> dict:
     из2: dict = {}
     for з in ряд or []:
         в = з.get("versiya") or "версия не прочитана"
-        гр = из2.setdefault(в, {"liderov": 0, "slotov_epohi": 0})
+        гр = из2.setdefault(в, {"liderov": 0, "slotov_epohi": 0,
+                                 "featureSet": set()})
         гр["liderov"] += 1
         гр["slotov_epohi"] += int(з.get("slotov_epohi") or 0)
+        if з.get("featureSet") is not None:
+            гр["featureSet"].add(з["featureSet"])
+    for гр in из2.values():
+        гр["featureSet"] = sorted(гр["featureSet"])
     return dict(sorted(из2.items(), key=lambda т: -т[1]["slotov_epohi"]))
 
 
@@ -662,7 +670,8 @@ def main() -> int:
         карта = (TV.карта_слотов(расп, первый)
                  if расп and первый is not None else {})
         итог_ = лидеры_фида(пре, карта, расп or {}, сн.get("metki") or {},
-                             сн.get("versii_uzlov") or {})
+                             сн.get("versii_uzlov") or {},
+                             сн.get("featureset_uzlov") or {})
         итог_["epoch"] = сн.get("epoch")
         итог_["prekonfov"] = len(пре)
         текст_ = json.dumps(итог_, ensure_ascii=False, indent=1)

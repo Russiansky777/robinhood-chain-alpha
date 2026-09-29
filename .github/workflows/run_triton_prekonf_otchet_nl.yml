@@ -133,6 +133,21 @@ jobs:
             exit 1
           fi
 
+      - name: "Живы ли потоки зонда и не закрылся ли Harmonic по пределу"
+        # Владелец спрашивает это каждое утро отдельным пунктом: жив ли BAM и
+        # закрылся ли Harmonic по записанному пределу billable-слотов. Читаем
+        # всегда, а не только при остановке зонда: раньше эти строки
+        # появлялись лишь в прогоне с ostanovit_zond=yes.
+        if: always()
+        run: |
+          set -e
+          for F in bam harmonic; do
+            SOST=$(ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl is-active triton-zond-$F.service 2>/dev/null || echo net-sluzhby")
+            echo "triton-zond-$F: $SOST"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "head -c 900 $ZOND_DIR/status_$F.json 2>/dev/null || echo '(status_$F.json net)'"
+            echo ""
+          done
+
       - name: "Остановить зонд, если просили"
         if: ${{ inputs.ostanovit_zond == 'yes' }}
         run: |
