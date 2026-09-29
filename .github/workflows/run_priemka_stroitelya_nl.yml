@@ -206,10 +206,29 @@ jobs:
           else
             echo "otdelnogo kljucha net -- harness vozmet obshchij i skazhet ob etom strokoj"
           fi
+          # ФЛАГИ ТОЛЬКО ДЛЯ ХАРНЕССА, И НИ ДЛЯ КОГО БОЛЬШЕ. Они идут в env
+          # одного процесса приёмки; env хоста и служб не тронуты, перезапуска
+          # нет. Тип пула и строитель включаются ДВУМЯ разными флагами, и оба
+          # нужны: LANE_<ТИП> пускает сигнал через гейт полосы, а
+          # BLOOM_<ТИП>_STROITEL разрешает считать цену и живые счета.
+          FLAGI="${{ inputs.flagi }}"
+          # ФОРМА ПРОВЕРЯЕТСЯ ДО ХОСТА: только ИМЯ=ЗНАЧЕНИЕ латиницей. Иначе
+          # строка уехала бы в shell на хосте как есть.
+          if [ -n "$FLAGI" ]; then
+            for F in $FLAGI; do
+              case "$F" in
+                [A-Z_][A-Z0-9_]*=[A-Za-z0-9_.,:-]*) ;;
+                *) echo "SBOY: flag ne vida IMJA=ZNACHENIE: $F"; exit 1 ;;
+              esac
+            done
+            echo "flagi harnessa: $FLAGI"
+          else
+            echo "flagov net -- meriaem s temi, chto v env hosta"
+          fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY_CHECKS=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY_CHECKS; fi
-            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$KOD:$CODE_DIR BLOOM_CODE_DIR=$KOD \
+            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$KOD:$CODE_DIR BLOOM_CODE_DIR=$KOD $FLAGI \
               $VENV/python $RABOTA/priemka_stroitelya.py \
                 --program '${{ inputs.program }}' \
                 --skolko '${{ inputs.skolko }}' \
