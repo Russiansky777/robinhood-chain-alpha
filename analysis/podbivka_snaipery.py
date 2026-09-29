@@ -101,9 +101,10 @@ class Блоки:
     def индекс(self, слот: int, подпись: str):
         if слот not in self.кэш:
             try:
+                # версия 1 и Helius: с версией 0 блок без транзакций v1, Shyft getBlock их не отдаёт (29.09)
                 б = self.уз.вызов("getBlock", [слот, {"transactionDetails": "signatures", "rewards": False,
-                                                      "maxSupportedTransactionVersion": 0, "commitment": "confirmed"}],
-                                  срок=40.0)
+                                                      "maxSupportedTransactionVersion": 1, "commitment": "confirmed"}],
+                                  срок=40.0, узел="helius")
                 self.кэш[слот] = (б or {}).get("signatures") or []
             except RuntimeError:
                 self.кэш[слот] = None

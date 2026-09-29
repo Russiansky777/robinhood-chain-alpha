@@ -669,7 +669,7 @@ def подпись_после_слота(уз: Узел, слот: int) -> str |
     for б in блоки:
         try:
             блок = уз.вызов("getBlock", [б, {"transactionDetails": "signatures", "rewards": False,
-                                             "maxSupportedTransactionVersion": 0,
+                                             "maxSupportedTransactionVersion": 1,   # опора: любая подпись блока
                                              "commitment": "confirmed"}], срок=40.0)
         except RuntimeError:
             continue
