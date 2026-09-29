@@ -1,0 +1,99 @@
+name: "NL-хост: что изменит деплой (только чтение, перед окном)"
+
+# ЗАЧЕМ. Над одними и теми же денежными модулями работают несколько
+# исполнителей. Найдено 29.09 ночью: bloom_own_send.py на хосте совпал по
+# sha256 с версией ветки claude/stroiteli, а не с рабочей -- службы едут НЕ на
+# том коде, что лежит в ветке. Деплой "своей" ветки в такой обстановке может
+# молча снести чужую правку, и узнать об этом можно будет только по сделкам.
+#
+# Прогон отвечает на один вопрос ДО деплоя: что именно он изменит и не унесёт ли
+# строк, которых в ветке нет. Сравнение построчное, не по mtime: mtime врёт при
+# перезаписи байт в байт.
+#
+# ПАДАЕТ ПРИ ТРЕВОГЕ нарочно: иначе она утонет в выводе. Ни одной правки на
+# хосте -- только чтение модулей и sha256.
+on:
+  workflow_dispatch:
+    inputs:
+      moduli:
+        description: "модули через запятую (пусто -- весь денежный путь полосы)"
+        required: false
+        default: ""
+
+concurrency:
+  group: chto-izmenit-deploy-nl
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  OUT_FILE: data/chto_izmenit_deploy.json
+
+jobs:
+  sravnenie:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка сравнения (без хоста)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/chto_izmenit_deploy.py
+          python3 deploy/checks/chto_izmenit_deploy.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Снять с хоста копии модулей денежного пути"
+        run: |
+          set -e
+          set -o pipefail
+          rm -rf /tmp/s_hosta
+          install -d -m 755 /tmp/s_hosta
+          MODULI="${{ inputs.moduli }}"
+          if [ -z "$MODULI" ]; then
+            MODULI="bloom_own_send.py,bloom_detector.py,bloom_seller.py,bloom_exec_state.py,bloom_region_send.py,bloom_doklad.py,c2_swap_build.py,bloom_senders.py"
+          fi
+          echo "MODULI=$MODULI" >> "$GITHUB_ENV"
+          # ОДНИМ ПОТОКОМ: tar вместо cat на каждый файл -- меньше соединений и
+          # меньше времени на единственном раннере.
+          SPISOK=$(echo "$MODULI" | tr ',' ' ')
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && tar -cf - $SPISOK 2>/dev/null || true" | tar -C /tmp/s_hosta -xf - || true
+          echo "snjato s hosta: $(ls /tmp/s_hosta | wc -l) fajlov"
+          ls -la /tmp/s_hosta || true
+
+      - name: "Что изменит деплой"
+        run: |
+          set -e
+          python3 deploy/checks/chto_izmenit_deploy.py \
+            --s-hosta /tmp/s_hosta --vetka analysis \
+            --moduli "$MODULI" --out "$OUT_FILE"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Chto izmenit deploj: sha256 hosta protiv vetki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
