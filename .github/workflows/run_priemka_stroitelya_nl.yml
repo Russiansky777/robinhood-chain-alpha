@@ -49,6 +49,10 @@ on:
         description: "ветка Code-2 со сборами (пусто -- сборы не брать)"
         required: false
         default: "claude/podbivka"
+      tolko_s_mintom:
+        description: "брать только покупки с этим минтом среди счетов (WSOL: So11111111111111111111111111111111111111112)"
+        required: false
+        default: ""
 
 concurrency:
   group: priemka-stroitelya
@@ -148,6 +152,7 @@ jobs:
                 --lamportov '${{ inputs.lamportov }}' \
                 --otkuda '${{ inputs.otkuda }}' \
                 --sbory $RABOTA/podbivka \
+                --tolko-s-mintom '${{ inputs.tolko_s_mintom }}' \
                 --state-dir $STATE_DIR \
                 --out $RABOTA/out.json" | tail -120
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/priemka.json || true
