@@ -16,6 +16,7 @@ import gzip
 import statistics
 import json
 import os
+import sys
 import time
 
 # ОТКАЗЫ "БЕЗ ВТОРОЙ НОГИ" (слово владельца 29.09, п.4). Ровно две причины, с
@@ -91,6 +92,8 @@ def main() -> int:
     р.add_argument("--since-utc", required=True)
     р.add_argument("--podrobno", type=int, default=12)
     р.add_argument("--out", default="/tmp/dvuhshagovyy_v_zhurnale.json")
+    р.add_argument("--kotirovki-s-cepi", type=int, default=1,
+                    help="1 -- котировку отказанных сигналов читать с цепи")
     # ПОДПИСИ ЦЕЛИКОМ: по названной подписи печатаются ВСЕ строки журнала --
     # так видно, звали ли полосу вообще и на какой стадии она встала.
     р.add_argument("--podpisi", default="",
@@ -196,13 +199,18 @@ def main() -> int:
                     без_ноги_трат_известно += 1
                 if з.get("mint"):
                     без_ноги_минты.add(з["mint"])
-                if len(без_ноги_примеры) < 15:
-                    без_ноги_примеры.append({к: з.get(к) for к in
-                                              ("ts_utc", "source", "mint", "quote_mint",
-                                                "spend_mint", "pool_program",
-                                                "leg1_pool_program", "lane_group",
-                                                "group", "spend_sol_eq", "why_not",
-                                                "reason") if з.get(к) is not None})
+                # ВСЕ ОТКАЗЫ, А НЕ ПЕРВЫЕ 15, и с подписью источника: по ней
+                # котировка пула берётся С ЦЕПИ. В самой строке отказа поля
+                # quote_mint нет -- отказ случается ДО того, как котировка
+                # попадает в запись, и прогон 02:17Z честно показал "не назван"
+                # у всех 52. Спрашивать журнал бесполезно, спрашиваем цепь.
+                без_ноги_примеры.append({к: з.get(к) for к in
+                                          ("ts_utc", "source", "mint", "quote_mint",
+                                            "spend_mint", "pool_program",
+                                            "leg1_pool_program", "lane_group",
+                                            "group", "spend_sol_eq", "why_not",
+                                            "reason", "signature", "source_sig",
+                                            "source_pool") if з.get(к) is not None})
                 break
 
             двух = (ст == "two_step_build" or з.get("route") == "two_step"
@@ -286,6 +294,84 @@ def main() -> int:
                     "мин_мс": round(min(v), 1), "макс_мс": round(max(v), 1)}
                 for ч, v in sorted(по_часам.items())}
 
+    # --- КОТИРОВКА ОТКАЗАННЫХ СИГНАЛОВ -- С ЦЕПИ (слово владельца 29.09, п.4:
+    # разбить по котировке). В журнале её нет, поэтому по подписи источника
+    # читаем его транзакцию и берём минт котировки тем же кодом, которым это
+    # делает служба. Только чтение; если узла или модуля нет -- честный отказ,
+    # а не пустой разрез.
+    котировки_с_цепи = collections.Counter()
+    не_прочитано = collections.Counter()
+    if а.kotirovki_s_cepi:
+        зов_ = None
+        try:
+            import urllib.request  # noqa: PLC0415
+
+            ключ = (os.environ.get("HELIUS_API_KEY")
+                    or os.environ.get("HELIUS_API") or "").strip()
+            урл_ = f"https://mainnet.helius-rpc.com/?api-key={ключ}"
+
+            def зов_(метод, параметры, таймаут=20.0):  # noqa: F811
+                тело = json.dumps({"jsonrpc": "2.0", "id": 1, "method": метод,
+                                    "params": параметры}).encode()
+                зпр = urllib.request.Request(
+                    урл_, data=тело, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(зпр, timeout=таймаут) as отв:  # noqa: S310
+                    о = json.loads(отв.read().decode())
+                return о.get("result")
+        except Exception as exc:  # noqa: BLE001
+            не_прочитано[f"узел недоступен: {type(exc).__name__}"] += 1
+        B = None
+        try:
+            for пт in (os.environ.get("BLOOM_CODE_DIR") or "", "/home/bot/bloom_executor"):
+                if пт and os.path.isdir(пт) and пт not in sys.path:
+                    sys.path.insert(0, пт)
+            import c2_swap_build as B  # noqa: PLC0415
+        except Exception as exc:  # noqa: BLE001
+            не_прочитано[f"модуля сборки нет: {type(exc).__name__}"] += 1
+        видели = set()
+        for з in без_ноги_примеры:
+            подпись = з.get("signature") or з.get("source_sig")
+            прог = з.get("pool_program")
+            имя = ("котировка не SOL" if "котировка пула не SOL" in
+                   f"{з.get('why_not')} {з.get('reason')}" else "строителя нет")
+            if not подпись or not прог or not зов_ or B is None:
+                не_прочитано["подписи, программы или модуля нет"] += 1
+                continue
+            if подпись in видели:
+                continue
+            видели.add(подпись)
+            try:
+                tx = зов_("getTransaction",
+                          [подпись, {"encoding": "jsonParsed",
+                                      "maxSupportedTransactionVersion": 0,
+                                      "commitment": "finalized"}])
+            except Exception as exc:  # noqa: BLE001
+                не_прочитано[f"транзакция не прочиталась: {type(exc).__name__}"] += 1
+                continue
+            if not tx:
+                не_прочитано["узел вернул пусто"] += 1
+                continue
+            найдено = None
+            try:
+                инстр = [ix for ix in B.all_instructions(tx)
+                         if ix.get("programId") == прог]
+                for канд in (инстр[0]["accounts"] if инстр else []):
+                    т = B.extract_template(tx, прог, канд)
+                    if not т.get("ok"):
+                        continue
+                    mv = B.mints_and_vaults(т, tx)
+                    if mv and mv.get("quote_mint"):
+                        найдено = mv["quote_mint"]
+                        break
+            except Exception as exc:  # noqa: BLE001
+                не_прочитано[f"шаблон не восстановился: {type(exc).__name__}"] += 1
+                continue
+            if not найдено:
+                не_прочитано["котировка пула не восстановилась"] += 1
+                continue
+            з["quote_mint_s_cepi"] = найдено
+            котировки_с_цепи[f"{имя} | {ИЗВЕСТНЫЕ_КОТИРОВКИ.get(найдено, найдено)}"] += 1
+
     двухшаговые.sort(key=lambda з: str(з.get("ts_utc") or ""))
     отчёт = {
         "since_utc": а.since_utc,
@@ -309,7 +395,9 @@ def main() -> int:
                                "SOL-эквиваленте. Это масштаб пропущенного, а НЕ "
                                "наша упущенная прибыль: итог по этим минтам "
                                "считается по цепи отдельно."),
-            "примеры": без_ноги_примеры,
+            "по_котировке_с_цепи": dict(котировки_с_цепи.most_common(30)),
+            "котировка_с_цепи_не_прочитана": dict(не_прочитано.most_common(10)),
+            "примеры": без_ноги_примеры[:60],
         },
         "налоговые_отказы": налоговые,
         "возраст_сигнала_слотов": возраст_свод(возрасты),
