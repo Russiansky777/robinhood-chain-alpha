@@ -123,6 +123,45 @@ def снимок(уз, пул: str, массивов: int) -> dict:
             "данные": {a: (x["data"][0] if x else None) for a, x in zip(адр, val)}}
 
 
+def пересёк_тик(сн: dict, т: dict) -> bool:
+    import podbivka_whirlpool_quote as Q  # noqa: PLC0415
+    ев = [e for e in события(т) if e["whirlpool"] == сн["пул"]]
+    if not ев:
+        return False
+    lo, hi = sorted((ев[0]["pre_sqrt_price"], ев[0]["post_sqrt_price"]))
+    sp = пул_поля(base64.b64decode(сн["данные"][сн["пул"]]))["tick_spacing"]
+    for адр in сн["массивы"].values():
+        if сн["данные"].get(адр):
+            а = Q.разобрать_массив(base64.b64decode(сн["данные"][адр]))
+            for off in а["ticks"]:
+                if lo <= Q.sqrt_price_from_tick_index(а["start_tick_index"] + off * sp) <= hi:
+                    return True
+    return False
+
+
+def пулы_из_api(уз, url: str, программа: str, сколько: int = 20) -> tuple:
+    """Адреса пулов с наибольшим оборотом из официального API; каждый проверяется по цепи: владелец счёта = программа."""
+    import re  # noqa: PLC0415
+    import requests  # noqa: PLC0415
+    try:
+        о = requests.get(url, timeout=30)
+        текст = о.text if о.status_code == 200 else ""
+        why = None if о.status_code == 200 else f"http {о.status_code}"
+    except Exception as exc:  # noqa: BLE001
+        текст, why = "", type(exc).__name__
+    канд = []
+    for a in re.findall(r'"(?:id|address|poolId|whirlpool)"\s*:\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"', текст):
+        if a not in канд:
+            канд.append(a)
+    ок = []
+    for i in range(0, min(len(канд), 60), 20):
+        r = уз.вызов("getMultipleAccounts", [канд[i:i + 20], {"encoding": "base64", "dataSlice": {"offset": 0, "length": 0}}])
+        for a, v in zip(канд[i:i + 20], (r or {}).get("value") or []):
+            if v and v.get("owner") == программа and len(ок) < сколько:
+                ок.append(a)
+    return ок, {"url": url, "кандидатов": len(канд), "проверено_по_цепи": len(ок), "why_not": why}
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--s", default="2026-09-28T06:00:00Z")
@@ -130,12 +169,16 @@ def main() -> int:
     р.add_argument("--cel", type=int, default=40)
     р.add_argument("--massivov", type=int, default=3)
     р.add_argument("--minut", type=float, default=80)
+    р.add_argument("--top-api", type=int, default=0, help="добавить N пулов с наибольшим оборотом из официального API (api.orca.so)")
+    р.add_argument("--tolko-peresechenie", action="store_true")
+    р.add_argument("--puly-iz", default="")
+    р.add_argument("--metka", default="")
     а = р.parse_args()
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
     сп = json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki_code1_kandidaty.json").read_text(encoding="utf-8"))
     кошельки = sorted(set(сп["группы_code1"]) | set(сп["кандидаты"]) | set(сп.get("снайперы") or []))
     уз = S.Узел()
-    out = КОРЕНЬ / "data" / "podbivka" / "whirlpool_sbor.json"
+    out = КОРЕНЬ / "data" / "podbivka" / f"whirlpool_sbor{('_' + а.metka) if а.metka else ''}.json"
     import podbivka_run as R  # noqa: PLC0415
     итог: dict = {"окно_с": а.s, "кошельков": len(кошельки), "покрытие": {}, "сделки": [], "версия": {},
                   "снимки": [], "отсев": {}}
@@ -157,7 +200,9 @@ def main() -> int:
         except RuntimeError as exc:
             итог["версия"] = {"why_not": S.чисто(str(exc))[:160]}
         пулы: dict = {}
-        for w in кошельки:
+        if а.puly_iz:
+            пулы = json.loads((КОРЕНЬ / а.puly_iz).read_text(encoding="utf-8")).get("пулы_источников") or {}
+        for w in ([] if а.puly_iz else кошельки):
             сп_w, до = [], None
             while len(сп_w) < а.podpisey:
                 try:
@@ -190,7 +235,12 @@ def main() -> int:
             print(w[:8], "подписей", len(сп_w), "сделок Whirlpool", len(итог["сделки"]), flush=True)
         итог["пулы_источников"] = пулы
         записать()
-        очередь = sorted(пулы, key=lambda p: -пулы[p])
+        if а.top_api:
+            топ, итог["api"] = пулы_из_api(уз, "https://api.orca.so/v2/solana/pools?sortBy=volume24h&sortDirection=desc&size=50", ПРОГРАММА, а.top_api)
+            print("пулы из API:", итог["api"], flush=True)
+            for p_ in топ:
+                пулы.setdefault(p_, 0)
+        очередь = sorted(пулы, key=lambda p: -пулы[p]) if not а.top_api else [p_ for p_ in пулы if пулы[p_] == 0] + sorted((p_ for p_ in пулы if пулы[p_]), key=lambda p: -пулы[p])
         конец = time.time() + а.minut * 60
         k = 0
         while очередь and time.time() < конец and len(итог["снимки"]) < а.cel:
@@ -218,6 +268,9 @@ def main() -> int:
                 continue
             в_слоте = [з for з in уз.подписи(пул, limit=50) if з.get("slot") == след["slot"] and з.get("err") is None]
             сн.update(сделка=след["signature"], slot_сделки=т.get("slot"), транзакция=т, успешных_в_слоте_сделки=len(в_слоте))
+            if а.tolko_peresechenie and not пересёк_тик(сн, т):
+                итог["отсев"]["без пересечения тика"] = итог["отсев"].get("без пересечения тика", 0) + 1
+                continue
             итог["снимки"].append(сн)
             записать()
             print("снимок", пул[:8], len(итог["снимки"]), flush=True)

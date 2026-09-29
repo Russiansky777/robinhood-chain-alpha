@@ -203,6 +203,46 @@ def снимок_по_карте(уз, пул: str, сколько: int = 3) -> 
             "данные": {a: (x["data"][0] if x else None) for a, x in zip(адр, val2)}}
 
 
+def пересёк_тик(сн: dict, т: dict) -> bool:
+    """Своп пула в транзакции пересёк инициализированный тик (по прочитанным массивам и цене после из SwapEvent)."""
+    import podbivka_clmm_quote as Q  # noqa: PLC0415
+    ев = [e for e in события(т) if e["pool_state"] == сн["пул"]]
+    if not ев or not сн["данные"].get(сн["пул"]):
+        return False
+    pool = Q.разобрать_пул(base64.b64decode(сн["данные"][сн["пул"]]))
+    lo, hi = sorted((pool["sqrt_price_x64"], ев[0]["sqrt_price_x64"]))
+    for адр in сн["массивы"].values():
+        if сн["данные"].get(адр):
+            for тк in Q.разобрать_массив(base64.b64decode(сн["данные"][адр]))["ticks"]:
+                if (тк["liquidity_gross"] > 0 or тк["orders_amount"] or тк["part_filled_orders_remaining"]) and \
+                        lo <= Q.get_sqrt_price_at_tick(тк["tick"]) <= hi:
+                    return True
+    return False
+
+
+def пулы_из_api(уз, url: str, программа: str, сколько: int = 20) -> tuple:
+    """Адреса пулов с наибольшим оборотом из официального API; каждый проверяется по цепи: владелец счёта = программа."""
+    import re  # noqa: PLC0415
+    import requests  # noqa: PLC0415
+    try:
+        о = requests.get(url, timeout=30)
+        текст = о.text if о.status_code == 200 else ""
+        why = None if о.status_code == 200 else f"http {о.status_code}"
+    except Exception as exc:  # noqa: BLE001
+        текст, why = "", type(exc).__name__
+    канд = []
+    for a in re.findall(r'"(?:id|address|poolId|whirlpool)"\s*:\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"', текст):
+        if a not in канд:
+            канд.append(a)
+    ок = []
+    for i in range(0, min(len(канд), 60), 20):
+        r = уз.вызов("getMultipleAccounts", [канд[i:i + 20], {"encoding": "base64", "dataSlice": {"offset": 0, "length": 0}}])
+        for a, v in zip(канд[i:i + 20], (r or {}).get("value") or []):
+            if v and v.get("owner") == программа and len(ок) < сколько:
+                ок.append(a)
+    return ок, {"url": url, "кандидатов": len(канд), "проверено_по_цепи": len(ок), "why_not": why}
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--s", default="2026-09-28T06:00:00Z", help="начало окна разбора сделок источников, UTC")
@@ -210,6 +250,8 @@ def main() -> int:
     р.add_argument("--cel", type=int, default=40, help="снимков «состояние → следующий своп»")
     р.add_argument("--massivov", type=int, default=4, help="tick arrays в каждую сторону от текущего")
     р.add_argument("--minut", type=float, default=80)
+    р.add_argument("--top-api", type=int, default=0, help="добавить N пулов с наибольшим оборотом из официального API (api-v3.raydium.io)")
+    р.add_argument("--tolko-peresechenie", action="store_true", help="оставлять только снимки, где своп пересёк тик")
     р.add_argument("--po-karte", action="store_true", help="tick arrays по битовой карте пула, 3 в каждую сторону")
     р.add_argument("--puly-iz", default="", help="json прошлого сбора: пулы оттуда, часть 1 (сделки) не делать")
     р.add_argument("--metka", default="", help="суффикс файла выхода")
@@ -286,7 +328,12 @@ def main() -> int:
         итог["пулы_источников"] = пулы
         записать()
         # 3. снимки
-        очередь = sorted(пулы, key=lambda p: -пулы[p])
+        if а.top_api:
+            топ, итог["api"] = пулы_из_api(уз, "https://api-v3.raydium.io/pools/info/list?poolType=concentrated&poolSortField=volume24h&sortType=desc&pageSize=50&page=1", ПРОГРАММА, а.top_api)
+            print("пулы из API:", итог["api"], flush=True)
+            for p_ in топ:
+                пулы.setdefault(p_, 0)
+        очередь = sorted(пулы, key=lambda p: -пулы[p]) if not а.top_api else [p_ for p_ in пулы if пулы[p_] == 0] + sorted((p_ for p_ in пулы if пулы[p_]), key=lambda p: -пулы[p])
         конец = time.time() + а.minut * 60
         k = 0
         while очередь and time.time() < конец and len(итог["снимки"]) < а.cel:
@@ -315,6 +362,9 @@ def main() -> int:
             в_слоте = [з for з in уз.подписи(пул, limit=50) if з.get("slot") == след["slot"] and з.get("err") is None]
             сн.update(сделка=след["signature"], slot_сделки=т.get("slot"), транзакция=т,
                       успешных_в_слоте_сделки=len(в_слоте))
+            if а.tolko_peresechenie and not пересёк_тик(сн, т):
+                итог["отсев"]["без пересечения тика"] = итог["отсев"].get("без пересечения тика", 0) + 1
+                continue
             итог["снимки"].append(сн)
             записать()
             print("снимок", пул[:8], len(итог["снимки"]), flush=True)
