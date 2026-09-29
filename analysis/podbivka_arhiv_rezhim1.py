@@ -41,7 +41,14 @@ def ячейка(v: list) -> str:
 
 
 def main() -> int:
-    файлы = sorted(glob.glob(str(КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / "pyg3_*.json.gz")))
+    import argparse  # noqa: PLC0415
+    р = argparse.ArgumentParser()
+    р.add_argument("--prefiks", default="pyg3")
+    р.add_argument("--vyhod", default="docs/podbivka_2026-09-28_arhiv_rezhim1.md")
+    р.add_argument("--sravnimo", action="store_true",
+                   help="только сигналы от 2 SOL с котировкой SOL (сравнение прогонов с разным правилом сигнала)")
+    а = р.parse_args()
+    файлы = sorted(glob.glob(str(КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{а.prefiks}_*.json.gz")))
     сиг, видел, часы, ошибки = [], set(), 0, []
     for f in файлы:
         a = json.loads(gzip.decompress(Path(f).read_bytes()))
@@ -49,6 +56,9 @@ def main() -> int:
         ошибки += [e.split(":")[0] for e in (a.get("счёт") or {}).get("ошибки") or []]
         for с in a.get("сигналы") or []:
             if с["signature"] in видел or (с.get("модель") or {}).get("why_not"):
+                continue
+            if а.sravnimo and ((с.get("sol") or 0) < 2 or с.get("quoteMint", "So11111111111111111111111111111111111111112")
+                               != "So11111111111111111111111111111111111111112"):
                 continue
             видел.add(с["signature"])
             сиг.append(с)
@@ -135,7 +145,7 @@ def main() -> int:
     md += ["", f"Сигналов 133 за 25.09: {sum(1 for с in с133 if d25(с))}, из них нет в наших файлах: "
                f"{sum(1 for с in с133 if d25(с) and с['signature'] not in наши_sig)} (разбор 25.09 насчитал 485 пропущенных "
                "покупок от 2 SOL за SOL или доллары; здесь -- только за SOL и только первые покупки).", ""]
-    (КОРЕНЬ / "docs" / "podbivka_2026-09-28_arhiv_rezhim1.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    (КОРЕНЬ / а.vyhod).write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md[:40]))
     return 0
 
