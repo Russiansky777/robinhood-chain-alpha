@@ -13,6 +13,7 @@ S0 (сразу за ним), S0_дно (конец слота), S1; выходы
 from __future__ import annotations
 
 import argparse
+import collections
 import glob
 import gzip
 import json
@@ -44,9 +45,15 @@ def main() -> int:
                                             .read_text(encoding="utf-8")).get("снайперы") or [])
     файлы = sorted(glob.glob(str(КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{а.prefiks}_*.json.gz")))
     сиг, видел, ошибки = [], set(), []
+    пок_ист, видел_п = [], set()       # все покупки источников за WSOL (все пулы) -- для строки «что не вошло»
     for f in файлы:
         д = json.loads(gzip.decompress(Path(f).read_bytes()))
         ошибки += [e.split(":")[0] for e in (д.get("счёт") or {}).get("ошибки") or []]
+        for п in д.get("покупки_ист") or []:
+            к = (п["signature"], п["trader"], п.get("poolId"))
+            if к not in видел_п:
+                видел_п.add(к)
+                пок_ист.append(п)
         for с in д.get("сигналы") or []:
             if (с["signature"] in видел or (с.get("модель") or {}).get("why_not") or с.get("quoteMint") != WSOL
                     or с.get("по_окну") is False):
@@ -54,6 +61,13 @@ def main() -> int:
             видел.add(с["signature"])
             сиг.append(с)
     пп = lambda с, k: (с["модель"].get("пп") or {}).get(k)  # noqa: E731
+    # правило Code-1 по покупкам источников (все пулы, котировка WSOL): нет покупки того же минта в предыдущие 1800 слотов
+    пок_ист.sort(key=lambda п: п.get("block") or 0)
+    посл: dict = {}
+    for п in пок_ист:
+        кл = (п["trader"], п["mint"])
+        п["_новая"] = кл not in посл or (п.get("block") or 0) - посл[кл] > 1800
+        посл[кл] = п.get("block") or 0
     дни = sorted({Path(f).name.split("_")[1][:10] for f in файлы})
     md = ["# Подбивка: ранние выходы / билет / конец слота по группам Code-1 -- архив PumpApi", "",
           f"Прогон {а.prefiks}: суток {len(файлы)} (начала суток: {', '.join(дни)}); недочитанные часы: "
@@ -65,7 +79,12 @@ def main() -> int:
           "Ничего не рекомендуется.", ""]
     for г, (билет, порог, держим) in ЖИВЫЕ.items():
         сс_г = [с for с in сиг if с["trader"] in кошельки[г] and (с.get("sol") or 0) >= порог]
-        md += [f"## {г}: живой билет {билет}, порог {порог:g} SOL, держим {держим} слотов; сигналов {len(сс_г)}", ""]
+        по_пулам = collections.Counter(п.get("pool") for п in пок_ист
+                                       if п["trader"] in кошельки[г] and п["_новая"] and (п.get("sol") or 0) >= порог)
+        md += [f"## {г}: живой билет {билет}, порог {порог:g} SOL, держим {держим} слотов; сигналов в таблицах {len(сс_г)}", "",
+               "Все его покупки за WSOL по правилу Code-1 от порога, по пулам (модель есть только для кривой, LaunchLab, CPMM, "
+               "DAMM v1, Pump AMM; DLMM, DAMM v2, DBC -- без модели): " +
+               (", ".join(f"{k} {n}" for k, n in по_пулам.most_common()) or "нет") + ".", ""]
         for p, имя in ПУЛЫ:
             сс = [с for с in сс_г if с["pool"] == p]
             if not сс:
