@@ -327,6 +327,16 @@ jobs:
           # без файла первый сигнал DLMM после перезапуска отказывает, пока
           # фоновое чтение не доберёт счёт пула с цепи.
           [ -f data/dlmm_shag_korziny.json ] && DATA_FILES="$DATA_FILES data/dlmm_shag_korziny.json"
+          # РЕГИОНАЛЬНАЯ ОТПРАВКА: ДВА ЕЁ ФАЙЛА. Найдено 29.09 ночью, до
+          # включения флага: на хосте не было НИ ОДНОГО из них, и проверка
+          # живости точек честно ответила "адрес есть у 0 из 24 пар", а проверка
+          # карты -- "неизвестных лидеров 664 из 664, слотов у них 432 000 из
+          # 432 000". То есть с BLOOM_REGION_SEND=1 регион был бы "неизвестно"
+          # у ВСЕХ слотов и ни один адрес не сменился бы: флаг не изменил бы
+          # ничего, кроме лишнего getLeaderSchedule. Модуль ищет их как
+          # <родитель каталога кода>/data/, то есть /home/bot/data.
+          [ -f data/sender_regions.json ] && DATA_FILES="$DATA_FILES data/sender_regions.json"
+          [ -f data/leader_regions.json ] && DATA_FILES="$DATA_FILES data/leader_regions.json"
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
