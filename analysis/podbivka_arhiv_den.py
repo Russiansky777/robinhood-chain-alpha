@@ -268,157 +268,170 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     счёт_ист = 0
     for ч in часы:
         url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
-        try:
-            with requests.get(url, stream=True, timeout=120) as о:
-                if о.status_code != 200:
-                    счёт["ошибки"].append(f"{ч}: http {о.status_code}")
-                    continue
-                счёт["файлов"] += 1
-                for стр in io.TextIOWrapper(zstandard.ZstdDecompressor().stream_reader(о.raw), encoding="utf-8",
-                                            errors="replace"):
-                    счёт["строк"] += 1
-                    пм = р_pool.search(стр)
-                    pid = пм.group(1) if пм else None
-                    бм = р_block.search(стр)
-                    блок = int(бм.group(1)) if бм else None
-                    цена_до = None
-                    if pid and блок:
-                        поля = dict(р_q.findall(стр))
-                        x_ = поля.get("vQuoteInBondingCurve") or поля.get("quoteInPool")
-                        y_ = поля.get("vTokensInBondingCurve") or поля.get("tokensInPool")
+        прочитано = 0            # строк часа уже обработано: после обрыва связи час качается заново, они пропускаются
+        for попытка in range(4):
+            try:
+                with requests.get(url, stream=True, timeout=120) as о:
+                    if о.status_code != 200:
+                        счёт["ошибки"].append(f"{ч}: http {о.status_code}")
+                        break
+                    if попытка == 0:
+                        счёт["файлов"] += 1
+                    n_стр = 0
+                    for стр in io.TextIOWrapper(zstandard.ZstdDecompressor().stream_reader(о.raw), encoding="utf-8",
+                                                errors="replace"):
+                        n_стр += 1
+                        if n_стр <= прочитано:
+                            continue
+                        прочитано = n_стр
+                        счёт["строк"] += 1
+                        пм = р_pool.search(стр)
+                        pid = пм.group(1) if пм else None
+                        бм = р_block.search(стр)
+                        блок = int(бм.group(1)) if бм else None
+                        цена_до = None
+                        if pid and блок:
+                            поля = dict(р_q.findall(стр))
+                            x_ = поля.get("vQuoteInBondingCurve") or поля.get("quoteInPool")
+                            y_ = поля.get("vTokensInBondingCurve") or поля.get("tokensInPool")
+                            try:
+                                цена = float(x_) / float(y_) if x_ and y_ and float(y_) > 0 else None
+                            except ValueError:
+                                цена = None
+                            qм = р_qmint.search(стр) if (цена and не_sol) else None
+                            if qм and qм.group(1) == WSOL:
+                                мм_ = р_mint.search(стр)
+                                if мм_:
+                                    цена_sol[мм_.group(1)] = цена
+                            if цена:
+                                дк = история_цены.setdefault(pid, collections.deque())
+                                рост = None
+                                if дк:
+                                    пр_ц = дк[-1][1]
+                                    мин750 = min(c for b, c in дк)
+                                    мин150 = min((c for b, c in дк if b >= блок - 150), default=пр_ц)
+                                    рост = (round((пр_ц / мин750 - 1) * 100, 2), round((пр_ц / мин150 - 1) * 100, 2))
+                                дк.append((блок, цена))
+                                while дк and дк[0][0] < блок - НАЗАД:
+                                    дк.popleft()
+                                цена_до = рост
+                            else:
+                                цена_до = None
+                            счёт_ист += 1
+                            if счёт_ист % 2_000_000 == 0:
+                                for k in [k for k, v in история_цены.items() if not v or v[-1][0] < блок - НАЗАД]:
+                                    del история_цены[k]
+                        в_активе = pid in активные
+                        sn = р_signer.search(стр)
+                        трейдеры = set(р_trader.findall(стр))
+                        if sn:
+                            трейдеры.add(sn.group(1))
+                        наши = [t for t in трейдеры if t in адр]
+                        сг = р_sig.search(стр)
+                        цель = bool(сг and сг.group(1) in celi)
+                        мм = р_mint.search(стр) if минты else None
+                        по_минту = bool(мм and мм.group(1) in минты)
+                        if not (в_активе or наши or цель or по_минту):
+                            continue
                         try:
-                            цена = float(x_) / float(y_) if x_ and y_ and float(y_) > 0 else None
+                            e_full = json.loads(стр)
                         except ValueError:
-                            цена = None
-                        qм = р_qmint.search(стр) if (цена and не_sol) else None
-                        if qм and qм.group(1) == WSOL:
-                            мм_ = р_mint.search(стр)
-                            if мм_:
-                                цена_sol[мм_.group(1)] = цена
-                        if цена:
-                            дк = история_цены.setdefault(pid, collections.deque())
-                            рост = None
-                            if дк:
-                                пр_ц = дк[-1][1]
-                                мин750 = min(c for b, c in дк)
-                                мин150 = min((c for b, c in дк if b >= блок - 150), default=пр_ц)
-                                рост = (round((пр_ц / мин750 - 1) * 100, 2), round((пр_ц / мин150 - 1) * 100, 2))
-                            дк.append((блок, цена))
-                            while дк and дк[0][0] < блок - НАЗАД:
-                                дк.popleft()
-                            цена_до = рост
-                        else:
-                            цена_до = None
-                        счёт_ист += 1
-                        if счёт_ист % 2_000_000 == 0:
-                            for k in [k for k, v in история_цены.items() if not v or v[-1][0] < блок - НАЗАД]:
-                                del история_цены[k]
-                    в_активе = pid in активные
-                    sn = р_signer.search(стр)
-                    трейдеры = set(р_trader.findall(стр))
-                    if sn:
-                        трейдеры.add(sn.group(1))
-                    наши = [t for t in трейдеры if t in адр]
-                    сг = р_sig.search(стр)
-                    цель = bool(сг and сг.group(1) in celi)
-                    мм = р_mint.search(стр) if минты else None
-                    по_минту = bool(мм and мм.group(1) in минты)
-                    if not (в_активе or наши or цель or по_минту):
-                        continue
-                    try:
-                        e_full = json.loads(стр)
-                    except ValueError:
-                        continue
-                    e = {k: e_full.get(k) for k in КЛЮЧИ}
-                    _бд = [b.get("trader") for b in e_full.get("breakdown") or [] if isinstance(b, dict) and b.get("trader")]
-                    e["трейдер"] = _бд[0] if _бд else e.get("txSigner")      # кошелёк -- по трейдеру, не по плательщику
-                    if по_минту:
-                        ленты_минтов.setdefault(мм.group(1), []).append(
-                            {**e, "трейдеры": [b.get("trader") for b in e_full.get("breakdown") or [] if isinstance(b, dict)],
-                             "рост_до_750": цена_до[0] if цена_до else None})
-                    if цель:
-                        цели_события.append({**e, "breakdown": e_full.get("breakdown")})
-                        if pid and pid not in активные:          # ряд пула цели -- тоже в окне
-                            ряды.setdefault(pid, []).append(e)
-                            активные[pid] = (e.get("block") or 0) + окно
-                            в_активе = False
-                    if в_активе:
-                        if (e.get("block") or 0) > активные[pid]:
-                            активные.pop(pid, None)
-                        else:
-                            ряды[pid].append(e)
-                    if not наши or e.get("action") not in ("buy", "sell"):
-                        continue
-                    по_трейдеру = {b.get("trader"): b for b in e_full.get("breakdown") or [] if isinstance(b, dict)}
-                    for t in наши:
-                        b = по_трейдеру.get(t) or {}
-                        ток = float(b.get("tokenAmount") or e.get("tokenAmount") or 0)
-                        кв = float(b.get("quoteAmount") or e.get("quoteAmount") or 0)
-                        пост = ((e_full.get("postBalances") or {}).get(t) or {}).get(e.get("mint"))
-                        # первая покупка: баланс после = сумме купленного этим трейдером этого минта во всех
-                        # ногах транзакции (покупка одной транзакцией в двух пулах -- тоже первая)
-                        ключ_ноги = (e["signature"], t, e.get("mint"))
-                        if e["action"] == "buy":
-                            ноги[ключ_ноги] = ноги.get(ключ_ноги, 0.0) + ток
-                        всего_в_tx = ноги.get(ключ_ноги, ток)
-                        первая = (пост is not None and ток > 0 and abs(float(пост) - всего_в_tx) <= 0.01 * всего_в_tx)
-                        if len(ноги) > 20000:
-                            ноги.clear()
-                        q = e.get("quoteMint")
-                        курс_q = None
-                        if q == WSOL:
-                            sol = кв
-                        elif q in USD and курс((e.get("timestamp") or 0) / 1000):
-                            курс_q = 1.0 / курс((e.get("timestamp") or 0) / 1000)
-                            sol = кв * курс_q
-                        elif не_sol and цена_sol.get(q):
-                            курс_q = цена_sol[q]
-                            sol = кв * курс_q
-                        else:
-                            sol = None
-                        наши_события.append({"trader": t, "signature": e["signature"], "action": e["action"],
-                                             "pool": e.get("pool"), "poolId": pid, "mint": e.get("mint"),
-                                             "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
-                                             "первая": первая, "block": e.get("block"), "timestamp": e.get("timestamp"),
-                                             "priorityFee": e.get("priorityFee"),
-                                             "рост_до_750": цена_до[0] if цена_до else None,
-                                             "рост_до_150": цена_до[1] if цена_до else None,
-                                             "курс_q": курс_q, **резерв(e, курс_q)})
-                        if t in ист and e["action"] == "buy" and q == WSOL and pid:
-                            покупки_ист.append({"trader": t, "signature": e["signature"], "poolId": pid, "pool": e.get("pool"),
-                                                "mint": e.get("mint"), "block": e.get("block"), "timestamp": e.get("timestamp"),
-                                                "sol": sol, "первая": первая,
+                            continue
+                        e = {k: e_full.get(k) for k in КЛЮЧИ}
+                        _бд = [b.get("trader") for b in e_full.get("breakdown") or [] if isinstance(b, dict) and b.get("trader")]
+                        e["трейдер"] = _бд[0] if _бд else e.get("txSigner")      # кошелёк -- по трейдеру, не по плательщику
+                        if по_минту:
+                            ленты_минтов.setdefault(мм.group(1), []).append(
+                                {**e, "трейдеры": [b.get("trader") for b in e_full.get("breakdown") or [] if isinstance(b, dict)],
+                                 "рост_до_750": цена_до[0] if цена_до else None})
+                        if цель:
+                            цели_события.append({**e, "breakdown": e_full.get("breakdown")})
+                            if pid and pid not in активные:          # ряд пула цели -- тоже в окне
+                                ряды.setdefault(pid, []).append(e)
+                                активные[pid] = (e.get("block") or 0) + окно
+                                в_активе = False
+                        if в_активе:
+                            if (e.get("block") or 0) > активные[pid]:
+                                активные.pop(pid, None)
+                            else:
+                                ряды[pid].append(e)
+                        if not наши or e.get("action") not in ("buy", "sell"):
+                            continue
+                        по_трейдеру = {b.get("trader"): b for b in e_full.get("breakdown") or [] if isinstance(b, dict)}
+                        for t in наши:
+                            b = по_трейдеру.get(t) or {}
+                            ток = float(b.get("tokenAmount") or e.get("tokenAmount") or 0)
+                            кв = float(b.get("quoteAmount") or e.get("quoteAmount") or 0)
+                            пост = ((e_full.get("postBalances") or {}).get(t) or {}).get(e.get("mint"))
+                            # первая покупка: баланс после = сумме купленного этим трейдером этого минта во всех
+                            # ногах транзакции (покупка одной транзакцией в двух пулах -- тоже первая)
+                            ключ_ноги = (e["signature"], t, e.get("mint"))
+                            if e["action"] == "buy":
+                                ноги[ключ_ноги] = ноги.get(ключ_ноги, 0.0) + ток
+                            всего_в_tx = ноги.get(ключ_ноги, ток)
+                            первая = (пост is not None and ток > 0 and abs(float(пост) - всего_в_tx) <= 0.01 * всего_в_tx)
+                            if len(ноги) > 20000:
+                                ноги.clear()
+                            q = e.get("quoteMint")
+                            курс_q = None
+                            if q == WSOL:
+                                sol = кв
+                            elif q in USD and курс((e.get("timestamp") or 0) / 1000):
+                                курс_q = 1.0 / курс((e.get("timestamp") or 0) / 1000)
+                                sol = кв * курс_q
+                            elif не_sol and цена_sol.get(q):
+                                курс_q = цена_sol[q]
+                                sol = кв * курс_q
+                            else:
+                                sol = None
+                            наши_события.append({"trader": t, "signature": e["signature"], "action": e["action"],
+                                                 "pool": e.get("pool"), "poolId": pid, "mint": e.get("mint"),
+                                                 "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
+                                                 "первая": первая, "block": e.get("block"), "timestamp": e.get("timestamp"),
+                                                 "priorityFee": e.get("priorityFee"),
+                                                 "рост_до_750": цена_до[0] if цена_до else None,
+                                                 "рост_до_150": цена_до[1] if цена_до else None,
+                                                 "курс_q": курс_q, **резерв(e, курс_q)})
+                            if t in ист and e["action"] == "buy" and q == WSOL and pid:
+                                покупки_ист.append({"trader": t, "signature": e["signature"], "poolId": pid, "pool": e.get("pool"),
+                                                    "mint": e.get("mint"), "block": e.get("block"), "timestamp": e.get("timestamp"),
+                                                    "sol": sol, "первая": первая,
+                                                    "рост_до_750": цена_до[0] if цена_до else None,
+                                                    "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, 1.0)})
+                                if pid not in активные:
+                                    ряды.setdefault(pid, [])
+                                    if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
+                                        ряды[pid].append(e)
+                                активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
+                            порог_t = porog_доп if (t in ист and porog_доп is not None) else porog
+                            по_окну = None
+                            if окно_докупки and t in ист and e["action"] == "buy":
+                                кл = (t, e.get("mint"))
+                                пред = последняя_пок.get(кл)
+                                по_окну = пред is None or (e.get("block") or 0) - пред > окно_докупки
+                                последняя_пок[кл] = e.get("block") or 0
+                            новый = по_окну if по_окну is not None else первая
+                            if (e["action"] == "buy" and новый and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
+                                    and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
+                                сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
+                                                "первая": первая, "по_окну": по_окну,
+                                                "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
+                                                "sol": sol, "timestamp": e.get("timestamp"),
+                                                "quoteMint": q, "курс_q": курс_q,
                                                 "рост_до_750": цена_до[0] if цена_до else None,
-                                                "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, 1.0)})
-                            if pid not in активные:
-                                ряды.setdefault(pid, [])
-                                if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
-                                    ряды[pid].append(e)
-                            активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
-                        порог_t = porog_доп if (t in ист and porog_доп is not None) else porog
-                        по_окну = None
-                        if окно_докупки and t in ист and e["action"] == "buy":
-                            кл = (t, e.get("mint"))
-                            пред = последняя_пок.get(кл)
-                            по_окну = пред is None or (e.get("block") or 0) - пред > окно_докупки
-                            последняя_пок[кл] = e.get("block") or 0
-                        новый = по_окну if по_окну is not None else первая
-                        if (e["action"] == "buy" and новый and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
-                                and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
-                            сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
-                                            "первая": первая, "по_окну": по_окну,
-                                            "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
-                                            "sol": sol, "timestamp": e.get("timestamp"),
-                                            "quoteMint": q, "курс_q": курс_q,
-                                            "рост_до_750": цена_до[0] if цена_до else None,
-                                            "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, курс_q)})
-                            if pid not in активные:
-                                ряды.setdefault(pid, [])
-                                if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
-                                    ряды[pid].append(e)
-                            активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
-        except Exception as exc:  # noqa: BLE001
-            счёт["ошибки"].append(f"{ч}: {type(exc).__name__}: {str(exc)[:100]}")
+                                                "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, курс_q)})
+                                if pid not in активные:
+                                    ряды.setdefault(pid, [])
+                                    if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
+                                        ряды[pid].append(e)
+                                активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
+                break
+            except Exception as exc:  # noqa: BLE001
+                if попытка == 3:
+                    счёт["ошибки"].append(f"{ч}: {type(exc).__name__}: {str(exc)[:100]}")
+                else:
+                    счёт.setdefault("докачки", []).append(f"{ч}: после {прочитано} строк: {type(exc).__name__}")
+                    time.sleep(5 * (попытка + 1))
         print(f"{ч}: строк всего {счёт['строк']}, наших событий {len(наши_события)}, сигналов {len(сигналы)}, "
               f"активных пулов {len(активные)}", flush=True)
     for с in сигналы:
