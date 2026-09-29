@@ -75,7 +75,7 @@ def main() -> int:
         if not сд.get("слот_покупки") or not сд.get("подпись_покупки"):
             рез.append({"подпись_покупки": сд.get("подпись_покупки"), "why_not": "нет слота покупки"})
             continue
-        with уз.на(S.узел_по_времени(None)):
+        with уз.на("helius"):          # Shyft getBlock отдаёт блок без транзакций v1 (проверено 29.09)
             try:
                 рез.append(одна(уз, сд))
             except RuntimeError as exc:

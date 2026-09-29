@@ -37,7 +37,7 @@ def main() -> int:
         по_слоту.setdefault(с["slot"], []).append(с)
     рез, ошибки = [], []
     for n, (слот, сс) in enumerate(sorted(по_слоту.items())):
-        with уз.на(S.узел_по_времени(сс[0].get("blockTime"))):
+        with уз.на("helius"):          # Shyft getBlock отдаёт блок без транзакций v1 (проверено 29.09)
             try:
                 б = уз.вызов("getBlock", [слот, {"encoding": "jsonParsed", "transactionDetails": "accounts",
                                                  "rewards": False, "maxSupportedTransactionVersion": 1,
