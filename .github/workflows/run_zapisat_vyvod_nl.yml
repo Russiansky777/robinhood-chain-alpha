@@ -67,7 +67,7 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zapisat_vyvod_vladelca.py" < deploy/checks/zapisat_vyvod_vladelca.py
           ZAP=""
           [ "${{ inputs.zapisat }}" = "yes" ] && ZAP="--zapisat"

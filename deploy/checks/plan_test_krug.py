@@ -383,9 +383,17 @@ def main() -> int:
         итог = {"файл": путь, "план": {к: v for к, v in п.items()
                                         if к != "новые_группы"},
                  "проверка": пр, "замки": зм, "команда": КОМАНДА}
-        with open(а.out, "w", encoding="utf-8") as ф:
-            json.dump(итог, ф, ensure_ascii=False, indent=1)
-        print("записано:", а.out)
+        # ЗАПИСЬ ОТЧЁТА НЕ ДОЛЖНА РОНЯТЬ ПРОГОН. 03:11:29Z прогон посчитал всё
+        # верно, но упал на записи: файл out.json остался от прежнего прогона
+        # и принадлежал root, а этот шёл под bot. Числа уже напечатаны, и
+        # терять их из-за прав на файл незачем -- говорим, почему не записали.
+        try:
+            with open(а.out, "w", encoding="utf-8") as ф:
+                json.dump(итог, ф, ensure_ascii=False, indent=1)
+            print("записано:", а.out)
+        except OSError as exc:
+            print(f"ОТЧЁТ НЕ ЗАПИСАН в {а.out}: {type(exc).__name__}: "
+                  f"{str(exc)[:160]}")
     return 0 if пр["ok"] else 1
 
 

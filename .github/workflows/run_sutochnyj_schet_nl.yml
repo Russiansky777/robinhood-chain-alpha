@@ -60,7 +60,7 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/sutochnyj_schet_polosy.py" < deploy/checks/sutochnyj_schet_polosy.py
           ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/sutochnyj_schet_polosy.py --state-dir $STATE_DIR --podpisej '${{ inputs.podpisej }}' --out $RABOTA/out.json" | tail -60
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/sutochnyj_schet.json || true
