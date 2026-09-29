@@ -286,6 +286,8 @@ def режим_цепи(а) -> int:
     for кошелёк in sorted(вх.get("wallets") or {}):
         всего_счетов = 0
         лампортов = 0
+        ренты_лампортов = 0
+        завёрнуто_лампортов = 0
         пустых = 0
         for программа in ("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
                           "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"):
@@ -294,15 +296,33 @@ def режим_цепи(а) -> int:
                              {"encoding": "jsonParsed"}])
             for счёт in ((рез or {}).get("value") or []):
                 всего_счетов += 1
-                лампортов += int(счёт.get("account", {}).get("lamports") or 0)
+                л = int(счёт.get("account", {}).get("lamports") or 0)
+                лампортов += л
                 инфо = (((счёт.get("account") or {}).get("data") or {})
                         .get("parsed", {}).get("info", {}))
                 сумма = ((инфо.get("tokenAmount") or {}).get("amount")) or "0"
                 if сумма == "0":
                     пустых += 1
+                # СЧЁТ WSOL: его лампорты -- рента ПЛЮС завёрнутый SOL. Назвать
+                # всё это рентой значит посчитать завёрнутое дважды: те же
+                # лампорты приходят вторым разом нативным возвратом при
+                # закрытии счёта. Признак isNative и запас ренты даёт узел.
+                if инфо.get("isNative"):
+                    try:
+                        р = int(инфо.get("rentExemptReserve"))
+                    except (TypeError, ValueError):
+                        р = max(0, л - int(сумма))
+                    р = max(0, min(р, л))
+                    ренты_лампортов += р
+                    завёрнуто_лампортов += л - р
+                else:
+                    ренты_лампортов += л
         рента[кошелёк] = {"token_accounts": всего_счетов,
                           "lamports": лампортов,
                           "sol": round(лампортов / ЛАМПОРТОВ_В_SOL, 9),
+                          "renta_sol": round(ренты_лампортов / ЛАМПОРТОВ_В_SOL, 9),
+                          "zavernuto_sol": round(
+                              завёрнуто_лампортов / ЛАМПОРТОВ_В_SOL, 9),
                           "pustyh": пустых,
                           "sol_v_pustyh_po_rente": round(
                               пустых * РЕНТА_ТОКЕН_СЧЁТА_ЛАМПОРТЫ
@@ -405,8 +425,15 @@ def режим_цепи(а) -> int:
         "iz_zhurnala": {к: v for к, v in вх.items()
                         if к != "obrazets_neschitaemyh"},
         "chislo_3_renta_po_koshelkam": рента,
-        "chislo_3_renta_vsego_sol": round(
+        # Всего на счетах -- прежнее число (лампорты счетов целиком), и рядом
+        # два его куска: рента и завёрнутый SOL. Завёрнутое рентой не
+        # называется: оно вернётся нативно при закрытии счёта.
+        "chislo_3_na_schetah_vsego_sol": round(
             sum(з["sol"] for з in рента.values()), 9),
+        "chislo_3_renta_vsego_sol": round(
+            sum(з["renta_sol"] for з in рента.values()), 9),
+        "chislo_3_zavernuto_vsego_sol": round(
+            sum(з["zavernuto_sol"] for з in рента.values()), 9),
         "neschitaemye_po_cepi": разобрано,
         "neschitaemye_s_chislom": с_числом,
         "neschitaemye_sredniy_itog_sol": (round(сумма_итогов / с_числом, 9)

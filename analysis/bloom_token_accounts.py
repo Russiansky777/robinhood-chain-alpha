@@ -49,6 +49,23 @@ def счета(helius, кошелёк: str) -> dict:
             данные = (((z.get("account") or {}).get("data") or {}).get("parsed")
                        or {}).get("info") or {}
             сумма = (данные.get("tokenAmount") or {})
+            лампорты = int((z.get("account") or {}).get("lamports", 0) or 0)
+            # СЧЁТ WSOL: его lamports -- это рента ПЛЮС завёрнутый SOL. Считать
+            # их рентой целиком значит задвоить завёрнутые деньги: те же самые
+            # лампорты приходят вторым разом нативным возвратом при закрытии
+            # счёта. Признак isNative и rentExemptReserve узел отдаёт сам.
+            свой = bool(данные.get("isNative"))
+            запас = данные.get("rentExemptReserve")
+            if свой:
+                try:
+                    рента_л = int(запас)
+                except (TypeError, ValueError):
+                    # Запаса в ответе нет -- завёрнутое берём из остатка счёта:
+                    # у WSOL остаток и есть лампорты.
+                    рента_л = max(0, лампорты - int(сумма.get("amount") or 0))
+            else:
+                рента_л = лампорты
+            рента_л = max(0, min(рента_л, лампорты))
             строки.append({
                 "account": счёт,
                 "mint": данные.get("mint"),
@@ -56,7 +73,10 @@ def счета(helius, кошелёк: str) -> dict:
                 "amount_ui": сумма.get("uiAmount"),
                 "amount_raw": сумма.get("amount"),
                 "decimals": сумма.get("decimals"),
-                "rent_sol": round((z.get("account") or {}).get("lamports", 0) / ЛАМПОРТ, 9),
+                "is_native": свой,
+                "lamports": лампорты,
+                "rent_sol": round(рента_л / ЛАМПОРТ, 9),
+                "wrapped_sol": round((лампорты - рента_л) / ЛАМПОРТ, 9),
             })
     пустые = [x for x in строки if not float(x.get("amount_raw") or 0)]
     с_остатком = [x for x in строки if float(x.get("amount_raw") or 0)]
@@ -68,12 +88,19 @@ def счета(helius, кошелёк: str) -> dict:
         "with_balance_count": len(с_остатком),
         "rent_locked_sol": round(sum(x["rent_sol"] for x in строки), 9),
         "rent_locked_in_empty_sol": round(sum(x["rent_sol"] for x in пустые), 9),
+        # Завёрнутый SOL считается ОТДЕЛЬНО от ренты и в неё не входит: он
+        # вернётся нативно при закрытии счёта, и складывать его с рентой
+        # значит посчитать одни и те же лампорты дважды.
+        "wrapped_sol": round(sum(x["wrapped_sol"] for x in строки), 9),
+        "wsol_accounts": [x for x in строки if x["is_native"]],
         "empty": пустые,
         "with_balance": с_остатком,
         "failures": отказы,
         "note": ("рента в ПУСТЫХ счетах заперта зря: продажа прошла, счёт не "
                   "закрыт. Вернуть её можно только закрытием счёта, и это "
-                  "транзакция кошелька -- здесь она НЕ делается"),
+                  "транзакция кошелька -- здесь она НЕ делается. У счёта WSOL "
+                  "рента и завёрнутый SOL разделены: в rent_sol только рента, "
+                  "завёрнутое в wrapped_sol"),
     }
 
 
@@ -88,10 +115,15 @@ def self_test() -> None:
         else:
             print(f"  [ПЛОХО] {имя} -- {факт}")
 
-    def счёт(pk, минт, raw, lamports=2039280):
+    def счёт(pk, минт, raw, lamports=2039280, свой=False, запас=None):
+        инфо = {"mint": минт, "tokenAmount": {"amount": str(raw), "decimals": 6,
+                                               "uiAmount": raw / 1e6}}
+        if свой:
+            инфо["isNative"] = True
+            if запас is not None:
+                инфо["rentExemptReserve"] = str(запас)
         return {"pubkey": pk, "account": {"lamports": lamports, "data": {"parsed": {
-            "info": {"mint": минт, "tokenAmount": {"amount": str(raw), "decimals": 6,
-                                                    "uiAmount": raw / 1e6}}}}}}
+            "info": инфо}}}}
 
     class HeliusЗаглушка:
         def __init__(self, по_программам, падать=False):
@@ -117,6 +149,36 @@ def self_test() -> None:
     chk("пыль видна с минтом и остатком",
         r["with_balance"][0]["mint"] == "МИНТ2"
         and r["with_balance"][0]["amount_ui"] == 0.012345, r["with_balance"])
+
+    # ЗАДВОЕНИЕ WSOL. Счёт WSOL на 0.1 SOL держит 0.102039280 лампортов: рента
+    # плюс завёрнутое. Прежний код звал всё это рентой, и те же лампорты второй
+    # раз приходили нативным возвратом при закрытии счёта.
+    WSOL = "So11111111111111111111111111111111111111112"
+    hw = HeliusЗаглушка({ПРОГРАММЫ[0]: [
+        счёт("W", WSOL, 100_000_000, lamports=102_039_280, свой=True, запас=2_039_280),
+        счёт("D", "МИНТ9", 0)]})
+    rw = счета(hw, "КОШ")
+    chk("у счёта WSOL рента без завёрнутого",
+        abs(rw["accounts"][0]["rent_sol"] - 0.00203928) < 1e-12, rw["accounts"][0])
+    chk("завёрнутое названо отдельно",
+        abs(rw["accounts"][0]["wrapped_sol"] - 0.1) < 1e-12, rw["accounts"][0])
+    chk("итог ренты не включает завёрнутое",
+        abs(rw["rent_locked_sol"] - 0.00407856) < 1e-12
+        and abs(rw["wrapped_sol"] - 0.1) < 1e-12,
+        (rw["rent_locked_sol"], rw["wrapped_sol"]))
+    chk("счёт WSOL c остатком не попал в пустые",
+        rw["empty_count"] == 1 and rw["empty"][0]["account"] == "D", rw["empty"])
+    # Без rentExemptReserve в ответе завёрнутое берётся из остатка счёта.
+    hb = HeliusЗаглушка({ПРОГРАММЫ[0]: [
+        счёт("W2", WSOL, 100_000_000, lamports=102_039_280, свой=True)]})
+    rb = счета(hb, "КОШ")
+    chk("без запаса ренты завёрнутое считается по остатку",
+        abs(rb["accounts"][0]["rent_sol"] - 0.00203928) < 1e-12
+        and abs(rb["accounts"][0]["wrapped_sol"] - 0.1) < 1e-12, rb["accounts"][0])
+    # Обычный токен-счёт не трогаем: вся его рента остаётся рентой.
+    chk("у обычного счёта завёрнутого нет",
+        r["accounts"][0]["wrapped_sol"] == 0.0
+        and abs(r["accounts"][0]["rent_sol"] - 0.00203928) < 1e-12, r["accounts"][0])
 
     r2 = счета(HeliusЗаглушка({}, падать=True), "КОШ")
     chk("отказ узла -- причина, а не пустота",
