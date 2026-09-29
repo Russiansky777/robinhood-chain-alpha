@@ -4832,6 +4832,14 @@ class Детектор:
             if натив.get("ok"):
                 поля["lane_buy_native_sol"] = натив["native_sol"]
                 поля["lane_buy_fee_sol"] = натив["fee_sol"]
+                # ЧТО ОСЕЛО НА НОВЫХ СЧЕТАХ -- ДВУМЯ ИМЕНАМИ. Без них остаток
+                # нативной дельты оставался безымянным, и разложение итога
+                # упиралось в "прочее".
+                if натив.get("rent_sol") is not None:
+                    поля["lane_buy_rent_sol"] = натив["rent_sol"]
+                    поля["lane_buy_wrapped_sol"] = натив["wrapped_sol"]
+                elif натив.get("rent_why_not"):
+                    поля["lane_buy_rent_why_not"] = натив["rent_why_not"]
             if куплено.get("ok"):
                 поля["lane_bought_raw"] = куплено["raw"]
                 поля["chain_ok"] = True

@@ -1660,6 +1660,14 @@ class Seller:
             self.state.update_position(
                 cid, lane_buy_native_sol=натив["native_sol"],
                 lane_buy_fee_sol=натив["fee_sol"],
+                # Те же два имени, что и у догона детектора: рента и завёрнутое
+                # на СОЗДАННЫХ покупкой счетах. None не пишем -- пусть поля
+                # просто не будет, чем ноль вместо незнания.
+                **({"lane_buy_rent_sol": натив["rent_sol"],
+                     "lane_buy_wrapped_sol": натив["wrapped_sol"]}
+                    if натив.get("rent_sol") is not None else
+                    ({"lane_buy_rent_why_not": натив["rent_why_not"]}
+                     if натив.get("rent_why_not") else {})),
                 lane_buy_native_from="seller_before_close",
                 lane_landed_signature=подпись)
             из_.update(filled=True, why_not=None, signature=подпись,
