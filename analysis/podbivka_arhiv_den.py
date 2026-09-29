@@ -52,7 +52,7 @@ WSOL = "So11111111111111111111111111111111111111112"
 USD = {"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"}
 XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 КРИВЫЕ = {"pump", "raydium-launchpad"}
-ВЫХОДЫ = (6, 12, 24, 36, 72, 150)
+ВЫХОДЫ = (6, 12, 24, 36, 72, 108, 150)   # 108 -- удержание живой полосы lane_s0
 БИЛЕТЫ = (0.3, 0.5)
 ИЗДЕРЖКИ = 0.002
 КЛЮЧИ = ("signature", "action", "pool", "poolId", "mint", "quoteMint", "txSigner", "tokenAmount", "quoteAmount",
@@ -196,8 +196,13 @@ def удержание(покупка: dict, ряд: list, окно: int = 150) 
     p0 = x0 / y0
     пр05 = пр_любая = None
     пик, пик_слот = p0, s0
+    t0 = ряд[i0].get("timestamp") or 0
+    секунд: dict = {}           # секунд от покупки до первого события пула на слоте ≥ s0+h (метки архива)
     for e in ряд[i0 + 1:]:
         b = e.get("block") or 0
+        for h in (72, 108, 150):
+            if h not in секунд and b >= s0 + h and e.get("timestamp") and t0:
+                секунд[h] = round((e["timestamp"] - t0) / 1000, 2)
         if b > s0 + окно:
             break
         с_ = ст(e)
@@ -209,7 +214,8 @@ def удержание(покупка: dict, ряд: list, окно: int = 150) 
             if пр05 is None and float(e.get("quoteAmount") or 0) * курс_q >= 0.5:
                 пр05 = b - s0
     return {"первая_продажа_05_слотов": пр05, "первая_продажа_слотов": пр_любая,
-            "пик_слотов": пик_слот - s0, "пик_пп": round((пик / p0 - 1) * 100, 2)}
+            "пик_слотов": пик_слот - s0, "пик_пп": round((пик / p0 - 1) * 100, 2),
+            "секунд_до": {str(h): v for h, v in секунд.items()}}
 
 
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,

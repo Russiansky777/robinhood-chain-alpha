@@ -53,7 +53,7 @@ def строка(имя: str, пп: list) -> str:
 
 def main() -> int:
     р = argparse.ArgumentParser()
-    р.add_argument("--prefiks", default="pyg5")
+    р.add_argument("--prefiks", default="pyg6")
     а = р.parse_args()
     файлы = sorted(glob.glob(str(КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{а.prefiks}_*.json.gz")))
     пок, видел, ошибки = [], set(), []
