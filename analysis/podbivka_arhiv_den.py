@@ -27,7 +27,9 @@
     слота s0 (порядок внутри слота -- порядок файла, timestamp мс; оценка);
     S1 -- после последнего события слота s0+1;
   * выход +H -- состояние после последнего события со слотом <= s0+H−1, наша
-    покупка вставлена (потолок); билеты 0.3 и 0.5 SOL, минус 0.002 SOL на круг;
+    покупка вставлена (потолок); билеты --bilety (0.3 и 0.5 SOL; pyg9 -- ещё 1 и 3), минус 0.002 SOL на круг;
+  * резерв пула после события (quoteInPool / vQuoteInBondingCurve и в SOL-экв.) -- у событий наших адресов,
+    сигналов и покупок источников (pyg9);
   * налог Token-2022 не учтён (флаг).
 Выход: data/podbivka/arhiv_den/<метка>.json.
 """
@@ -68,6 +70,20 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 р_qmint = re.compile(r'"quoteMint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_mint = re.compile(r'"mint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_trader = re.compile(r'"trader":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
+
+
+def резерв(e: dict, курс_q: float | None) -> dict:
+    """Резерв котировки пула ПОСЛЕ события (поля архива): quoteInPool -- настоящий (AMM; у кривой -- если есть),
+    vQuoteInBondingCurve -- виртуальный кривой; и в SOL-экв. по курсу котировки события (SOL -- 1)."""
+    def ч(k):
+        try:
+            return float(e.get(k)) if e.get(k) not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+    x, vx = ч("quoteInPool"), ч("vQuoteInBondingCurve")
+    к = 1.0 if e.get("quoteMint") == WSOL else курс_q
+    return {"резерв_q": x, "вирт_резерв_q": vx, "резерв_sol": round(x * к, 4) if (x is not None and к) else None,
+            "вирт_резерв_sol": round(vx * к, 4) if (vx is not None and к) else None}
 
 
 def курс(ts):
@@ -366,13 +382,14 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                              "первая": первая, "block": e.get("block"), "timestamp": e.get("timestamp"),
                                              "priorityFee": e.get("priorityFee"),
                                              "рост_до_750": цена_до[0] if цена_до else None,
-                                             "рост_до_150": цена_до[1] if цена_до else None})
+                                             "рост_до_150": цена_до[1] if цена_до else None,
+                                             "курс_q": курс_q, **резерв(e, курс_q)})
                         if t in ист and e["action"] == "buy" and q == WSOL and pid:
                             покупки_ист.append({"trader": t, "signature": e["signature"], "poolId": pid, "pool": e.get("pool"),
                                                 "mint": e.get("mint"), "block": e.get("block"), "timestamp": e.get("timestamp"),
                                                 "sol": sol, "первая": первая,
                                                 "рост_до_750": цена_до[0] if цена_до else None,
-                                                "рост_до_150": цена_до[1] if цена_до else None})
+                                                "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, 1.0)})
                             if pid not in активные:
                                 ряды.setdefault(pid, [])
                                 if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
@@ -394,7 +411,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                             "sol": sol, "timestamp": e.get("timestamp"),
                                             "quoteMint": q, "курс_q": курс_q,
                                             "рост_до_750": цена_до[0] if цена_до else None,
-                                            "рост_до_150": цена_до[1] if цена_до else None})
+                                            "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, курс_q)})
                             if pid not in активные:
                                 ряды.setdefault(pid, [])
                                 if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
@@ -462,9 +479,12 @@ def main() -> int:
     р.add_argument("--minty", default="", help="через запятую: минты, все события которых пишутся целиком")
     р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
     р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
+    р.add_argument("--bilety", default="0.3,0.5", help="билеты модели, SOL, через запятую (pyg9: 0.3,0.5,1,3)")
     р.add_argument("--okno-dokupki", type=int, default=None,
                    help="для --istochniki сигнал по правилу Code-1: нет покупки того же минта в предыдущие N слотов (1800)")
     а = р.parse_args()
+    global БИЛЕТЫ  # noqa: PLW0603
+    БИЛЕТЫ = tuple(float(x) for x in а.bilety.split(",") if x.strip())
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
