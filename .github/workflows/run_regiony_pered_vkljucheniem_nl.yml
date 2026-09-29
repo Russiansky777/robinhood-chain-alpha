@@ -89,7 +89,8 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY_CHECKS=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY_CHECKS; fi
-            cd $CODE_DIR && $VENV/python $RABOTA/svezhest_karty_regionov.py \
+            cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python \
+              $RABOTA/svezhest_karty_regionov.py \
               --karta $CODE_DIR/data/leader_regions.json \
               --out $RABOTA/karta.json $STROGO" | tail -30
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/karta.json 2>/dev/null || true" > /tmp/karta.json || true
@@ -104,8 +105,12 @@ jobs:
         run: |
           set -e
           set -o pipefail
+          # PYTHONPATH ОБЯЗАТЕЛЕН: проверка спрашивает адрес у bloom_region_send,
+          # то есть у модуля СЛУЖБЫ, а он лежит в каталоге кода. Без этого
+          # прогон падал на ModuleNotFoundError (20:08:31Z).
           ssh -n $SSH_OPTS root@$TARGET_HOST "
-            cd $CODE_DIR && $VENV/python $RABOTA/zhivy_li_regionalnye_tochki.py \
+            cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python \
+              $RABOTA/zhivy_li_regionalnye_tochki.py \
               --out $RABOTA/tochki.json" | tail -40
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/tochki.json 2>/dev/null || true" > /tmp/tochki.json || true
           if python3 -c "import json; json.load(open('/tmp/tochki.json'))" 2>/dev/null; then
