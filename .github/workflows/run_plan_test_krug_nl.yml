@@ -9,6 +9,10 @@ name: "План утреннего круга 0.01: составить и про
 on:
   workflow_dispatch:
     inputs:
+      rezhim:
+        description: "pokazat -- только читать (по умолчанию); primenit -- записать файл групп на время круга; otkatit -- вернуть как было"
+        required: false
+        default: "pokazat"
       otkuda:
         description: "чьи источники берём в круг"
         required: false
@@ -62,7 +66,7 @@ jobs:
           # состояние по умолчанию: он напечатал "ОБА ЗАМКА СНЯТЫ: True", тогда
           # как в живом признаке жизни стоят оба, и порог суток взялся 0.5
           # вместо боевых 1.5. Читать замки можно только из живого состояния.
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/plan_test_krug.py --otkuda '${{ inputs.otkuda }}' --out $RABOTA/out.json" | tail -70
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/plan_test_krug.py --otkuda '${{ inputs.otkuda }}' --rezhim '${{ inputs.rezhim }}' --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/plan_test_krug.json || true
           if python3 -c "import json; json.load(open('/tmp/plan_test_krug.json'))" 2>/dev/null; then
             cp /tmp/plan_test_krug.json "$OUT_FILE"
