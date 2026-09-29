@@ -210,13 +210,15 @@ def main() -> int:
     р.add_argument("--s", type=int, default=0)
     р.add_argument("--po", type=int, default=0)
     р.add_argument("--push", action="store_true")
+    р.add_argument("--uzel", choices=("helius", "shyft"), default=None,
+                   help="принудительный узел (29.09: Shyft getBlock отдаёт блок без транзакций v1)")
     а = р.parse_args()
     if а.spisok:
         return собрать_список()
     имя_списка = "postobr_spisok_m7.json" if а.rezhim == "m7" else "postobr_spisok.json"
     спис = json.loads((КОРЕНЬ / "data" / "podbivka" / имя_списка).read_text(encoding="utf-8"))[а.rezhim]
     спис = спис[а.s:(а.po or None)]
-    out = КОРЕНЬ / "data" / "podbivka" / "postobr" / f"{а.rezhim}_{а.s}_{а.po or 'end'}.jsonl"
+    out = КОРЕНЬ / "data" / "podbivka" / "postobr" / f"{а.rezhim}_{а.s}_{а.po or 'end'}{'_' + а.uzel if а.uzel else ''}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
     уз = S.Узел()
     последний = time.time()
@@ -233,7 +235,7 @@ def main() -> int:
         for н, п in enumerate(спис):
             if п["signature"] in готово:
                 continue
-            with уз.на(S.узел_по_времени(п.get("blockTime"))):
+            with уз.на(а.uzel or S.узел_по_времени(п.get("blockTime"))):
                 try:
                     if а.rezhim == "m4":
                         рез = S._симулировать(уз, п, горизонты=S.ГОРИЗОНТЫ_ДОП, доп=True)  # noqa: SLF001
@@ -249,7 +251,7 @@ def main() -> int:
                 except Exception as exc:  # noqa: BLE001
                     рез = {"why_not": S.чисто(f"{type(exc).__name__}: {exc}")[:160]}
             уз._кэш.clear()  # noqa: SLF001
-            рез.update(signature=п["signature"], wallet=п["wallet"], узел=S.узел_по_времени(п.get("blockTime")))
+            рез.update(signature=п["signature"], wallet=п["wallet"], узел=а.uzel or S.узел_по_времени(п.get("blockTime")))
             ф.write(json.dumps(рез, ensure_ascii=False) + "\n")
             ф.flush()
             if а.push and time.time() - последний > 600:
