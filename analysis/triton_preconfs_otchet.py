@@ -393,7 +393,7 @@ def _счёт(ряд: list) -> dict:
 
 
 def лидеры_фида(преконфы: dict, карта: dict, расписание_: dict,
-                 метки: dict | None = None) -> dict:
+                 метки: dict | None = None, версии: dict | None = None) -> dict:
     """Личности лидеров слотов, по которым фид отдал ХОТЬ ЧТО-ТО.
 
     Спрос владельца 28.09 (после закрытия Harmonic): список личностей и их доля
@@ -417,7 +417,8 @@ def лидеры_фида(преконфы: dict, карта: dict, распис
         стр = гр.setdefault(лидер, {"identity": лидер, "soobshchenij": 0,
                                       "slotov_fida": set(),
                                       "slotov_epohi": len((расписание_ or {}).get(лидер) or []),
-                                      "metka_po_versii": (метки or {}).get(лидер)})
+                                      "metka_po_versii": (метки or {}).get(лидер),
+                                      "versiya": (версии or {}).get(лидер)})
         стр["soobshchenij"] += 1
         стр["slotov_fida"].add(int(слот))
     из_: dict = {"slotov_v_epohe": всего_слотов,
@@ -431,7 +432,8 @@ def лидеры_фида(преконфы: dict, карта: dict, распис
                          "slotov_epohi": стр["slotov_epohi"],
                          "dolya_epohi": (round(стр["slotov_epohi"] / всего_слотов, 6)
                                           if всего_слотов else None),
-                         "metka_po_versii": стр["metka_po_versii"]})
+                         "metka_po_versii": стр["metka_po_versii"],
+                         "versiya": стр.get("versiya")})
         ряд.sort(key=lambda з: -з["slotov_epohi"])
         сумма = sum(з["slotov_epohi"] for з in ряд)
         из_["po_fidam"][ф] = {
@@ -439,8 +441,42 @@ def лидеры_фида(преконфы: dict, карта: dict, распис
             "slotov_epohi_u_nih": сумма,
             "dolya_epohi_vmeste": (round(сумма / всего_слотов, 6)
                                     if всего_слотов else None),
+            # ПРАВИЛО "ВЕРСИЯ -> КЛИЕНТ" ВЫВОДИТСЯ ЗДЕСЬ, из данных: какие
+            # строки версий стоят у лидеров ЭТОГО фида и сколько слотов эпохи
+            # за каждой. Имени клиента в getClusterNodes нет вовсе, поэтому
+            # правило -- это наблюдение, а не справочник: строка версии,
+            # встречающаяся у лидеров фида и не встречающаяся у другого,
+            # и есть признак его клиента.
+            "po_versiyam": _по_версиям_лидеров(ряд),
             "lidery": ряд}
+    # ЧЕЙ ПРИЗНАК ОДНОЗНАЧЕН. Версия, которая есть у лидеров одного фида и
+    # отсутствует у другого, годится как правило; общая -- не годится, и это
+    # сказано словом, а не умолчанием.
+    фиды = sorted(из_["po_fidam"])
+    if len(фиды) == 2:
+        а_, б_ = фиды
+        va = set((из_["po_fidam"][а_].get("po_versiyam") or {}))
+        vb = set((из_["po_fidam"][б_].get("po_versiyam") or {}))
+        из_["pravilo_versiya_klient"] = {
+            f"tolko_{а_}": sorted(va - vb),
+            f"tolko_{б_}": sorted(vb - va),
+            "obshchie": sorted(va & vb),
+            "chto_eto": ("версия из tolko_<фид> встречается у лидеров только "
+                          "этого фида -- её и можно ставить в правило; "
+                          "obshchie как признак не годятся"),
+        }
     return из_
+
+
+def _по_версиям_лидеров(ряд: list) -> dict:
+    """Версия -> сколько лидеров фида и сколько слотов эпохи за ними."""
+    из2: dict = {}
+    for з in ряд or []:
+        в = з.get("versiya") or "версия не прочитана"
+        гр = из2.setdefault(в, {"liderov": 0, "slotov_epohi": 0})
+        гр["liderov"] += 1
+        гр["slotov_epohi"] += int(з.get("slotov_epohi") or 0)
+    return dict(sorted(из2.items(), key=lambda т: -т[1]["slotov_epohi"]))
 
 
 def проверка_фильтра(*, журналы: list, адреса: list, окно_s: float = 600.0,
@@ -615,7 +651,8 @@ def main() -> int:
         первый = сн.get("firstSlot")
         карта = (TV.карта_слотов(расп, первый)
                  if расп and первый is not None else {})
-        итог_ = лидеры_фида(пре, карта, расп or {}, сн.get("metki") or {})
+        итог_ = лидеры_фида(пре, карта, расп or {}, сн.get("metki") or {},
+                             сн.get("versii_uzlov") or {})
         итог_["epoch"] = сн.get("epoch")
         итог_["prekonfov"] = len(пре)
         текст_ = json.dumps(итог_, ensure_ascii=False, indent=1)
