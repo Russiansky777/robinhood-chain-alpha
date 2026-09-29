@@ -1,0 +1,116 @@
+name: "NL-хост: окна прогонов Actions против минут сделок (только чтение)"
+
+# ЗАЧЕМ (слово владельца 29.09 ночью, п.5): "были ли проверки на хосте в минуты
+# сделок". Раннер Actions живёт НА ТОМ ЖЕ хосте, что торгующие службы
+# (TARGET_HOST=127.0.0.1), и каждая проверка занимает те же два ядра.
+#
+# Два прежних ответа оба косвенные: время коммита -- это конец прогона, а
+# created_at/updated_at из API GitHub включают ОЧЕРЕДЬ, и три "активных" окна
+# разом означают лишь, что два стояли в очереди.
+#
+# Точный источник лежит на хосте: раннер на каждую задачу пишет
+# _diag/Worker_<ГГГГММДД>-<ЧЧММСС>-utc.log -- в имени метка НАЧАЛА, в mtime
+# время последней записи, то есть конец. Отсюда окно каждой задачи.
+#
+# Ни сети, ни ключей, ни единой правки на хосте: ls по журналам раннера.
+on:
+  workflow_dispatch:
+    inputs:
+      za_den:
+        description: "за какой день UTC (пусто -- сегодня)"
+        required: false
+        default: ""
+
+concurrency:
+  group: progony-na-hoste-nl
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  OUT_FILE: data/progony_na_hoste.json
+
+jobs:
+  progony:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка разбора (без сети и без хоста)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/progony_na_hoste.py
+          python3 deploy/checks/progony_na_hoste.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Список журналов задач раннера"
+        run: |
+          set -e
+          set -o pipefail
+          DEN="${{ inputs.za_den }}"
+          [ -n "$DEN" ] || DEN="$(date -u +%Y%m%d)"
+          echo "den: $DEN"
+          # КАТАЛОГ _diag ИЩЕТСЯ, А НЕ УГАДЫВАЕТСЯ: у раннера он лежит по-разному,
+          # и захардкоженный путь молча дал бы пустой ответ.
+          # TZ=UTC -- чтобы ls печатал mtime в UTC, как и метка в имени файла.
+          # Разбор умеет и местный сдвиг, но одинаковые часы надёжнее.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            for D in /home/actions-runner/_diag /opt/actions-runner/_diag \
+                     /root/actions-runner/_diag /home/runner/_diag; do
+              [ -d \$D ] && echo \$D
+            done" > /tmp/diag_dirs.txt || true
+          if [ ! -s /tmp/diag_dirs.txt ]; then
+            echo "kataloga _diag ne nashli -- ishchem shire"
+            ssh -n $SSH_OPTS root@$TARGET_HOST \
+              "find / -maxdepth 5 -type d -name _diag 2>/dev/null | head -5" \
+              > /tmp/diag_dirs.txt || true
+          fi
+          cat /tmp/diag_dirs.txt
+          : > /tmp/worker_ls.txt
+          while read -r D; do
+            [ -n "$D" ] || continue
+            ssh -n $SSH_OPTS root@$TARGET_HOST \
+              "TZ=UTC ls -l --time-style=full-iso $D/Worker_${DEN}-*.log 2>/dev/null || true" \
+              >> /tmp/worker_ls.txt || true
+          done < /tmp/diag_dirs.txt
+          echo "strok ls: $(wc -l < /tmp/worker_ls.txt)"
+          head -3 /tmp/worker_ls.txt || true
+
+      - name: "Окна задач против минут сделок"
+        run: |
+          set -e
+          set -o pipefail
+          SD="data/sdelki_polosy_$(date -u +%Y-%m-%d).json"
+          [ -f "$SD" ] || SD=""
+          python3 deploy/checks/progony_na_hoste.py \
+            ${SD:+--sdelki "$SD"} --out "$OUT_FILE" < /tmp/worker_ls.txt | tail -30
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Okna progonov Actions na hoste protiv minut sdelok [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
