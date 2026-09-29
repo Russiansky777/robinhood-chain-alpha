@@ -89,9 +89,15 @@ jobs:
           # МЕЛКО И РОВНО ОДНУ ВЕТКУ. Полная выкачка репозитория (fetch-depth 0)
           # идёт минутами: в нём лежат многомегабайтные выгрузки, а раннер один
           # и за ним стоят очередью деплои.
-          git fetch --depth=1 origin "$VETKA" || { echo "vetka ne dostupna: $VETKA"; exit 0; }
+          # БЕЗ БЛОБОВ И С ЧАСАМИ НА РУКАХ. Ветка Code-2 несёт десятки мегабайт
+          # данных: обычная выкачка на одну глубину шла больше четырёх минут и
+          # держала единственный раннер, за которым стоят очередью деплои.
+          # --filter=blob:none приносит только дерево, нужные файлы догружаются
+          # по одному; timeout -- чтобы шаг не мог занять раннер вовсе.
+          timeout 150 git fetch --depth=1 --filter=blob:none origin "$VETKA" \
+            || { echo "vetka ne dostupna ili medlenna: $VETKA"; exit 0; }
           for F in clmm_sbor.json whirlpool_sbor.json dlmm_sbor.json; do
-            if git show "FETCH_HEAD:data/podbivka/$F" > "/tmp/sbory/$F" 2>/dev/null; then
+            if timeout 120 git cat-file -p "FETCH_HEAD:data/podbivka/$F" > "/tmp/sbory/$F" 2>/dev/null; then
               echo "vzjat $F: $(wc -c < /tmp/sbory/$F) bajt"
             else
               rm -f "/tmp/sbory/$F"
