@@ -581,13 +581,33 @@ def self_test() -> int:
         свежо({"utc": 1000.0}, сейчас=1031.0) is False and свежо({"utc": 1000.0}, сейчас=1029.0) is True)
 
     # Рубильник: без него и без явного флага закрывать нельзя.
+    class СостЗаглушка:
+        """Состояние службы для проверок запрета: без каталога и без цепи."""
+
+        def __init__(self, полоса=(True, "полоса остановлена: окно"), позиций=0,
+                      падать=None):
+            self._полоса, self._позиций, self._падать = полоса, позиций, падать
+
+        def lane_kill_active(self):
+            if self._падать == "полоса":
+                raise OSError("состояние не читается")
+            return self._полоса
+
+        def open_positions(self):
+            if self._падать == "позиции":
+                raise OSError("журнал позиций не читается")
+            return [{"cid": f"c{и}"} for и in range(self._позиций)]
+
     было_фл = os.environ.pop("CLOSE_ACCOUNTS_WHILE_TRADING", None)
     было_kill = os.environ.get("BLOOM_KILL_FILE")
     tmp = Path(os.environ.get("TMPDIR") or "/tmp") / "close_accounts_kill_probe"
     try:
         os.environ["BLOOM_KILL_FILE"] = str(tmp)
         tmp.unlink(missing_ok=True)
-        нельзя, почему_нельзя = можно_сейчас()
+        # Состояние подставляется заглушкой: проверка запрета не должна зависеть
+        # от того, есть ли на этой машине каталог состояния службы.
+        нельзя, почему_нельзя = можно_сейчас(СостЗаглушка(полоса=(False, "")),
+                                              {"lane_s0": {"bloom_trades": False}})
         chk("без рубильника и без флага закрывать нельзя",
             нельзя is False and "KILL" in (почему_нельзя or ""), почему_нельзя)
         tmp.write_text("kill")
@@ -596,21 +616,6 @@ def self_test() -> int:
 
         # ТРЕТИЙ ПУТЬ: окно без покупок. Проверяется по отдельности каждое из
         # трёх условий -- и что незнание любого из них запрещает закрытие.
-        class СостЗаглушка:
-            def __init__(self, полоса=(True, "полоса остановлена: окно"), позиций=0,
-                          падать=None):
-                self._полоса, self._позиций, self._падать = полоса, позиций, падать
-
-            def lane_kill_active(self):
-                if self._падать == "полоса":
-                    raise OSError("состояние не читается")
-                return self._полоса
-
-            def open_positions(self):
-                if self._падать == "позиции":
-                    raise OSError("журнал позиций не читается")
-                return [{"cid": f"c{и}"} for и in range(self._позиций)]
-
         мирно = {"lane_s0": {"bloom_trades": False}, "batch5": {"bloom_trades": False}}
         можно3, почему3 = можно_сейчас(СостЗаглушка(), мирно)
         chk("окно без покупок разрешает закрытие без общего рубильника",

@@ -122,6 +122,8 @@ jobs:
               OWN_SEND_WALLET_KEY=\$OWN_SEND_WALLET_KEY \
               EXEC_WALLET_KEY=\$EXEC_WALLET_KEY \
               BLOOM_WALLET_KEY=\$BLOOM_WALLET_KEY \
+              BLOOM_STATE_DIR=\$BLOOM_STATE_DIR \
+              BLOOM_SOURCE_GROUPS=\$BLOOM_SOURCE_GROUPS \
               $LIVE $TRADING \
               PYTHONPATH=$CODE_DIR \
               /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py \
