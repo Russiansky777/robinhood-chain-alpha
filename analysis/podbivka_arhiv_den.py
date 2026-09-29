@@ -220,7 +220,7 @@ def удержание(покупка: dict, ряд: list, окно: int = 150) 
 
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
-           минты: set | None = None, не_sol: bool = False) -> Path:
+           минты: set | None = None, не_sol: bool = False, окно_докупки: int | None = None) -> Path:
     import requests  # noqa: PLC0415
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
     import zstandard  # noqa: PLC0415
@@ -235,6 +235,9 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     счёт = {"строк": 0, "файлов": 0, "ошибки": []}
     история_цены: dict = {}      # poolId -> deque[(слот, цена)] за НАЗАД слотов
     ноги: dict = {}              # (подпись, трейдер, минт) -> токенов куплено в транзакции (все ноги)
+    # правило Code-1 (bloom_detector.py, слово владельца 27.09): докупка -- тот же источник и тот же минт в пределах
+    # окна слотов от его предыдущей покупки; позже -- новый сигнал. Для --istochniki при --okno-dokupki.
+    последняя_пок: dict = {}     # (трейдер, минт) -> слот последней покупки
     цена_sol: dict = {}          # минт -> SOL за единицу (последнее событие SOL-пула этого минта)
     минты = минты or set()
     ленты_минтов: dict = {}      # минт -> все события (--minty)
@@ -368,9 +371,17 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                     ряды[pid].append(e)
                             активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
                         порог_t = porog_доп if (t in ист and porog_доп is not None) else porog
-                        if (e["action"] == "buy" and первая and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
+                        по_окну = None
+                        if окно_докупки and t in ист and e["action"] == "buy":
+                            кл = (t, e.get("mint"))
+                            пред = последняя_пок.get(кл)
+                            по_окну = пред is None or (e.get("block") or 0) - пред > окно_докупки
+                            последняя_пок[кл] = e.get("block") or 0
+                        новый = по_окну if по_окну is not None else первая
+                        if (e["action"] == "buy" and новый and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
                                 and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
                             сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
+                                            "первая": первая, "по_окну": по_окну,
                                             "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
                                             "sol": sol, "timestamp": e.get("timestamp"),
                                             "quoteMint": q, "курс_q": курс_q,
@@ -443,6 +454,8 @@ def main() -> int:
     р.add_argument("--minty", default="", help="через запятую: минты, все события которых пишутся целиком")
     р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
     р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
+    р.add_argument("--okno-dokupki", type=int, default=None,
+                   help="для --istochniki сигнал по правилу Code-1: нет покупки того же минта в предыдущие N слотов (1800)")
     а = р.parse_args()
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
@@ -450,7 +463,7 @@ def main() -> int:
     доп = set(json.loads(Path(а.dop_adresa).read_text(encoding="utf-8"))) if а.dop_adresa else set()
     ист = {x for x in а.istochniki.split(",") if x}
     out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop, ист,
-                 {x for x in а.minty.split(",") if x}, а.ne_sol)
+                 {x for x in а.minty.split(",") if x}, а.ne_sol, а.okno_dokupki)
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
     R.пуш(f"Podbivka-2: arhiv den {а.metka} [automated]", [str(out)])
