@@ -20,6 +20,9 @@ concurrency:
 
 env:
   TARGET_HOST: 127.0.0.1
+  ENV_DIR: /etc/bloom-executor
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
   RABOTA: /tmp/plan_test_krug
   OUT_FILE: data/plan_test_krug.json
 
@@ -52,9 +55,14 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/plan_test_krug.py" < deploy/checks/plan_test_krug.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $RABOTA/plan_test_krug.py --otkuda '${{ inputs.otkuda }}' --out $RABOTA/out.json" | tail -60
+          # ОКРУЖЕНИЕ И ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ python3 ПОД root.
+          # Прогон 02:58:34Z шёл системным питоном без env и открыл ПУСТОЕ
+          # состояние по умолчанию: он напечатал "ОБА ЗАМКА СНЯТЫ: True", тогда
+          # как в живом признаке жизни стоят оба, и порог суток взялся 0.5
+          # вместо боевых 1.5. Читать замки можно только из живого состояния.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/plan_test_krug.py --otkuda '${{ inputs.otkuda }}' --out $RABOTA/out.json" | tail -70
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/plan_test_krug.json || true
           if python3 -c "import json; json.load(open('/tmp/plan_test_krug.json'))" 2>/dev/null; then
             cp /tmp/plan_test_krug.json "$OUT_FILE"
