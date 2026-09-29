@@ -1,4 +1,4 @@
-=== NL-хост, живучесть служб, 2026-09-29T22:15:25Z ===
+=== NL-хост, живучесть служб, 2026-09-29T23:14:07Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
 bloom-seller: active=active enabled=enabled restarts=0 since=Tue 2026-09-29 23:23:21 CEST
@@ -6,11 +6,11 @@ bloom-detector: active=active enabled=enabled restarts=0 since=Tue 2026-09-29 23
 grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 12:31:15 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-29T22:15:27Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-09-29T23:13:54Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-29T22:15:27Z",
-  "updated_ts": 1790720127.5036252,
+  "updated_utc": "2026-09-29T23:13:54Z",
+  "updated_ts": 1790723634.9422438,
   "alive_since_utc": "2026-09-29T21:21:20Z",
   "mode": "live",
   "sources": 625,
@@ -262,55 +262,55 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "sender_connections": {
     "by_sender": {
       "astralane": {
-        "age_s": 3236.7,
-        "last_use_s": 611.9,
-        "last_ping_s": 0.0,
-        "pings_ok": 49,
+        "age_s": 6744.2,
+        "last_use_s": 4119.4,
+        "last_ping_s": 0.1,
+        "pings_ok": 107,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "blockrazor": {
-        "age_s": 3236.7,
-        "last_use_s": 612.0,
-        "last_ping_s": 0.0,
-        "pings_ok": 49,
+        "age_s": 6744.1,
+        "last_use_s": 4119.4,
+        "last_ping_s": 0.1,
+        "pings_ok": 107,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "helius": {
-        "age_s": 3236.7,
-        "last_use_s": 611.9,
+        "age_s": 6744.1,
+        "last_use_s": 4119.4,
         "last_ping_s": 0.0,
-        "pings_ok": 49,
-        "pings_failed": 0,
+        "pings_ok": 106,
+        "pings_failed": 1,
         "reopened": 0,
-        "last_error": ""
+        "last_error": "ReadTimeout: HTTPConnectionPool(host='ams-sender.helius-rpc.com', port=80): Read timed out. (read timeout=3.0)"
       },
       "jito": {
-        "age_s": 3236.7,
-        "last_use_s": 612.0,
+        "age_s": 6744.1,
+        "last_use_s": 4119.4,
         "last_ping_s": 0.0,
-        "pings_ok": 49,
+        "pings_ok": 107,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "nozomi": {
-        "age_s": 3236.7,
-        "last_use_s": 611.9,
+        "age_s": 6744.1,
+        "last_use_s": 4119.4,
         "last_ping_s": 0.0,
-        "pings_ok": 49,
+        "pings_ok": 107,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "zeroslot": {
-        "age_s": 3236.6,
-        "last_use_s": 612.0,
+        "age_s": 6744.1,
+        "last_use_s": 4119.4,
         "last_ping_s": 0.0,
-        "pings_ok": 49,
+        "pings_ok": 107,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
@@ -329,23 +329,23 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "subscribed_addresses": 53,
   "unsubscribed_addresses": 591,
   "credits": {
-    "за_сеанс": 12188,
-    "за_час": 2414,
-    "за_прошлый_час": 15551,
-    "за_сутки": 437026,
+    "за_сеанс": 29557,
+    "за_час": 4781,
+    "за_прошлый_час": 15002,
+    "за_сутки": 454395,
     "бюджет_за_сутки": 1000000,
     "why_not": null
   },
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 297,
+  "signals_seen": 655,
   "to_buy": 0,
   "by_code": {
-    "TARGET_AMOUNT_OUT_OF_RANGE": 28,
-    "NOT_A_BUY": 164,
-    "TOKEN_RECEIVED_NOT_BOUGHT": 64,
-    "SKIP_TARGET_INCREASE_POSITION": 29,
-    "INSUFFICIENT_BALANCE": 10,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 127,
+    "NOT_A_BUY": 335,
+    "TOKEN_RECEIVED_NOT_BOUGHT": 120,
+    "SKIP_TARGET_INCREASE_POSITION": 50,
+    "INSUFFICIENT_BALANCE": 21,
     "THRESHOLD_EDGE": 2
   },
   "by_code_test_source": {},
@@ -363,18 +363,18 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "без_ставки": 0
   },
   "dlmm_bin_steps": {
-    "в_кэше": 17,
+    "в_кэше": 20,
     "ждут_чтения": 0,
     "без_шага": 0
   },
   "lane_cu_limit": 140000,
   "summary_minute": 2,
-  "summary_last_hour": "2026-09-29T21:00Z",
+  "summary_last_hour": "2026-09-29T22:00Z",
   "summary_write_error": null,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 119.1871498649581,
+  "rate_usd_sol": 119.51452058165471,
   "rate_fresh": true,
-  "rate_stale_used": 35,
+  "rate_stale_used": 39,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
@@ -383,41 +383,41 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
   "kill_bloom_active": false,
   "kill_bloom_note": "",
-  "net_slot": 451773154,
-  "slot_notifications": 12066,
+  "net_slot": 451786191,
+  "slot_notifications": 25097,
   "ws_baity_po_vidam": {
-    "источники": 247805161,
-    "слоты": 1679392
+    "источники": 704140221,
+    "слоты": 3568708
   },
   "dlina_slota": {
-    "измерено_с": 0.27423,
-    "слотов": 73,
-    "окно_с": 20.019,
-    "когда": 1790719900.8308868
+    "измерено_с": 0.27054,
+    "слотов": 74,
+    "окно_с": 20.02,
+    "когда": 1790723501.2211058
   },
   "dlina_slota_v_rabote": {
-    "длина_слота_с": 0.27423,
+    "длина_слота_с": 0.27054,
     "источник": "замер",
-    "возраст_замера_с": 226.7,
+    "возраст_замера_с": 133.7,
     "константа_в_коде_с": 0.4
   },
-  "net_slot_age_s": 0.09,
+  "net_slot_age_s": 0.18,
   "balance_sol": 0.024620982,
-  "balance_age_s": 7.41,
-  "rpc_calls": 3972,
+  "balance_age_s": 8.35,
+  "rpc_calls": 6077,
   "rpc_by_method": {
-    "getMultipleAccounts": 700,
-    "getBalance": 646,
-    "getSlot": 22,
-    "getLatestBlockhash": 270,
-    "getAccountInfo": 274,
+    "getMultipleAccounts": 1456,
+    "getBalance": 1344,
+    "getSlot": 46,
+    "getLatestBlockhash": 561,
+    "getAccountInfo": 565,
     "getTransaction": 1988,
-    "simulateTransaction": 41,
+    "simulateTransaction": 86,
     "getBlock": 26,
     "getSignatureStatuses": 4,
     "getAsset": 1
   },
-  "session_credits": 12188,
+  "session_credits": 29557,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -426,7 +426,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "format3": true,
     "tracked_messages": 2,
     "tracked_texts": 2,
-    "sent": 5,
+    "sent": 6,
     "failed": 0,
     "last_error": "",
     "off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
@@ -434,7 +434,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
       "main": {
-        "sent": 5,
+        "sent": 6,
         "failed": 0,
         "last_error": ""
       },
@@ -463,13 +463,13 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "hour_seconds": 0.0,
     "on_fallback_now": false,
     "report_threshold_s": 30.0,
-    "silent_ticks": 402,
+    "silent_ticks": 687,
     "tick_s": 2.0,
     "breaks_by_reason": {}
   },
   "shadow": {
     "enabled": true,
-    "built": 69,
+    "built": 200,
     "would_pass": 0,
     "over_cap": 0,
     "failed": 0,
@@ -484,28 +484,28 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": 0,
       "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0,
       "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 0,
-      "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": 0
+      "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": 0,
+      "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": 0
     },
     "hour": {
-      "since_ts": 1790716880.0421169,
-      "since_utc": "2026-09-29T21:21:20Z",
-      "signals": 69,
-      "built": 39,
-      "sim_failed": 39,
+      "since_ts": 1790720493.4506433,
+      "since_utc": "2026-09-29T22:21:33Z",
+      "signals": 124,
+      "built": 42,
+      "sim_failed": 42,
       "not_built": {
-        "котировка не SOL: шаблона SOL -> Q в кэше нет": 13,
-        "тип пула не покрыт сборщиком: QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 1,
-        "сборка: ValueError: роли счетов не восстановились": 8,
-        "шаблон: у источника инструкция 9527de9bd37c981a, не buy_exact_in": 4,
-        "тип пула не покрыт сборщиком: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 1,
-        "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2": 2,
-        "тип пула не покрыт сборщиком: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": 1
+        "котировка не SOL: шаблона SOL -> Q в кэше нет": 25,
+        "тип пула не покрыт сборщиком: QUayE6nexQWYNZAEqfN8FxoNwQDSu3CAzT2qq9J1ArG": 3,
+        "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2": 3,
+        "сборка: ValueError: роли счетов не восстановились": 48,
+        "шаблон: у источника инструкция 9527de9bd37c981a, не buy_exact_in": 1,
+        "шаблон: у источника инструкция 33e685a4017f83ad, не buy_exact_quote_in": 2
       },
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 669,
+    "credits_day": 720,
     "credits_write_why_not": ""
   },
   "route_tax_filter": {
@@ -522,13 +522,13 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "live": true,
     "module_loaded": true,
     "module_why_not": "",
-    "paths": 10,
-    "starts": 10,
+    "paths": 21,
+    "starts": 21,
     "threads_alive": 0,
     "sent": 2,
     "by_stage": {
-      "gate": 5,
-      "two_step_build": 2,
+      "gate": 14,
+      "two_step_build": 4,
       "sent": 2,
       "build": 1
     },
@@ -575,21 +575,21 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "выводов": 0,
       "кошелёк": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
     },
-    "balance_age_s": 7.3,
+    "balance_age_s": 8.3,
     "sim_shadow": {
       "done": 2,
       "would_fail": 0
     },
-    "blockhash_age_s": 4.7,
-    "blockhash_updates": 270,
+    "blockhash_age_s": 8.2,
+    "blockhash_updates": 561,
     "blockhash_why_not": "",
     "last": {
-      "stage": "sent",
-      "ok": true,
-      "why_not": null,
-      "signature": "36tjm8yYCnqsFV6rchjT15BtXL7q7jY65wXmAZPLbMrtLwKQVogegJhgaaRR2WqwG7rzgX3jxWkHwbCBDzEK5SFx",
-      "pool_program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
-      "ts_utc": "2026-09-29T22:05:18Z"
+      "stage": "gate",
+      "ok": false,
+      "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+      "signature": null,
+      "pool_program": null,
+      "ts_utc": "2026-09-29T23:08:27Z"
     },
     "lane_kill": [
       false,
@@ -717,10 +717,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
       "shift_signature": null,
       "warm": {
         "есть": true,
-        "возраст_с": 4.64,
+        "возраст_с": 8.19,
         "почему": "",
-        "обновлений": 270,
-        "взят_тёплым": 5,
+        "обновлений": 561,
+        "взят_тёплым": 7,
         "взят_по_сети": 0,
         "срок_с": 30.0
       }
@@ -731,93 +731,93 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "pools": 17,
     "templates": {
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-        "age_s": 1.7,
+        "age_s": 2.7,
         "flipped": false,
-        "sig": "4nWVYhBsZAaQSf93Ws42rzknDifpgHHpTwexZiA3P7eiFt9jY1USyAUsZrgvBC44gCgn68bM3RtapixRnxVkRvFs"
+        "sig": "5Z2dnoiBLyqBe63YnffNLVWWJAjAajpu4Vt7FP2gTpUCqPdUxen2aqJQeH5CDWo2gvznhCPdf6HqHFtxJCLsdgy4"
       },
       "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
-        "age_s": 4.9,
+        "age_s": 0.5,
         "flipped": false,
-        "sig": "4cLU9ptdFRbAuqv9josfrCR8WcNCpmN7dcJdCDkf2GUGxugbnqPeU5qtm7v8xCK7fz1aNpTDB2y4whT18DjVQMmg"
+        "sig": "39TsDPYRgVu7Coe6Bth2A9SL41HHcKAK1AnwwL8yTqwffJTio7CgJNbRSF7ZnaLskKonDVv6poi3owx8KekfWKGJ"
       },
       "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
-        "age_s": 0.4,
+        "age_s": 0.0,
         "flipped": false,
-        "sig": "55fXv6msvRfaTFiqFQA9HLhVbFcsRSPVTQiPux46ZxCeM3HQVydDW3Sxs5mk16gPnNPfKVdnrJwRSFKMZR1fmxPN"
+        "sig": "3jMtCtyzqMtMc4oe8MaDfizwLBd8t5bJCsZPFqwEwi5HV2LSvGjgdsgDPYDr5heqjFDW4x2qX2SSm8h9LaQi4j5E"
       },
       "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump": {
-        "age_s": 20.7,
+        "age_s": 1.3,
         "flipped": false,
-        "sig": "4jJ1xJpLoDGsfsPM72oDow8cb1H1sBryuGALRbKqqeZYkkzzXm2maBPuRV7oSKHFCNWzFowbszQ5WCBV6oMtKj8J"
+        "sig": "2du2k1z62rDkx7hvreJw5WkwCFbNdPsoYREVgSvQ1Ru92oi96ptFNbgvuSPd5dbMPVLp6jjtPWyEBxdzfDepYdqs"
       },
       "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump": {
-        "age_s": 6.3,
+        "age_s": 9.0,
         "flipped": false,
-        "sig": "4hx7AdgnEkya7SGSpyjbG8TEiVS68d1RN97qjcmZPb4hvRYn9o9LfAiUPuSE3zYG5AoMA5vx7wvai9wLv3diyT7t"
+        "sig": "5ne6bE8xnFM1mPZdWWx1DstAWbUK1E1oUbvMVPADo8jZTy5DdaZFcaFkNZcHiGiKcrmZqgnwRfvSqg8r1fhf6pk7"
       },
       "4N4DnNo3qpPks9aQCkcWkzoir8tnvT6diS4TnnZibonk": {
-        "age_s": 1.4,
+        "age_s": 55.8,
         "flipped": false,
-        "sig": "5ebCRNo6jBorgDpp1fRjxxDQqK8Qzc6XRWLumoFfY26EefVVCP7uohkXRzhf1akqgTPy2ViKqTSHZrYYWyfHBuq3"
+        "sig": "Ci85ScHyCJB8oXNGwo8pVrkQDTsyw1ahsykTSn2xYU9M8R8v4tuaoHDmg3TrMEyiENAhwjUYwqdjY27AyZUhGLr"
       },
       "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump": {
-        "age_s": 552.8,
+        "age_s": 108.1,
         "flipped": false,
-        "sig": "3ugBVkujZimNqdJYpL29RcK1ZYHdCN7xqHRm9RVT2fA2jRH15rgQ9v8ikTyXLVYRxEKa1MQshJfwwRoRYsE4WuDo"
+        "sig": "36pSnEfXswqp1XkN52NHk1QT1qC8atLt8oaWUT8gjapMAfE4zSWDYv6worXfwj8ST295iQrxN72hW6MpjHTNFK4R"
       },
       "Cm6fNnMk7NfzStP9CZpsQA2v3jjzbcYGAxdJySmHpump": {
-        "age_s": 56.1,
+        "age_s": 10.5,
         "flipped": false,
-        "sig": "5v7mfbQByXow31EKHRQwpg6o9FFmzyAbRdQ1yhNwmdP4MSZuv6E998Cje5xRJY9nXzZqy161Syba8P1jvuoBoqdN"
+        "sig": "E6pJDu7Mw7vHd2NMjfm25XDyLNe1Z9LdsyHbeAnRoq6mjJ1V3jH7WMakDD1aHsFJ8LFbmcn9gzVoHsC8Bv8nbjg"
       },
       "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2": {
-        "age_s": 56.1,
+        "age_s": 8.3,
         "flipped": false,
-        "sig": "2ipSYSm5aFd5myc7j6SP99ewkSYRCBRo9Cjw9iWh6mmKPqPBvpvnjAWuZneZ7RAbtvpv4w3R5nESDCCz8hg3Fb1G"
+        "sig": "2AMVweM9MLunX8LE5d1nyHvE1zUSMw82z6WXzMQq6j2Gx7Gz1C8cCfKRPVMt26W9CweCzgVLaX8MgRSaST5NaojQ"
       },
       "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": {
-        "age_s": 543.8,
+        "age_s": 0.5,
         "flipped": false,
-        "sig": "34m6gjjMucZ6HhY8CRsxNMVkiTPnLKKd1stAa3u1tbQJBHd5kA61FMsjuq21kjLZDvZEXN7PDQPvNjcSFeEUMfxE"
+        "sig": "2nbpotSmEdvWt3cbfXft4gy1yKEXE1Vbnp7zPjKEyam41R6nV4dnqqekFRWpeieuVGFWh5kC6HpaTcEAPV644NnZ"
       },
       "8J69rbLTzWWgUJziFY8jeu5tDwEPBwUz4pKBMr5rpump": {
-        "age_s": 20.7,
+        "age_s": 14.7,
         "flipped": false,
-        "sig": "2XchBP9obECXEyXSgZ8Rqo3nMJ4C1QQjXxjtzxhPxCQV2R477s3MXodGuae7CK2m8tHYKtyhLrAgmQenpGb7BR6W"
+        "sig": "3MFh7egZv2fnNQt2qousExUue84Xk7x9zwnDaAQbGZJkwqwc7zNxSZU5XiD3LFbQYpLpohK6k1QXNxa3Dc9naSpk"
       },
       "7n8kRipxAQBfpGQtcGA2AbkM2HASSVCzqZ5F3QEopump": {
-        "age_s": 349.2,
+        "age_s": 343.6,
         "flipped": false,
-        "sig": "4Ac8Xt84jMERzTyTRTyCb7E6NYDNFYus8Q8M8pfBYuNLCSmpgMWkYBgbEddS7Zrar7F59UsWWkQ8oCjjJuuwmjg6"
+        "sig": "2u813LaCCWDXA5Q2yyxC3uSobm47kCqpenBuVSUW5vFv9yWgWbv6jNyRwde4yC3gKKqvQrS4zBkqb5yZ3S19XP7g"
       },
       "DitHyRMQiSDhn5cnKMJV2CDDt6sVct96YrECiM49pump": {
-        "age_s": 24.7,
+        "age_s": 81.1,
         "flipped": false,
-        "sig": "2RWBrv78xL2TyVwxj9gMrGdGuPodm6Ny46p7h5ZwcHfzAKotS427R9ennyiehoL8v3TiuLsTyMYKwV5SNDSikAno"
+        "sig": "F5PUiF6nsFvoCuGbpXqSn3MwASbeVSgFarRWXTkvNBNUmn2qQRLau6Gmjj7ciGFZPhvg7KtL9b42oTtea6o3xZ4"
       },
       "AywAYdNJnSLSXwKWYxDciPjqGRnwp4iZdQptuuQTpump": {
-        "age_s": 397.4,
+        "age_s": 211.1,
         "flipped": false,
         "sig": "B6WZ2eQf9d7tbTe9S474pYA9pXxhgKECJDsBYW7LEruyMD7GqNfUq1icTHPczGgAQmY8wKkXWEoE2F7sk7vCLu5"
       },
       "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": {
-        "age_s": 344.0,
+        "age_s": 842.6,
         "flipped": false,
-        "sig": "64zrMpzBB6zo92uKN25KwViaYsExS14c2QWnkKa9z9a2JaBRzH9knFcbjJ4u7h9tBkPtLg9sezJKezmvphXJVb7x"
+        "sig": "5BaLt68zf9xRckTQqhQYFoYNQ8chMFPwf3RbFDJ2fc7FWc39i1N5YtY7Hd4rRJmtbfFR8QQCDLgE8czhx9VuSGHj"
       }
     },
-    "fed": 7508,
+    "fed": 23745,
     "no_tx": 0,
     "failed": 0,
-    "luts": 526,
+    "luts": 914,
     "luts_pending": 0,
     "luts_warmed": 18,
     "warm_why_not": "",
-    "luts_topped_up": 504,
+    "luts_topped_up": 882,
     "top_up_why_not": "",
-    "bytes": 241785429,
-    "credits": 4612,
-    "credits_day": 188812,
+    "bytes": 690849696,
+    "credits": 13178,
+    "credits_day": 197378,
     "credits_before_start": 184200,
     "credits_write_why_not": "",
     "credit_budget": 0,
@@ -826,17 +826,14 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "dropped_why": "",
     "ingest_stats": {
       "шаблона нет": 67,
-      "новый шаблон": 2143,
-      "не своп / счета не зависят от цены -- шаблон подтверждён": 5583
-    }
-  },
-  "leg_static": {
-    "fayl": "/home/bot/data/nogi_sha
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-29T22:15:37Z):
+      "новый шаблон": 4691,
+      "не своп / счета не зависят от цены -- шаблон подтверждён": 19593
+  
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-09-29T23:14:13Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-09-29T22:15:37Z",
-  "updated_ts": 1790720137.0691905,
+  "updated_utc": "2026-09-29T23:14:13Z",
+  "updated_ts": 1790723653.9605072,
   "mode": "live",
   "positions_in_cycle": 0,
   "last_cycle": [],
@@ -896,15 +893,15 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "без_времени_блока": 0,
     "от_таймера_до_посадки_с": {
       "n": 14,
-      "медиана": 1.15,
-      "p90": 60.14,
-      "макс": 69.36
+      "медиана": 1.18,
+      "p90": 60.54,
+      "макс": 69.76
     },
     "от_таймера_до_отправки_с": {
       "n": 14,
-      "медиана": 1.57,
-      "p90": 60.98,
-      "макс": 69.77
+      "медиана": 1.7,
+      "p90": 61.38,
+      "макс": 70.17
     },
     "от_отправки_до_посадки_с": {
       "n": 14,
@@ -942,10 +939,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "note": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-09-29T22:15:24Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-09-29T23:13:24Z):
 {
-  "updated_utc": "2026-09-29T22:15:24Z",
-  "uptime_s": 301448.0,
+  "updated_utc": "2026-09-29T23:13:24Z",
+  "uptime_s": 304928.1,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
@@ -1010,9 +1007,9 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     }
   ],
   "источников": 18,
-  "событий_записано": 4933,
+  "событий_записано": 4989,
   "дублей_пропущено": 4,
-  "неудачных_пропущено": 1203,
+  "неудачных_пропущено": 1217,
   "переподключений_tx": 15,
   "причины_разрыва_tx": {
     "ConnectionClosedError: no close frame received or sent": 13,
@@ -1020,23 +1017,23 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   },
   "слепое_время_с": 16.1,
   "слепое_время_доля": 5e-05,
-  "переподключений_slot": 15,
-  "slot_уведомлений": 1124437,
-  "текущий_слот": 451773142,
-  "последнее_событие_utc": "2026-09-29T22:13:12Z",
+  "переподключений_slot": 16,
+  "slot_уведомлений": 1137361,
+  "текущий_слот": 451786077,
+  "последнее_событие_utc": "2026-09-29T23:12:48Z",
   "часы": {
-    "checked_at_utc": "2026-09-29T21:31:19Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Tue 2026-09-29 23:31:19 CEST\nRTCTimeUSec=Tue 2026-09-29 23:31:20 CEST",
+    "checked_at_utc": "2026-09-29T22:31:19Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Wed 2026-09-30 00:31:19 CEST\nRTCTimeUSec=Wed 2026-09-30 00:31:20 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
-/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-29T22:15:35Z):
+/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-09-29T23:14:10Z):
 {
-  "utc": "2026-09-29T22:15:35Z",
+  "utc": "2026-09-29T23:14:10Z",
   "started_utc": "2026-09-26T10:31:17Z",
-  "uptime_s": 301458.1,
+  "uptime_s": 304973.1,
   "channels": 4,
   "channel_names": [
     "grpc",
@@ -1123,7 +1120,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "spent_today": 14,
     "limit": 300000,
     "share": 0.0,
-    "projected_daily": 4,
+    "projected_daily": 3,
     "threshold": 0.7,
     "projection_limit": 200000,
     "window_s": 0.0,
@@ -1155,10 +1152,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "rabbit_fra": 6180,
-      "rabbit_ams": 6178,
-      "grpc2": 4968,
-      "grpc": 4968
+      "rabbit_fra": 6248,
+      "rabbit_ams": 6246,
+      "grpc2": 5022,
+      "grpc": 5022
     },
     "duplicates": {},
     "unpaired_single_channel": {
@@ -1172,100 +1169,100 @@ grpc-feed-probe: active=active enabled=enabled restarts=0 since=Sat 2026-09-26 1
     "by_group": {},
     "pairwise": {
       "grpc_vs_grpc2": {
-        "pairs": 105,
-        "first_share": 0.1143,
-        "median_ms": -8.83,
-        "p10_ms": -29.95,
-        "p90_ms": 0.19,
-        "p95_ms": 1.01,
-        "mean_ms": -21.71
+        "pairs": 60,
+        "first_share": 0.1333,
+        "median_ms": -7.54,
+        "p10_ms": -73.54,
+        "p90_ms": 0.47,
+        "p95_ms": 1.8,
+        "mean_ms": -41.87
       },
       "grpc_vs_rabbit_ams": {
-        "pairs": 105,
-        "first_share": 0.0762,
-        "median_ms": -10.75,
-        "p10_ms": -37.47,
-        "p90_ms": -1.11,
-        "p95_ms": 200.45,
-        "mean_ms": -12.42
+        "pairs": 60,
+        "first_share": 0.05,
+        "median_ms": -10.12,
+        "p10_ms": -88.74,
+        "p90_ms": -1.72,
+        "p95_ms": -0.54,
+        "mean_ms": -32.12
       },
       "grpc_vs_rabbit_fra": {
-        "pairs": 104,
-        "first_share": 0.0385,
-        "median_ms": -12.82,
-        "p10_ms": -38.59,
-        "p90_ms": -1.95,
-        "p95_ms": -0.55,
-        "mean_ms": -26.31
+        "pairs": 60,
+        "first_share": 0.0333,
+        "median_ms": -11.79,
+        "p10_ms": -92.34,
+        "p90_ms": -1.91,
+        "p95_ms": -0.79,
+        "mean_ms": -46.65
       },
       "grpc2_vs_rabbit_ams": {
-        "pairs": 105,
-        "first_share": 0.2476,
-        "median_ms": -2.86,
-        "p10_ms": -6.75,
-        "p90_ms": 2.54,
-        "p95_ms": 209.82,
-        "mean_ms": 9.3
+        "pairs": 60,
+        "first_share": 0.2833,
+        "median_ms": -2.88,
+        "p10_ms": -9.91,
+        "p90_ms": 4.82,
+        "p95_ms": 143.02,
+        "mean_ms": 9.75
       },
       "grpc2_vs_rabbit_fra": {
-        "pairs": 104,
-        "first_share": 0.0481,
-        "median_ms": -3.77,
-        "p10_ms": -9.2,
-        "p90_ms": -1.26,
-        "p95_ms": -0.46,
-        "mean_ms": -4.41
+        "pairs": 60,
+        "first_share": 0.0333,
+        "median_ms": -3.55,
+        "p10_ms": -9.15,
+        "p90_ms": -0.8,
+        "p95_ms": -0.41,
+        "mean_ms": -4.79
       },
       "rabbit_ams_vs_rabbit_fra": {
-        "pairs": 115,
-        "first_share": 0.4261,
-        "median_ms": -1.47,
-        "p10_ms": -5.22,
-        "p90_ms": 1.79,
-        "p95_ms": 2.41,
-        "mean_ms": -12.58
+        "pairs": 74,
+        "first_share": 0.4595,
+        "median_ms": -0.38,
+        "p10_ms": -13.97,
+        "p90_ms": 1.84,
+        "p95_ms": 2.15,
+        "mean_ms": -14.63
       }
     },
-    "pairs_total": 116
+    "pairs_total": 74
   }
 }
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 91 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 587 строк
 /home/bot/bloom_executor_live_data/positions.jsonl: 27 строк
-/home/bot/dbot_detect_probe/events.jsonl: 14229 строк
+/home/bot/dbot_detect_probe/events.jsonl: 14283 строк
 
 --- решения детектора по кодам ---
-всего решений: 91
+всего решений: 587
 первое: "ts_utc": "2026-09-29T22:01:05Z"
-последнее: "ts_utc": "2026-09-29T22:15:36Z"
+последнее: "ts_utc": "2026-09-29T23:14:04Z"
 по кодам:
-     34 NOT_A_BUY
-     27 TOKEN_RECEIVED_NOT_BOUGHT
-      7 TARGET_AMOUNT_OUT_OF_RANGE
-      4 INSUFFICIENT_BALANCE
-      1 SKIP_TARGET_INCREASE_POSITION
+    203 NOT_A_BUY
+    105 TARGET_AMOUNT_OUT_OF_RANGE
+     82 TOKEN_RECEIVED_NOT_BOUGHT
+     22 SKIP_TARGET_INCREASE_POSITION
+     15 INSUFFICIENT_BALANCE
       1 CHAIN_VS_LEDGER
 по задачам источника:
-     20 BATCH-5
-     17 lane_s0
-     15 sniper_src
-     10 kandidaty
-      5 batch5
-      4 BATCH-3
-забран bloom_detector.json (20479 байт)
+    135 sniper_src
+    106 lane_s0
+     66 batch5
+     49 kandidaty
+     47 BATCH-5
+     22 BATCH-3
+забран bloom_detector.json (20597 байт)
 забран bloom_seller.json (11647 байт)
 забран c2_own_send_dry.json (793 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 437074 кредитов, бюджет 1000000, доля 0.4371
+  bloom_detector: 454672 кредитов, бюджет 1000000, доля 0.4547
   bloom_seller: 28 кредитов, бюджет 15000, доля 0.0019
-  ВСЕГО за 2026-09-29: 437102 кредитов
+  ВСЕГО за 2026-09-29: 454700 кредитов
 
 --- возраст признаков жизни (порог 600 с) ---
-/home/bot/bloom_executor_live_data/detector_status.json: 23 с (свежий)
+/home/bot/bloom_executor_live_data/detector_status.json: 29 с (свежий)
 /home/bot/bloom_executor_live_data/seller_heartbeat.json: 1 с (свежий)
-/home/bot/dbot_detect_probe/status.json: 26 с (свежий)
-/home/bot/grpc_feed_probe_data/heartbeat.json: 5 с (свежий)
+/home/bot/dbot_detect_probe/status.json: 59 с (свежий)
+/home/bot/grpc_feed_probe_data/heartbeat.json: 3 с (свежий)
 
 --- старт служб против mtime модулей ---
 самый свежий модуль: /home/bot/bloom_executor/bloom_doklad.py (2026-09-29T21:21:12Z)
@@ -1278,109 +1275,78 @@ bloom-seller: старт 2026-09-29T21:23:21Z, модули 2026-09-29T21:21:12Z
 строк UNSOLD и автопауз в журнале сторожа нет
 
 --- журнал детектора (ключи вычищены) ---
-Sep 29 23:16:05 claude-nl python[1461279]: 2026-09-29 23:16:05,103 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:16:11 claude-nl python[1461279]: 2026-09-29 23:16:11,788 INFO таблицы адресов догружены: 8, в очереди осталось 0
-Sep 29 23:16:15 claude-nl python[1461279]: 2026-09-29 23:16:15,669 INFO полоса: старт на 4LENyjBDSZfA
-Sep 29 23:16:15 claude-nl python[1461279]: 2026-09-29 23:16:15,679 INFO полоса: конец на 4LENyjBDSZfA -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Sep 29 23:16:25 claude-nl python[1461279]: 2026-09-29 23:16:25,119 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:16:45 claude-nl python[1461279]: 2026-09-29 23:16:45,472 INFO полоса: старт на 5fzSNKDj7CRN
-Sep 29 23:16:45 claude-nl python[1461279]: 2026-09-29 23:16:45,481 INFO полоса: конец на 5fzSNKDj7CRN -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Sep 29 23:17:22 claude-nl python[1461279]: 2026-09-29 23:17:22,715 INFO таблицы адресов догружены: 5, в очереди осталось 0
-Sep 29 23:17:45 claude-nl python[1461279]: 2026-09-29 23:17:45,148 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:18:33 claude-nl python[1461279]: 2026-09-29 23:18:33,370 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Sep 29 23:19:08 claude-nl python[1461279]: 2026-09-29 23:19:08,828 INFO полоса: старт на 4psyoMxfTVxc
-Sep 29 23:19:08 claude-nl python[1461279]: 2026-09-29 23:19:08,837 INFO полоса: конец на 4psyoMxfTVxc -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
-Sep 29 23:19:40 claude-nl python[1461279]: 2026-09-29 23:19:40,006 INFO полоса: старт на 3QHauuFfek9x
-Sep 29 23:19:40 claude-nl python[1461279]: 2026-09-29 23:19:40,016 INFO полоса: конец на 3QHauuFfek9x -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Sep 29 23:19:44 claude-nl python[1461279]: 2026-09-29 23:19:44,053 INFO таблицы адресов догружены: 2, в очереди осталось 0
-Sep 29 23:20:25 claude-nl python[1461279]: 2026-09-29 23:20:25,182 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:20:58 claude-nl python[1461279]: 2026-09-29 23:20:58,695 INFO таблицы адресов догружены: 16, в очереди осталось 0
-Sep 29 23:21:19 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
-Sep 29 23:21:19 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
-Sep 29 23:21:19 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Sep 29 23:21:19 claude-nl systemd[1]: bloom-detector.service: Consumed 4min 5.193s CPU time, 260.6M memory peak, 0B memory swap peak.
-Sep 29 23:21:19 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,039 INFO исполнитель подключён, режим live
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,260 INFO таблицы адресов прогреты: 18 из 18 запрошенных
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,279 INFO прогрев соединения к Bloom: раз в 20 с
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,280 INFO команды Telegram: слушаю
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,280 INFO источников: 625 (BATCH-3, BATCH-5, TEST, batch5, kandidaty, lane_s0, log_only, off, sniper_src), откуда: DBot живьём + групп источников: 605 + тестовых источников из окружения: 2
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,364 INFO ставки CLMM из файла: 9 конфигов
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,364 INFO шаги корзин DLMM из файла: 11 пулов
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,423 WARNING цепь и учёт полосы расходятся на 1.399922365 SOL (цепь -0.786437792, учёт -2.186360157)
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,460 INFO slotSubscribe подтверждён (подписка 7448345)
-Sep 29 23:21:20 claude-nl python[1498585]: 2026-09-29 23:21:20,482 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 53
-Sep 29 23:22:31 claude-nl python[1498585]: 2026-09-29 23:22:31,051 INFO таблицы адресов догружены: 14, в очереди осталось 0
-Sep 29 23:23:41 claude-nl python[1498585]: 2026-09-29 23:23:41,700 INFO таблицы адресов догружены: 32, в очереди осталось 0
-Sep 29 23:24:53 claude-nl python[1498585]: 2026-09-29 23:24:53,132 INFO таблицы адресов догружены: 14, в очереди осталось 0
-Sep 29 23:26:03 claude-nl python[1498585]: 2026-09-29 23:26:03,734 INFO таблицы адресов догружены: 29, в очереди осталось 0
-Sep 29 23:27:14 claude-nl python[1498585]: 2026-09-29 23:27:14,361 INFO таблицы адресов догружены: 28, в очереди осталось 0
-Sep 29 23:27:40 claude-nl python[1498585]: 2026-09-29 23:27:40,396 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:28:00 claude-nl python[1498585]: 2026-09-29 23:28:00,412 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:28:20 claude-nl python[1498585]: 2026-09-29 23:28:20,428 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:28:24 claude-nl python[1498585]: 2026-09-29 23:28:24,982 INFO таблицы адресов догружены: 37, в очереди осталось 0
-Sep 29 23:29:59 claude-nl python[1498585]: 2026-09-29 23:29:59,632 INFO полоса: старт на 5tUjCf4XGJSJ
-Sep 29 23:29:59 claude-nl python[1498585]: 2026-09-29 23:29:59,641 INFO полоса: конец на 5tUjCf4XGJSJ -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
-Sep 29 23:30:40 claude-nl python[1498585]: 2026-09-29 23:30:40,033 INFO полоса: старт на 5phPgbGsNhvs
-Sep 29 23:30:40 claude-nl python[1498585]: 2026-09-29 23:30:40,043 INFO полоса: конец на 5phPgbGsNhvs -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
-Sep 29 23:30:46 claude-nl python[1498585]: 2026-09-29 23:30:46,147 INFO таблицы адресов догружены: 4, в очереди осталось 0
-Sep 29 23:31:56 claude-nl python[1498585]: 2026-09-29 23:31:56,746 INFO таблицы адресов догружены: 4, в очереди осталось 0
-Sep 29 23:32:07 claude-nl python[1498585]: 2026-09-29 23:32:07,518 INFO полоса: старт на 38qEfkBPYtfW
-Sep 29 23:32:07 claude-nl python[1498585]: 2026-09-29 23:32:07,532 INFO полоса: конец на 38qEfkBPYtfW -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Sep 29 23:33:09 claude-nl python[1498585]: 2026-09-29 23:33:09,405 INFO таблицы адресов догружены: 9, в очереди осталось 0
-Sep 29 23:34:20 claude-nl python[1498585]: 2026-09-29 23:34:20,033 INFO таблицы адресов догружены: 20, в очереди осталось 0
-Sep 29 23:35:30 claude-nl python[1498585]: 2026-09-29 23:35:30,616 INFO таблицы адресов догружены: 9, в очереди осталось 0
-Sep 29 23:36:41 claude-nl python[1498585]: 2026-09-29 23:36:41,217 INFO таблицы адресов догружены: 6, в очереди осталось 0
-Sep 29 23:37:08 claude-nl python[1498585]: 2026-09-29 23:37:08,577 INFO полоса: старт на 2onUfgNxDhHj
-Sep 29 23:37:08 claude-nl python[1498585]: 2026-09-29 23:37:08,587 INFO полоса: конец на 2onUfgNxDhHj -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
-Sep 29 23:37:51 claude-nl python[1498585]: 2026-09-29 23:37:51,842 INFO таблицы адресов догружены: 5, в очереди осталось 0
-Sep 29 23:39:02 claude-nl python[1498585]: 2026-09-29 23:39:02,404 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Sep 29 23:40:00 claude-nl python[1498585]: 2026-09-29 23:40:00,505 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:40:06 claude-nl python[1498585]: 2026-09-29 23:40:06,503 INFO полоса: старт на 4NwKB2jfkM7D
-Sep 29 23:40:09 claude-nl python[1498585]: 2026-09-29 23:40:09,825 INFO полоса: конец на 4NwKB2jfkM7D -- sent
-Sep 29 23:41:23 claude-nl python[1498585]: 2026-09-29 23:41:23,495 INFO таблицы адресов догружены: 4, в очереди осталось 0
-Sep 29 23:42:34 claude-nl python[1498585]: 2026-09-29 23:42:34,426 INFO таблицы адресов догружены: 10, в очереди осталось 0
-Sep 29 23:43:45 claude-nl python[1498585]: 2026-09-29 23:43:45,094 INFO таблицы адресов догружены: 12, в очереди осталось 0
-Sep 29 23:44:56 claude-nl python[1498585]: 2026-09-29 23:44:56,517 INFO таблицы адресов догружены: 8, в очереди осталось 0
-Sep 29 23:46:07 claude-nl python[1498585]: 2026-09-29 23:46:07,495 INFO таблицы адресов догружены: 22, в очереди осталось 0
-Sep 29 23:47:00 claude-nl python[1498585]: 2026-09-29 23:47:00,542 INFO полоса: старт на 4GEBFgiLgGNt
-Sep 29 23:47:00 claude-nl python[1498585]: 2026-09-29 23:47:00,553 INFO полоса: конец на 4GEBFgiLgGNt -- gate предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)
-Sep 29 23:47:00 claude-nl python[1498585]: 2026-09-29 23:47:00,553 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:47:18 claude-nl python[1498585]: 2026-09-29 23:47:18,265 INFO таблицы адресов догружены: 33, в очереди осталось 0
-Sep 29 23:48:28 claude-nl python[1498585]: 2026-09-29 23:48:28,765 INFO таблицы адресов догружены: 19, в очереди осталось 0
-Sep 29 23:49:00 claude-nl python[1498585]: 2026-09-29 23:49:00,580 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Sep 29 23:49:39 claude-nl python[1498585]: 2026-09-29 23:49:39,891 INFO таблицы адресов догружены: 10, в очереди осталось 0
-Sep 29 23:50:50 claude-nl python[1498585]: 2026-09-29 23:50:50,946 INFO таблицы адресов догружены: 11, в очереди осталось 0
-Sep 29 23:52:02 claude-nl python[1498585]: 2026-09-29 23:52:02,916 INFO таблицы адресов догружены: 13, в очереди осталось 0
-Sep 29 23:53:15 claude-nl python[1498585]: 2026-09-29 23:53:15,673 INFO таблицы адресов догружены: 2, в очереди осталось 0
-Sep 29 23:54:26 claude-nl python[1498585]: 2026-09-29 23:54:26,535 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Sep 29 23:55:37 claude-nl python[1498585]: 2026-09-29 23:55:37,391 INFO таблицы адресов догружены: 15, в очереди осталось 0
-Sep 29 23:56:48 claude-nl python[1498585]: 2026-09-29 23:56:48,378 INFO таблицы адресов догружены: 5, в очереди осталось 0
-Sep 29 23:57:59 claude-nl python[1498585]: 2026-09-29 23:57:59,286 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Sep 29 23:59:10 claude-nl python[1498585]: 2026-09-29 23:59:10,131 INFO таблицы адресов догружены: 26, в очереди осталось 0
-Sep 30 00:00:20 claude-nl python[1498585]: 2026-09-30 00:00:20,998 INFO таблицы адресов догружены: 15, в очереди осталось 0
-Sep 30 00:01:21 claude-nl python[1498585]: 2026-09-30 00:01:21,148 INFO таблицы адресов догружены: 6, в очереди осталось 0
-Sep 30 00:02:21 claude-nl python[1498585]: 2026-09-30 00:02:21,297 INFO таблицы адресов догружены: 2, в очереди осталось 0
-Sep 30 00:03:21 claude-nl python[1498585]: 2026-09-30 00:03:21,436 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Sep 30 00:03:45 claude-nl python[1498585]: 2026-09-30 00:03:45,537 INFO полоса: старт на 4oyz7Nb7WGJ7
-Sep 30 00:03:45 claude-nl python[1498585]: 2026-09-30 00:03:45,543 INFO полоса: конец на 4oyz7Nb7WGJ7 -- build тип пула вне полосы: 675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8
-Sep 30 00:04:10 claude-nl python[1498585]: 2026-09-30 00:04:10,311 INFO полоса: старт на 4g15ptJw72ub
-Sep 30 00:04:10 claude-nl python[1498585]: 2026-09-30 00:04:10,315 INFO полоса: конец на 4g15ptJw72ub -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Sep 30 00:04:21 claude-nl python[1498585]: 2026-09-30 00:04:21,875 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Sep 30 00:05:15 claude-nl python[1498585]: 2026-09-30 00:05:15,524 INFO полоса: старт на 45w1kYLjF1oR
-Sep 30 00:05:15 claude-nl python[1498585]: 2026-09-30 00:05:15,765 INFO полоса: старт на 4kuXFKYMgdQr
-Sep 30 00:05:15 claude-nl python[1498585]: 2026-09-30 00:05:15,766 INFO полоса: конец на 4kuXFKYMgdQr -- gate предел полосы: минт уже открыт
-Sep 30 00:05:16 claude-nl python[1498585]: 2026-09-30 00:05:16,176 WARNING цепь и учёт полосы расходятся на 0.104081880 SOL (цепь -0.10408188, учёт 0.0)
-Sep 30 00:05:18 claude-nl python[1498585]: 2026-09-30 00:05:18,810 INFO полоса: конец на 45w1kYLjF1oR -- sent
-Sep 30 00:05:22 claude-nl python[1498585]: 2026-09-30 00:05:22,220 INFO таблицы адресов догружены: 27, в очереди осталось 0
-Sep 30 00:06:22 claude-nl python[1498585]: 2026-09-30 00:06:22,642 INFO таблицы адресов догружены: 16, в очереди осталось 0
-Sep 30 00:07:23 claude-nl python[1498585]: 2026-09-30 00:07:23,231 INFO таблицы адресов догружены: 5, в очереди осталось 0
-Sep 30 00:08:23 claude-nl python[1498585]: 2026-09-30 00:08:23,601 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Sep 30 00:09:23 claude-nl python[1498585]: 2026-09-30 00:09:23,939 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Sep 30 00:10:24 claude-nl python[1498585]: 2026-09-30 00:10:24,305 INFO таблицы адресов догружены: 2, в очереди осталось 0
-Sep 30 00:11:24 claude-nl python[1498585]: 2026-09-30 00:11:24,631 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Sep 30 00:12:24 claude-nl python[1498585]: 2026-09-30 00:12:24,961 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Sep 30 00:13:25 claude-nl python[1498585]: 2026-09-30 00:13:25,379 INFO таблицы адресов догружены: 6, в очереди осталось 0
-Sep 30 00:14:25 claude-nl python[1498585]: 2026-09-30 00:14:25,712 INFO таблицы адресов догружены: 2, в очереди осталось 0
 Sep 30 00:15:27 claude-nl python[1498585]: 2026-09-30 00:15:27,448 INFO таблицы адресов догружены: 7, в очереди осталось 0
 Sep 30 00:15:40 claude-nl python[1498585]: 2026-09-30 00:15:40,703 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
+Sep 30 00:16:00 claude-nl python[1498585]: 2026-09-30 00:16:00,722 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
+Sep 30 00:16:27 claude-nl python[1498585]: 2026-09-30 00:16:27,770 INFO таблицы адресов догружены: 24, в очереди осталось 0
+Sep 30 00:17:28 claude-nl python[1498585]: 2026-09-30 00:17:28,081 INFO таблицы адресов догружены: 7, в очереди осталось 0
+Sep 30 00:18:28 claude-nl python[1498585]: 2026-09-30 00:18:28,426 INFO таблицы адресов догружены: 6, в очереди осталось 0
+Sep 30 00:20:29 claude-nl python[1498585]: 2026-09-30 00:20:29,051 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 30 00:22:33 claude-nl python[1498585]: 2026-09-30 00:22:33,766 INFO таблицы адресов догружены: 10, в очереди осталось 0
+Sep 30 00:23:34 claude-nl python[1498585]: 2026-09-30 00:23:34,109 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Sep 30 00:24:34 claude-nl python[1498585]: 2026-09-30 00:24:34,411 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Sep 30 00:25:34 claude-nl python[1498585]: 2026-09-30 00:25:34,753 INFO таблицы адресов догружены: 6, в очереди осталось 0
+Sep 30 00:26:35 claude-nl python[1498585]: 2026-09-30 00:26:35,078 INFO таблицы адресов догружены: 9, в очереди осталось 0
+Sep 30 00:27:15 claude-nl python[1498585]: 2026-09-30 00:27:15,012 INFO полоса: старт на 2sTLP5J9Ky8H
+Sep 30 00:27:15 claude-nl python[1498585]: 2026-09-30 00:27:15,015 INFO полоса: конец на 2sTLP5J9Ky8H -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 00:27:35 claude-nl python[1498585]: 2026-09-30 00:27:35,444 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 30 00:28:35 claude-nl python[1498585]: 2026-09-30 00:28:35,772 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 30 00:30:36 claude-nl python[1498585]: 2026-09-30 00:30:36,381 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 30 00:31:36 claude-nl python[1498585]: 2026-09-30 00:31:36,708 INFO таблицы адресов догружены: 12, в очереди осталось 0
+Sep 30 00:32:37 claude-nl python[1498585]: 2026-09-30 00:32:37,101 INFO таблицы адресов догружены: 15, в очереди осталось 0
+Sep 30 00:33:37 claude-nl python[1498585]: 2026-09-30 00:33:37,489 INFO таблицы адресов догружены: 36, в очереди осталось 0
+Sep 30 00:34:37 claude-nl python[1498585]: 2026-09-30 00:34:37,967 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 30 00:34:50 claude-nl python[1498585]: 2026-09-30 00:34:50,750 INFO полоса: старт на 2aN1USb9du6P
+Sep 30 00:34:50 claude-nl python[1498585]: 2026-09-30 00:34:50,753 INFO полоса: конец на 2aN1USb9du6P -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 00:35:01 claude-nl python[1498585]: 2026-09-30 00:35:01,010 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
+Sep 30 00:35:38 claude-nl python[1498585]: 2026-09-30 00:35:38,286 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Sep 30 00:36:25 claude-nl python[1498585]: 2026-09-30 00:36:25,886 INFO полоса: старт на 4FRbBXMdQ9nu
+Sep 30 00:36:25 claude-nl python[1498585]: 2026-09-30 00:36:25,890 INFO полоса: конец на 4FRbBXMdQ9nu -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Sep 30 00:36:40 claude-nl python[1498585]: 2026-09-30 00:36:40,540 INFO таблицы адресов догружены: 13, в очереди осталось 0
+Sep 30 00:36:57 claude-nl python[1498585]: 2026-09-30 00:36:57,071 INFO полоса: старт на 2czB5aTntxk3
+Sep 30 00:36:57 claude-nl python[1498585]: 2026-09-30 00:36:57,074 INFO полоса: конец на 2czB5aTntxk3 -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 00:37:40 claude-nl python[1498585]: 2026-09-30 00:37:40,864 INFO таблицы адресов догружены: 9, в очереди осталось 0
+Sep 30 00:38:41 claude-nl python[1498585]: 2026-09-30 00:38:41,187 INFO таблицы адресов догружены: 6, в очереди осталось 0
+Sep 30 00:39:41 claude-nl python[1498585]: 2026-09-30 00:39:41,524 INFO таблицы адресов догружены: 15, в очереди осталось 0
+Sep 30 00:41:42 claude-nl python[1498585]: 2026-09-30 00:41:42,166 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 30 00:42:42 claude-nl python[1498585]: 2026-09-30 00:42:42,484 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 30 00:44:43 claude-nl python[1498585]: 2026-09-30 00:44:43,113 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Sep 30 00:45:43 claude-nl python[1498585]: 2026-09-30 00:45:43,428 INFO таблицы адресов догружены: 17, в очереди осталось 0
+Sep 30 00:46:43 claude-nl python[1498585]: 2026-09-30 00:46:43,749 INFO таблицы адресов догружены: 14, в очереди осталось 0
+Sep 30 00:47:44 claude-nl python[1498585]: 2026-09-30 00:47:44,109 INFO таблицы адресов догружены: 23, в очереди осталось 0
+Sep 30 00:48:44 claude-nl python[1498585]: 2026-09-30 00:48:44,437 INFO таблицы адресов догружены: 18, в очереди осталось 0
+Sep 30 00:48:50 claude-nl python[1498585]: 2026-09-30 00:48:50,645 INFO полоса: старт на 2w5hH9bMEfx8
+Sep 30 00:48:50 claude-nl python[1498585]: 2026-09-30 00:48:50,649 INFO полоса: конец на 2w5hH9bMEfx8 -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 00:50:11 claude-nl python[1498585]: 2026-09-30 00:50:11,671 INFO полоса: старт на a32WEcr2jBb5
+Sep 30 00:50:11 claude-nl python[1498585]: 2026-09-30 00:50:11,677 INFO полоса: конец на a32WEcr2jBb5 -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Sep 30 00:50:45 claude-nl python[1498585]: 2026-09-30 00:50:45,022 INFO таблицы адресов догружены: 10, в очереди осталось 0
+Sep 30 00:51:45 claude-nl python[1498585]: 2026-09-30 00:51:45,365 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 30 00:53:46 claude-nl python[1498585]: 2026-09-30 00:53:46,176 INFO таблицы адресов догружены: 24, в очереди осталось 0
+Sep 30 00:54:46 claude-nl python[1498585]: 2026-09-30 00:54:46,607 INFO таблицы адресов догружены: 7, в очереди осталось 0
+Sep 30 00:55:47 claude-nl python[1498585]: 2026-09-30 00:55:47,099 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Sep 30 00:56:33 claude-nl python[1498585]: 2026-09-30 00:56:33,252 INFO полоса: старт на CfBM9Eypgg4P
+Sep 30 00:56:33 claude-nl python[1498585]: 2026-09-30 00:56:33,254 INFO полоса: конец на CfBM9Eypgg4P -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 00:56:47 claude-nl python[1498585]: 2026-09-30 00:56:47,416 INFO таблицы адресов догружены: 4, в очереди осталось 0
+Sep 30 00:57:01 claude-nl python[1498585]: 2026-09-30 00:57:01,013 INFO полоса: старт на 54BQKBSU3VDH
+Sep 30 00:57:01 claude-nl python[1498585]: 2026-09-30 00:57:01,016 INFO полоса: конец на 54BQKBSU3VDH -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 00:57:47 claude-nl python[1498585]: 2026-09-30 00:57:47,734 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Sep 30 00:58:48 claude-nl python[1498585]: 2026-09-30 00:58:48,104 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 30 00:59:45 claude-nl python[1498585]: 2026-09-30 00:59:45,625 INFO полоса: старт на 5SpVG3GhXyhT
+Sep 30 00:59:45 claude-nl python[1498585]: 2026-09-30 00:59:45,627 INFO полоса: конец на 5SpVG3GhXyhT -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 00:59:48 claude-nl python[1498585]: 2026-09-30 00:59:48,517 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Sep 30 01:01:49 claude-nl python[1498585]: 2026-09-30 01:01:49,113 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 30 01:02:49 claude-nl python[1498585]: 2026-09-30 01:02:49,444 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Sep 30 01:03:49 claude-nl python[1498585]: 2026-09-30 01:03:49,828 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Sep 30 01:04:16 claude-nl python[1498585]: 2026-09-30 01:04:16,333 INFO полоса: конец на 4q8NdD4wwuij -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 01:04:16 claude-nl python[1498585]: 2026-09-30 01:04:16,334 INFO полоса: старт на 4q8NdD4wwuij
+Sep 30 01:04:50 claude-nl python[1498585]: 2026-09-30 01:04:50,429 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 30 01:05:50 claude-nl python[1498585]: 2026-09-30 01:05:50,755 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 30 01:06:51 claude-nl python[1498585]: 2026-09-30 01:06:51,058 INFO таблицы адресов догружены: 13, в очереди осталось 0
+Sep 30 01:08:27 claude-nl python[1498585]: 2026-09-30 01:08:27,599 INFO полоса: старт на 5pHzWYMuRMzP
+Sep 30 01:08:27 claude-nl python[1498585]: 2026-09-30 01:08:27,601 INFO полоса: конец на 5pHzWYMuRMzP -- gate предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)
+Sep 30 01:08:52 claude-nl python[1498585]: 2026-09-30 01:08:52,162 INFO таблицы адресов догружены: 5, в очереди осталось 1
+Sep 30 01:09:53 claude-nl python[1498585]: 2026-09-30 01:09:53,042 INFO таблицы адресов догружены: 4, в очереди осталось 0
+Sep 30 01:10:53 claude-nl python[1498585]: 2026-09-30 01:10:53,294 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Sep 30 01:11:53 claude-nl python[1498585]: 2026-09-30 01:11:53,743 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Sep 30 01:12:54 claude-nl python[1498585]: 2026-09-30 01:12:54,119 INFO таблицы адресов догружены: 4, в очереди осталось 0
+Sep 30 01:13:54 claude-nl python[1498585]: 2026-09-30 01:13:54,874 INFO таблицы адресов догружены: 12, в очереди осталось 0
