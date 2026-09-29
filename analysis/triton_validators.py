@@ -344,13 +344,18 @@ def main() -> int:
     с = снимок(каталог=а.katalog)
     if с.get("ok"):
         записать(с, а.katalog)
-    печать = {к: зн for к, зн in с.items()
-               if к not in ("metki", "versii_uzlov")}
-    печать["dolya_slotov"] = доля_слотов(с)
-    текст = json.dumps(печать, ensure_ascii=False, indent=1)
+    # В ФАЙЛ -- ВСЁ, КРОМЕ metki (3755 строк "прочие" и ни одного числа);
+    # В ПЕЧАТЬ -- без versii_uzlov: их читает отчёт лидеров, а в журнале
+    # прогона они только заняли бы экран. Прогон 02:38Z записал файл БЕЗ
+    # versii_uzlov ровно потому, что файл писался из печати.
+    в_файл = {к: зн for к, зн in с.items() if к != "metki"}
+    в_файл["dolya_slotov"] = доля_слотов(с)
+    печать = {к: зн for к, зн in в_файл.items() if к != "versii_uzlov"}
+    печать["versii_uzlov_shtuk"] = len(с.get("versii_uzlov") or {})
     if а.out:
-        Path(а.out).write_text(текст, encoding="utf-8")
-    print(текст[:8000])
+        Path(а.out).write_text(json.dumps(в_файл, ensure_ascii=False, indent=1),
+                                encoding="utf-8")
+    print(json.dumps(печать, ensure_ascii=False, indent=1)[:8000])
     return 0 if с.get("ok") else 1
 
 
