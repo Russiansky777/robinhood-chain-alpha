@@ -1,0 +1,91 @@
+name: "Движение кошелька полосы за окно (по цепи, только чтение)"
+
+# ЗАЧЕМ. Правило 11 берёт продажу из истории токенового счёта позиции. Если тем
+# же счётом потом занимался кто-то ещё (владелец своим ключом через Jupiter,
+# прогон закрытия пустых счетов), в строку попадает НЕ та транзакция. Здесь
+# считается кошелёк: каждая его транзакция за окно, нативная дельта и минты.
+#
+# Только чтение: getSignaturesForAddress и getTransaction.
+on:
+  workflow_dispatch:
+    inputs:
+      koshelek:
+        description: "кошелёк (пусто -- кошелёк полосы из env хоста)"
+        required: false
+        default: ""
+      s:
+        description: "с какого времени UTC, например 2026-09-28T22:00:00Z"
+        required: true
+        default: "2026-09-28T22:00:00Z"
+      po:
+        description: "до какого времени UTC (пусто -- до сейчас)"
+        required: false
+        default: ""
+      podpisej:
+        description: "сколько подписей тянуть"
+        required: false
+        default: "100"
+
+concurrency:
+  group: dvizhenie-koshelka
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  RABOTA: /tmp/dvizhenie_koshelka
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  OUT_FILE: data/dvizhenie_koshelka.json
+
+jobs:
+  dvizhenie:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: SSH key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: Движение кошелька за окно
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dvizhenie_koshelka_okno.py" < deploy/checks/dvizhenie_koshelka_okno.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; W='${{ inputs.koshelek }}'; [ -n \"\$W\" ] || W=\"\$OWN_SEND_WALLET\"; [ -n \"\$W\" ] || W=\"\$BLOOM_LANE_WALLET\"; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR $VENV/python $RABOTA/dvizhenie_koshelka_okno.py --koshelek \"\$W\" --s '${{ inputs.s }}' --po '${{ inputs.po }}' --podpisej '${{ inputs.podpisej }}' --out $RABOTA/out.json" | tail -200
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > "$OUT_FILE" || true
+          [ -s "$OUT_FILE" ] || echo '{}' > "$OUT_FILE"
+
+      - name: Ключей в отчёте быть не должно
+        run: |
+          set -e
+          ! grep -Eq 'api-key=[A-Za-z0-9._-]{8,}' "$OUT_FILE"
+          echo "ключей в отчёте нет"
+
+      - name: Коммит
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Dvizhenie koshelka polosy za okno [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
