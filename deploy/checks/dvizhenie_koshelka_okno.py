@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import calendar
 import json
 import os
 import sys
@@ -70,7 +71,15 @@ def utc(т) -> str | None:
 
 
 def в_секундах(с: str) -> float:
-    return time.mktime(time.strptime(с.replace("Z", ""), "%Y-%m-%dT%H:%M:%S")) - time.timezone
+    """Строка UTC -> секунды эпохи. ТОЛЬКО calendar.timegm.
+
+    ПОЧЕМУ НЕ mktime МИНУС time.timezone. mktime читает время как МЕСТНОЕ, а
+    time.timezone -- сдвиг ЗИМНЕЙ зоны; на хосте в CEST это давало ошибку в
+    час, и первый прогон 01:30Z взял окно 21:00-23:00Z вместо 22:00-00:00Z.
+    Час сдвига в окне суток полосы -- это чужие сделки в счёте.
+    """
+    return float(calendar.timegm(time.strptime(с.replace("Z", ""),
+                                                "%Y-%m-%dT%H:%M:%S")))
 
 
 def разбор(tx: dict, кошелёк: str) -> dict:
