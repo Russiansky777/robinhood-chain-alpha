@@ -1,0 +1,181 @@
+name: "Приёмка строителя любого типа пула (только чтение и симуляция)"
+
+# ЗАЧЕМ (слово владельца 29.09 ночью, п.1): "Харнесс приёмки -- обобщить с DLMM
+# на любой тип пула: вход -- программа и живые покупки источников этого типа,
+# выход -- байт в байт / сборка / simulateTransaction / три числа. К 08:00 им
+# принимается CLMM без доработок харнесса".
+#
+# Ни одной подписи и ни одной отправки: сборку делает bloom_own_send.собрать,
+# которая намеренно отдаёт НЕПОДПИСАННУЮ транзакцию, а симуляция идёт с
+# sigVerify=false и replaceRecentBlockhash=true.
+#
+# ДЕНЕЖНЫЕ МОДУЛИ НЕ ПОДМЕНЯЮТСЯ. Харнесс зовёт ту сборку, что стоит на хосте у
+# службы: если мерить чужой версией, числа будут не про то, что торгует. На хост
+# кладётся только сам харнесс, во временный каталог.
+#
+# СВОЙ КЛЮЧ HELIUS (п.4 слова владельца): если задан секрет
+# HELIUS_API_KEY_CHECKS, прогон кладёт его в HELIUS_API_KEY_CHECKS, и харнесс
+# берёт именно его -- ключ служб при этом не трогается и перезапуск не нужен.
+# Секрета нет -- харнесс честно скажет, что взял общий ключ.
+#
+# ЖИВЫЕ ПОКУПКИ ИСТОЧНИКОВ берутся из сборов Code-2 (ветка claude/podbivka),
+# образцов пулов и журнала решений -- в этом порядке, и он задаётся входом.
+# Сборы НЕ копируются в рабочую ветку (они по 3-6 МБ и перезаписываются): они
+# читаются из ветки Code-2 прямо в каталог прогона.
+on:
+  workflow_dispatch:
+    inputs:
+      program:
+        description: "адрес программы пула (DLMM: LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo)"
+        required: true
+        default: "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+      skolko:
+        description: "сколько живых покупок взять"
+        required: false
+        default: "10"
+      simulyacij:
+        description: "по скольким просить simulateTransaction"
+        required: false
+        default: "3"
+      lamportov:
+        description: "размер нашей покупки для сборки, лампорты"
+        required: false
+        default: "10000000"
+      otkuda:
+        description: "порядок источников живых покупок"
+        required: false
+        default: "sbor,obrazcy,zhurnal"
+      vetka_sborov:
+        description: "ветка Code-2 со сборами (пусто -- сборы не брать)"
+        required: false
+        default: "claude/podbivka"
+
+concurrency:
+  group: priemka-stroitelya
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/priemka_stroitelya
+  OUT_FILE: data/priemka_stroitelya.json
+
+jobs:
+  priemka:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 0
+
+      - name: "Самопроверка харнесса (без сети)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/priemka_stroitelya.py
+          python3 deploy/checks/priemka_stroitelya.py --self-test | tail -3
+
+      - name: "Сборы Code-2 из его ветки (в рабочую ветку не копируются)"
+        run: |
+          set -e
+          install -d -m 755 /tmp/sbory
+          VETKA="${{ inputs.vetka_sborov }}"
+          if [ -z "$VETKA" ]; then echo "sbory ne berem"; exit 0; fi
+          git fetch origin "$VETKA" --depth=1 || { echo "vetka ne dostupna: $VETKA"; exit 0; }
+          for F in clmm_sbor.json whirlpool_sbor.json dlmm_sbor.json; do
+            if git show "origin/$VETKA:data/podbivka/$F" > "/tmp/sbory/$F" 2>/dev/null; then
+              echo "vzjat $F: $(wc -c < /tmp/sbory/$F) bajt"
+            else
+              rm -f "/tmp/sbory/$F"
+              echo "net $F na vetke"
+            fi
+          done
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Приёмка на хосте (ни подписи, ни отправки)"
+        env:
+          KLJUCH_CHECKS: ${{ secrets.HELIUS_API_KEY_CHECKS }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA $RABOTA/podbivka"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/priemka_stroitelya.py" < deploy/checks/priemka_stroitelya.py
+          for F in /tmp/sbory/*.json; do
+            [ -s "$F" ] || continue
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/podbivka/$(basename "$F")" < "$F"
+          done
+          ssh -n $SSH_OPTS root@$TARGET_HOST "ls -la $RABOTA/podbivka || true"
+          # КЛЮЧ ХАРНЕССА -- ЧЕРЕЗ stdin, не через командную строку: аргументы
+          # процесса видны всем в ps, переменная окружения -- нет.
+          if [ -n "$KLJUCH_CHECKS" ]; then
+            printf '%s' "$KLJUCH_CHECKS" | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/kljuch; chmod 600 $RABOTA/kljuch; chown bot:bot $RABOTA/kljuch"
+            echo "kljuch harnessov zadan otdelno (HELIUS_API_KEY_CHECKS)"
+          else
+            echo "otdelnogo kljucha net -- harness vozmet obshchij i skazhet ob etom strokoj"
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY_CHECKS=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY_CHECKS; fi
+            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR \
+              $VENV/python $RABOTA/priemka_stroitelya.py \
+                --program '${{ inputs.program }}' \
+                --skolko '${{ inputs.skolko }}' \
+                --simulyacij '${{ inputs.simulyacij }}' \
+                --lamportov '${{ inputs.lamportov }}' \
+                --otkuda '${{ inputs.otkuda }}' \
+                --sbory $RABOTA/podbivka \
+                --state-dir $STATE_DIR \
+                --out $RABOTA/out.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/priemka.json || true
+          if python3 -c "import json; json.load(open('/tmp/priemka.json'))" 2>/dev/null; then
+            cp /tmp/priemka.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: priemka ne sobralas"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT_FILE" ] || exit 0
+          if grep -qiE 'api-key=[A-Za-z0-9-]{8}|HELIUS_API_KEY=[A-Za-z0-9-]{8}' "$OUT_FILE"; then
+            echo "SBOY: v otchete est pohozhee na kljuch"
+            exit 1
+          fi
+          echo "kljuchej v otchete net"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Priemka stroitelya: bajt v bajt, sborka polosoj, simulyaciya [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
