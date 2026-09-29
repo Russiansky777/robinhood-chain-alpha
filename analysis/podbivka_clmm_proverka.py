@@ -57,6 +57,8 @@ def сверить(сн: dict) -> dict:
         return {"отсев": "exact_out"}
     e = ев[0]
     zfo = e["zero_for_one"]
+    if (zfo and e["sqrt_price_x64"] > pool["sqrt_price_x64"]) or (not zfo and e["sqrt_price_x64"] < pool["sqrt_price_x64"]):
+        return {"отсев": "цена после сдвинулась против направления свопа (между чтением и сделкой было другое)"}
     вход = e["amount_0"] if zfo else e["amount_1"]
     факт = (e["amount_1"] + e["transfer_fee_1"]) if zfo else (e["amount_0"] + e["transfer_fee_0"])
     лимит = x.get("sqrt_price_limit_x64") or 0
