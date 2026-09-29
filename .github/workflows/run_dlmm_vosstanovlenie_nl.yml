@@ -70,7 +70,7 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dlmm_vosstanovlenie.py" < deploy/checks/dlmm_vosstanovlenie.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/podbivka_dlmm_quote.py" < analysis/podbivka_dlmm_quote.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py" < analysis/c2_dlmm_tochnaya_kotirovka.py
