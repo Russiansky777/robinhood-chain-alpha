@@ -69,6 +69,8 @@ def одна(уз: S.Узел, с: dict) -> dict:
     tb = уз.tx(с["buy_sig"])
     if not tb:
         return {**из_, "why_not": "узел не отдал нашу покупку"}
+    if (tb.get("meta") or {}).get("err") is not None:
+        return {**из_, "why_not": "покупка не села (транзакция упала) -- продажи нет"}
     наш = с.get("наш_кошелёк") or (C.account_keys(tb) or [None])[0]   # плательщик нашей покупки
     sell = с.get("sell_sig")
     if not sell:
@@ -95,6 +97,8 @@ def одна(уз: S.Узел, с: dict) -> dict:
     прог = PP.pool_program(tb, пул["pool_vault"], PP.labels()).get("pool_program")
     из_["program"] = прог
     if прог not in (S.SB.CPMM, S.SB.PUMP_AMM, "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"):
+        if прог == "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd":
+            return {**из_, "why_not": "Meteora DAMM v2 -- модели нет"}
         return {**из_, "why_not": f"программа пула {прог}: вне x*y=k по хранилищам"}
     src = с.get("src_sig")
     if not src:
