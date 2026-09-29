@@ -4,7 +4,8 @@
 Группы и их живые настройки -- data/vps_health_nl.txt ветки Code-1 (29.09 01:14Z, только чтение):
 leader 0.5 SOL / порог 3 / держим 150; batch5 и lane_s0 0.3 / 2 / 108; sniper_src 0.3 / 2 / 12 (lane_trades false).
 Адреса групп -- data/podbivka/gruppy_code1.json, снайперы -- data/podbivka/istochniki_code1_kandidaty.json.
-Сигнал -- первая покупка источника от порога группы, котировка SOL. Модель режима 1 архива: входы
+Сигнал -- покупка источника от порога группы по правилу Code-1 (нет его покупки того же минта в предыдущие
+1800 слотов; прогон с --okno-dokupki 1800, поле «по_окну»), котировка SOL. Модель режима 1 архива: входы
 S0 (сразу за ним), S0_дно (конец слота), S1; выходы +6…+150 слотов; билеты 0.3 и 0.5.
 Пулы: кривая pump.fun и LaunchLab -- для вывода; Pump AMM -- не для вывода (лишний остаток E, архив видит
 не все свопы). Выход: docs/podbivka_2026-09-29_gruppy_vyhody.md.
@@ -35,7 +36,7 @@ def ячейка(v: list) -> str:
 
 def main() -> int:
     р = argparse.ArgumentParser()
-    р.add_argument("--prefiks", default="pyg6")
+    р.add_argument("--prefiks", default="pyg7")
     а = р.parse_args()
     гр = json.loads((КОРЕНЬ / "data" / "podbivka" / "gruppy_code1.json").read_text(encoding="utf-8"))["groups"]
     кошельки = {г: set((гр.get(г) or {}).get("addresses") or {}) for г in ("leader", "batch5", "lane_s0")}
@@ -47,7 +48,8 @@ def main() -> int:
         д = json.loads(gzip.decompress(Path(f).read_bytes()))
         ошибки += [e.split(":")[0] for e in (д.get("счёт") or {}).get("ошибки") or []]
         for с in д.get("сигналы") or []:
-            if с["signature"] in видел or (с.get("модель") or {}).get("why_not") or с.get("quoteMint") != WSOL:
+            if (с["signature"] in видел or (с.get("модель") or {}).get("why_not") or с.get("quoteMint") != WSOL
+                    or с.get("по_окну") is False):
                 continue
             видел.add(с["signature"])
             сиг.append(с)
@@ -55,8 +57,9 @@ def main() -> int:
     дни = sorted({Path(f).name.split("_")[1][:10] for f in файлы})
     md = ["# Подбивка: ранние выходы / билет / конец слота по группам Code-1 -- архив PumpApi", "",
           f"Прогон {а.prefiks}: суток {len(файлы)} (начала суток: {', '.join(дни)}); недочитанные часы: "
-          f"{', '.join(sorted(set(ошибки))) or 'нет'}. Сигнал -- первая покупка источника от порога группы, котировка SOL "
-          "(«первая» -- по сумме ног транзакции). Модель режима 1 архива, п.п. чистыми. Ячейка: среднее / медиана / в плюсе. "
+          f"{', '.join(sorted(set(ошибки))) or 'нет'}. Сигнал -- покупка источника от порога группы, котировка SOL, "
+          "по правилу Code-1: нет его покупки того же минта в предыдущие 1800 слотов (bloom_detector.py, «докупка -- по окну, "
+          "а не по остатку»). Модель режима 1 архива, п.п. чистыми. Ячейка: среднее / медиана / в плюсе. "
           "Живые настройки групп -- data/vps_health_nl.txt ветки Code-1 (29.09 01:14Z); столбец живого удержания -- жирным. "
           "Секунды: +72 ≈ 19 с, +108 ≈ 29 с, +150 ≈ 41 с (метки архива, docs/podbivka_2026-09-29_lane_s0.md). "
           "Ничего не рекомендуется.", ""]
