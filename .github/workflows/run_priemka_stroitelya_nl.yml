@@ -53,6 +53,10 @@ on:
         description: "брать только покупки с этим минтом среди счетов (WSOL: So11111111111111111111111111111111111111112)"
         required: false
         default: ""
+      vetka_kandidata:
+        description: "ветка со строителем-кандидатом (пусто -- мерить то, что СТОИТ на хосте)"
+        required: false
+        default: ""
 
 concurrency:
   group: priemka-stroitelya
@@ -109,6 +113,44 @@ jobs:
             fi
           done
 
+      - name: "Строитель-кандидат из его ветки (только если попросили)"
+        run: |
+          set -e
+          VK="${{ inputs.vetka_kandidata }}"
+          if [ -z "$VK" ]; then
+            echo "kandidata net -- meriaem to, chto STOIT na hoste"
+            exit 0
+          fi
+          # ЗАЧЕМ ЭТО НУЖНО И ПОЧЕМУ ЭТО НЕ ПРАВКА ХАРНЕССА. Харнесс ищет
+          # денежные модули в BLOOM_CODE_DIR -- так он и мерит то, что стоит у
+          # службы. Приёмка НОВОГО строителя обязана мерить его ДО развёртывания,
+          # иначе "принято" означало бы "уже торгует". Здесь меняется только
+          # каталог, из которого харнесс берёт сборку; сам харнесс тот же.
+          #
+          # ОТЧЁТ СКАЖЕТ, ЧЕЙ КОД МЕРИЛИ: харнесс пишет путь и sha256 файла
+          # сборки и метку "это кандидат" -- иначе два отчёта не различить.
+          install -d -m 755 /tmp/kandidat
+          rm -f /tmp/kandidat/*.py
+          timeout 150 git fetch --depth=1 --filter=blob:none origin "$VK"             || { echo "vetka kandidata ne dostupna: $VK"; exit 1; }
+          echo "kandidat: $(git rev-parse --short FETCH_HEAD)"
+          timeout 60 git ls-tree --name-only FETCH_HEAD:analysis > /tmp/kand_spisok.txt
+          VZJATO=0
+          while read -r F; do
+            case "$F" in
+              *.py)
+                if timeout 60 git cat-file -p "FETCH_HEAD:analysis/$F" > "/tmp/kandidat/$F" 2>/dev/null; then
+                  VZJATO=$((VZJATO + 1))
+                else
+                  rm -f "/tmp/kandidat/$F"
+                fi
+                ;;
+            esac
+          done < /tmp/kand_spisok.txt
+          echo "fajlov kandidata vzjato: $VZJATO"
+          [ "$VZJATO" -gt 0 ] || { echo "SBOY: ni odnogo .py u kandidata"; exit 1; }
+          [ -f /tmp/kandidat/bloom_own_send.py ] || {
+            echo "SBOY: u kandidata net bloom_own_send.py -- merit' nechem"; exit 1; }
+
       - name: "SSH key"
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -133,6 +175,20 @@ jobs:
             ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/podbivka/$(basename "$F")" < "$F"
           done
           ssh -n $SSH_OPTS root@$TARGET_HOST "ls -la $RABOTA/podbivka || true"
+          # КОД КАНДИДАТА -- В ОТДЕЛЬНЫЙ КАТАЛОГ ПРОГОНА, НИКОГДА В $CODE_DIR.
+          # Служба продолжает работать своим кодом; каталог сносится в конце.
+          KOD="$CODE_DIR"
+          if [ -n "${{ inputs.vetka_kandidata }}" ] && [ -f /tmp/kandidat/bloom_own_send.py ]; then
+            ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA/kandidat"
+            # ОДНИМ ПОТОКОМ, А НЕ ФАЙЛ НА ssh: модулей у кандидата десятки, и
+            # два десятка соединений заняли бы раннер дольше самой приёмки.
+            tar -C /tmp/kandidat -cf - . | ssh $SSH_OPTS root@$TARGET_HOST "tar -C $RABOTA/kandidat -xf -"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $RABOTA/kandidat; echo 'fajlov u kandidata na hoste:' \$(ls $RABOTA/kandidat/*.py | wc -l)"
+            KOD="$RABOTA/kandidat"
+            echo "MERIM KANDIDATA iz $KOD (vetka ${{ inputs.vetka_kandidata }})"
+          else
+            echo "merim to, chto stoit u sluzhby: $KOD"
+          fi
           # КЛЮЧ ХАРНЕССА -- ЧЕРЕЗ stdin, не через командную строку: аргументы
           # процесса видны всем в ps, переменная окружения -- нет.
           if [ -n "$KLJUCH_CHECKS" ]; then
@@ -144,7 +200,7 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY_CHECKS=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY_CHECKS; fi
-            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR \
+            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$KOD:$CODE_DIR BLOOM_CODE_DIR=$KOD \
               $VENV/python $RABOTA/priemka_stroitelya.py \
                 --program '${{ inputs.program }}' \
                 --skolko '${{ inputs.skolko }}' \
