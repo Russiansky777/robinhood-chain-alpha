@@ -1,0 +1,82 @@
+name: "План утреннего круга 0.01: составить и проверить (файл НЕ меняется)"
+
+# ЗАЧЕМ (слово владельца 29.09 ночью, п.2): "подготовить, не запускать: группа
+# test_krug ... Проверка плана самопроверкой, сам файл до утра не менять".
+#
+# Прогон только читает живой файл групп, строит план в памяти, проверяет его
+# списком условий и печатает план, план возврата и команду владельца. Ни записи,
+# ни бэкапа: файл на диске не трогается вовсе.
+on:
+  workflow_dispatch:
+    inputs:
+      otkuda:
+        description: "чьи источники берём в круг"
+        required: false
+        default: "lane_s0"
+
+concurrency:
+  group: plan-test-krug
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  RABOTA: /tmp/plan_test_krug
+  OUT_FILE: data/plan_test_krug.json
+
+jobs:
+  plan:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка плана ДО чтения хоста"
+        run: python3 deploy/checks/plan_test_krug.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "План по живому файлу групп (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/plan_test_krug.py" < deploy/checks/plan_test_krug.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $RABOTA/plan_test_krug.py --otkuda '${{ inputs.otkuda }}' --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/plan_test_krug.json || true
+          if python3 -c "import json; json.load(open('/tmp/plan_test_krug.json'))" 2>/dev/null; then
+            cp /tmp/plan_test_krug.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: plan ne sobralsya"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Plan utrennego kruga 0.01: sostavlen i proveren [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
