@@ -92,6 +92,46 @@ def s_plus(ряд: dict) -> dict:
     return {"s_plus": int(наш) - int(ист), "why_not": None}
 
 
+def карта_лидеров(путь: str) -> dict:
+    """Карта "личность лидера -> регион" из data/leader_regions.json.
+
+    Возвращает {по_лидеру, эпоха, начало_эпохи, слотов_в_эпохе, why_not}.
+    Карты нет или в ней нет эпохи -- отказ словами: region у сделок останется
+    пустым с причиной, а не догадкой.
+    """
+    if not путь or not os.path.exists(путь):
+        return {"по_лидеру": {}, "why_not": f"карты регионов нет: {путь}"}
+    try:
+        with open(путь, encoding="utf-8") as ф:
+            д = json.load(ф)
+    except Exception as e:  # noqa: BLE001
+        return {"по_лидеру": {}, "why_not": f"карта не читается: {type(e).__name__}"}
+    по_лидеру = д.get("по_лидеру") or {}
+    нач, длина = д.get("начало_эпохи"), д.get("слотов_в_эпохе")
+    if not по_лидеру:
+        return {"по_лидеру": {}, "why_not": "в карте нет по_лидеру"}
+    if not isinstance(нач, int) or not isinstance(длина, int):
+        return {"по_лидеру": по_лидеру,
+                "why_not": "в карте нет границ эпохи -- слот к лидеру не привязать"}
+    return {"по_лидеру": по_лидеру, "эпоха": д.get("эпоха"),
+            "начало_эпохи": нач, "слотов_в_эпохе": длина,
+            "собрано_utc": д.get("собрано_utc"), "why_not": None}
+
+
+def лидер_слота(слот, расписание: dict, начало: int):
+    """Личность лидера слота по расписанию эпохи. {лидер, why_not}.
+
+    В getLeaderSchedule ключ -- личность, значение -- ИНДЕКСЫ слотов от начала
+    эпохи. Разворачиваем в индекс -> личность один раз на прогон.
+    """
+    if not isinstance(слот, int):
+        return {"лидер": None, "why_not": "слота нет"}
+    и = слот - начало
+    if и < 0 or и not in расписание:
+        return {"лидер": None, "why_not": "слот вне расписания этой эпохи"}
+    return {"лидер": расписание[и], "why_not": None}
+
+
 def удержание_в_секундах(п: dict):
     """Секунд от отправки покупки до отправки продажи. То же, что в строке SELL."""
     начало = п.get("ts_sent") or п.get("ts_accepted") or п.get("ts_intent")
@@ -396,6 +436,8 @@ def main() -> int:
     р.add_argument("--bez-seti", action="store_true",
                    help="не ходить в сеть: место в блоке останется пустым там, "
                          "где его нет в записи")
+    р.add_argument("--karta-regionov", default="data/leader_regions.json",
+                    help="карта личность лидера -> регион (только чтение)")
     р.add_argument("--self-test", action="store_true")
     а = р.parse_args()
     if а.self_test:
@@ -483,11 +525,22 @@ def main() -> int:
             # записи нет, здесь стоит None и причина -- это честнее нуля.
             "s_plus": None,
             "s_plus_why_not": None,
-            "region_lidera": п.get("lane_region"),
+            # РЕГИОН ЛИДЕРА И РЕГИОН ОТПРАВКИ -- ДВЕ РАЗНЫЕ ВЕЩИ, и мешать
+            # их нельзя. region_lidera -- где сидел лидер слота, в который мы
+            # СЕЛИ: он считается по расписанию эпохи и карте регионов ниже и
+            # есть уже сейчас, до всякого включения флага. Именно он даёт "ДО"
+            # в метрике "S+0 до/после по не-EU лидерам". region_otpravki --
+            # какую региональную точку выбрала полоса; пока
+            # BLOOM_REGION_SEND выключен, его в записи нет вовсе.
+            "region_lidera": None,
+            "region_lidera_why_not": None,
+            "region_otpravki": п.get("lane_region"),
             "region_point": п.get("lane_region_point"),
             "region_senders": п.get("lane_region_senders"),
-            "region_why_not": (п.get("lane_region_why_not")
-                                if п.get("lane_region") is None else None),
+            "region_otpravki_why_not": (
+                п.get("lane_region_why_not") or "поля региона в записи нет:"
+                " региональная отправка регион не писала"
+                if п.get("lane_region") is None else None),
             "hold_s_fact": удержание_в_секундах(п),
             "tips_sol": п.get("lane_tips_total_sol"),
             "priority_lamports": п.get("lane_priority_lamports"),
@@ -632,6 +685,64 @@ def main() -> int:
         р_["s_plus_why_not"] = сп["why_not"]
         с_плюсом += (сп["s_plus"] is not None)
     print(f"S+0 посчитан у {с_плюсом} из {len(ряды)} сделок")
+    # РЕГИОН ЛИДЕРА СЛОТА ПОСАДКИ -- база "ДО" для метрики п.2. Расписание
+    # эпохи спрашивается ОДИН раз: границы эпохи берутся из самой карты
+    # (getEpochInfo лишним вызовом не нужен), а слоты чужих эпох честно
+    # помечаются причиной.
+    км = карта_лидеров(а.karta_regionov)
+    if км.get("why_not"):
+        for р_ in ряды:
+            р_["region_lidera_why_not"] = км["why_not"]
+        print(f"регион лидера: {км['why_not']}")
+    else:
+        нач, длина = км["начало_эпохи"], км["слотов_в_эпохе"]
+        свои = [р_ for р_ in ряды
+                 if isinstance(р_.get("landed_slot"), int)
+                 and нач <= р_["landed_slot"] < нач + длина]
+        чужие = len(ряды) - len(свои)
+        расп: dict = {}
+        причина = None
+        if not свои:
+            причина = f"ни один слот не из эпохи карты ({км.get('эпоха')})"
+        elif а.bez_seti:
+            причина = "расписание эпохи не спрошено (--bez-seti)"
+        elif not ключ:
+            причина = "HELIUS_API_KEY не задан -- расписание эпохи спросить нечем"
+        else:
+            у = узел if узел is not None else Узел(ключ)
+            узел = у
+            try:
+                сырое = у.зов("getLeaderSchedule", [нач]) or {}
+                for личность, инд in сырое.items():
+                    for и in инд:
+                        расп[и] = личность
+            except Exception as e:  # noqa: BLE001
+                причина = f"getLeaderSchedule не отдался: {type(e).__name__}"
+        по_региону: dict = {}
+        посчитано = 0
+        for р_ in ряды:
+            if причина:
+                р_["region_lidera_why_not"] = причина
+                continue
+            слот = р_.get("landed_slot")
+            if not (isinstance(слот, int) and нач <= слот < нач + длина):
+                р_["region_lidera_why_not"] = (
+                    f"слот посадки не из эпохи карты ({км.get('эпоха')})")
+                continue
+            л = лидер_слота(слот, расп, нач)
+            if not л["лидер"]:
+                р_["region_lidera_why_not"] = л["why_not"]
+                continue
+            рег = (км["по_лидеру"] or {}).get(л["лидер"])
+            if not рег:
+                р_["region_lidera_why_not"] = "лидера нет в карте регионов"
+                continue
+            р_["region_lidera"] = рег
+            посчитано += 1
+            по_региону[рег] = по_региону.get(рег, 0) + 1
+        сводка = ", ".join(f"{к}={v}" for к, v in sorted(по_региону.items()))
+        print(f"регион лидера посадки: посчитан у {посчитано} из {len(ряды)}"
+              f" сделок; вне эпохи карты {чужие}; {сводка or 'по регионам пусто'}")
     # ЧУЖИЕ ПРОДАЖИ В ОКНЕ НАШЕГО УДЕРЖАНИЯ / НАШ БИЛЕТ (слово владельца
     # 29.09, п.3). Считается по цепи и только для ЗАКРЫТЫХ сделок, у которых
     # есть обе подписи и обе метки слотов: без них окна нет, а выдумывать его
@@ -765,6 +876,17 @@ def самопроверка() -> int:
     chk("подписи варианта не двоятся",
         наши_подписи({"lane_signature": "A", "lane_pool_candidates": ["A", "B"]})
         == ["A", "B"])
+    chk("S+0: 451748367 - 451748365 = 2",
+        s_plus({"landed_slot": 451748367, "source_slot": 451748365})["s_plus"] == 2)
+    chk("нет слота источника -- причина, а не ноль",
+        s_plus({"landed_slot": 1})["s_plus"] is None
+        and s_plus({"landed_slot": 1})["why_not"])
+    chk("карты регионов нет -- отказ словами, а не пустая карта молча",
+        карта_лидеров("/нет/такого/файла.json")["why_not"])
+    chk("лидер слота берётся по индексу от начала эпохи",
+        лидер_слота(451440007, {7: "Личность"}, 451440000)["лидер"] == "Личность")
+    chk("слот вне расписания эпохи -- причина, а не чужой лидер",
+        лидер_слота(451440007, {8: "Личность"}, 451440000)["лидер"] is None)
     print(f"самопроверка выгрузки сделок полосы: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
