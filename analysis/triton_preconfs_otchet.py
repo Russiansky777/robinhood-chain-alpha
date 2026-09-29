@@ -423,8 +423,30 @@ def лидеры_фида(преконфы: dict, карта: dict, распис
                                       "featureSet": (наборы or {}).get(лидер)})
         стр["soobshchenij"] += 1
         стр["slotov_fida"].add(int(слот))
+    # ОКНО РАБОТЫ ЗОНДА -- ИЗ САМИХ ЗАПИСЕЙ (п.6 слова владельца 29.09).
+    # ЗАЧЕМ: любую долю "покупок источников в слотах лидеров фида" можно считать
+    # ТОЛЬКО внутри часов, когда зонд действительно слушал. 0.87 % за "24 ч"
+    # невалидно: Harmonic закрылся по пределу задолго до конца суток, и знаменатель
+    # был взят чужой. Границы берутся по t_recv самих преконфов -- это то время,
+    # за которое у нас есть данные, и выдумывать его не нужно.
+    времена = [float(з.get("t_recv")) for з in (преконфы or {}).values()
+                if isinstance(з.get("t_recv"), (int, float))]
+    окно = {"ts_min": (min(времена) if времена else None),
+             "ts_max": (max(времена) if времена else None),
+             "zapisej": len(времена)}
+    окно["chasov"] = (round((окно["ts_max"] - окно["ts_min"]) / 3600.0, 3)
+                       if окно["ts_min"] is not None and окно["ts_max"] is not None
+                       else None)
+    окно["utc_s"] = (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(окно["ts_min"]))
+                      if окно["ts_min"] is not None else None)
+    окно["utc_po"] = (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(окно["ts_max"]))
+                       if окно["ts_max"] is not None else None)
+    окно["kak_schitat_dolyu"] = ("долю покупок в слотах лидеров фида считать "
+                                  "ТОЛЬКО по покупкам внутри этого окна: вне его "
+                                  "у нас нет данных фида, и знаменатель был бы чужой")
     из_: dict = {"slotov_v_epohe": всего_слотов,
-                  "slotov_bez_lidera": без_лидера, "po_fidam": {}}
+                  "slotov_bez_lidera": без_лидера, "okno_zonda": окно,
+                  "po_fidam": {}}
     for ф, гр in sorted(по_фидам.items()):
         ряд = []
         for лидер, стр in гр.items():
@@ -659,10 +681,52 @@ def main() -> int:
         # рядом числом.
         расход["cena_soobshcheniya_usd"] = 50.0 / 1_000_000
         расход["cena_slota_usd"] = 1_500.0 / 1_000_000
-        расход["usd_po_paneli"] = round(
+        расход["usd_perescheto"] = round(
             int(расход.get("bam_messages") or 0) * 50.0 / 1_000_000
             + int(расход.get("harmonic_billable_slots") or 0) * 1_500.0 / 1_000_000,
             4)
+        # РАСХОД СЧИТАЕТСЯ ПО СТАТУСАМ ПРОЦЕССОВ (п.6 слова владельца 29.09).
+        # Почему не по осколкам суток: осколки берутся тут через max() по полям,
+        # и если фид перезапускался или день в файле сменился, max даёт МЕНЬШЕ
+        # потраченного. 29.09 из-за этого сводка показывала $0.019, тогда как
+        # сами зонды в своих статусах насчитали $0.063 и $0.017. Правду знает
+        # процесс: он и считает стоимость своим же стоимость_usd().
+        #
+        # Пересчёт по осколкам оставлен РЯДОМ и назван usd_perescheto: два
+        # числа и их разница честнее одного, про которое неизвестно, откуда оно.
+        по_статусам = {"usd": 0.0, "файлов": 0, "по_фидам": {}, "why_not": None}
+        for фид in ("bam", "harmonic"):
+            пс = Path(а.katalog) / f"status_{фид}.json"
+            if not пс.exists():
+                по_статусам["по_фидам"][фид] = {"why_not": "статуса нет"}
+                continue
+            try:
+                с_ = json.loads(пс.read_text(encoding="utf-8"))
+            except Exception as exc:  # noqa: BLE001
+                по_статусам["по_фидам"][фид] = {
+                    "why_not": f"{type(exc).__name__}"}
+                continue
+            u = с_.get("usd_po_paneli")
+            по_статусам["по_фидам"][фид] = {
+                "usd_po_paneli": u, "day": с_.get("day"),
+                "messages_day": с_.get("messages_day"),
+                "billable_slots_day": с_.get("billable_slots_day"),
+                "closed_why": с_.get("closed_why")}
+            if isinstance(u, (int, float)):
+                по_статусам["usd"] = round(по_статусам["usd"] + float(u), 6)
+                по_статусам["файлов"] += 1
+        if not по_статусам["файлов"]:
+            по_статусам["why_not"] = "ни одного статуса процесса не прочитано"
+        расход["po_statusam"] = по_статусам
+        # ГЛАВНОЕ ЧИСЛО -- ПО СТАТУСАМ. Если их нет вовсе, честно берётся
+        # пересчёт, и сказано, что это он.
+        расход["usd_po_paneli"] = (по_статусам["usd"] if по_статусам["файлов"]
+                                    else расход["usd_perescheto"])
+        расход["usd_otkuda"] = ("статусы процессов" if по_статусам["файлов"]
+                                 else "пересчёт по осколкам суток")
+        расход["usd_raznica_statusy_minus_oskolki"] = round(
+            (по_статусам["usd"] if по_статусам["файлов"] else 0.0)
+            - расход["usd_perescheto"], 6)
     журналы = [ж.strip() for ж in (а.zhurnaly or "").split(",") if ж.strip()]
     if а.lidery_fida:
         пре = преконфы_из_журнала(журналы)["preconfs"]
