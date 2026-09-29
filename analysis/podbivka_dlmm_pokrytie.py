@@ -100,6 +100,7 @@ def main() -> int:
     import podbivka_run as R  # noqa: PLC0415
     р = argparse.ArgumentParser()
     р.add_argument("--n", type=int, default=40)
+    р.add_argument("--tolko-svop", action="store_true", help="только разбор свопа 4pSQ2zbz (часть 2)")
     а = р.parse_args()
     д = json.loads(gzip.decompress((КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / "den_2026-09-28T06.json.gz").read_bytes()))
     пок, по_ист, видел = [], {}, set()
@@ -114,14 +115,15 @@ def main() -> int:
     уз = S.Узел()
     рез = []
     with уз.на("helius"):
-        for п in пок:
+        for п in ([] if а.tolko_svop else пок):
             try:
                 рез.append(одна(уз, п))
             except (RuntimeError, Q.ОшибкаDLMM) as exc:
                 рез.append({"подпись": п["signature"], "why_not": S.чисто(str(exc))[:160]})
         # 2. своп 4pSQ2zbz
         мн = json.loads((КОРЕНЬ / "data" / "podbivka" / "dlmm_proverka_mnogo4.json").read_text(encoding="utf-8"))
-        x = next((x for x in мн["итог"] if x["пул"].startswith("4pSQ2zbz") and x["swap_for_y"] is False), None)
+        x = next((x for x in мн["итог"] if x["пул"].startswith("4pSQ2zbz") and x["swap_for_y"] is False
+                  and (x.get("расхождение_пп") or 0) < -1), None)          # необъяснённый: −2.74 %, 1 корзина против 5
         разбор = {}
         if x:
             т = уз.tx(x["сделка"])
@@ -140,7 +142,7 @@ def main() -> int:
                                        "поддержка_лимитных": Q.support_limit_order(lb)}
             разбор["сделка"] = x["сделка"]
             разбор["слот_чтения"] = x["slot_чтения"]
-    вых = КОРЕНЬ / "data" / "podbivka" / "dlmm_pokrytie.json"
+    вых = КОРЕНЬ / "data" / "podbivka" / ("dlmm_4pSQ2zbz.json" if а.tolko_svop else "dlmm_pokrytie.json")
     вых.write_text(json.dumps({"покупки": рез, "своп_4pSQ2zbz": разбор, "расход": уз.расход()}, ensure_ascii=False,
                               default=str), encoding="utf-8")
     R.записано(вых)
