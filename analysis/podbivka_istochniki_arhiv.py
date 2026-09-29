@@ -41,7 +41,8 @@ def main() -> int:
     а = р.parse_args()
     сп = json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki_code1_kandidaty.json").read_text(encoding="utf-8"))
     канд = set(сп["кандидаты"])
-    кошельки = sorted(set(сп["группы_code1"]) | канд)
+    снайп = set(сп.get("снайперы") or [])      # sniper_src Code-1 (29.09; в архиве с pyg5)
+    кошельки = sorted(set(сп["группы_code1"]) | канд | снайп)
     адр = json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
     файлы = sorted(glob.glob(str(КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{а.prefiks}*.json.gz")))
     пок, видел, ошибки, t = [], set(), [], []
@@ -74,7 +75,7 @@ def main() -> int:
         ник = lambda x: (x["следом_05_15с"] == 0) if x.get("следом_05_15с") is not None else None  # noqa: E731
         пр = lambda x: (x["продаж_в_слоте"] > 0) if x.get("продаж_в_слоте") is not None else None  # noqa: E731
         сумм = [x["продажи_в_слоте_sol"] for x in сс if (x.get("продаж_в_слоте") or 0) > 0]
-        г = "кандидат" if w in канд else ", ".join(g for g in ((адр.get(w) or {}).get("группы") or []) if g in ("leader", "batch5", "lane_s0"))
+        г = "sniper_src" if w in снайп else "кандидат" if w in канд else ", ".join(g for g in ((адр.get(w) or {}).get("группы") or []) if g in ("leader", "batch5", "lane_s0"))
         имя = (адр.get(w) or {}).get("имя")
         строки.append(len(сс))
         md.append(f"| `{w[:8]}`{(' ' + имя) if имя else ''} | {г or '—'} | {len(сс)} ({len(с2)}) | {доля(сс, вер)} | {доля(с2, вер)} | "
