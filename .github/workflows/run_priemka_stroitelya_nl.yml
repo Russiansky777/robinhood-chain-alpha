@@ -184,6 +184,15 @@ jobs:
             # два десятка соединений заняли бы раннер дольше самой приёмки.
             tar -C /tmp/kandidat -cf - . | ssh $SSH_OPTS root@$TARGET_HOST "tar -C $RABOTA/kandidat -xf -"
             ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $RABOTA/kandidat; echo 'fajlov u kandidata na hoste:' \$(ls $RABOTA/kandidat/*.py | wc -l)"
+            # КАТАЛОГ ДАННЫХ РЯДОМ С КОДОМ КАНДИДАТА. Модули считают его от
+            # своего файла (c2_common: parents[1]/data), и у кандидата в /tmp
+            # его нет: первый прогон 29.09 22:52 дал 134 отказа подряд
+            # "FileNotFoundError: /tmp/priemka_stroitelya/data/solana_buyer_200/
+            # prior/current/buyer_100/dex_labels.json" -- и это была нехватка
+            # окружения, а не изъян строителя. Ссылкой на тот же каталог, из
+            # которого читает служба: мерить кандидата на ДРУГИХ данных значило
+            # бы мерить не то.
+            ssh -n $SSH_OPTS root@$TARGET_HOST "ln -sfn /home/bot/data $RABOTA/data; ls -ld $RABOTA/data"
             KOD="$RABOTA/kandidat"
             echo "MERIM KANDIDATA iz $KOD (vetka ${{ inputs.vetka_kandidata }})"
           else
