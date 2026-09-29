@@ -183,6 +183,35 @@ def рисунок(сигнал: dict, ряд: list, вверх: int = 30, вн�
             "событий_до_30": len(пос)}
 
 
+def удержание(покупка: dict, ряд: list, окно: int = 150) -> dict:
+    """После покупки (сигнала или покупки источника): через сколько слотов первая чужая продажа
+    от 0.5 SOL-экв. (кошелёк -- по трейдеру) и первая чужая продажа любого размера; слот и
+    величина пика цены пула в s0..s0+окно (к цене после покупки)."""
+    i0 = next((i for i, e in enumerate(ряд) if e["signature"] == покупка["signature"]), None)
+    if i0 is None or not ст(ряд[i0]):
+        return {"why_not": "покупка не найдена в ряду"}
+    s0 = покупка["block"]
+    курс_q = покупка.get("курс_q") or 1.0
+    x0, y0 = ст(ряд[i0])
+    p0 = x0 / y0
+    пр05 = пр_любая = None
+    пик, пик_слот = p0, s0
+    for e in ряд[i0 + 1:]:
+        b = e.get("block") or 0
+        if b > s0 + окно:
+            break
+        с_ = ст(e)
+        if с_ and с_[0] / с_[1] > пик:
+            пик, пик_слот = с_[0] / с_[1], b
+        if e.get("action") == "sell" and (e.get("трейдер") or e.get("txSigner")) != покупка["trader"]:
+            if пр_любая is None:
+                пр_любая = b - s0
+            if пр05 is None and float(e.get("quoteAmount") or 0) * курс_q >= 0.5:
+                пр05 = b - s0
+    return {"первая_продажа_05_слотов": пр05, "первая_продажа_слотов": пр_любая,
+            "пик_слотов": пик_слот - s0, "пик_пп": round((пик / p0 - 1) * 100, 2)}
+
+
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
            минты: set | None = None, не_sol: bool = False) -> Path:
@@ -199,6 +228,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     ряды: dict = {}              # poolId -> [события]
     счёт = {"строк": 0, "файлов": 0, "ошибки": []}
     история_цены: dict = {}      # poolId -> deque[(слот, цена)] за НАЗАД слотов
+    ноги: dict = {}              # (подпись, трейдер, минт) -> токенов куплено в транзакции (все ноги)
     цена_sol: dict = {}          # минт -> SOL за единицу (последнее событие SOL-пула этого минта)
     минты = минты or set()
     ленты_минтов: dict = {}      # минт -> все события (--minty)
@@ -292,7 +322,15 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                         ток = float(b.get("tokenAmount") or e.get("tokenAmount") or 0)
                         кв = float(b.get("quoteAmount") or e.get("quoteAmount") or 0)
                         пост = ((e_full.get("postBalances") or {}).get(t) or {}).get(e.get("mint"))
-                        первая = (пост is not None and ток > 0 and abs(float(пост) - ток) <= 0.01 * ток)
+                        # первая покупка: баланс после = сумме купленного этим трейдером этого минта во всех
+                        # ногах транзакции (покупка одной транзакцией в двух пулах -- тоже первая)
+                        ключ_ноги = (e["signature"], t, e.get("mint"))
+                        if e["action"] == "buy":
+                            ноги[ключ_ноги] = ноги.get(ключ_ноги, 0.0) + ток
+                        всего_в_tx = ноги.get(ключ_ноги, ток)
+                        первая = (пост is not None and ток > 0 and abs(float(пост) - всего_в_tx) <= 0.01 * всего_в_tx)
+                        if len(ноги) > 20000:
+                            ноги.clear()
                         q = e.get("quoteMint")
                         курс_q = None
                         if q == WSOL:
@@ -344,6 +382,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     for с in сигналы:
         с["модель"] = модель(с, ряды.get(с["poolId"]) or [])
         с["рисунок"] = рисунок(с, ряды.get(с["poolId"]) or [])
+        с["удержание"] = удержание(с, ряды.get(с["poolId"]) or [])
         ряд = ряды.get(с["poolId"]) or []
         с["событий_пула_в_окне"] = sum(1 for e in ряд if с["block"] <= (e.get("block") or 0) <= с["block"] + окно)
     # покупки --istochniki: кто купил следом (≥ 0.5 SOL, другие кошельки) в +15 с, в его слоте и в +3 слота
@@ -362,6 +401,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                "мс": (e.get("timestamp") or 0) - (п["timestamp"] or 0)})
         п["следом"] = следом
         п["следом_05_15с"] = sum(1 for x in следом if x["q"] >= 0.5)
+        п["удержание"] = удержание(п, ряд)
         # продажи в его слоте после его покупки (порядок файла внутри слота -- по timestamp, оценка)
         прод_сл = [e for e in ряд[i0 + 1:] if e.get("block") == п["block"] and e.get("action") == "sell"
                    and e.get("трейдер") != п["trader"]]
