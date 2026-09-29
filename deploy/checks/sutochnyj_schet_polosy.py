@@ -104,7 +104,10 @@ def main() -> int:
     кошелёк = (а.kowelek or os.environ.get("OWN_SEND_WALLET")
                 or os.environ.get("BLOOM_LANE_WALLET") or "")
     состояние = ST.ExecState()
-    с = OSW.состояние_полосы(состояние)
+    # состояние_полосы берёт СЛОВАРЬ ПОЗИЦИЙ, а не ExecState: 01:09:20Z прогон
+    # упал на этом ровно так -- 'ExecState' object has no attribute 'values'.
+    все_позиции = состояние.positions()
+    с = OSW.состояние_полосы(все_позиции)
     сут = OSW.начало_суток()
     итог = {"порог_суток_sol": float(OSW.СТОП_ПОЛОСЫ_СУТКИ_SOL),
              "день": с.get("day"), "начало_суток_utc": utc(сут.get("ts")),
@@ -121,7 +124,7 @@ def main() -> int:
           f"без итога {итог['no_result_today']} | расход {итог['spend_sol']}")
 
     начало = float(сут.get("ts") or 0)
-    все = позиции(а.state_dir)
+    все = все_позиции or позиции(а.state_dir)
     сумма_службы = 0.0
     сумма_цепи = 0.0
     for cid, п in sorted(все.items(), key=lambda кв: float(кв[1].get("ts_intent") or 0)):
