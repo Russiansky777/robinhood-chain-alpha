@@ -29,6 +29,10 @@ env:
   ENV_DIR: /etc/bloom-executor
   TARGET_HOST: 127.0.0.1
   CODE_DIR: /home/bot/bloom_executor
+  # ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ: первый прогон упал ModuleNotFoundError на
+  # solders -- c2_swap_build без него не импортируется, а solders стоит только
+  # в окружении службы.
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
   RABOTA: /tmp/lane_pools_spisok
   OUT_FILE: data/lane_pools_spisok.json
 
@@ -72,7 +76,7 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR \
-              python3 $RABOTA/lane_pools_polnyj_spisok.py \
+              $VENV/python $RABOTA/lane_pools_polnyj_spisok.py \
                 --dobavit '${{ inputs.dobavit }}' \
                 --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/lane_pools.json || true
