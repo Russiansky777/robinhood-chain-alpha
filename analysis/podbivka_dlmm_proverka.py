@@ -173,22 +173,27 @@ def дельты(tx: dict, lb: dict) -> dict:
 
 def сверить(уз, пул: str, ст: dict, повод: str, пулы: dict) -> dict | None:
     """Первая успешная транзакция пула со слотом > S; одна инструкция swap/swap2 и одно событие по пулу."""
+    # первая УСПЕШНАЯ транзакция пула после чтения: упавшие состояние пула не меняют (как в v1)
     след = None
     for _ in range(25):
         time.sleep(2)
-        зз = [з for з in уз.подписи(пул, limit=20) if (з.get("slot") or 0) > (ст["slot"] or 0)]
+        зз = [з for з in уз.подписи(пул, limit=50) if (з.get("slot") or 0) > (ст["slot"] or 0) and з.get("err") is None]
         if зз:
             след = min(зз, key=lambda з: з["slot"])
             break
-    if not след or след.get("err") is not None:
-        return None
+    if not след:
+        return {"отсев": "нет успешной транзакции за 50 с"}
     т = уз.tx(след["signature"])
     if not т:
-        return None
+        return {"отсев": "транзакция не получена"}
     ев = [e for e in события_swap(т) if e["lb_pair"] == пул]
     виды = вид_инструкции(т, пул)
-    if len(ев) != 1 or len(виды) != 1 or виды[0] not in ("swap", "swap2"):
-        return None
+    if not виды:
+        return {"отсев": "не swap: инструкции пула нет (ликвидность/иное)"}
+    if len(виды) != 1 or виды[0] not in ("swap", "swap2"):
+        return {"отсев": f"инструкций пула {len(виды)}: {','.join(sorted(set(виды)))}"}
+    if len(ев) != 1:
+        return {"отсев": f"событий Swap по пулу {len(ев)}"}
     e = ев[0]
     д = дельты(т, ст["lb"])
     try:
@@ -221,11 +226,12 @@ def main() -> int:
     кошельки = sorted(set(сп["группы_code1"]) | set(сп["кандидаты"]))
     уз = S.Узел()
     итог, отказы = [], {}
+    отсев: dict = {}
     out = КОРЕНЬ / "data" / "podbivka" / f"dlmm_proverka_{а.metka}.json"
     import podbivka_run as R  # noqa: PLC0415
 
     def записать():
-        out.write_text(json.dumps({"итог": итог, "отказы": отказы, "расход": уз.расход()}, ensure_ascii=False, indent=1),
+        out.write_text(json.dumps({"итог": итог, "отказы": отказы, "отсев": отсев, "расход": уз.расход()}, ensure_ascii=False, indent=1),
                        encoding="utf-8")
         R.записано(out)
     with уз.на("helius"):
@@ -268,7 +274,9 @@ def main() -> int:
                                 continue
                             x = сверить(уз, e["lb_pair"], ст, f"после источника {w[:8]} ({e['amount_in']} сырых, "
                                         f"{abs(e['end'] - e['start']) + 1} корзин)", пулы)
-                            if x:
+                            if x and x.get("отсев"):
+                                отсев[x["отсев"]] = отсев.get(x["отсев"], 0) + 1
+                            elif x:
                                 итог.append(x)
                                 записать()
                                 print("ИСТ", x["пул"][:8], x["корзин_факт"], x["расхождение_пп"], flush=True)
@@ -284,6 +292,12 @@ def main() -> int:
                 очередь.remove(пул)
                 continue
             x = сверить(уз, пул, ст, "поток", пулы)
+            if x and x.get("отсев"):
+                отсев[x["отсев"]] = отсев.get(x["отсев"], 0) + 1
+                if k % 50 == 0:
+                    print("отсев:", отсев, flush=True)
+                    записать()
+                continue
             if x and (x["корзин_факт"] >= 2 or not any(y["пул"] == пул for y in итог)):
                 итог.append(x)
                 записать()
