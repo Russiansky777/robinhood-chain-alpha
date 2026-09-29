@@ -97,6 +97,7 @@ def события_swap(tx: dict) -> list:
             if b[:8] == EVENT_IX_TAG:
                 e = _разбор_события(b[8:])
                 if e:
+                    e["канал"] = "cpi"
                     из_.append(e)
                     видел.add((e["start"], e["amount_in"], e["amount_out"]))
     for л in ((tx.get("meta") or {}).get("logMessages") or []):
@@ -106,6 +107,7 @@ def события_swap(tx: dict) -> list:
             except Exception:  # noqa: BLE001
                 continue
             if e and (e["start"], e["amount_in"], e["amount_out"]) not in видел:
+                e["канал"] = "лог"
                 из_.append(e)
     return из_
 
@@ -189,11 +191,22 @@ def сверить(уз, пул: str, ст: dict, повод: str, пулы: dic
     ев = [e for e in события_swap(т) if e["lb_pair"] == пул]
     виды = вид_инструкции(т, пул)
     if not виды:
-        return {"отсев": "не swap: инструкции пула нет (ликвидность/иное)", "образец": след["signature"]}
+        # для разбора: какие программы трогают пул (счёт в инструкции) и какие события есть
+        прог = sorted({ix.get("programId") for ix in инструкции(т) if isinstance(ix, dict) and пул in (ix.get("accounts") or [])})
+        return {"отсев": "не swap: инструкции пула нет (ликвидность/иное)", "образец": след["signature"],
+                "события": [{к: e.get(к) for к in ("вид", "канал", "lb_pair", "start", "end")} for e in события_swap(т)],
+                "программы": прог}
     if any(в not in ("swap", "swap2") for в in виды):
         return {"отсев": f"инструкции пула: {','.join(sorted(set(виды)))}", "образец": след["signature"]}
-    if not ев or len(ев) != len(виды):
-        return {"отсев": f"инструкций swap {len(виды)}, событий {len(ев)}", "образец": след["signature"]}
+    # канал событий: CPI (emit_cpi) -- основной; логи «Program data:» -- только если CPI-событий нет
+    ев_cpi = [e for e in ев if e.get("канал") == "cpi"]
+    ев = ев_cpi or ев
+    все_события = [{к: e.get(к) for к in ("вид", "канал", "start", "end", "amount_in", "amount_out", "fee")} for e in ев]
+    if len(виды) == 1 and len(ев) > 1 and len({(e["start"], e["end"]) for e in ев}) == 1:
+        pass    # одна инструкция, несколько событий с теми же корзинами -- сверяем первое, все пишутся
+    elif not ев or len(ев) != len(виды):
+        return {"отсев": f"инструкций swap {len(виды)}, событий {len(ев)}", "образец": след["signature"],
+                "события": все_события}
     # несколько свопов по пулу в одной транзакции (боты): первый идёт из прочитанного состояния -- сверяем его
     e = ев[0]
     д = дельты(т, ст["lb"])
@@ -212,7 +225,7 @@ def сверить(уз, пул: str, ст: dict, повод: str, пулы: dic
             "active_id_чтения": ст["lb"]["active_id"], "end_модель": q["active_id_после"] if q else None,
             "корзин_модель": q["корзин"] if q else None, "host_fee": e.get("host_fee"), "fee_факт": e.get("fee"),
             "fee_модель": q["fee"] if q else None, "вход_по_хранилищу": д, "подписант": e.get("from"),
-            "why_not": why, "сделки_источников_в_пуле": len(пулы.get(пул, [])), "свопов_по_пулу_в_tx": len(ев)}
+            "why_not": why, "сделки_источников_в_пуле": len(пулы.get(пул, [])), "свопов_по_пулу_в_tx": len(виды), "события": все_события}
 
 
 def main() -> int:
@@ -279,7 +292,7 @@ def main() -> int:
                             if x and x.get("отсев"):
                                 отсев[x["отсев"]] = отсев.get(x["отсев"], 0) + 1
                                 if x.get("образец") and len(образцы.setdefault(x["отсев"], [])) < 5:
-                                    образцы[x["отсев"]].append(x["образец"])
+                                    образцы[x["отсев"]].append({"подпись": x["образец"], "события": x.get("события"), "программы": x.get("программы")})
                             elif x:
                                 итог.append(x)
                                 записать()
@@ -299,7 +312,7 @@ def main() -> int:
             if x and x.get("отсев"):
                 отсев[x["отсев"]] = отсев.get(x["отсев"], 0) + 1
                 if x.get("образец") and len(образцы.setdefault(x["отсев"], [])) < 5:
-                    образцы[x["отсев"]].append(x["образец"])
+                    образцы[x["отсев"]].append({"подпись": x["образец"], "события": x.get("события"), "программы": x.get("программы")})
                 if k % 50 == 0:
                     print("отсев:", отсев, flush=True)
                     записать()
