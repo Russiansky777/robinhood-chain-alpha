@@ -1,0 +1,80 @@
+name: "Сверка сторожа: процесс против файлов и processed в чтении остатка (чтение)"
+
+# ЗАЧЕМ (слово владельца 29.09, п.1 к докладу): "время старта процесса сторожа
+# (ActiveEnterTimestamp) против mtime bloom_seller.py и bloom_exec_state.py на
+# хосте, и grep по хосту, что чтение остатка идёт на processed".
+#
+# Вопрос по делу: рестарт 23:18:19Z раньше отметки деплоя 23:18:55Z. Если файлы
+# старше старта процесса -- процесс поднялся УЖЕ с новым кодом, а 23:18:55 это
+# конец задачи деплоя (шаг коммита отчёта идёт последним). Если новее -- нужен
+# перезапуск при нуле позиций, и тогда это видно числом, а не рассуждением.
+#
+# Только чтение: systemctl show, stat, grep. Ни правок, ни перезапусков.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: sverka-storozha
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  OUT_FILE: data/sverka_storozha.txt
+
+jobs:
+  sverka:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Процесс, файлы и processed"
+        run: |
+          set -e
+          set -o pipefail
+          : > /tmp/sverka.txt
+          echo "=== start процесса сторожа ===" >> /tmp/sverka.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl show bloom-seller -p ActiveEnterTimestamp -p ActiveEnterTimestampMonotonic -p ExecMainStartTimestamp" >> /tmp/sverka.txt
+          echo "=== mtime модулей (UTC) ===" >> /tmp/sverka.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "TZ=UTC stat -c '%y %n' $CODE_DIR/bloom_seller.py $CODE_DIR/bloom_exec_state.py $CODE_DIR/bloom_own_send.py" >> /tmp/sverka.txt
+          echo "=== sha256 на хосте против репозитория ===" >> /tmp/sverka.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/bloom_seller.py $CODE_DIR/bloom_exec_state.py" >> /tmp/sverka.txt
+          sha256sum analysis/bloom_seller.py analysis/bloom_exec_state.py >> /tmp/sverka.txt
+          echo "=== чтение остатка: commitment ===" >> /tmp/sverka.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -n 'ОСТАТОК_COMMITMENT\|commitment.*ОСТАТОК\|getTokenAccountsByOwner' $CODE_DIR/bloom_seller.py | head -12" >> /tmp/sverka.txt
+          echo "=== ожидание остатка и подтверждение нуля ===" >> /tmp/sverka.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -n 'ОЖИДАНИЕ_ОСТАТКА_S\|_дождаться_остатка\|_ноль_подтверждён' $CODE_DIR/bloom_seller.py | head -10" >> /tmp/sverka.txt
+          cat /tmp/sverka.txt
+          cp /tmp/sverka.txt "$OUT_FILE"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Sverka storozha: process, fajly, processed [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
