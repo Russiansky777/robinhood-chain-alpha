@@ -385,17 +385,73 @@ def steal_s_zagruzki(путь: str = "/proc/stat") -> dict:
     return из_
 
 
+def разобрать_zhurnal(текст: str):
+    """Строки JSONL-журнала снимков в часовые строки. None, если это не журнал.
+
+    Признак журнала -- в первой же разобранной строке есть "доли_от_прошлого"
+    или "cpu". ЗАЧЕМ так строго: иначе обычный JSON-массив часов тоже прошёл бы
+    сюда и потерял бы свои проценты.
+    """
+    строки = [с for с in (текст or "").splitlines() if с.strip()]
+    if not строки:
+        return None
+    разобраны = []
+    for с in строки:
+        try:
+            з = json.loads(с)
+        except ValueError:
+            # Одна битая строка журнал не отменяет (дозапись могла оборваться),
+            # но её пропуск виден в счёте снимков.
+            continue
+        if isinstance(з, dict):
+            разобраны.append(з)
+    if not разобраны:
+        return None
+    if not any(("доли_от_прошлого" in з or "cpu" in з) for з in разобраны):
+        return None
+    из_ = []
+    for з in разобраны:
+        д = з.get("доли_от_прошлого") or {}
+        службы = д.get("по_службам_проц") or {}
+        детектор = None
+        for имя, значение in службы.items():
+            # ЗАЧЕМ по подстроке: служба называется то bloom-detector, то
+            # bloom_detector.py -- владельцу нужна "загрузка ядра детектора",
+            # а не точное имя юнита.
+            if "detector" in имя.lower() or "детектор" in имя.lower():
+                детектор = значение
+                break
+        из_.append({
+            "chas": з.get("utc"),
+            "interval_s": д.get("интервал_с"),
+            "steal_proc": д.get("steal_проц"),
+            "zanjato_proc": д.get("занято_проц"),
+            "iowait_proc": д.get("iowait_проц"),
+            "jadro_detektora_proc": детектор,
+            "po_sluzhbam_proc": службы,
+            # ЗАЧЕМ причина едет рядом с каждой строкой: первый снимок за день
+            # долей не даёт, и пустая клетка обязана объяснить себя.
+            "pochemu": д.get("почему"),
+        })
+    из_.sort(key=lambda з: з["chas"] or "")
+    return из_
+
+
 def часы_процессора(путь: str) -> dict:
     """Таблица по часам из --cpu. Понимает два вида файла, иначе честный отказ.
 
-    Вид 1 -- уже часовой: {"по_часам": [{"час": "2026-09-29T16", "steal_proc": ...,
+    Вид 1 -- журнал снимков .jsonl от deploy/checks/cpu_steal_po_chasam.py: по
+    строке в час, доли лежат в "доли_от_прошлого". ЗАЧЕМ он первый: это
+    единственный источник в репозитории, который вообще снимает steal (появился
+    29.09; до него steal не мерил никто, см. chego_net этой проверки).
+    Вид 2 -- уже часовой: {"по_часам": [{"час": "2026-09-29T16", "steal_proc": ...,
     "zanjato_proc": ..., "jadro_detektora_proc": ...}, ...]} (допускаются имена
     hour/chas, steal/steal_pct, zanjato/busy, detektor/jadro_detektora_proc).
-    Вид 2 -- снимок вроде data/skorost_i_cpu.json: один замер с полем
+    Вид 3 -- снимок вроде data/skorost_i_cpu.json: один замер с полем
     "процессор". Его нельзя разложить по часам, и он так и помечается.
     """
-    из_ = {"fajl": путь, "est_po_chasam": False, "chasy": [], "snimok": None,
-            "pochemu": None}
+    из_ = {"fajl": путь, "vid": None, "est_po_chasam": False, "chasy": [],
+            "snimok": None, "pochemu": None}
     if not путь:
         из_["pochemu"] = "аргумент --cpu не задан"
         return из_
@@ -404,7 +460,30 @@ def часы_процессора(путь: str) -> dict:
         return из_
     try:
         with open(путь, "r", encoding="utf-8") as ф:
-            д = json.load(ф)
+            текст = ф.read()
+    except Exception as сбой:  # noqa: BLE001
+        из_["pochemu"] = f"не прочитать {путь}: {type(сбой).__name__}: {сбой}"
+        return из_
+
+    # ЗАЧЕМ журнал проверяется ПЕРВЫМ и по содержимому, а не по расширению: имя
+    # файла владелец может дать любое, а перепутать журнал снимков с готовой
+    # часовой таблицей нельзя -- в журнале доли лежат в "доли_от_прошлого", и
+    # если прочитать его как таблицу, все проценты выйдут пустыми.
+    строки_журнала = разобрать_zhurnal(текст)
+    if строки_журнала is not None:
+        из_["chasy"] = строки_журнала
+        из_["vid"] = "журнал снимков cpu_steal_po_chasam.py"
+        из_["est_po_chasam"] = any(з.get("steal_proc") is not None
+                                    or з.get("zanjato_proc") is not None
+                                    for з in строки_журнала)
+        if not из_["est_po_chasam"]:
+            из_["pochemu"] = (f"в журнале {путь} есть {len(строки_журнала)} снимков, но "
+                               "ни у одного нет долей: доля считается разностью двух "
+                               "снимков, одного мало")
+        return из_
+
+    try:
+        д = json.loads(текст)
     except Exception as сбой:  # noqa: BLE001
         из_["pochemu"] = f"не разобрать {путь}: {type(сбой).__name__}: {сбой}"
         return из_
@@ -428,6 +507,7 @@ def часы_процессора(путь: str) -> dict:
                 "jadro_detektora_proc": первое(з, ("jadro_detektora_proc", "detektor",
                                                     "проц_одного_ядра", "detector_pct")),
             })
+        из_["vid"] = "готовая часовая таблица"
         из_["est_po_chasam"] = bool(из_["chasy"])
         if not из_["chasy"]:
             из_["pochemu"] = f"в {путь} список часов пуст"
@@ -448,6 +528,7 @@ def часы_процессора(путь: str) -> dict:
                           "proc_vsej_mashiny": п.get("проц_всей_машины")}
                          for п in (ц.get("процессы") or []) if isinstance(п, dict)],
         }
+        из_["vid"] = "один замер skorost_i_cpu.py"
         из_["pochemu"] = (f"{путь} -- ОДИН замер за {ц.get('секунд')} с, часовой разбивки в нём нет")
         return из_
 
@@ -607,17 +688,24 @@ def печать_сравнения(ср: dict) -> None:
 def печать_процессора(часы: dict, steal: dict) -> None:
     print("\n--- процессор и steal по часам ---")
     if часы.get("est_po_chasam"):
-        print(f"   {'час':16s} {'steal %':>8s} {'занято %':>9s} {'ядро детектора %':>18s}")
+        print(f"   источник: {часы.get('fajl')} ({часы.get('vid')})")
+        print(f"   {'час (конец интервала)':22s} {'интервал с':>10s} {'steal %':>8s} "
+              f"{'занято %':>9s} {'ядро детектора %':>18s}")
         for з in часы["chasy"]:
-            print(f"   {str(з['chas'] or 'нет'):16s} {ч(з['steal_proc'], 2, 8)} "
-                  f"{ч(з['zanjato_proc'], 1, 9)} {ч(з['jadro_detektora_proc'], 1, 18)}")
+            строка = (f"   {str(з['chas'] or 'нет'):22s} {ч(з.get('interval_s'), 0, 10)} "
+                      f"{ч(з['steal_proc'], 3, 8)} {ч(з['zanjato_proc'], 2, 9)} "
+                      f"{ч(з['jadro_detektora_proc'], 2, 18)}")
+            if з.get("pochemu"):
+                строка += f"   ПОЧЕМУ ПУСТО: {з['pochemu']}"
+            print(строка)
     else:
         print(f"   ПО ЧАСАМ НЕТ: {часы.get('pochemu')}")
-        print("   что даст таблицу: прогон, который раз в час пишет steal и такты "
-              "процесса детектора в один файл (счётчики /proc/stat и "
-              "/proc/<pid>/stat снимает уже существующий deploy/checks/skorost_i_cpu.py, "
-              "но он делает ОДИН замер и steal не снимает); готовый файл подать "
-              "этой проверке через --cpu.")
+        print("   что даст таблицу: часовой прогон "
+              "deploy/checks/cpu_steal_po_chasam.py --zhurnal data/cpu_steal_po_chasam.jsonl "
+              "(он снимает steal из /proc/stat и такты детектора; доля появляется со "
+              "ВТОРОГО снимка), затем этой проверке подать тот журнал через --cpu. "
+              "Старый deploy/checks/skorost_i_cpu.py не годится: один замер и steal "
+              "не снимает вовсе.")
         сн = часы.get("snimok")
         if сн:
             print(f"   есть только снимок {сн.get('s')} .. {сн.get('po')}: "
