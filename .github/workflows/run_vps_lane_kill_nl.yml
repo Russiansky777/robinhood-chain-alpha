@@ -194,12 +194,30 @@ jobs:
           # увидеть рубильник (true), после clear -- перестать его видеть
           # (false). Одинаковое ожидание врало бы в одном из двух случаев.
           mode_now='${{ inputs.mode }}'
-          for i in 1 2 3 4 5 6 7 8; do
+          # ЖДЁМ ДО ПОДТВЕРЖДЕНИЯ СЛУЖБЫ, А НЕ 40 СЕКУНД (слово владельца
+          # 29.09). Прежний цикл ждал 8 раз по 5 с и молча заканчивался: 15:30Z
+          # он восемь раз напечатал lane_kill false, тогда как файл уже лежал, и
+          # прогон завершился "успехом" -- ложноотрицательная проверка на
+          # рубильнике недопустима. Теперь: ждём до PREDEL_S секунд, и если
+          # служба так и не подтвердила -- job ПАДАЕТ.
+          podtverzhdeno=net
+          PREDEL_S=180
+          SHAG_S=5
+          proshlo=0
+          while [ "$proshlo" -lt "$PREDEL_S" ]; do
             out=$(ssh -n $SSH_OPTS root@127.0.0.1 "grep -A4 '\"lane_kill\"' $STATE_DIR/detector_status.json || true")
             echo "$out"
             case "$mode_now" in
-              clear) case "$out" in *false*) echo "служба больше не видит рубильник"; break ;; esac ;;
-              *) case "$out" in *true*) break ;; esac ;;
+              clear) case "$out" in *false*) echo "служба больше не видит рубильник"; podtverzhdeno=da ;; esac ;;
+              status) podtverzhdeno=da ;;
+              *) case "$out" in *true*) echo "служба видит рубильник"; podtverzhdeno=da ;; esac ;;
             esac
-            sleep 5
+            [ "$podtverzhdeno" = da ] && break
+            sleep "$SHAG_S"
+            proshlo=$((proshlo + SHAG_S))
           done
+          if [ "$podtverzhdeno" != da ]; then
+            echo "SBOY: sluzhba ne podtverdila sostojanie rubilnika za $PREDEL_S s (rezhim $mode_now)"
+            exit 1
+          fi
+          echo "podtverzhdeno sluzhboj za $proshlo s"
