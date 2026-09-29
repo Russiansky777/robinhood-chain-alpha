@@ -1,0 +1,122 @@
+name: "NL-хост: включить тип пула в lane_pools названных групп (полным списком)"
+
+# ЗАЧЕМ. Владелец 30.09: "у lane_s0 и batch5 lane_pools полным списком (всё, что
+# торгует сейчас, + clmm + whirlpool)". Список ПОЛНЫЙ И ЗАПРЕЩАЮЩИЙ: чего в нём
+# нет -- то выключено. Нынешний набор берётся вызовом bloom_own_send.типы_полосы
+# и двухшаговый_включён -- тем же кодом, по которому решает полоса.
+#
+# ЗАПИСЬ АТОМАРНАЯ, с копией прежнего файла рядом. Перезапуск службы НЕ нужен:
+# политика перечитывается по метке файла (bloom_source_groups.py:261), и прогон
+# сам перечитывает её заново и печатает, что теперь берёт каждая группа.
+#
+# БЕЗ podtverzhdenie=DA прогон только показывает план и ничего не пишет.
+on:
+  workflow_dispatch:
+    inputs:
+      gruppy:
+        description: "группы через запятую"
+        required: false
+        default: "lane_s0,batch5"
+      dobavit:
+        description: "типы через запятую (clmm,whirlpool)"
+        required: false
+        default: "clmm,whirlpool"
+      podtverzhdenie:
+        description: "ровно DA -- иначе только показ, файл не трогается"
+        required: false
+        default: ""
+
+concurrency:
+  group: lane-pools-vkljuchit-nl
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  RABOTA: /tmp/lane_pools_vkljuchit
+  OUT_FILE: data/lane_pools_vkljucheno.json
+
+jobs:
+  vkljuchit:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки (без хоста)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/lane_pools_polnyj_spisok.py
+          python3 -m py_compile deploy/checks/lane_pools_vkljuchit.py
+          python3 deploy/checks/lane_pools_polnyj_spisok.py --self-test | tail -1
+          python3 deploy/checks/lane_pools_vkljuchit.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "План и запись на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          cat deploy/checks/lane_pools_polnyj_spisok.py | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/lane_pools_polnyj_spisok.py"
+          cat deploy/checks/lane_pools_vkljuchit.py | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/lane_pools_vkljuchit.py"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR \
+              $VENV/python $RABOTA/lane_pools_vkljuchit.py \
+                --gruppy '${{ inputs.gruppy }}' \
+                --dobavit '${{ inputs.dobavit }}' \
+                --podtverzhdenie '${{ inputs.podtverzhdenie }}' \
+                --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/lane_pools_vkl.json || true
+          if python3 -c "import json; json.load(open('/tmp/lane_pools_vkl.json'))" 2>/dev/null; then
+            cp /tmp/lane_pools_vkl.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: progon ne otdal json"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT_FILE" ] || exit 0
+          if grep -qiE 'api-key=[A-Za-z0-9-]{8}|PRIVATE|SECRET' "$OUT_FILE"; then
+            echo "SBOY: v otchete est pohozhee na kljuch"
+            exit 1
+          fi
+          echo "kljuchej v otchete net"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Lane_pools: vkljuchenie tipa polnym spiskom [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
