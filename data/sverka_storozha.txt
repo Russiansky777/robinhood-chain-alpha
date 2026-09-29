@@ -1,0 +1,35 @@
+=== start процесса сторожа ===
+ExecMainStartTimestamp=Tue 2026-09-29 01:18:19 CEST
+ActiveEnterTimestamp=Tue 2026-09-29 01:18:19 CEST
+ActiveEnterTimestampMonotonic=218833012623
+=== mtime модулей (UTC) ===
+2026-09-29 00:15:47.808898585 +0000 /home/bot/bloom_executor/bloom_seller.py
+2026-09-29 00:15:46.959891077 +0000 /home/bot/bloom_executor/bloom_exec_state.py
+2026-09-29 00:15:51.984935497 +0000 /home/bot/bloom_executor/bloom_own_send.py
+=== sha256 на хосте против репозитория ===
+efefb8fa44dfd0dcc98595a26b0edaa630930d71fe6cd11ca33518ed462c08c1  /home/bot/bloom_executor/bloom_seller.py
+f5d731c37616718a69d951974799df17b46657faf6f5cb66a2b0c2bceb05eb69  /home/bot/bloom_executor/bloom_exec_state.py
+efefb8fa44dfd0dcc98595a26b0edaa630930d71fe6cd11ca33518ed462c08c1  analysis/bloom_seller.py
+f5d731c37616718a69d951974799df17b46657faf6f5cb66a2b0c2bceb05eb69  analysis/bloom_exec_state.py
+=== чтение остатка: commitment ===
+155:ОСТАТОК_COMMITMENT = "processed"
+299:    """Сумма, ui и число счетов из ответа getTokenAccountsByOwner."""
+319:    Фильтр у getTokenAccountsByOwner -- РОВНО ОДИН: либо mint, либо
+337:    r = rpc_call("getTokenAccountsByOwner", [wallet, {"mint": mint},
+339:                                                "commitment": ОСТАТОК_COMMITMENT}])
+349:        r2 = rpc_call("getTokenAccountsByOwner", [wallet, {"programId": prog},
+351:                                                     "commitment": ОСТАТОК_COMMITMENT}])
+848:    Закрытый счёт узел в getTokenAccountsByOwner больше не отдаёт, поэтому
+1806:        r = rpc_call("getTokenAccountsByOwner", [кошелёк, {"mint": mint},
+3434:            if метод == "getTokenAccountsByOwner":
+=== ожидание остатка и подтверждение нуля ===
+158:ОЖИДАНИЕ_ОСТАТКА_S = float(os.environ.get("BLOOM_BALANCE_WAIT_S", "10") or 10)
+1798:    def _ноль_подтверждён(self, кошелёк: str, mint: str) -> dict:
+1818:    def _дождаться_остатка(self, кошелёк: str, mint: str, *, balance_reader) -> dict:
+1824:        пусто. Читаем шагом ШАГ_ОЖИДАНИЯ_ОСТАТКА_S до ОЖИДАНИЕ_ОСТАТКА_S.
+1832:        предел = max(шаг, float(ОЖИДАНИЕ_ОСТАТКА_S))
+2000:        # до ОЖИДАНИЕ_ОСТАТКА_S; если так и не появился -- продаём КОЛИЧЕСТВО ИЗ
+2005:            перечитано = self._дождаться_остатка(
+2032:                подтв = self._ноль_подтверждён(кошелёк_позиции(pos), mint)
+3393:        прежнее_ожидание = globals()["ОЖИДАНИЕ_ОСТАТКА_S"]
+3395:        globals()["ОЖИДАНИЕ_ОСТАТКА_S"] = 0.2
