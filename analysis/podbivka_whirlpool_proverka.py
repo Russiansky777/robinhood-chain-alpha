@@ -72,7 +72,8 @@ def сверить(сн: dict) -> dict:
 
 
 def main() -> int:
-    д = json.loads((КОРЕНЬ / "data" / "podbivka" / "whirlpool_sbor.json").read_text(encoding="utf-8"))
+    файлы = sys.argv[1:] or ["data/podbivka/whirlpool_sbor.json"]
+    д = {"снимки": [сн for ф in файлы for сн in json.loads((КОРЕНЬ / ф).read_text(encoding="utf-8")).get("снимки") or []]}
     итог, отсев = [], collections.Counter()
     for сн in д.get("снимки") or []:
         r = сверить(сн)
