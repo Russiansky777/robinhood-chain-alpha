@@ -72,10 +72,18 @@ jobs:
           set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dlmm_vosstanovlenie.py" < deploy/checks/dlmm_vosstanovlenie.py
+          # СБОРЩИК КЛАДЁТСЯ ВО ВРЕМЕННЫЙ КАТАЛОГ, А НЕ В КАТАЛОГ СЛУЖБЫ.
+          # c2_swap_build -- денежный путь, и класть его новую версию рядом со
+          # службой можно только в вечернее окно при нуле позиций (слово
+          # владельца). Здесь он нужен проверке: в нём живёт подстановка и
+          # дописывание массивов корзин. Каталог прогона стоит ПЕРВЫМ в
+          # PYTHONPATH, поэтому новую версию видит только эта проверка, а
+          # служба продолжает работать со своей.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/c2_swap_build.py" < analysis/c2_swap_build.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/podbivka_dlmm_quote.py" < analysis/podbivka_dlmm_quote.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py" < analysis/c2_dlmm_tochnaya_kotirovka.py
           ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR $VENV/python $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py --self-test"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/dlmm_vosstanovlenie.py --state-dir $STATE_DIR --skolko '${{ inputs.skolko }}' --simulyacij '${{ inputs.simulyacij }}' --lamportov '${{ inputs.lamportov }}' --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$RABOTA:$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/dlmm_vosstanovlenie.py --state-dir $STATE_DIR --skolko '${{ inputs.skolko }}' --simulyacij '${{ inputs.simulyacij }}' --lamportov '${{ inputs.lamportov }}' --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/dlmm_vosst.json || true
           if python3 -c "import json; json.load(open('/tmp/dlmm_vosst.json'))" 2>/dev/null; then
             cp /tmp/dlmm_vosst.json "$OUT_FILE"
