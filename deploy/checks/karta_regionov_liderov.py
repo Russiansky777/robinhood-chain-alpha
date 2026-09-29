@@ -42,7 +42,9 @@ def main() -> int:
     р.add_argument("--only-schedule", action="store_true",
                    help="брать только лидеров текущей эпохи, а не весь кластер")
     а = р.parse_args()
-    ключ = (os.environ.get("HELIUS_API_KEY") or os.environ.get("HELIUS_API") or "").strip()
+    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+            or os.environ.get("HELIUS_API_KEY")
+            or os.environ.get("HELIUS_API") or "").strip()
     url = (f"https://mainnet.helius-rpc.com/?api-key={ключ}" if ключ
            else "https://api.mainnet-beta.solana.com")
 

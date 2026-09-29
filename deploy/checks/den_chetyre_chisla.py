@@ -273,7 +273,8 @@ def нативная_дельта(tx: dict, кошелёк: str) -> dict:
 
 
 def режим_цепи(а) -> int:
-    ключ = (os.environ.get("HELIUS_API_KEY") or "").strip()
+    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+            or os.environ.get("HELIUS_API_KEY") or "").strip()
     if not ключ:
         print("СТОП: HELIUS_API_KEY не задан", file=sys.stderr)
         return 2

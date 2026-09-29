@@ -38,7 +38,9 @@ DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 
 
 def урл() -> str:
-    к = (os.environ.get("HELIUS_API_KEY") or os.environ.get("HELIUS_API") or "").strip()
+    к = (os.environ.get("HELIUS_API_KEY_CHECKS")
+         or os.environ.get("HELIUS_API_KEY")
+         or os.environ.get("HELIUS_API") or "").strip()
     return f"{HELIUS}/?api-key={к}"
 
 

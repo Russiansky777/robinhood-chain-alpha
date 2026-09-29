@@ -27,7 +27,9 @@ WSOL = "So11111111111111111111111111111111111111112"
 
 
 def узел() -> str:
-    ключ = (os.environ.get("HELIUS_API") or os.environ.get("HELIUS_API_KEY") or "").strip()
+    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+            or os.environ.get("HELIUS_API")
+            or os.environ.get("HELIUS_API_KEY") or "").strip()
     if not ключ:
         raise SystemExit("СБОЙ: HELIUS_API не задан")
     return f"https://mainnet.helius-rpc.com/?api-key={ключ}"
