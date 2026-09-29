@@ -41,13 +41,16 @@ def _модуль():
 
 def _счета(rpc_call, адреса: list, *, таймаут: float = 3.0) -> dict:
     """getMultipleAccounts одним запросом: адрес -> сырые байты (или None)."""
-    из_ = {"ok": False, "данные": {}, "why_not": None, "slot": None}
+    из_ = {"ok": False, "данные": {}, "why_not": None, "slot": None, "мс": None}
+    т0 = time.perf_counter()
     try:
         о = rpc_call("getMultipleAccounts",
                       [адреса, {"encoding": "base64", "commitment": "confirmed"}])
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+        из_["мс"] = round((time.perf_counter() - т0) * 1000.0, 2)
         return из_
+    из_["мс"] = round((time.perf_counter() - т0) * 1000.0, 2)
     о = о if isinstance(о, dict) else {}
     рез = о.get("result") if "result" in о else о
     if not isinstance(рез, dict):
@@ -93,6 +96,7 @@ def котировка(*, пул: str, минт_базы: str, минт_коти
 
     ч1 = _счета(rpc_call, [пул, Q.адрес_расширения(пул)])
     из_["чтений"] += 1
+    из_["мс_чтение1"] = ч1.get("мс")
     if not ч1["ok"]:
         из_["why_not"] = f"пул не прочитан: {ч1['why_not']}"
         return из_
@@ -140,6 +144,9 @@ def котировка(*, пул: str, минт_базы: str, минт_коти
     адреса = [Q.адрес_массива(пул, и) for и in индексы]
     ч2 = _счета(rpc_call, [пул] + адреса)
     из_["чтений"] += 1
+    из_["мс_чтение2"] = ч2.get("мс")
+    из_["мс_чтений_всего"] = round(float(из_.get("мс_чтение1") or 0.0)
+                                    + float(ч2.get("мс") or 0.0), 2)
     if not ч2["ok"]:
         из_["why_not"] = f"корзины не прочитаны: {ч2['why_not']}"
         return из_
@@ -212,6 +219,17 @@ def self_test() -> int:
         os.environ.pop("BLOOM_DLMM_QUOTE", None)
     else:
         os.environ["BLOOM_DLMM_QUOTE"] = было
+
+    # --- ДАЛЬШЕ НУЖЕН solders (вывод адресов PDA). На бегунке его нет, на хосте
+    # есть: без него эти условия ПРОПУСКАЮТСЯ и об этом говорится прямо, а не
+    # выдаются за пройденные.
+    try:
+        import solders.pubkey  # noqa: F401,PLC0415
+    except Exception:  # noqa: BLE001
+        print("  [проп ] условия с выводом адресов: на этой машине нет solders")
+        print(f"самопроверка точной котировки DLMM: {пройдено}/{пройдено + провалено}"
+              " пройдено (часть пропущена -- нет solders)")
+        return 0 if провалено == 0 else 1
 
     # --- узел молчит: честный отказ, а не выдуманный минимум
     def мёртвый(метод, параметры):

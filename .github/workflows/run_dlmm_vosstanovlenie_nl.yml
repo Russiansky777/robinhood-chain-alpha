@@ -46,12 +46,12 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "Сборка модулей и самопроверка котировки"
+      - name: "Сборка модулей (самопроверка -- на хосте: solders только там)"
         run: |
           set -e
           python3 -m py_compile deploy/checks/dlmm_vosstanovlenie.py
           python3 -m py_compile analysis/podbivka_dlmm_quote.py
-          python3 analysis/c2_dlmm_tochnaya_kotirovka.py --self-test
+          python3 -m py_compile analysis/c2_dlmm_tochnaya_kotirovka.py
 
       - name: "SSH key"
         env:
@@ -72,6 +72,7 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dlmm_vosstanovlenie.py" < deploy/checks/dlmm_vosstanovlenie.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/podbivka_dlmm_quote.py" < analysis/podbivka_dlmm_quote.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py" < analysis/c2_dlmm_tochnaya_kotirovka.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR python3 $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py --self-test"
           ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR python3 $RABOTA/dlmm_vosstanovlenie.py --state-dir $STATE_DIR --skolko '${{ inputs.skolko }}' --simulyacij '${{ inputs.simulyacij }}' --lamportov '${{ inputs.lamportov }}' --out $RABOTA/out.json" | tail -80
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/dlmm_vosst.json || true
           if python3 -c "import json; json.load(open('/tmp/dlmm_vosst.json'))" 2>/dev/null; then
