@@ -28,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import podbivka_clmm_quote as QC  # noqa: E402
 import podbivka_sim as S  # noqa: E402
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
@@ -221,7 +222,8 @@ def пересёк_тик(сн: dict, т: dict) -> bool:
 
 
 def пулы_из_api(уз, url: str, программа: str, сколько: int = 20) -> tuple:
-    """Адреса пулов с наибольшим оборотом из официального API; каждый проверяется по цепи: владелец счёта = программа."""
+    """Адреса пулов с наибольшим оборотом из официального API; каждый проверяется по цепи: владелец счёта = программа
+    и дискриминатор счёта Anchor = PoolState (в ответе API есть и другие счета программы, например конфиг)."""
     import re  # noqa: PLC0415
     import requests  # noqa: PLC0415
     try:
@@ -236,9 +238,10 @@ def пулы_из_api(уз, url: str, программа: str, сколько: i
             канд.append(a)
     ок = []
     for i in range(0, min(len(канд), 60), 20):
-        r = уз.вызов("getMultipleAccounts", [канд[i:i + 20], {"encoding": "base64", "dataSlice": {"offset": 0, "length": 0}}])
+        r = уз.вызов("getMultipleAccounts", [канд[i:i + 20], {"encoding": "base64", "dataSlice": {"offset": 0, "length": 8}}])
         for a, v in zip(канд[i:i + 20], (r or {}).get("value") or []):
-            if v and v.get("owner") == программа and len(ок) < сколько:
+            if (v and v.get("owner") == программа and len(ок) < сколько
+                    and base64.b64decode(v["data"][0]) == hashlib.sha256(b"account:PoolState").digest()[:8]):
                 ок.append(a)
     return ок, {"url": url, "кандидатов": len(канд), "проверено_по_цепи": len(ок), "why_not": why}
 
@@ -341,7 +344,7 @@ def main() -> int:
             k += 1
             try:
                 сн = снимок_по_карте(уз, пул) if а.po_karte else снимок(уз, пул, а.massivov)
-            except RuntimeError as exc:
+            except (RuntimeError, QC.ОшибкаCLMM) as exc:
                 итог["отсев"][f"снимок: {S.чисто(str(exc))[:60]}"] = итог["отсев"].get(f"снимок: {S.чисто(str(exc))[:60]}", 0) + 1
                 очередь.remove(пул)
                 continue
