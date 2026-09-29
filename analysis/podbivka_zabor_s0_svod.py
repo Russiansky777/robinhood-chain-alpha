@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Подбивка: забор S+0 в деньгах -- сводка по цепи (data/podbivka/zabor_s0_2026-09-29.json). Офлайн.
+
+Каждая транзакция -- ровно одной сделке: (1) сделка, у которой она -- подпись покупки (buy_sig / landed_sig);
+(2) иначе -- подпись продажи из записи Code-1; (3) иначе -- сделка того же минта с последним слотом источника
+≤ слоту транзакции среди сделок с севшей покупкой. Лаг = слот севшей покупки − слот источника (запись Code-1).
+Выход: docs/podbivka_2026-09-29_zabor_s0.md.
+"""
+from __future__ import annotations
+
+import collections
+import json
+import time
+from pathlib import Path
+
+КОРЕНЬ = Path(__file__).resolve().parent.parent
+
+
+def main() -> int:
+    д = json.loads((КОРЕНЬ / "data" / "podbivka" / "zabor_s0_2026-09-29.json").read_text(encoding="utf-8"))
+    вход = {р["cid"]: р for р in json.loads((КОРЕНЬ / "data" / "podbivka" / "mesto" / "vhod_2026-09-29.json")
+                                              .read_text(encoding="utf-8"))["ряды"]}
+    Р = д["разбор"]
+    С = д["сделки"]
+    хоз: dict = {}
+    for шаг in ("покупка", "продажа"):
+        for с in С:
+            р = вход[с["cid"]]
+            з = р.get("zapis") or {}
+            явные = [р.get("buy_sig"), р.get("landed_sig")] if шаг == "покупка" else [р.get("sell_sig"), *(з.get("last_sell_signatures") or [])]
+            for s in явные:
+                if s and s in Р and s not in хоз:
+                    хоз[s] = с["cid"]
+    села = {с["cid"] for с in С if any(хоз.get(s) == с["cid"] and not Р[s]["ошибка"] for s in с["подписи"])}
+    for с in С:
+        for s in с["подписи"]:
+            if s in хоз:
+                continue
+            канд = [x for x in С if x["mint"] == с["mint"] and x["cid"] in села and (x["source_slot"] or 0) <= (Р[s]["slot"] or 0)]
+            if канд:
+                хоз[s] = max(канд, key=lambda x: x["source_slot"] or 0)["cid"]
+    for с in С:
+        свои = sorted({s for x in С for s in x["подписи"] if хоз.get(s) == с["cid"]})
+        с["свои"] = свои
+        с["цепь"] = sum(Р[s]["лампорты"] for s in свои) / 1e9
+        с["продаж"] = sum(1 for s in свои if (Р[s]["минты"].get(с["mint"]) or 0) < 0)
+        с["лаг"] = (с["landed_slot"] - с["source_slot"]) if с["landed_slot"] and с["source_slot"] and с["cid"] in села else None
+        с["время_продаж"] = [time.strftime("%H:%M:%S", time.gmtime(Р[s]["blockTime"])) for s in свои
+                            if (Р[s]["минты"].get(с["mint"]) or 0) < 0 and Р[s]["blockTime"]]
+    def корз(с):
+        if с["лаг"] is None:
+            return "не села"
+        return "S+0" if с["лаг"] == 0 else "S+1 и позже"
+    md = ["# Забор S+0 в деньгах: 45 сделок полосы 28.09 06Z → 29.09 06Z по цепи", "",
+          f"Вход -- data/sdelki_polosy_2026-09-29.json ветки Code-1 (только чтение). Итог -- Правило 11: изменение нативного "
+          f"баланса кошелька `{д['кошелёк']}` и всех его токеновых счетов по всем транзакциям сделки (комиссии, чаевые, "
+          f"рента внутри). Транзакции сделки -- её покупка и все транзакции кошелька в окне, где меняется баланс этого минта "
+          f"(продажи -- по подписям кошелька, не по истории пула; подписей кошелька в окне {д['подписей_кошелька']}). "
+          "Пакетные закрытия счетов (несколько минтов) не входят: у кошелька и его счетов вместе рента в них сходится в ноль. "
+          "Лаг -- слот севшей покупки − слот источника по записи Code-1.", "",
+          "| группа | лаг | n | сумма по цепи, SOL | в плюсе | сумма по полю Code-1 итог_sol |", "|---|---|---|---|---|---|"]
+    гр = collections.defaultdict(list)
+    for с in С:
+        гр[(с["группа"], корз(с))].append(с)
+    for (г, к), сс in sorted(гр.items()):
+        md.append(f"| {г} | {к} | {len(сс)} | {sum(x['цепь'] for x in сс):+.6f} | {sum(1 for x in сс if x['цепь'] > 0)} из {len(сс)} | "
+                  f"{sum((x['итог_code1'] or 0) for x in сс):+.6f} |")
+    for г in ("lane_s0", "batch5", "sniper_src"):
+        сс = [с for с in С if с["группа"] == г]
+        md.append(f"| **{г}, всего** | | {len(сс)} | **{sum(x['цепь'] for x in сс):+.6f}** | {sum(1 for x in сс if x['цепь'] > 0)} из {len(сс)} | "
+                  f"{sum((x['итог_code1'] or 0) for x in сс):+.6f} |")
+    md += ["", "## Построчно", "",
+           "| cid | группа | минт | лаг | транзакций | продажи (UTC) | по цепи, SOL | Code-1 итог_sol | разница | запись Code-1 о закрытии |",
+           "|---|---|---|---|---|---|---|---|---|---|"]
+    for с in sorted(С, key=lambda x: x["source_slot"] or 0):
+        р = вход[с["cid"]]
+        раз = с["цепь"] - (с["итог_code1"] or 0)
+        md.append(f"| {с['cid'][-10:]} | {с['группа']} | {с['mint'][:8]} | {'—' if с['лаг'] is None else с['лаг']} | {len(с['свои'])} | "
+                  f"{', '.join(с['время_продаж']) or '—'} | {с['цепь']:+.6f} | {(с['итог_code1'] or 0):+.6f} | {раз:+.6f} | "
+                  f"{(р.get('closed_reason') or '')[:70]} |")
+    md += ["", "Замечания: «не села» -- покупка упала или не дошла до цепи (итог -- комиссия упавшей транзакции). В «месте в "
+           "блоке» S+0 считался и по упавшим транзакциям (их слот -- слот источника), поэтому там S+0 -- 11, здесь -- только "
+           "севшие. Число lane_s0 +0.903 в это окно не попадает: сверка построчно -- по таблице Правила 11 Code-1 за то же окно, "
+           "когда она будет.", ""]
+    (КОРЕНЬ / "docs" / "podbivka_2026-09-29_zabor_s0.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    print("\n".join(md[:20]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
