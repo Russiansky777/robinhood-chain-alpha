@@ -593,12 +593,22 @@ def main() -> int:
         print(текст_)
         return 0
     с_ts = сейчас - а.chasov * 3600.0
-    сн = TV.прочитать(а.katalog) or {}
-    каталог_вал = а.katalog
-    if not сн and а.katalog_validatorov:
-        сн = TV.прочитать(а.katalog_validatorov) or {}
-        if сн:
-            каталог_вал = а.katalog_validatorov
+    # СНИМОК БЕРЁМ СВЕЖИЙ, А НЕ ПЕРВЫЙ НАЙДЕННЫЙ. Прогон валидаторов пишет
+    # кэш в каталог состояния службы, а отчёт смотрел сначала в каталог зонда,
+    # где лежал снимок прошлых суток; он не пустой, поэтому запасной вариант
+    # не срабатывал ни разу. 02:57Z из-за этого версии узлов у всех 48 лидеров
+    # вышли "не прочитана", хотя в свежем снимке они есть у всех 48.
+    варианты = [(а.katalog, TV.прочитать(а.katalog) or {})]
+    if а.katalog_validatorov and а.katalog_validatorov != а.katalog:
+        варианты.append((а.katalog_validatorov,
+                          TV.прочитать(а.katalog_validatorov) or {}))
+    сн, каталог_вал = {}, а.katalog
+    for кат, зн in варианты:
+        if not зн:
+            continue
+        if not сн or str(зн.get("utc") or "") > str(сн.get("utc") or ""):
+            сн, каталог_вал = зн, кат
+    сн = сн or {}
     расп = None
     путь_расп = Path(каталог_вал) / TV.ФАЙЛ_РАСПИСАНИЯ
     if путь_расп.exists():
