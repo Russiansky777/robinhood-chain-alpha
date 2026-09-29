@@ -1,0 +1,88 @@
+name: "Круг: причины отказов по задаче (только чтение)"
+
+# ЗАЧЕМ. С 12:08Z торгует одна группа test_krug, и за полтора часа ни одно её
+# решение не дошло до гейта полосы. Признак жизни считает решения по задачам, а
+# коды -- по всем задачам сразу, поэтому "что именно останавливает круг" из него
+# не видно. Этот прогон даёт разбивку ПО ЗАДАЧЕ и ПО КОДУ и показывает каждую
+# покупку источника с её тратой против порога входа.
+#
+# ТОЛЬКО ЧТЕНИЕ: журнал решений читается потоком, ни один файл на хосте не
+# меняется. Ни одного ордера, ни одного порога.
+on:
+  workflow_dispatch:
+    inputs:
+      zadacha:
+        description: "задача источника (test_krug, lane_s0, sniper_src ... ; vse -- все)"
+        required: false
+        default: "test_krug"
+      s:
+        description: "с какого времени UTC, ISO (пусто -- с начала журнала)"
+        required: false
+        default: ""
+
+concurrency:
+  group: krug-prichiny
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  ENV_DIR: /etc/bloom-executor
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  RABOTA: /tmp/krug_prichiny
+  OUT_FILE: data/krug_prichiny.json
+
+jobs:
+  prichiny:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Причины по журналу решений"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/krug_prichiny.py" < deploy/checks/krug_prichiny.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR $VENV/python $RABOTA/krug_prichiny.py --zadacha '${{ inputs.zadacha }}' --s '${{ inputs.s }}' --out $RABOTA/out.json" | tail -120
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/krug_prichiny.json || true
+          if python3 -c "import json; json.load(open('/tmp/krug_prichiny.json'))" 2>/dev/null; then
+            cp /tmp/krug_prichiny.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: otchet ne sobralsya"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Krug: prichiny otkazov po zadache [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
