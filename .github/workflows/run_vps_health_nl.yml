@@ -218,8 +218,12 @@ jobs:
               echo 'журнал решений пуст'
             fi
             echo '--- сторож продаж: UNSOLD и автопауза ---'
-            G=/home/bot/bloom_executor_live_data/seller_log.jsonl
-            if [ -s \"\$G\" ]; then grep -E 'UNSOLD|автопауз' \"\$G\" | tail -n 10; else echo 'журнала продаж нет'; fi
+            # ЖУРНАЛ СТОРОЖА -- seller.jsonl, а НЕ seller_log.jsonl. Прежнего
+            # имени на хосте нет вовсе, поэтому проверка честно печатала
+            # "журнала продаж нет" и при живых строках UNSOLD: то есть этот
+            # греп был слепым с самого начала (замечено 29.09).
+            G=/home/bot/bloom_executor_live_data/seller.jsonl
+            if [ -s \"\$G\" ]; then grep -E 'UNSOLD|автопауз' \"\$G\" | tail -n 10 || echo 'строк UNSOLD и автопауз в журнале сторожа нет'; else echo \"журнала сторожа \$G нет или он пуст\"; fi
           " 2>&1 | tee -a data/vps_health_nl.txt
           # Журнал службы: ТОЛЬКО он несёт traceback (log.exception). Берём
           # во временный файл и чистим от ключей ДО того, как он попадёт в
