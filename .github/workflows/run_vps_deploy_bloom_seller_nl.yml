@@ -220,6 +220,14 @@ jobs:
             # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
             # то есть на хост уезжает пустота. Первый прогон именно так и
             # упал -- сверка sha256 показала сумму пустого файла.
+            # СОВПАЛО -- НЕ ПЕРЕПИСЫВАЕМ: тот же файл с новым mtime выглядит
+            # как новый код, и проверка "служба старше своих модулей" даёт
+            # ложную тревогу после второго деплоя подряд.
+            was_sum=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/$f 2>/dev/null | cut -d' ' -f1")
+            if [ "$was_sum" = "$local_sum" ]; then
+              echo "$f: уже такой ($local_sum) -- не переписан, mtime не тронут"
+              continue
+            fi
             ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/$f && chown bot:bot $CODE_DIR/$f && chmod 644 $CODE_DIR/$f" < "analysis/$f"
             remote_sum=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/$f | cut -d' ' -f1")
             echo "$f: локально $local_sum, на хосте $remote_sum"
