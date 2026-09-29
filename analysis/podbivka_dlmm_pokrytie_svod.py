@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Подбивка: сводка покрытия активной корзины DLMM массивами из транзакции источника. Офлайн.
+Вход: data/podbivka/dlmm_pokrytie.json, data/podbivka/dlmm_4pSQ2zbz.json (если есть), data/podbivka/dlmm_proverka_mnogo4.json.
+Выход: docs/podbivka_2026-09-29_dlmm_pokrytie.md.
+"""
+from __future__ import annotations
+
+import collections
+import json
+from pathlib import Path
+
+КОРЕНЬ = Path(__file__).resolve().parent.parent
+П = КОРЕНЬ / "data" / "podbivka"
+
+
+def индекс(b: int) -> int:
+    q = int(b / 70)
+    return q - 1 if b < 0 and b % 70 else q
+
+
+def main() -> int:
+    д = json.loads((П / "dlmm_pokrytie.json").read_text(encoding="utf-8"))
+    ok = [p for p in д["покупки"] if not p.get("why_not")]
+    md = ["# DLMM для Code-1: покрывают ли массивы корзин из транзакции источника активную корзину через 1 / 2 / 3 слота", "",
+          "analysis/podbivka_dlmm_pokrytie.py. Покупки источников в DLMM за 28.09 06Z → 29.09 06Z -- из архива PumpApi "
+          "(den_2026-09-28T06, покупки_ист, не больше 3 на источника), первые 40 по времени. Массивы в транзакции -- счета "
+          "транзакции источника, совпавшие с PDA bin_array пула. Активная корзина на конец слота s+k -- end_bin последнего "
+          "успешного свопа пула в (s, s+k] (подписи пула между сделкой источника и блоком s+4, Helius); свопов не было -- "
+          "end_bin источника. Покрыта -- индекс массива активной корзины среди массивов транзакции (или их соседей ±1).", "",
+          f"Разобрано: {len(ok)} из {len(д['покупки'])}. Массивов в транзакции источника: " +
+          ", ".join(f"{k} -- {n}" for k, n in sorted(collections.Counter(len(p['массивы_в_tx']) for p in ok).items())) + ".", "",
+          "| через | покрыта массивами tx | покрыта массивами tx ±1 | активная корзина сдвинулась от end_bin источника | активный массив сменился |",
+          "|---|---|---|---|---|"]
+    for k in ("1", "2", "3"):
+        c = [(p, p["по_слотам"][k]) for p in ok]
+        md.append(f"| {k} слот(а) | {sum(v['покрыта_без_соседей'] for _, v in c)} из {len(c)} | {sum(v['покрыта'] for _, v in c)} из {len(c)} | "
+                  f"{sum(1 for p, v in c if v['активная'] != p['end'])} | {sum(1 for p, v in c if v['массив'] != индекс(p['end']))} |")
+    md += ["", "Свопов пула в (s, s+3]: " + ", ".join(f"{k} -- {n}" for k, n in sorted(collections.Counter(
+        min(p["свопов_после"], 10) for p in ok).items())) + " (10 -- «10 и больше»).", "",
+           "| источник | пул | слот | start → end | массивы в tx | активная через 1 / 2 / 3 | свопов после |", "|---|---|---|---|---|---|---|"]
+    for p in ok:
+        md.append(f"| `{p['источник'][:8]}` | `{p['пул'][:8]}` | {p['слот']} | {p['start']} → {p['end']} | {p['массивы_в_tx']} | "
+                  f"{' / '.join(str(p['по_слотам'][k]['активная']) for k in '123')} | {p['свопов_после']} |")
+    мн = json.loads((П / "dlmm_proverka_mnogo4.json").read_text(encoding="utf-8"))
+    разн = collections.Counter(abs(индекс(x["end_факт"]) - индекс(x["start_факт"])) for x in мн["итог"])
+    md += ["", "## Свопы сверки v6 (46)", "", f"Массив стартовой и конечной корзины: совпадает у {разн.get(0, 0)} из {len(мн['итог'])} "
+           "(в том числе 12-корзинный своп Gdf1Uo1K -- внутри одного массива).", ""]
+    п4 = П / "dlmm_4pSQ2zbz.json"
+    if п4.exists():
+        r = json.loads(п4.read_text(encoding="utf-8"))["своп_4pSQ2zbz"]
+        md += ["## Необъяснённый своп 4pSQ2zbz (2x46Pfzr…, −2.74 %, факт 1 корзина, модуль 5)", "",
+               f"Событие Swap2Evt: `{json.dumps(r.get('свап2'), ensure_ascii=False)}`.", "",
+               f"Корзина 34 СЕЙЧАС (состояние на слот чтения {r.get('слот_чтения')} RPC не отдаёт): "
+               f"`{json.dumps(r.get('корзина_34_сейчас'), ensure_ascii=False)}`; пул сейчас: `{json.dumps(r.get('пул_сейчас'), ensure_ascii=False)}`.", ""]
+    (КОРЕНЬ / "docs" / "podbivka_2026-09-29_dlmm_pokrytie.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    print("\n".join(md[:14]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
