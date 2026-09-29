@@ -53,8 +53,11 @@ jobs:
           set -e
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
             "cat > /tmp/dvuhshagovyy_v_zhurnale.py" < deploy/checks/dvuhshagovyy_v_zhurnale.py
+          # ПИТОН СЛУЖБЫ И ЕЁ ОКРУЖЕНИЕ: котировку отказанных сигналов разбор
+          # читает с цепи, а для этого нужны и ключ узла из env, и solders --
+          # он есть только в venv службы. Системный python3 сюда не годится.
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
-            "python3 /tmp/dvuhshagovyy_v_zhurnale.py --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' --podrobno '${{ inputs.podrobno }}' --podpisi '${{ inputs.podpisi }}' --out /tmp/dv_zh.json" | tee /tmp/vyvod.txt
+            "set -a; . /etc/bloom-executor/env; set +a; PYTHONPATH=/home/bot/bloom_executor BLOOM_CODE_DIR=/home/bot/bloom_executor /home/bot/robinhood-chain-alpha/venv/bin/python /tmp/dvuhshagovyy_v_zhurnale.py --state-dir '$STATE_DIR' --since-utc '${{ inputs.since_utc }}' --podrobno '${{ inputs.podrobno }}' --podpisi '${{ inputs.podpisi }}' --out /tmp/dv_zh.json" | tee /tmp/vyvod.txt
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes root@"$HOST" \
             "cat /tmp/dv_zh.json" > "$OUT"
 
