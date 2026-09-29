@@ -24,7 +24,8 @@ from pathlib import Path
 WSOL = "So11111111111111111111111111111111111111112"
 ЖИВЫЕ = {"leader": (0.5, 3.0, 150), "batch5": (0.3, 2.0, 108), "lane_s0": (0.3, 2.0, 108), "sniper_src": (0.3, 2.0, 12)}
 ВЫХОДЫ = (6, 12, 24, 36, 72, 108, 150)
-ВХОДЫ = (("S0", "сразу за ним"), ("S0_дно", "конец слота"), ("S1", "S+1"))
+ВХОДЫ = (("S0", "сразу за ним"), ("N16", "наше место: после 16 покупок"), ("N50", "наше место: после 50 покупок"),
+         ("S0_дно", "конец слота"), ("S1", "S+1"))   # N16 / N50 -- медиана и p80 места в блоке (pyg8 и позже)
 ПУЛЫ = (("pump", "кривая pump.fun"), ("raydium-launchpad", "LaunchLab"), ("pump-amm", "Pump AMM (не для вывода)"))
 
 
@@ -37,7 +38,7 @@ def ячейка(v: list) -> str:
 
 def main() -> int:
     р = argparse.ArgumentParser()
-    р.add_argument("--prefiks", default="pyg7")
+    р.add_argument("--prefiks", default="pyg8")
     а = р.parse_args()
     гр = json.loads((КОРЕНЬ / "data" / "podbivka" / "gruppy_code1.json").read_text(encoding="utf-8"))["groups"]
     кошельки = {г: set((гр.get(г) or {}).get("addresses") or {}) for г in ("leader", "batch5", "lane_s0")}
@@ -96,6 +97,12 @@ def main() -> int:
                 for б in (0.3, 0.5):
                     md.append(f"| {ви} | {б}{' (живой)' if б == билет else ''} | " +
                               " | ".join(ячейка([пп(с, f'{вход}|{б}|{h}') for с in сс]) for h in ВЫХОДЫ) + " |")
+            for n in (16, 50):
+                сл = sorted(с["модель"].get(f"N{n}_слотов") for с in сс if с["модель"].get(f"N{n}_слотов") is not None)
+                if сл:
+                    md.append(f"Вход N{n}: {n}-я покупка пула после сигнала была у {len(сл)} из {len(сс)} сигналов; слот входа от s0 -- "
+                              f"медиана {statistics.median(сл):g}, p80 {сл[int(0.8 * (len(сл) - 1))]}. Выход +h считается от s0; если вход "
+                              "позже s0+h−1, ячейка без этого сигнала.")
             md.append("")
     (КОРЕНЬ / "docs" / "podbivka_2026-09-29_gruppy_vyhody.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
