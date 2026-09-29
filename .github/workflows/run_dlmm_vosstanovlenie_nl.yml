@@ -1,0 +1,100 @@
+name: "DLMM без денег: восстановление байт в байт и симуляция (только чтение)"
+
+# ЗАЧЕМ (слово владельца 29.09 ночью, п.3): "Проверка без денег: восстановление
+# байт в байт по 10 живым покупкам источников в DLMM за 28.09 (они в журнале),
+# simulateTransaction без подписи по трём из них -- err=None, CU. Отчёт: совпало
+# N из 10, CU p50/max, что не покрыто".
+#
+# Ни одной подписи: симуляция идёт с sigVerify=false и replaceRecentBlockhash.
+# Флаг точной котировки DLMM при этом не включается -- прогон его не касается.
+on:
+  workflow_dispatch:
+    inputs:
+      skolko:
+        description: "сколько живых сделок взять"
+        required: false
+        default: "10"
+      simulyacij:
+        description: "по скольким просить simulateTransaction"
+        required: false
+        default: "3"
+      lamportov:
+        description: "размер нашей покупки для сборки, лампорты"
+        required: false
+        default: "10000000"
+
+concurrency:
+  group: dlmm-vosstanovlenie
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/dlmm_vosst
+  OUT_FILE: data/dlmm_vosstanovlenie.json
+
+jobs:
+  proverka:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Сборка модулей и самопроверка котировки"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/dlmm_vosstanovlenie.py
+          python3 -m py_compile analysis/podbivka_dlmm_quote.py
+          python3 analysis/c2_dlmm_tochnaya_kotirovka.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Проверка на хосте (ни одной подписи)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dlmm_vosstanovlenie.py" < deploy/checks/dlmm_vosstanovlenie.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/podbivka_dlmm_quote.py" < analysis/podbivka_dlmm_quote.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/c2_dlmm_tochnaya_kotirovka.py" < analysis/c2_dlmm_tochnaya_kotirovka.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR python3 $RABOTA/dlmm_vosstanovlenie.py --state-dir $STATE_DIR --skolko '${{ inputs.skolko }}' --simulyacij '${{ inputs.simulyacij }}' --lamportov '${{ inputs.lamportov }}' --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/dlmm_vosst.json || true
+          if python3 -c "import json; json.load(open('/tmp/dlmm_vosst.json'))" 2>/dev/null; then
+            cp /tmp/dlmm_vosst.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: proverka ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "DLMM: vosstanovlenie bajt v bajt i simulyaciya [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
