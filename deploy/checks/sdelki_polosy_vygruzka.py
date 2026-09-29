@@ -152,6 +152,14 @@ def из_решений(state_dir: str, cids: set, *, с_ts: float = 0.0) -> dic
                 в["nalog_marshruta_bps"] = нал["route_transfer_fee_bps"]
             if з.get("pool_fee_share") is not None:
                 в["komissiya_pula_pct"] = round(float(з["pool_fee_share"]) * 100, 4)
+            # СТРОИТЕЛЬ -- ВТОРЫМ ИСТОЧНИКОМ (слово владельца 29.09, п.5: в
+            # sdelki_polosy строитель должен быть заполнен везде). В записи
+            # позиции он лежит в program, но у сделок до правки брони поля там
+            # нет вовсе -- тогда берём программу пула из строки решения.
+            for поле_ж in ("pool_program", "program", "тип_пула"):
+                if з.get(поле_ж) and not в.get("stroitel"):
+                    в["stroitel"] = з[поле_ж]
+                    в["stroitel_otkuda"] = f"журнал решений: {поле_ж}"
     return из_
 
 
@@ -311,6 +319,12 @@ def main() -> int:
             "freeze_authority_otozvan": None,
             "state": п.get("state"),
             "closed_reason": п.get("closed_reason"),
+            # СТРОИТЕЛЬ: программа пула, которой собрана покупка. В записи
+            # позиции это program (ставится в БРОНИ, до отправки). Пусто --
+            # дозаполняется из журнала решений ниже, и в отчёте видно, у
+            # скольких рядов он так и остался пустым.
+            "stroitel": п.get("program"),
+            "stroitel_otkuda": ("запись позиции: program" if п.get("program") else None),
             "итог_sol": None, "расход_sol": None,
             # ПОЛЯ, КОТОРЫЕ ПРОСИЛ ВЛАДЕЛЕЦ ОТДЕЛЬНО (п.5, 28.09): подписи
             # покупки и продажи и СЕВШАЯ подпись со своим слотом. Севшая --
@@ -338,12 +352,24 @@ def main() -> int:
         д = решения.get(ряд["cid"]) or {}
         for поле in ("nalog_tokena_bps", "nalog_marshruta_bps",
                       "komissiya_pula_pct", "freeze_authority",
-                      "freeze_authority_otozvan"):
+                      "freeze_authority_otozvan", "stroitel", "stroitel_otkuda"):
             if ряд.get(поле) is None and д.get(поле) is not None:
                 ряд[поле] = д[поле]
                 добрано_чисел += 1
     print(f"налог и комиссия пула: дозаполнено чисел {добрано_чисел} "
           f"по {len(решения)} сделкам из журнала решений")
+    # СТРОИТЕЛЬ: сколько рядов знают его и откуда. Пустые называются поимённо --
+    # "почти везде заполнено" не годится, нужен список тех, где его нет.
+    с_строителем = [р for р in ряды if р.get("stroitel")]
+    без_строителя = [р for р in ряды if not р.get("stroitel")]
+    откуда = {}
+    for р in с_строителем:
+        откуда[р.get("stroitel_otkuda") or "не сказано"] = \
+            откуда.get(р.get("stroitel_otkuda") or "не сказано", 0) + 1
+    print(f"строитель: заполнен у {len(с_строителем)} из {len(ряды)}; откуда {откуда}")
+    if без_строителя:
+        print("строителя нет у cid: "
+              + ", ".join(str(р.get("cid"))[-12:] for р in без_строителя[:20]))
     # НАШЕ МЕСТО В БЛОКЕ -- ДОЗАПОЛНИТЬ ПО ЦЕПИ. Слово владельца 28.09 (п.4в):
     # "наш индекс в блоке почти везде пуст -- заполнять из того же источника,
     # что и TG-строка «мы: S+N, место»; уже записанные сделки дозаполнить".
