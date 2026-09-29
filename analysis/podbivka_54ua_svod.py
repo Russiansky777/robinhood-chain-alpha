@@ -145,10 +145,46 @@ def cu() -> list:
     return md + [""]
 
 
+def триггер() -> list:
+    п = П / "54ua_trigger.json"
+    if not п.exists():
+        return []
+    T = {z["signature"]: z for z in json.loads(п.read_text(encoding="utf-8"))["записи"]}
+    З = json.loads((П / "54ua_cu.json").read_text(encoding="utf-8"))["записи"]
+    инд = {p["signature"]: p for p in json.loads((П / "54ua_indeksy.json").read_text(encoding="utf-8"))["покупки"]}
+
+    def куст(з):
+        if з["слотов_до"] > 0:
+            return "источник на S−1 / S−2"
+        p = инд.get(з["signature"])
+        r = [x for x in (p or {}).get("покупатели") or [] if x["подпись"] == з["подпись_источника"]]
+        if not r:
+            return None
+        d = r[0]["разность"]
+        return "1–9" if d <= 9 else "10–29" if d <= 29 else "30–100" if d <= 100 else "> 100"
+    гр: dict = {}
+    for з in З:
+        t, к = T.get(з["signature"]), куст(з)
+        if t and к:
+            гр.setdefault(к, []).append((t["slot"] - t["слот_создания"]) if t.get("слот_создания") is not None else None)
+    md = ["## 4. Создание минта как «общий триггер»", "",
+          "Слот создания -- самая старая подпись минта до его покупки (getSignaturesForAddress, до 10 страниц по 1000; "
+          "Helius). Не дошли до начала -- минт старше, возраст неизвестен (в таблице -- «создание не найдено»). Возраст -- его "
+          "слот − слот создания.", "",
+          "| куст (его индекс − индекс ист.) | покупок | создание найдено | возраст минта, слотов: медиана | в том же слоте | ≤ 3 слотов | ≤ 150 слотов |",
+          "|---|---|---|---|---|---|---|"]
+    for к in ("1–9", "10–29", "30–100", "> 100", "источник на S−1 / S−2"):
+        v = гр.get(к) or []
+        a = [x for x in v if x is not None]
+        md.append(f"| {к} | {len(v)} | {len(a)} | {ф(мед(a))} | {sum(1 for x in a if x == 0)} | {sum(1 for x in a if x <= 3)} | "
+                  f"{sum(1 for x in a if x <= 150)} |")
+    return md + [""]
+
+
 def main() -> int:
     md = ["# Подбивка: 54uaRuJE -- следует за источником или общий триггер", "",
           "279 покупок за 7 суток (как в docs/podbivka_2026-09-28_snaipery.md). Ничего не рекомендуется.", ""]
-    md += индексы() + cu()
+    md += индексы() + cu() + триггер()
     (КОРЕНЬ / "docs" / "podbivka_2026-09-29_54ua.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
     return 0
