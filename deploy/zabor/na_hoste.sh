@@ -57,6 +57,21 @@ if [ ! -s "$RABOTA/c2_zabor_s0_opyt.py" ]; then
   exit 1
 fi
 
+# DOSTUP DLJA bot. Progon sozdajot $RABOTA rezhimom 700 ot root i kladjot fajly
+# s umask 077, to est 600 root:root. A i samoproverka, i SAM OPYT zapuskajutsja
+# cherez sudo -u bot -- i bot ni prochitat skript, ni zapisat out.json v etot
+# katalog ne mozhet: "Permission denied", kod 2. Progon kolca 30.09 15:44Z upal
+# imenno tak. Eto sorvalo by i opyt: on idjot tem zhe sudo -u bot, prosto gejt
+# samoproverki padal ranshe i do nego delo ne dohodilo.
+#
+# Dajom dostup GRUPPE bot, a ne vsem: katalog 770 i skript 640 s gruppoj bot.
+# FAJL SEKRETA ETIM NE OTKRYVAETSJA: on ostajotsja 600 root:root, i bot ego ne
+# chitaet -- sekret v opyt popadaet cherez okruzhenie (sudo -E), a chitaet ego
+# root. Prava 600 na njom proverjajutsja otdelno nizhe.
+chgrp bot "$RABOTA" && chmod 770 "$RABOTA"
+chgrp bot "$RABOTA/c2_zabor_s0_opyt.py" && chmod 640 "$RABOTA/c2_zabor_s0_opyt.py"
+echo "dostup dlja bot: katalog $(stat -c %a:%U:%G "$RABOTA"), skript $(stat -c %a:%U:%G "$RABOTA/c2_zabor_s0_opyt.py")"
+
 # ОКРУЖЕНИЕ СЛУЖБЫ -- ТОЛЬКО ЧИТАЕМ. Узел, отправители и их ключи берутся оттуда
 # же, откуда их берёт полоса: иначе опыт мерил бы не ту дорогу.
 if [ ! -r "$ENV_DIR/env" ]; then
