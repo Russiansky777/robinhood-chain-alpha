@@ -162,6 +162,139 @@ def группа_записи(з: dict) -> str:
     return "группы в записи нет"
 
 
+def группа_по_источнику() -> tuple:
+    """(функция адрес->группа, откуда взято). В записи ТЕНИ группы нет вовсе.
+
+    Запись теневого разбора собирается из stage/signature/mint/source плюс ответ
+    shadow_build -- полей lane_group/group/source_task там НЕТ, и группа_записи на
+    ней всегда отвечала бы "группы в записи нет". Поэтому группа берётся по
+    ИСТОЧНИКУ из файла групп -- того же, что читает гейт полосы. Не вышло взять
+    файл -- возвращаем None и говорим причину, а не подставляем "off" молча:
+    "off" означает "не торгуем", и спутать его с "не знаем" нельзя.
+    """
+    for кат in (os.environ.get("BLOOM_CODE_DIR", "").strip(),
+                 "/home/bot/bloom_executor",
+                 os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "..", "..", "analysis")):
+        if not кат or not os.path.isdir(кат):
+            continue
+        if кат not in sys.path:
+            sys.path.insert(0, кат)
+        try:
+            import bloom_source_groups as SG  # noqa: PLC0415
+
+            по_адресу = dict(SG.загрузить().get("по_адресу") or {})
+
+            def _гр(а, _карта=по_адресу):
+                # "OFF" И "АДРЕСА НЕТ В ФАЙЛЕ" -- РАЗНЫЕ ОТВЕТЫ. SG.группа на
+                # незнакомом адресе отдаёт "off" по замыслу гейта ("не торгуем
+                # ничем"), но в списке для Code-2 это прочиталось бы как "источник
+                # в группе off", то есть как факт о настройке. Поэтому отсутствие
+                # называется словами.
+                if not а:
+                    return None, "источника в записи нет"
+                if а not in _карта:
+                    return None, "адреса нет в файле групп"
+                return _карта[а], "файл групп по источнику"
+
+            return _гр, f"файл групп через {кат}"
+        except Exception:  # noqa: BLE001, S112
+            continue
+    return None, "файл групп не прочитан: группа по источнику неизвестна"
+
+
+def выписка_теней(журнал_каталог: str, с_ts: float, программы: dict) -> dict:
+    """Подписи сигналов теневого разбора, которые НЕ собрались, по названным программам.
+
+    ЗАЧЕМ (поручение владельца 30.09, п.4 для Code-2): по двум программам без
+    строителя нужен список подписей, чтобы Code-2 закрыла вопрос "пул токена или
+    нога маршрута". Список, а не число: по числу этого не решить.
+
+    Поля берутся ИЗ ЗАПИСИ и ничего не досочиняются. Слота в записи тени нет --
+    в детекторе она собирается из stage/signature/mint/source плюс ответ
+    shadow_build; поэтому слот отдаётся как None с названной причиной, а не
+    подставляется из соседней строки наугад.
+
+    Только чтение журнала. Ни цепи, ни подписи, ни отправки.
+    """
+    по_источнику, откуда_группа = группа_по_источнику()
+    из_ = {"с": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(с_ts)),
+            "программы": dict(программы), "строк_просмотрено": 0,
+            "подходящих_записей": 0, "собранных_пропущено": 0,
+            "группа_откуда": откуда_группа,
+            "по_программам": {}, "строки": [],
+            "почему_нет_слота": ("в записи теневого разбора слота нет: она "
+                                  "состоит из stage/signature/mint/source и ответа "
+                                  "shadow_build -- слот туда не пишется"),
+            "только_чтение": True, "why_not": None}
+    пути = sorted(glob.glob(os.path.join(журнал_каталог, "decisions.jsonl*")))
+    if not пути:
+        из_["why_not"] = f"журнала решений нет: {журнал_каталог}"
+        return из_
+    for путь in пути:
+        try:
+            if os.path.getmtime(путь) < с_ts - 86400:
+                continue
+        except OSError:
+            pass
+        for с in строки(путь):
+            из_["строк_просмотрено"] += 1
+            адрес = None
+            for а in программы:
+                if а in с:
+                    адрес = а
+                    break
+            if адрес is None:
+                continue
+            try:
+                з = json.loads(с)
+            except ValueError:
+                continue
+            if not isinstance(з, dict):
+                continue
+            if str(з.get("stage") or "") != "shadow":
+                continue
+            if str(з.get("pool_program") or "") != адрес:
+                continue
+            т = время_записи(з)
+            if т is not None and т < с_ts:
+                continue
+            # СОБРАЛАСЬ -- НЕ НАШ СЛУЧАЙ. Вопрос владельца про not_built.
+            if з.get("ok") and з.get("tx_base64"):
+                из_["собранных_пропущено"] += 1
+                continue
+            из_["подходящих_записей"] += 1
+            имя = программы[адрес]
+            св = из_["по_программам"].setdefault(имя, {"всего": 0, "причины": {}})
+            св["всего"] += 1
+            поч = str(з.get("why_not") or "без причины")[:120]
+            св["причины"][поч] = int(св["причины"].get(поч, 0)) + 1
+            гр_из_записи = группа_записи(з)
+            if гр_из_записи != "группы в записи нет":
+                гр_знач, гр_откуда = гр_из_записи, "из записи"
+            elif по_источнику is not None:
+                гр_знач, гр_откуда = по_источнику(з.get("source"))
+            else:
+                гр_знач, гр_откуда = None, откуда_группа
+            из_["строки"].append({
+                "podpis": з.get("signature"),
+                "slot": з.get("slot"),
+                "mint": з.get("mint"),
+                "gruppa": гр_знач,
+                "gruppa_otkuda": гр_откуда,
+                "kotirovka": з.get("quote_mint"),
+                "programma": адрес,
+                "imya_programmy": имя,
+                "metka_pula": з.get("pool_label"),
+                "istochnik": з.get("source"),
+                "why_not": поч,
+                "ts_utc": (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(т))
+                            if т is not None else None)})
+    for св in из_["по_программам"].values():
+        св["причины"] = dict(sorted(св["причины"].items(), key=lambda т_: -т_[1])[:10])
+    return из_
+
+
 def посчитать(журнал_каталог: str, с_ts: float) -> dict:
     торгующие, откуда_торгующие = торгующие_группы()
     итог = {"с": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(с_ts)),
@@ -241,11 +374,42 @@ def main() -> int:
     р.add_argument("--state-dir", default="/home/bot/bloom_executor_live_data")
     р.add_argument("--since", default="", help="'2026-09-28T00:21:00Z', '-24h' или пусто")
     р.add_argument("--out", default="")
+    р.add_argument("--vypisat-programmy", default="",
+                   help="адреса программ через запятую: выписать подписи НЕсобранных теней")
+    р.add_argument("--vypisat-out", default="",
+                   help="куда положить выписку (JSON)")
     р.add_argument("--self-test", action="store_true")
     а = р.parse_args()
     if а.self_test:
         return самопроверка()
-    итог = посчитать(а.state_dir, момент(а.since))
+    с_ts = момент(а.since)
+    # ВЫПИСКА -- ОТДЕЛЬНЫЙ РЕЖИМ. Счёт сигналов и список подписей отвечают на
+    # разные вопросы, и смешивать их в одном выводе значит заставить читателя
+    # угадывать, о чём число.
+    if а.vypisat_programmy.strip():
+        имена = {}
+        for а_ in а.vypisat_programmy.replace(";", ",").split(","):
+            а_ = а_.strip()
+            if not а_:
+                continue
+            имена[а_] = СТРОИТЕЛИ.get(а_) or а_[:8]
+        if not имена:
+            print("СБОЙ: в --vypisat-programmy не нашлось ни одного адреса")
+            return 1
+        в = выписка_теней(а.state_dir, с_ts, имена)
+        краткое = {к: v for к, v in в.items() if к != "строки"}
+        краткое["строк_в_выписке"] = len(в["строки"])
+        print(json.dumps(краткое, ensure_ascii=False, indent=1))
+        for р_ in в["строки"][:20]:
+            print(f"  {р_['ts_utc']} {р_['imya_programmy']} {(р_['podpis'] or '')[:24]} "
+                  f"минт {(р_['mint'] or '')[:12]} группа {р_['gruppa']} "
+                  f"котировка {(р_['kotirovka'] or 'нет')[:12]} -- {р_['why_not'][:70]}")
+        if а.vypisat_out:
+            with open(а.vypisat_out, "w", encoding="utf-8") as ф:
+                json.dump(в, ф, ensure_ascii=False, indent=1)
+            print(f"выписка записана: {а.vypisat_out}")
+        return 0
+    итог = посчитать(а.state_dir, с_ts)
     print(json.dumps(итог, ensure_ascii=False, indent=1)[:6000])
     if а.out:
         with open(а.out, "w", encoding="utf-8") as ф:
@@ -344,6 +508,55 @@ def самопроверка() -> int:
         chk("время UTC разбирается как UTC",
             момент("2026-09-28T00:21:00Z") == 1790554860.0,
             момент("2026-09-28T00:21:00Z"))
+    # ВЫПИСКА ТЕНЕЙ: берёт только stage=shadow нужной программы и только
+    # НЕсобранные. Проверяется на поддельном журнале -- иначе пустой список в
+    # прогоне нельзя отличить от "фильтр не тот".
+    import tempfile  # noqa: PLC0415
+    ПР_A = "ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch"
+    ПР_B = "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH"
+    with tempfile.TemporaryDirectory() as кат:
+        with io.open(os.path.join(кат, "decisions.jsonl"), "w", encoding="utf-8") as ф:
+            # 1. Наш случай: тень этой программы, не собралась.
+            ф.write(json.dumps({"ts_utc": "2026-09-30T10:00:00Z", "stage": "shadow",
+                                 "signature": "ПОДПИСЬ1", "mint": "МИНТ1",
+                                 "source": "ИСТ1", "lane_group": "lane_s0",
+                                 "pool_program": ПР_A, "quote_mint": "USDC",
+                                 "ok": False, "why_not": "нет участка SOL->Q"},
+                                ensure_ascii=False) + "\n")
+            # 2. Тень той же программы, но СОБРАЛАСЬ -- не наш случай.
+            ф.write(json.dumps({"ts_utc": "2026-09-30T10:00:01Z", "stage": "shadow",
+                                 "signature": "ПОДПИСЬ2", "mint": "МИНТ2",
+                                 "pool_program": ПР_A, "ok": True,
+                                 "tx_base64": "БАЗА"}, ensure_ascii=False) + "\n")
+            # 3. Другая программа -- мимо фильтра.
+            ф.write(json.dumps({"ts_utc": "2026-09-30T10:00:02Z", "stage": "shadow",
+                                 "signature": "ПОДПИСЬ3", "pool_program": "ЧУЖАЯ",
+                                 "ok": False}, ensure_ascii=False) + "\n")
+            # 4. Не тень, а решение полосы той же программы -- мимо.
+            ф.write(json.dumps({"ts_utc": "2026-09-30T10:00:03Z", "stage": "gate",
+                                 "signature": "ПОДПИСЬ4", "pool_program": ПР_A,
+                                 "ok": False}, ensure_ascii=False) + "\n")
+            # 5. Вторая программа, не собралась -- наш случай.
+            ф.write(json.dumps({"ts_utc": "2026-09-30T10:00:04Z", "stage": "shadow",
+                                 "signature": "ПОДПИСЬ5", "mint": "МИНТ5",
+                                 "pool_program": ПР_B, "ok": False,
+                                 "why_not": "нога маршрута"}, ensure_ascii=False) + "\n")
+        в = выписка_теней(кат, 0.0, {ПР_A: "corch", ПР_B: "tessera"})
+        равно = [р_["podpis"] for р_ in в["строки"]]
+        chk("в выписку попали только НЕсобранные тени нужных программ",
+            равно == ["ПОДПИСЬ1", "ПОДПИСЬ5"], равно)
+        chk("собранная тень посчитана отдельно, а не выброшена молча",
+            в["собранных_пропущено"] == 1, в["собранных_пропущено"])
+        chk("поля берутся из записи: минт, группа, котировка",
+            в["строки"][0]["mint"] == "МИНТ1"
+            and в["строки"][0]["gruppa"] == "lane_s0"
+            and в["строки"][0]["kotirovka"] == "USDC", в["строки"][0])
+        chk("слота в записи тени нет -- None с названной причиной, а не догадка",
+            в["строки"][0]["slot"] is None and "слота нет" in в["почему_нет_слота"])
+        chk("причины сгруппированы по программам",
+            в["по_программам"]["corch"]["всего"] == 1
+            and в["по_программам"]["tessera"]["всего"] == 1, в["по_программам"])
+
     print(f"самопроверка счёта сигналов по строителям: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
