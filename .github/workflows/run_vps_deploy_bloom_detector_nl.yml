@@ -145,6 +145,18 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Отчёт прогона: начать с чистого файла (обнуление РОВНО ОДИН раз)"
+        run: |
+          set -e
+          # ZACHEM. Otchjot sobiraetsja shagami cherez tee -a i kommititsja v konce.
+          # Shag "--check-only" pisal v nego cherez tee BEZ -a, to est OBNULJAL fajl
+          # v seredine progona: vsjo, chto shagi vyshe uspeli zapisat, propadalo do
+          # kommita. Imenno tak propal PROTOKOL env -- shag otrabotal uspeshno, a v
+          # fajle ego stroki ne dozhili do konca. Teper obnulenie stoit odin raz i
+          # v nachale, a vse shagi pishut tolko cherez tee -a.
+          : > data/bloom_detector_deploy.txt
+          echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> data/bloom_detector_deploy.txt
+
       - name: "ГЕЙТ: переписывать env можно только по явному слову"
         # ЗАЧЕМ (слово владельца 28.09 ночью, п.3): "keep_env=yes сделать
         # умолчанием деплоя; вход без него невозможен. Два раза за два дня гейт
@@ -767,7 +779,7 @@ jobs:
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_detector.py --check-only --config $CODE_DIR/konfig_snapshot.json
             echo '--- исполнитель ---'
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_executor.py --check-only
-          " 2>&1 | tail -60 | tee data/bloom_detector_deploy.txt
+          " 2>&1 | tail -60 | tee -a data/bloom_detector_deploy.txt
 
       - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
         run: |
