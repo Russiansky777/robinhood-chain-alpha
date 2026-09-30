@@ -27,6 +27,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import os
 import sys
@@ -114,13 +115,45 @@ def _подписи_из_записи(r: dict) -> set:
     return out
 
 
+# Отложенные журналы, которые прочитать НЕ УДАЛОСЬ: путь -> причина словами.
+# Пустой набор здесь -- НЕ то же самое, что "чужих подписей нет": набор наших
+# подписей решает, что считать ЧУЖОЙ активностью на кошельке, и молча неполный
+# он и есть источник неверного вердикта. Поэтому причина выносится наружу.
+НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ: dict = {}
+
+
+def _строки_журнала(путь: Path):
+    """Строки журнала ПОТОКОМ, включая сжатые отложенные (.gz).
+
+    ПОЧЕМУ НЕ read_text. Во-первых, отложенный журнал СЖАТ: на нём
+    read_text(encoding="utf-8") падает UnicodeDecodeError (первый байт gzip --
+    0x1f 0x8b), а прежний except OSError его не ловил, потому что это ValueError.
+    Сверка при старте падала целиком -- то есть денежный гейт деплоя не давал
+    вердикта вовсе. Во-вторых, журнал позиций идёт на сотни мегабайт, и читать
+    его в память запрещено правилом владельца: только потоком.
+
+    Сжатость определяется по МАГИЧЕСКИМ БАЙТАМ, а не по имени: имя может быть
+    любым, а ошибаться здесь нельзя.
+    """
+    try:
+        with open(путь, "rb") as ф:
+            начало = ф.read(2)
+    except OSError as exc:
+        НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ[str(путь)] = f"{type(exc).__name__}: {exc}"
+        return
+    откр = gzip.open if начало == b"\x1f\x8b" else open
+    try:
+        with откр(путь, "rt", encoding="utf-8", errors="replace") as ф:
+            for с in ф:
+                yield с
+    except (OSError, EOFError, gzip.BadGzipFile) as exc:
+        # Обрезанный или битый архив: отдаём, что успели, и НАЗЫВАЕМ причину.
+        НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ[str(путь)] = f"{type(exc).__name__}: {exc}"
+
+
 def _подписи_из_файла(путь: Path) -> set:
     out = set()
-    try:
-        текст = путь.read_text(encoding="utf-8")
-    except OSError:
-        return out
-    for line in текст.splitlines():
+    for line in _строки_журнала(путь):
         line = line.strip()
         if not line:
             continue
@@ -139,6 +172,9 @@ def our_signatures(state: ST.ExecState) -> set:
     журнал пуст, и без их чтения вся прежняя наша активность выглядела бы
     чужой: ровно то различие, которое стенд обязан делать.
     """
+    # НАБОР ПРИЧИН -- ЗА КАЖДЫЙ СЧЁТ СВОЙ. Иначе причина прошлого вызова
+    # держалась бы и блокировала старт после того, как её уже нет.
+    НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ.clear()
     out = set()
     for p in state.positions().values():
         out |= _подписи_из_записи(p)
@@ -491,6 +527,16 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
     if журнал["mixed"]:
         блокеры.append("журнал смешан из записей прежнего и нового формата")
 
+    # НЕПРОЧИТАННЫЙ ОТЛОЖЕННЫЙ ЖУРНАЛ -- БЛОКЕР, А НЕ ЗАМЕТКА.
+    # Набор НАШИХ подписей решает, что считать ЧУЖОЙ активностью на кошельке.
+    # Неполный молча, он превращает нашу же прежнюю сделку в "чужую свежую
+    # активность" -- или, наоборот, прячет настоящую чужую. Неясность на
+    # деньгах -- запрет, и причина названа словами, а не числом.
+    for путь_, почему_ in sorted(НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ.items()):
+        блокеры.append(f"отложенный журнал не прочитан ({путь_}): {почему_} -- "
+                        f"набор наших подписей неполон, чужую активность "
+                        f"считать нельзя")
+
     return {ST.SCHEMA_VERSION_KEY: ST.SCHEMA_VERSION,
             "checked_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "mode": mode,
@@ -505,6 +551,7 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
             "foreign_activity": чужая,
             "stand_start": метка,
             "journal": журнал,
+            "otlozhennye_ne_prochitany": dict(НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ),
             "notes": заметки,
             "blockers": блокеры,
             "clean": not блокеры,
@@ -931,6 +978,57 @@ def self_test() -> int:
         r = reconcile(st, mode=ST.MODE_DRY, helius=HeliusЗаглушка([], баланс=0.35))
         chk("включённый рубильник блокирует старт", not r["clean"])
         chk("и это видно отдельным полем", r["kill_active"] is True)
+
+    # СЖАТЫЙ ОТЛОЖЕННЫЙ ЖУРНАЛ. Ровно то, на чём сверка падала 30.09 в 02:27Z:
+    # read_text на gzip даёт UnicodeDecodeError (это ValueError, а не OSError),
+    # и денежный гейт деплоя не давал вердикта вовсе.
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        подпись_из_архива = "SIGARHIV" + "z" * 80
+        with gzip.open(str(st.positions_path) + ".1.gz", "wt",
+                        encoding="utf-8") as ф:
+            ф.write(json.dumps({"mint": "M1", "signatures": [подпись_из_архива]},
+                                ensure_ascii=False) + "\n")
+        наши = our_signatures(st)
+        chk("подпись из СЖАТОГО отложенного журнала прочитана",
+            подпись_из_архива in наши, sorted(наши))
+        chk("и причин непрочтения нет",
+            НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ == {}, НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ)
+        r = reconcile(st, mode=ST.MODE_DRY, helius=HeliusЗаглушка([], баланс=0.35))
+        chk("на сжатом журнале сверка НЕ падает и остаётся чистой",
+            r["clean"], r["blockers"])
+        # ТА ЖЕ ПОДПИСЬ ИЗ АРХИВА НЕ ДОЛЖНА СТАТЬ "ЧУЖОЙ СВЕЖЕЙ АКТИВНОСТЬЮ".
+        r2 = reconcile(st, mode=ST.MODE_DRY,
+                       helius=HeliusЗаглушка([{"signature": подпись_из_архива,
+                                                "blockTime": time.time()}],
+                                              баланс=0.35))
+        chk("наша подпись из архива не выдана за чужую активность",
+            r2["clean"], (r2["blockers"], r2["foreign_activity"]))
+
+    # НЕЧИТАЕМЫЙ отложенный журнал: битый архив -- это БЛОКЕР, а не заметка.
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        with open(str(st.positions_path) + ".2.gz", "wb") as ф:
+            ф.write(b"\x1f\x8b" + b"\x00" * 8)   # магия gzip, а дальше мусор
+        r = reconcile(st, mode=ST.MODE_DRY, helius=HeliusЗаглушка([], баланс=0.35))
+        chk("битый отложенный журнал блокирует старт", not r["clean"], r["blockers"])
+        chk("и причина названа словами, а не числом",
+            any("отложенный журнал не прочитан" in b for b in r["blockers"]),
+            r["blockers"])
+        chk("и виден отдельным полем сводки",
+            bool(r.get("otlozhennye_ne_prochitany")),
+            r.get("otlozhennye_ne_prochitany"))
+
+    # НЕСЖАТЫЙ отложенный журнал читается как раньше -- правка не сломала прежнее.
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        подпись_текстом = "SIGTEXT" + "y" * 80
+        with open(str(st.positions_path) + ".3", "w", encoding="utf-8") as ф:
+            ф.write(json.dumps({"mint": "M2", "signatures": [подпись_текстом]},
+                                ensure_ascii=False) + "\n")
+        наши = our_signatures(st)
+        chk("подпись из НЕсжатого отложенного журнала читается по-прежнему",
+            подпись_текстом in наши, sorted(наши))
 
     chk("все ключи сводки латинские",
         all(k.isascii() for k in reconcile(
