@@ -1,157 +1,852 @@
 {
- "patterns": "предел полосы",
+ "patterns": "предел полосы:",
  "file": "decisions",
  "rows": [
   {
-   "schema_version": 2,
-   "ts_utc": "2026-09-30T21:14:37Z",
-   "signature": "2X4Q4paKDJjCj3jTvkLRxoFQYbZcCdEZ1c3P5JHvki736XYxtrrqfXwmdK47djkSQ4KD6eCeqeZiUipC5EimcmkA",
-   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
-   "mint": "yvBAxs9YMDieWGCnLAphiZyiEdmXUKMv97SDY3hpump",
-   "slot": 452082413,
-   "kind": "sell",
-   "spend_sol_eq": null,
-   "spend_mint": null,
-   "spend_ui": null,
-   "first_entry": null,
-   "dex_programs": [
-    "Jupiter v6",
-    "Pump AMM",
-    "Meteora DLMM"
-   ],
-   "token_program": null,
-   "route": null,
-   "native_delta_sol": -0.0001,
-   "slot_lag": 0,
-   "action": "skip",
-   "code": "NOT_A_BUY",
-   "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки",
-   "filter": "задача DBot",
-   "test_source": false,
-   "parse_ms": 1.04,
-   "gate_ms": 0.28,
-   "via": "transactionSubscribe",
-   "parsed_from": "PARSE_VIA_MSG",
-   "tx_version": 0,
-   "t_recv_ts": 1790802877.78448,
-   "t_recv_utc": "2026-09-30T21:14:37Z",
-   "t_decide_ts": 1790802877.785792,
-   "decide_latency_ms": 1.3,
-   "source_slot": 452082413,
-   "net_slot_at_decision": 452082413,
-   "net_slot_age_s": 0.129,
-   "rate_note": "трата не определена",
-   "rate_age_s": 45.6,
-   "rate_state": "курс свежий (46 с)",
-   "rate_source": "geckoterminal",
-   "source_task": "lane_s0",
-   "mode": "live"
+   "stage": "gate",
+   "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "why_not": "предел полосы: минт уже открыт",
+   "ts_utc": "2026-09-29T22:05:15Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
   },
   {
-   "schema_version": 2,
-   "ts_utc": "2026-09-30T21:14:50Z",
-   "signature": "5iBJqd5RApX25eGGgg5QCqeqwcRLgaJ6vZtb25ih9qtzqrfaRC1uH5Waq91Rfszu42u61K3tZGRN52k6FJQ7KMiP",
-   "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC",
-   "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
-   "slot": 452082462,
-   "kind": "received",
-   "spend_sol_eq": null,
-   "spend_mint": null,
-   "spend_ui": null,
-   "first_entry": false,
-   "dex_programs": [
-    "Pump.fun"
-   ],
-   "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-   "route": {
-    "programs": [
-     "Pump.fun"
-    ],
-    "intermediate_mints": [],
-    "mints_in_route": 1,
-    "hops_by_mints": 1,
-    "dex_calls": 2,
-    "via_intermediate": false,
-    "intermediate_from": "промежуточных нет",
-    "authorized_only_mints": [],
-    "other_tx_mints": [],
-    "all_tx_mints": [
-     "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn"
-    ]
-   },
-   "pool_why_not": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
-   "flags": [
-    "NO_SOL_POOL_IN_TX"
-   ],
-   "native_delta_sol": 0.0,
-   "received_ui": 740.416685,
-   "slot_lag": 0,
-   "action": "skip",
-   "code": "TOKEN_RECEIVED_NOT_BOUGHT",
-   "reason": "минт вырос, но источник не отдал ни SOL, ни стейблов (нативная дельта +0.000000000 SOL): это получение токена, а не покупка -- копировать нечего",
-   "filter": "задача DBot",
-   "test_source": false,
-   "parse_ms": 0.69,
-   "gate_ms": 0.63,
-   "via": "transactionSubscribe",
-   "parsed_from": "PARSE_VIA_MSG",
-   "tx_version": 0,
-   "t_recv_ts": 1790802890.660712,
-   "t_recv_utc": "2026-09-30T21:14:50Z",
-   "t_decide_ts": 1790802890.66203,
-   "decide_latency_ms": 1.3,
-   "source_slot": 452082462,
-   "net_slot_at_decision": 452082462,
-   "net_slot_age_s": 0.089,
-   "rate_note": "трата не определена",
-   "rate_age_s": 58.4,
-   "rate_state": "курс свежий (58 с)",
-   "rate_source": "geckoterminal",
-   "source_task": "sniper_src",
-   "mode": "live"
-  },
-  {
-   "schema_version": 2,
-   "ts_utc": "2026-09-30T21:14:52Z",
-   "signature": "63cpVJTH1wYVtBMMyZ1EUi5CVWfcawX8EaQYAS5fukyGFZ7N1CZmL7hi8BV7BCRNssw732e8z1Mz7T7Y5RH5Vgkg",
+   "stage": "gate",
    "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
-   "mint": null,
-   "slot": 452082466,
-   "kind": "other",
-   "spend_sol_eq": null,
-   "spend_mint": null,
-   "spend_ui": null,
-   "first_entry": null,
-   "dex_programs": [
-    "Pump.fun"
-   ],
-   "token_program": null,
-   "route": null,
-   "native_delta_sol": 0.30248846,
-   "slot_lag": 0,
-   "action": "skip",
-   "code": "NOT_A_BUY",
-   "reason": "ни один некотировочный минт не изменился",
-   "filter": "задача DBot",
-   "test_source": false,
-   "parse_ms": 0.31,
-   "gate_ms": 0.24,
-   "via": "transactionSubscribe",
-   "parsed_from": "PARSE_VIA_MSG",
-   "tx_version": 0,
-   "t_recv_ts": 1790802892.157779,
-   "t_recv_utc": "2026-09-30T21:14:52Z",
-   "t_decide_ts": 1790802892.158334,
-   "decide_latency_ms": 0.6,
-   "source_slot": 452082466,
-   "net_slot_at_decision": 452082466,
-   "net_slot_age_s": 0.299,
-   "rate_note": "трата не определена",
-   "rate_age_s": 59.9,
-   "rate_state": "курс свежий (60 с)",
-   "rate_source": "geckoterminal",
-   "source_task": "cand1",
-   "mode": "live"
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T22:27:15Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T22:34:50Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T22:36:57Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T22:48:50Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T22:56:33Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T22:57:01Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T22:59:45Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T23:04:16Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T23:08:27Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T23:26:10Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-29T23:29:27Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T00:14:56Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T00:18:56Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "GZi5tmvZePF3rqWyGJf3wtNaninFKbCWanYjAr736xU3",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T00:24:08Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T00:27:24Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T00:33:29Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T00:43:10Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T01:02:19Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T01:28:15Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "why_not": "предел полосы: минт уже открыт",
+   "ts_utc": "2026-09-30T01:31:19Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T01:32:42Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T02:04:49Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T02:17:33Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T02:48:27Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "GZi5tmvZePF3rqWyGJf3wtNaninFKbCWanYjAr736xU3",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T02:53:25Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "why_not": "предел полосы: минт уже открыт",
+   "ts_utc": "2026-09-30T02:59:39Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T03:00:04Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T03:34:21Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T03:41:34Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T03:46:25Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T03:56:40Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T04:11:21Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T04:40:00Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T04:42:42Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:05:52Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:19:01Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:20:56Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:24:31Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:41:07Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:41:46Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:44:25Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:45:29Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:47:50Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:51:49Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:54:15Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:55:37Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T05:59:35Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:18:00Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:19:11Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:33:31Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:35:35Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:39:34Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:40:29Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:46:33Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T06:58:08Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T07:01:04Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T07:22:56Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T07:24:16Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T07:25:11Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T07:26:17Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T11:45:53Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T12:31:07Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T12:32:39Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T13:48:36Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T13:50:28Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T13:53:24Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T13:59:49Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:06:04Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:11:18Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:11:45Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:20:35Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:25:27Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:47:42Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:48:30Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T14:51:02Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T15:29:54Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T15:52:59Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T16:55:54Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T17:03:57Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T17:16:41Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T17:31:31Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T17:48:28Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T17:58:13Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+   "why_not": "предел полосы: по группе batch5 полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T18:43:47Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+   "why_not": "предел полосы: по группе batch5 полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T19:23:32Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T19:31:21Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T19:40:37Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm",
+   "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T19:42:00Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T20:35:01Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T20:38:11Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T20:40:00Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T20:40:09Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
+  },
+  {
+   "stage": "gate",
+   "source": "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu",
+   "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+   "ts_utc": "2026-09-30T20:43:24Z",
+   "source_task": null,
+   "code": null,
+   "reason": null
   }
  ]
 }
