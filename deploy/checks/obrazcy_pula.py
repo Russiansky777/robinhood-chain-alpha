@@ -38,7 +38,9 @@ sys.path.insert(0, str(КОРЕНЬ / "analysis"))
 
 
 def узел() -> str:
-    к = (os.environ.get("HELIUS_API") or os.environ.get("HELIUS_API_KEY") or "").strip()
+    к = (os.environ.get("HELIUS_API_KEY2")
+         or os.environ.get("HELIUS_API")
+         or os.environ.get("HELIUS_API_KEY") or "").strip()
     if not к:
         raise SystemExit("СБОЙ: ключ Helius не задан в окружении")
     return f"https://mainnet.helius-rpc.com/?api-key={к}"

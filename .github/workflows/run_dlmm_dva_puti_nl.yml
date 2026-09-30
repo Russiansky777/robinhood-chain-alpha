@@ -1,0 +1,151 @@
+name: "NL-хост: DLMM два пути цены рядом (одно чтение против двух, только чтение)"
+
+# ЗАЧЕМ. Владелец 30.09 (п.3): принять "DLMM одним чтением" на живых покупках --
+# три числа и РАВЕНСТВО ЦЕН двух путей, плюс замер времени на хосте. Code-3
+# равенство цен измерить не мог: сети у него нет, а снимка состояния пула DLMM
+# того вида, что у CLMM и Whirlpool, в репозитории нет.
+#
+# ЧЕСТНОСТЬ СРАВНЕНИЯ. Оба пути зовутся ПОДРЯД в одном процессе на одной живой
+# покупке, и каждый говорит, из какого СЛОТА читал. Строгим сравнение считается
+# только при равных слотах: у DLMM между двумя чтениями активная корзина уходит,
+# и объявлять такое расхождение изъяном пути было бы ложью.
+#
+# ТОЛЬКО ЧТЕНИЕ: ни подписи, ни отправки, ни симуляции. Флаг одного чтения
+# включается ТОЛЬКО внутри процесса проверки, окружение службы не трогается.
+on:
+  workflow_dispatch:
+    inputs:
+      skolko:
+        description: "сколько живых покупок DLMM взять"
+        required: false
+        default: "12"
+      otkuda:
+        description: "источники строк: zhurnal, obrazcy, sbor (через запятую)"
+        required: false
+        default: "zhurnal,obrazcy,sbor"
+      lamportov:
+        description: "размер пробной покупки в лампортах (только счёт цены)"
+        required: false
+        default: "10000000"
+      zhdat:
+        description: "ждать СВЕЖИХ строк журнала столько секунд (0 -- брать готовые; свежие мерят путь как в бою)"
+        required: false
+        default: "0"
+      vetka_kandidata:
+        description: "ветка, чей analysis/ мерить (пусто -- то, что на хосте)"
+        required: false
+        default: "claude/nifty-sagan-r0polg"
+
+concurrency:
+  group: dlmm-dva-puti-nl
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  RABOTA: /tmp/dlmm_dva_puti
+  OUT_FILE: data/dlmm_dva_puti.json
+
+jobs:
+  dva_puti:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки (без хоста)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/dlmm_dva_puti.py
+          python3 deploy/checks/dlmm_dva_puti.py --self-test | tail -1
+          python3 deploy/checks/dlmm_odno_chtenie.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Кандидат из ветки (модули полосы для замера)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA $RABOTA/kandidat"
+          KOD=$CODE_DIR
+          if [ -n "${{ inputs.vetka_kandidata }}" ]; then
+            tar -czf - analysis | ssh $SSH_OPTS root@$TARGET_HOST "tar -xzf - -C $RABOTA && mv $RABOTA/analysis/* $RABOTA/kandidat/ && rmdir $RABOTA/analysis"
+            KOD=$RABOTA/kandidat
+            # ДАННЫЕ ХОСТА РЯДОМ С КАНДИДАТОМ: модули ищут их как <родитель>/data.
+            ssh -n $SSH_OPTS root@$TARGET_HOST "ln -sfn /home/bot/data $RABOTA/data; ls -l $RABOTA/data"
+            echo "MERIM KANDIDATA iz $KOD"
+          else
+            echo "MERIM TO, CHTO NA HOSTE: $KOD"
+          fi
+          echo "KOD=$KOD" >> "$GITHUB_ENV"
+          cat deploy/checks/dlmm_dva_puti.py | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/dlmm_dva_puti.py"
+          cat deploy/checks/priemka_stroitelya.py | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/priemka_stroitelya.py"
+
+      - name: "Два пути на живых покупках DLMM"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$KOD:$CODE_DIR BLOOM_CODE_DIR=$KOD \
+              $VENV/python $RABOTA/dlmm_dva_puti.py \
+                --skolko '${{ inputs.skolko }}' \
+                --otkuda '${{ inputs.otkuda }}' \
+                --lamportov '${{ inputs.lamportov }}' \
+                --zhdat '${{ inputs.zhdat }}' \
+                --sbory $RABOTA/kandidat \
+                --state-dir $STATE_DIR \
+                --out $RABOTA/out.json" | tail -90
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/dlmm_dva.json || true
+          if python3 -c "import json; json.load(open('/tmp/dlmm_dva.json'))" 2>/dev/null; then
+            cp /tmp/dlmm_dva.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: proverka ne otdala json"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT_FILE" ] || exit 0
+          if grep -qiE 'api-key=[A-Za-z0-9-]{8}|PRIVATE|SECRET' "$OUT_FILE"; then
+            echo "SBOY: v otchete est pohozhee na kljuch"
+            exit 1
+          fi
+          echo "kljuchej v otchete net"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "DLMM: dva puti ceny ryadom, zhivye pokupki [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

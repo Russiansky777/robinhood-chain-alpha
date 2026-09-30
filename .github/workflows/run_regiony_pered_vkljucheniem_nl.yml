@@ -1,0 +1,164 @@
+name: "Регионы перед включением: свежесть карты лидеров и живость точек (только чтение)"
+
+# ЗАЧЕМ (слово владельца 29.09 ночью, п.2): региональная отправка включается
+# утром на 0.1 SOL, и до включения нужны два доказательства -- карта регионов
+# лидеров свежая для нынешней эпохи, и точки отправителей по регионам живы.
+#
+# НИ ОДНОЙ ОТПРАВКИ. Живость проверяется GET-ом без ключа: точка, принимающая
+# только POST, отвечает 405 -- и это ЖИВАЯ точка. Карта проверяется чтением
+# файла плюс getEpochInfo и getLeaderSchedule.
+#
+# Прогон идёт НА ХОСТЕ: там лежит ключ Helius и оттуда же ходит боевая отправка,
+# то есть и задержки до точек мерятся из того места, где они важны.
+on:
+  workflow_dispatch:
+    inputs:
+      strogo:
+        description: "'yes' -- падать, если эпоха карты не равна текущей"
+        required: false
+        default: "no"
+      tolko_karta:
+        description: "'yes' -- только карта, точки не опрашивать"
+        required: false
+        default: "no"
+
+concurrency:
+  group: regiony-pered-vkljucheniem
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  RABOTA: /tmp/regiony_pered
+  OUT_KARTA: data/svezhest_karty_regionov.json
+  OUT_TOCHKI: data/regionalnye_tochki_zhivy.json
+
+jobs:
+  regiony:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверки обеих проверок (без сети)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/svezhest_karty_regionov.py
+          python3 -m py_compile deploy/checks/zhivy_li_regionalnye_tochki.py
+          python3 deploy/checks/svezhest_karty_regionov.py --self-test | tail -2
+          python3 deploy/checks/zhivy_li_regionalnye_tochki.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Свежесть карты регионов лидеров (эпоха и неизвестные лидеры)"
+        env:
+          KLJUCH_CHECKS: ${{ secrets.HELIUS_API_KEY2 }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/svezhest_karty_regionov.py" < deploy/checks/svezhest_karty_regionov.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zhivy_li_regionalnye_tochki.py" < deploy/checks/zhivy_li_regionalnye_tochki.py
+          # КАРТА ЧИТАЕТСЯ ТА, ЧТО ВИДИТ СЛУЖБА. Путь СПРАШИВАЕМ У МОДУЛЯ, а не
+          # пишем здесь: bloom_region_send считает его как
+          # Path(__file__).parent.parent/data, то есть от РОДИТЕЛЯ каталога кода
+          # (/home/bot/data), а здесь стояло $CODE_DIR/data -- на уровень глубже.
+          # Из-за этого прогон 08:12:23Z 30.09 ответил "карта не прочитана:
+          # FileNotFoundError" про файл, которого служба и не читает, и вывел
+          # "неизвестных лидеров 668 из 668" -- вывод о ЧУЖОМ пути. Проверка
+          # живости точек в этом же прогоне при этом нашла адреса у 24 пар из 24,
+          # то есть sender_regions.json рядом со службой лежит. Копию из
+          # репозитория на хост НЕ кладём -- смысл проверки в том, какая карта у
+          # службы, а не какая в репозитории.
+          if [ -n "$KLJUCH_CHECKS" ]; then
+            printf '%s' "$KLJUCH_CHECKS" | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/kljuch; chmod 600 $RABOTA/kljuch"
+            echo "kljuch zamerov zadan otdelno"
+          else
+            echo "otdelnogo kljucha net -- vozmem obshchij i skazhem strokoj"
+          fi
+          STROGO=""
+          if [ "${{ inputs.strogo }}" = "yes" ]; then STROGO="--strogo"; fi
+          KARTA_PUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python -c 'import bloom_region_send as m; print(m.ФАЙЛ_ЛИДЕРОВ)'" | tail -1 | tr -d '\r')
+          case "$KARTA_PUT" in
+            /*leader_regions.json) echo "put karty u sluzhby: $KARTA_PUT" ;;
+            *) echo "SBOY: modul ne nazval put karty (poluchili: $KARTA_PUT)"; exit 1 ;;
+          esac
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY2=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY2; fi
+            cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python \
+              $RABOTA/svezhest_karty_regionov.py \
+              --karta $KARTA_PUT \
+              --out $RABOTA/karta.json $STROGO" | tail -30
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/karta.json 2>/dev/null || true" > /tmp/karta.json || true
+          if python3 -c "import json; json.load(open('/tmp/karta.json'))" 2>/dev/null; then
+            cp /tmp/karta.json "$OUT_KARTA"; echo "obnovlen $OUT_KARTA"
+          else
+            echo "SBOY: otchet po karte ne sobralsja"; exit 1
+          fi
+
+      - name: "Живость региональных точек (GET, без отправки и без ключа)"
+        if: ${{ inputs.tolko_karta != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # PYTHONPATH ОБЯЗАТЕЛЕН: проверка спрашивает адрес у bloom_region_send,
+          # то есть у модуля СЛУЖБЫ, а он лежит в каталоге кода. Без этого
+          # прогон падал на ModuleNotFoundError (20:08:31Z).
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python \
+              $RABOTA/zhivy_li_regionalnye_tochki.py \
+              --out $RABOTA/tochki.json" | tail -40
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/tochki.json 2>/dev/null || true" > /tmp/tochki.json || true
+          if python3 -c "import json; json.load(open('/tmp/tochki.json'))" 2>/dev/null; then
+            cp /tmp/tochki.json "$OUT_TOCHKI"; echo "obnovlen $OUT_TOCHKI"
+          else
+            echo "SBOY: otchet po tochkam ne sobralsja"; exit 1
+          fi
+
+      - name: "Ключей в отчётах быть не должно"
+        if: always()
+        run: |
+          set -e
+          for F in "$OUT_KARTA" "$OUT_TOCHKI"; do
+            [ -f "$F" ] || continue
+            if grep -qiE 'api-key=[A-Za-z0-9-]{8}|[?&]c=[A-Za-z0-9-]{12}' "$F"; then
+              echo "SBOY: v $F est pohozhee na kljuch"; exit 1
+            fi
+          done
+          echo "kljuchej v otchetah net"
+
+      - name: "Убрать рабочий каталог с хоста"
+        if: always()
+        run: ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT_KARTA" "$OUT_TOCHKI"; do [ -f "$F" ] && git add "$F"; done
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Regiony pered vkljucheniem: svezhest karty i zhivost tochek [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

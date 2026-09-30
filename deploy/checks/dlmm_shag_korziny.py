@@ -324,7 +324,8 @@ def main() -> int:
     а = р.parse_args()
     if а.self_test:
         return самопроверка()
-    ключ = os.environ.get("HELIUS_API_KEY") or ""
+    ключ = (os.environ.get("HELIUS_API_KEY2")
+            or os.environ.get("HELIUS_API_KEY") or "")
     if not ключ:
         print("нет HELIUS_API_KEY в окружении")
         return 2

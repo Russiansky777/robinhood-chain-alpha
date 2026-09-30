@@ -1,0 +1,118 @@
+name: "NL-хост: полный список lane_pools для включения типа (только чтение)"
+
+# ЗАЧЕМ. Владелец 30.09: включение типа пула -- lane_pools ПОЛНЫМ СПИСКОМ (всё,
+# что торгует сейчас, + новый тип), флаг строителя одновременно. Список полный и
+# ЗАПРЕЩАЮЩИЙ: чего в нём нет -- то выключено. Написать его по памяти нельзя:
+# забытый тип (или двухшаговый маршрут, которого в типах пулов нет вовсе) молча
+# перестанет торговать.
+#
+# Прогон считает список ТОЙ ЖЕ функцией, по которой решает полоса
+# (bloom_own_send.типы_полосы + двухшаговый_включён), и печатает по каждой
+# группе: что берёт сейчас, что предлагается, что изменится и что пропадёт.
+# Падает, если полный список терял бы хоть один нынешний тип.
+#
+# ТОЛЬКО ЧТЕНИЕ. Файл групп не правится: предложение кладётся в отчёт, правку
+# делает человек отдельным прогоном.
+on:
+  workflow_dispatch:
+    inputs:
+      dobavit:
+        description: "какие типы добавить через запятую (clmm; потом whirlpool)"
+        required: false
+        default: "clmm"
+
+concurrency:
+  group: lane-pools-spisok-nl
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  # ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ: первый прогон упал ModuleNotFoundError на
+  # solders -- c2_swap_build без него не импортируется, а solders стоит только
+  # в окружении службы.
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  RABOTA: /tmp/lane_pools_spisok
+  OUT_FILE: data/lane_pools_spisok.json
+
+jobs:
+  spisok:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка зонда (без хоста)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/lane_pools_polnyj_spisok.py
+          python3 deploy/checks/lane_pools_polnyj_spisok.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Зонд на хосте (файл групп и флаги службы читаются как есть)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          cat deploy/checks/lane_pools_polnyj_spisok.py | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/lane_pools_polnyj_spisok.py"
+          # ОКРУЖЕНИЕ СЛУЖБЫ ПОДКЛЮЧАЕТСЯ ЦЕЛИКОМ, как в прочих проверках: без
+          # него флаги LANE_* и BLOOM_*_STROITEL не видны, а зонд печатает
+          # ТОЛЬКО их имена и значения -- ключей среди них нет.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR \
+              $VENV/python $RABOTA/lane_pools_polnyj_spisok.py \
+                --dobavit '${{ inputs.dobavit }}' \
+                --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/lane_pools.json || true
+          if python3 -c "import json; json.load(open('/tmp/lane_pools.json'))" 2>/dev/null; then
+            cp /tmp/lane_pools.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: zond ne otdal json"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT_FILE" ] || exit 0
+          if grep -qiE 'api-key=[A-Za-z0-9-]{8}|PRIVATE|SECRET|TOKEN=[A-Za-z0-9-]{8}' "$OUT_FILE"; then
+            echo "SBOY: v otchete est pohozhee na kljuch"
+            exit 1
+          fi
+          echo "kljuchej v otchete net"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Lane_pools: polnyj spisok dlja vkljuchenija tipa [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

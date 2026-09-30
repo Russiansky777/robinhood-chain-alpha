@@ -748,6 +748,29 @@ def main() -> int:
     факт["ожидали_sol"] = round(sum(вернётся_лампортов(с) for г in группы for с in г)
                                 / 1_000_000_000, 9)
     факт["вернулось_sol"] = round(факт["вернулось_лампортов"] / 1_000_000_000, 9)
+    # НАШИ ПОДПИСИ -- В ЖУРНАЛ СЛУЖЕБНЫХ, ЧТОБЫ СВЕРКА НЕ СЧИТАЛА ИХ ЧУЖИМИ.
+    # Закрытие счетов -- не сделка, поэтому в записях позиций его нет, и сверка
+    # при старте (bloom_reconcile) объявляла нашу же подпись "чужой свежей
+    # активностью на кошельке": именно так вышло 29.09 в 18:42:50Z с подписью
+    # r4THZ8F6... (12 счетов проверено, 9 закрыто, вернулось 0.02381504 SOL).
+    # На стенде такой блокер смертелен, а регулярно врущий блокер учит не читать
+    # настоящий.
+    #
+    # ЗАПИСЬ НЕ ДОЛЖНА РОНЯТЬ ПРОГОН: деньги уже вернулись на кошелёк, и падение
+    # на ведении журнала не отменит и не откатит этого. Причина -- в отчёт.
+    факт["sluzhebnye_podpisi_zapisany"] = 0
+    факт["sluzhebnye_podpisi_why_not"] = None
+    try:
+        import bloom_exec_state as _ST  # noqa: PLC0415
+        сост = _ST.ExecState()
+        for шаг in (факт.get("шаги") or []):
+            if сост.zapisat_sluzhebnuju_podpis(
+                    шаг.get("подпись"), кто="close_empty_token_accounts",
+                    почему=(f"закрытие пустых токен-счетов кошелька {кошелёк}, "
+                            f"закрыто {шаг.get('закрыто')}")):
+                факт["sluzhebnye_podpisi_zapisany"] += 1
+    except Exception as exc:  # noqa: BLE001
+        факт["sluzhebnye_podpisi_why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
     Path(а.result).write_text(json.dumps(факт, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(факт, ensure_ascii=False, indent=1))
     return 0 if факт.get("ok") else 5

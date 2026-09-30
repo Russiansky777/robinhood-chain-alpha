@@ -1,0 +1,137 @@
+name: "NL-хост: отдельный ключ Helius для зондов (конфиг, без перезапуска служб)"
+
+# ЗАЧЕМ (слово владельца 29.09 ночью, п.4): "Отдельный ключ Helius для
+# харнессов и зондов -- сейчас, без перезапуска (только их конфиг)".
+#
+# Зонды и харнессы бьют по тому же ключу, что и торгующая служба: приёмка
+# строителя тянет сотни getTransaction, выгрузка сделок дозаполняет место в
+# блоке, карта регионов зовёт getClusterNodes. Лимит один, и в минуты сделок
+# это отнимает у детектора его же запросы.
+#
+# ЧТО ДЕЛАЕТ. Дописывает в /etc/bloom-executor/env строку
+# HELIUS_API_KEY2=<значение секрета>. Больше ничего: ни одна служба не
+# перезапускается, HELIUS_API_KEY не трогается, и работающие процессы своё
+# окружение уже загрузили -- на них правка не влияет вовсе.
+#
+# Код зондов (deploy/checks/*.py) уже читает HELIUS_API_KEY2 первым и
+# падает на общий ключ, если своего нет. Пока секрета нет -- поведение
+# прежнее, ровно как было.
+#
+# ЗНАЧЕНИЕ КЛЮЧА НЕ ПЕЧАТАЕТСЯ НИКОГДА. В вывод идут только имя переменной,
+# длина и отпечаток sha256 первых 8 знаков -- по нему видно, что ключ зондов
+# ОТЛИЧАЕТСЯ от общего, но сам ключ по отпечатку не восстановить.
+on:
+  workflow_dispatch:
+    inputs:
+      podtverzhdenie:
+        description: "напишите DA, чтобы дописать ключ зондов в env хоста"
+        required: true
+        default: "net"
+      snjat:
+        description: "yes -- убрать HELIUS_API_KEY2 из env (вернуть как было)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: klyuch-zondov-nl
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  ENV_FILE: /etc/bloom-executor/env
+
+jobs:
+  klyuch:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Подтверждение"
+        run: |
+          set -e
+          [ "${{ inputs.podtverzhdenie }}" = "DA" ] || {
+            echo "SBOY: podtverzhdenie ne DA -- nichego ne delaem"; exit 1; }
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Снять ключ зондов (если попросили)"
+        if: ${{ inputs.snjat == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            cp -a $ENV_FILE $ENV_FILE.bak.\$(date -u +%Y%m%dT%H%M%SZ)
+            grep -v '^HELIUS_API_KEY2=' $ENV_FILE > $ENV_FILE.new
+            cat $ENV_FILE.new > $ENV_FILE
+            rm -f $ENV_FILE.new
+            echo snjato; grep -c '^HELIUS_API_KEY2=' $ENV_FILE || true"
+
+      - name: "Дописать ключ зондов в env хоста"
+        if: ${{ inputs.snjat != 'yes' }}
+        env:
+          HELIUS_API_KEY2: ${{ secrets.HELIUS_API_KEY2 }}
+        run: |
+          set -e
+          set -o pipefail
+          if [ -z "$HELIUS_API_KEY2" ]; then
+            echo "SBOY: sekret HELIUS_API_KEY2 ne zadan v repozitorii."
+            echo "Vladelec: Settings -> Secrets and variables -> Actions ->"
+            echo "New repository secret, imya HELIUS_API_KEY2."
+            exit 1
+          fi
+          # ЗНАЧЕНИЕ ИДЁТ ЧЕРЕЗ stdin, А НЕ В КОМАНДНОЙ СТРОКЕ ssh: аргументы
+          # видны в ps на хосте, stdin -- нет.
+          printf '%s' "$HELIUS_API_KEY2" | ssh $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            umask 077
+            KL=\$(cat)
+            [ -n \"\$KL\" ] || { echo 'SBOY: pustoj kljuch'; exit 1; }
+            cp -a $ENV_FILE $ENV_FILE.bak.\$(date -u +%Y%m%dT%H%M%SZ)
+            grep -v '^HELIUS_API_KEY2=' $ENV_FILE > $ENV_FILE.new
+            printf 'HELIUS_API_KEY2=%s\n' \"\$KL\" >> $ENV_FILE.new
+            cat $ENV_FILE.new > $ENV_FILE
+            rm -f $ENV_FILE.new
+            echo 'HELIUS_API_KEY2 dopisan, dlina' \${#KL}"
+
+      - name: "Отпечатки: ключ зондов отличается от общего"
+        run: |
+          set -e
+          set -o pipefail
+          # ОТПЕЧАТОК, А НЕ КЛЮЧ: sha256 первых 8 знаков. Отвечает ровно на один
+          # вопрос -- разные ли это ключи. Сам ключ по нему не восстановить.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_FILE; set +a
+            O=\$(printf '%s' \"\$HELIUS_API_KEY\" | sha256sum | cut -c1-8)
+            Z=\$(printf '%s' \"\$HELIUS_API_KEY2\" | sha256sum | cut -c1-8)
+            echo \"obshchij HELIUS_API_KEY: otpechatok \$O dlina \${#HELIUS_API_KEY}\"
+            echo \"kljuch zondov HELIUS_API_KEY2: otpechatok \$Z dlina \${#HELIUS_API_KEY2}\"
+            if [ -z \"\$HELIUS_API_KEY2\" ]; then
+              echo 'kljucha zondov net -- zondy budut brat obshchij, kak i ranshe'
+            elif [ \"\$O\" = \"\$Z\" ]; then
+              echo 'PREDUPREZHDENIE: kljuch zondov TOT ZHE, chto obshchij -- limit ne razdelen'
+            else
+              echo 'kljuch zondov otlichaetsja ot obshchego: da'
+            fi"
+
+      - name: "Службы не перезапускались"
+        if: always()
+        run: |
+          set -e
+          # ДОКАЗАТЕЛЬСТВО "БЕЗ ПЕРЕЗАПУСКА": метка старта служб печатается после
+          # правки env. Сравнить с предыдущим прогоном проверки здоровья.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            for S in bloom-detector bloom-seller; do
+              echo \"\$S \$(systemctl show -p ActiveEnterTimestamp --value \$S)\"
+            done"

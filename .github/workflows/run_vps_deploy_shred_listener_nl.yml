@@ -159,7 +159,11 @@ jobs:
             # ТОЛЬКО С АДРЕСА ПОТОКА и только UDP на этот порт.
             ssh -n $SSH_OPTS root@"$HOST" "
               if command -v ufw >/dev/null 2>&1; then
-                ufw allow from $FROM_IP to any port $PORT proto udp comment 'BlockRazor shreds (zamer)'
+                # PODPIS PRAVILA -- PO FAKTU. Ranshe zdes stojalo 'BlockRazor shreds':
+                # 30.09 istochnik uzhe Triton, i pravilo v ufw status nazyvalo by
+                # chuzhogo postavshchika -- po takoj podpisi pozzhe ne ponjat, chej
+                # eto port i mozhno li ego zakryvat.
+                ufw allow from $FROM_IP to any port $PORT proto udp comment \"shredy ot $FROM_IP (zamer)\"
                 ufw status | grep -F '$PORT' || true
               else
                 echo 'ufw нет -- правило не добавлено, скажите как открывать порт'
@@ -167,6 +171,17 @@ jobs:
           else
             echo "порт не открывался (open_firewall=${{ inputs.open_firewall }})" | tee -a data/shred_listener_deploy.txt
           fi
+
+      - name: "Внешний адрес хоста (его владелец вводит в портале источника)"
+        run: |
+          set -e
+          # ADRES BERJOTSJA S HOSTA, A NE IZ PAMJATI: v portal istochnika vladelec
+          # vvodit imenno tot adres, s kotorogo hodit nash uzel. Tot zhe sposob
+          # uzhe stoit v run_vps_leader_geo_nl.yml.
+          ADR=$(ssh -n $SSH_OPTS root@"$HOST" "curl -s --max-time 10 https://api.ipify.org" | tr -d '\r\n')
+          printf '%s' "$ADR" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$' \
+            || { echo "СБОЙ: внешний адрес хоста не прочитался (получили: $ADR)"; exit 1; }
+          echo "vneshnij adres hosta: $ADR, port UDP: $PORT" | tee -a data/shred_listener_deploy.txt
 
       - name: "env слушателя (без ключей в аргументах)"
         if: ${{ inputs.enable_service == 'yes' }}
@@ -261,6 +276,13 @@ jobs:
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
           set -e
+          # pipefail ОБJAZATELEN: nizhe kod vozvrata pitona reshaet, byli shredy
+          # ili net, no on stoit v konvejere "python | tee", i bez pipefail
+          # pipeline otdajot kod TEE, to est vsegda nol. Iz-za etogo SHREDS_OK
+          # byl "yes" pri SHREDOV 0 (progon 36708373119), otchjot pechatal
+          # "shredy idut -- tcpdump ne nuzhen", a diagnostika pri nule shredov
+          # ne zapuskalas NIKOGDA.
+          set -o pipefail
           {
             echo ""
             echo "--- первые 60 секунд работы ---"
@@ -306,7 +328,7 @@ jobs:
             echo ""
             echo "--- готовность: код доставлен, порт ещё не задан ---"
             echo "служба НЕ поднята: без порта UDP она не запускается по построению"
-            echo "что нужно от владельца: порт BlockRazor; дальше этот же прогон"
+            echo "что нужно от владельца: порт источника шредов; дальше этот же прогон"
             echo "с port=<порт> enable_service=yes open_firewall=yes"
           } | tee -a data/shred_listener_deploy.txt
 

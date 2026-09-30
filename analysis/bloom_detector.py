@@ -174,6 +174,11 @@ TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 
 SIG_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{64,90}$")
 LAMPORT = 10 ** 9
+# КАК ЧАСТО ЧАСЫ СЛОТОВ ПОПАДАЮТ НА ДИСК. Уведомления о слотах идут примерно
+# каждые 0.4 с; писать каждое незачем, а реже 0.5 с нельзя: решение сторожа об
+# удержании принимается по этому числу, и его возраст должен быть заметно меньше
+# порога свежести (5 с) и меньше одного слота.
+СЛОТ_ФАЙЛ_КАЖДЫЕ_S = 0.25
 
 # Программы DEX -- только те, что реально встречались в наших разборах
 # (solana_transfer_fee_audit / solana_pool_price_recompute). Список
@@ -1589,6 +1594,17 @@ class Helius:
         данные = val.get("data")
         разбор = данные.get("parsed") if isinstance(данные, dict) else None
         info = разбор.get("info") if isinstance(разбор, dict) else None
+        # РАЗОБРАН ЛИ СЧЁТ ВООБЩЕ -- ОТДЕЛЬНЫМИ ПРИЗНАКАМИ, А НЕ ПО НАЛОГУ. Ниже
+        # стоит taxed = bool(fee_bps), и без них ДВА разных случая сливались в
+        # одно "taxed: False": (1) счёт разобран, список расширений есть, налога
+        # среди них нет -- ноль ДОКАЗАН; (2) счёт не разобран вовсе (узел отдал
+        # data списком, адрес оказался не минтом, ответ без parsed) -- про налог
+        # не известно НИЧЕГО, а token_program при этом уже записан из owner, то
+        # есть Token-2022. Полоса по второму случаю считала ноль доказанным и
+        # ставила ЗАВЫШЕННЫЙ минимум -- покупка откатывалась бы на каждой
+        # попытке, сжигая приоритет и чаевые. Признаки читает bloom_own_send.
+        out["разобран"] = isinstance(info, dict) and bool(info)
+        out["расширения_есть"] = isinstance(info, dict) and "extensions" in info
         if not isinstance(info, dict):
             info = {}
         out["decimals"] = info.get("decimals")
@@ -1608,6 +1624,10 @@ class Helius:
                 out["fee_authority"] = st.get("transferFeeConfigAuthority")
                 out["withdraw_authority"] = st.get("withdrawWithheldAuthority")
         out["taxed"] = bool(out.get("fee_bps"))
+        out["ноль_доказан"] = bool(
+            out.get("разобран") and out.get("расширения_есть")
+            and (out.get("fee_bps") is None
+                 or int(out.get("fee_bps") or 0) == 0))
         return out
 
     def налоги_минтов(self, минты: list) -> dict:
@@ -1682,6 +1702,17 @@ class Helius:
         данные = val.get("data")
         разбор = данные.get("parsed") if isinstance(данные, dict) else None
         info = разбор.get("info") if isinstance(разбор, dict) else None
+        # РАЗОБРАН ЛИ СЧЁТ ВООБЩЕ -- ОТДЕЛЬНЫМИ ПРИЗНАКАМИ, А НЕ ПО НАЛОГУ. Ниже
+        # стоит taxed = bool(fee_bps), и без них ДВА разных случая сливались в
+        # одно "taxed: False": (1) счёт разобран, список расширений есть, налога
+        # среди них нет -- ноль ДОКАЗАН; (2) счёт не разобран вовсе (узел отдал
+        # data списком, адрес оказался не минтом, ответ без parsed) -- про налог
+        # не известно НИЧЕГО, а token_program при этом уже записан из owner, то
+        # есть Token-2022. Полоса по второму случаю считала ноль доказанным и
+        # ставила ЗАВЫШЕННЫЙ минимум -- покупка откатывалась бы на каждой
+        # попытке, сжигая приоритет и чаевые. Признаки читает bloom_own_send.
+        out["разобран"] = isinstance(info, dict) and bool(info)
+        out["расширения_есть"] = isinstance(info, dict) and "extensions" in info
         if not isinstance(info, dict):
             info = {}
         out["decimals"] = info.get("decimals")
@@ -1698,6 +1729,10 @@ class Helius:
                 st = (e.get("state") or {})
                 out["fee_bps"] = (st.get("newerTransferFee") or {}).get("transferFeeBasisPoints")
         out["taxed"] = bool(out.get("fee_bps"))
+        out["ноль_доказан"] = bool(
+            out.get("разобран") and out.get("расширения_есть")
+            and (out.get("fee_bps") is None
+                 or int(out.get("fee_bps") or 0) == 0))
         self._кеш_минтов[минт] = out
         return out
 
@@ -2112,6 +2147,9 @@ class Детектор:
         # getSlot в горячем пути: вызов и стоит задержку, и меряет слот
         # уже ПОСЛЕ неё, то есть врёт в нашу пользу.
         self.слот_сети: int | None = None
+        # Когда часы слотов последний раз попали на диск (прореживание записи).
+        self.t_слот_файл: float = 0.0
+        self.часы_слотов_почему: str | None = None
         self.t_слот: float | None = None
         self.слот_уведомлений = 0
         # Баланс кошелька тоже обновляется в фоне: getBalance в горячем
@@ -2145,6 +2183,44 @@ class Детектор:
 
     def статус_путь(self) -> Path:
         return self.состояние.base / "detector_status.json"
+
+    def часы_слотов_путь(self) -> Path:
+        return self.состояние.base / "net_slot.json"
+
+    def записать_часы_слотов(self, *, сейчас: float | None = None) -> bool:
+        """Счётчик слотов сети -- в маленький файл, на пути уведомления.
+
+        ЗАЧЕМ ОТДЕЛЬНО ОТ ПРИЗНАКА ЖИЗНИ (найдено 29.09 живой сделкой). Признак
+        жизни пишется раз в ПУЛЬС (60 с), и его net_slot -- лестница со ступенью
+        до 220 слотов, а поле net_slot_age_s считается в момент записи и всегда
+        выглядит свежим. Сторож продаж, решая по слотам, ждал ступени: сделка
+        19:05:05Z с удержанием 108 слотов держалась 200 (53.7 с вместо 29.2).
+        Ошибка всегда в одну сторону -- ПОЗЖЕ, -- но до целой минуты.
+
+        Здесь пишется ровно три числа и ничего больше: слот, момент по часам
+        хоста и сколько прошло с уведомления. Ни сети, ни расчётов: это часы, а
+        не отчёт. Запись прореживается СЛОТ_ФАЙЛ_КАЖДЫЕ_S, чтобы не писать на
+        каждое уведомление.
+        """
+        if not isinstance(self.слот_сети, int) or self.слот_сети <= 0:
+            return False
+        т = сейчас if сейчас is not None else time.time()
+        прошлое = getattr(self, "t_слот_файл", 0.0) or 0.0
+        if т - float(прошлое) < СЛОТ_ФАЙЛ_КАЖДЫЕ_S:
+            return False
+        try:
+            ST.atomic_write_json(self.часы_слотов_путь(), {
+                "net_slot": int(self.слот_сети),
+                "ts": т,
+                "age_s": (round(т - self.t_слот, 3) if self.t_слот else None),
+                "notifications": self.слот_уведомлений,
+            })
+        except Exception as exc:  # noqa: BLE001
+            self.часы_слотов_почему = f"{type(exc).__name__}: {str(exc)[:80]}"
+            return False
+        self.t_слот_файл = т
+        self.часы_слотов_почему = None
+        return True
 
     # ------------------------------------------------- тревога запасного пути
 
@@ -4832,6 +4908,14 @@ class Детектор:
             if натив.get("ok"):
                 поля["lane_buy_native_sol"] = натив["native_sol"]
                 поля["lane_buy_fee_sol"] = натив["fee_sol"]
+                # ЧТО ОСЕЛО НА НОВЫХ СЧЕТАХ -- ДВУМЯ ИМЕНАМИ. Без них остаток
+                # нативной дельты оставался безымянным, и разложение итога
+                # упиралось в "прочее".
+                if натив.get("rent_sol") is not None:
+                    поля["lane_buy_rent_sol"] = натив["rent_sol"]
+                    поля["lane_buy_wrapped_sol"] = натив["wrapped_sol"]
+                elif натив.get("rent_why_not"):
+                    поля["lane_buy_rent_why_not"] = натив["rent_why_not"]
             if куплено.get("ok"):
                 поля["lane_bought_raw"] = куплено["raw"]
                 поля["chain_ok"] = True
@@ -7297,6 +7381,10 @@ async def часы_слотов(детектор: Детектор, ключ: st
                         детектор.слот_сети = слот
                         детектор.t_слот = time.time()
                         детектор.слот_уведомлений += 1
+                        # ЧАСЫ СЛОТОВ -- НА ДИСК ЗДЕСЬ ЖЕ. Сторожу продаж нужен
+                        # счётчик слотов, а не признак жизни раз в минуту:
+                        # решение об удержании принимается по нему.
+                        детектор.записать_часы_слотов(сейчас=детектор.t_слот)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -7858,6 +7946,25 @@ def self_test() -> int:
                             курс=КурсSOL(), режим="dry")
             j = det.признак_жизни()
             chk("признак жизни записан на диск", det.статус_путь().exists())
+            # ЧАСЫ СЛОТОВ: отдельный файл, прореживание, три числа.
+            det.слот_сети, det.t_слот = 451730788, time.time()
+            det.t_слот_файл = 0.0
+            chk("часы слотов записаны на диск",
+                det.записать_часы_слотов() is True
+                and det.часы_слотов_путь().exists(), det.часы_слотов_почему)
+            ч = json.loads(det.часы_слотов_путь().read_text(encoding="utf-8"))
+            chk("в часах слотов слот, момент и возраст",
+                ч.get("net_slot") == 451730788
+                and isinstance(ч.get("ts"), float)
+                and isinstance(ч.get("age_s"), float), ч)
+            chk("второй раз подряд часы не переписываются (прореживание)",
+                det.записать_часы_слотов() is False, det.t_слот_файл)
+            chk("через прореживание -- переписываются",
+                det.записать_часы_слотов(
+                    сейчас=time.time() + СЛОТ_ФАЙЛ_КАЖДЫЕ_S + 0.01) is True)
+            det.слот_сети = None
+            chk("без слота часы не пишутся вовсе",
+                det.записать_часы_слотов(сейчас=time.time() + 10) is False)
             chk("в признаке жизни виден режим", j["mode"] == "dry", j["mode"])
             chk("в признаке жизни есть версия формата",
                 j.get(ST.SCHEMA_VERSION_KEY) == ST.SCHEMA_VERSION,
@@ -12114,6 +12221,48 @@ def self_test() -> int:
             os.environ.pop("BLOOM_TG_FORMAT", None)
         else:
             os.environ["BLOOM_TG_FORMAT"] = было_ф3
+
+    # НАЛОГ МИНТА: "НЕ РАЗОБРАН" -- НЕ ТО ЖЕ, ЧТО "НАЛОГА НЕТ". Живой след:
+    # полоса брала taxed=False за доказанный ноль и ставила завышенный минимум.
+    _T22 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+    _разобран = Helius._налог_из_счёта("М", {
+        "owner": _T22,
+        "data": {"parsed": {"info": {"decimals": 6, "extensions": []}}}})
+    chk("расширения есть, налога среди них нет -- ноль ДОКАЗАН",
+        _разобран["разобран"] and _разобран["расширения_есть"]
+        and _разобран["ноль_доказан"] and _разобран["taxed"] is False,
+        _разобран)
+    # УЗЕЛ ОТДАЛ data СПИСКОМ (адрес не минт либо разобрать нечем).
+    _не_разобран = Helius._налог_из_счёта("М", {
+        "owner": _T22, "data": ["AAAA", "base64"]})
+    chk("счёт не разобран -- ноль НЕ доказан, хотя taxed тоже False",
+        _не_разобран["разобран"] is False
+        and _не_разобран["ноль_доказан"] is False
+        and _не_разобран["taxed"] is False
+        and _не_разобран["token_program"] == _T22, _не_разобран)
+    # РАЗОБРАН, НО БЕЗ СПИСКА РАСШИРЕНИЙ -- тоже не доказательство.
+    _без_списка = Helius._налог_из_счёта("М", {
+        "owner": _T22, "data": {"parsed": {"info": {"decimals": 9}}}})
+    chk("разобран, а списка расширений нет -- ноль НЕ доказан",
+        _без_списка["разобран"] is True
+        and _без_списка["расширения_есть"] is False
+        and _без_списка["ноль_доказан"] is False, _без_списка)
+    _со_ставкой = Helius._налог_из_счёта("М", {
+        "owner": _T22,
+        "data": {"parsed": {"info": {"extensions": [
+            {"extension": "transferFeeConfig",
+              "state": {"newerTransferFee": {"transferFeeBasisPoints": 150,
+                                              "maximumFee": 7}}}]}}}})
+    chk("ставка прочитана -- налог есть, ноль не доказан",
+        _со_ставкой["fee_bps"] == 150 and _со_ставкой["taxed"] is True
+        and _со_ставкой["ноль_доказан"] is False, _со_ставкой)
+    _нулевая = Helius._налог_из_счёта("М", {
+        "owner": _T22,
+        "data": {"parsed": {"info": {"extensions": [
+            {"extension": "transferFeeConfig",
+              "state": {"newerTransferFee": {"transferFeeBasisPoints": 0}}}]}}}})
+    chk("ставка явно нулевая -- ноль доказан",
+        _нулевая["fee_bps"] == 0 and _нулевая["ноль_доказан"] is True, _нулевая)
 
     прошло = sum(1 for _, ок, _ in проверки if ок)
     for имя, ок, факт in проверки:

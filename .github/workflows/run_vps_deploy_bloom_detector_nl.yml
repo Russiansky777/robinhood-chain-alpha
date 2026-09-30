@@ -274,7 +274,7 @@ jobs:
           # Без них полоса не подписывает, а без самого модуля детектор
           # честно пишет ModuleNotFoundError в признак жизни -- ровно это и
           # случилось в прогоне 36080386872.
-          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py bloom_close_on_sell.py bloom_region_send.py bloom_token_name.py bloom_slot_peers.py bloom_copiers.py c2_cl_quote.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_entry_premium.py bloom_lane_jupiter.py bloom_lane_two_step.py bloom_queue_price.py bloom_nogi_shablony.py close_empty_token_accounts.py c2_followers_growth.py c2_dlmm_tochnaya_kotirovka.py podbivka_dlmm_quote.py; do
+          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py bloom_close_on_sell.py bloom_region_send.py bloom_token_name.py bloom_slot_peers.py bloom_copiers.py c2_cl_quote.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_entry_premium.py bloom_lane_jupiter.py bloom_lane_two_step.py bloom_queue_price.py bloom_nogi_shablony.py close_empty_token_accounts.py c2_followers_growth.py c2_dlmm_tochnaya_kotirovka.py podbivka_dlmm_quote.py c2_clmm_stroitel.py c2_whirlpool_stroitel.py c2_dbc_stroitel.py podbivka_clmm_quote.py podbivka_dbc_quote.py podbivka_whirlpool_quote.py c2_dlmm_odno_chtenie.py c2_ammv4_stroitel.py c2_nalog_2022.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # СОВПАЛО -- НЕ ПЕРЕПИСЫВАЕМ. Переписать файл тем же содержимым
@@ -327,6 +327,16 @@ jobs:
           # без файла первый сигнал DLMM после перезапуска отказывает, пока
           # фоновое чтение не доберёт счёт пула с цепи.
           [ -f data/dlmm_shag_korziny.json ] && DATA_FILES="$DATA_FILES data/dlmm_shag_korziny.json"
+          # РЕГИОНАЛЬНАЯ ОТПРАВКА: ДВА ЕЁ ФАЙЛА. Найдено 29.09 ночью, до
+          # включения флага: на хосте не было НИ ОДНОГО из них, и проверка
+          # живости точек честно ответила "адрес есть у 0 из 24 пар", а проверка
+          # карты -- "неизвестных лидеров 664 из 664, слотов у них 432 000 из
+          # 432 000". То есть с BLOOM_REGION_SEND=1 регион был бы "неизвестно"
+          # у ВСЕХ слотов и ни один адрес не сменился бы: флаг не изменил бы
+          # ничего, кроме лишнего getLeaderSchedule. Модуль ищет их как
+          # <родитель каталога кода>/data/, то есть /home/bot/data.
+          [ -f data/sender_regions.json ] && DATA_FILES="$DATA_FILES data/sender_regions.json"
+          [ -f data/leader_regions.json ] && DATA_FILES="$DATA_FILES data/leader_regions.json"
           for f in $DATA_FILES; do
             [ -e "$f" ] || { echo "СБОЙ: нет локального $f"; exit 1; }
           done
@@ -758,6 +768,20 @@ jobs:
           RC=$?
           set -e
           echo "$OUT" | tail -60 | tee -a data/bloom_detector_deploy.txt
+          # ПАДЕНИЕ СВЕРКИ -- НЕ ТО ЖЕ, ЧТО "СВЕРКА НЕ ЧИСТАЯ", И ГЛОТАТЬ ЕГО НЕЛЬЗЯ.
+          # Не чистая сверка на живом деплое бывает по делу: открытая позиция от
+          # обычной торговли -- нормальное состояние, поэтому RC != 0 здесь
+          # намеренно не смертелен. Но traceback означает, что вердикта НЕТ
+          # ВОВСЕ: денежный гейт старта не сказал ни "можно", ни "нельзя".
+          # 30.09 в 02:27Z это случилось на живом деплое и прошло молча:
+          # bloom_reconcile падал UnicodeDecodeError на СЖАТОМ отложенном
+          # журнале позиций, а проверка роняла деплой только при live_test=yes.
+          if printf '%s' "$OUT" | grep -q "Traceback (most recent call last)"; then
+            echo "СБОЙ: сверка при старте УПАЛА -- вердикта нет вовсе, а не 'не чистая'."
+            echo "Это не повод включать деньги: деплой остановлен."
+            printf '%s' "$OUT" | grep -A6 "Traceback (most recent call last)" | head -40
+            exit 1
+          fi
           if [ "${{ inputs.live_test }}" = "yes" ] && [ "$RC" != "0" ]; then
             echo "СТЕНД НЕ ЗАПУЩЕН: сверка при старте не чистая (см. blockers выше)"
             exit 1
@@ -799,6 +823,31 @@ jobs:
           } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/systemd/system/$SVC.service"
           ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl daemon-reload && echo 'юнит записан'"
 
+      - name: "НУЛЬ ПОЗИЦИЙ перед перезапуском (та же охрана, что у остальных прогонов)"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Правило "перезапуск только при НУЛЕ открытых позиций"
+          # держалось здесь на внимании человека, а не на проверке: этот прогон
+          # перезапускает детектор чаще всех, и охраны в нём не было ВОВСЕ,
+          # тогда как в run_vps_env_flag_nl, run_vps_group_policy_nl,
+          # run_vps_lane_curve_flag_nl, run_vps_nochnaya_konfiguraciya_nl,
+          # run_lane_wallet_env_nl и run_vps_autoupdate_guard_nl она стоит.
+          # Позиция в воздухе на время перезапуска остаётся без своего сторожа.
+          #
+          # ОХРАНА ТА ЖЕ САМАЯ, а не своя копия: расходятся именно копии.
+          # Она требует нуля открытых и нуля зависших ПО ВСЕМ группам, признак
+          # жизни детектора не старше 10 минут (иначе числам о позициях верить
+          # нельзя) и снятый рубильник продаж (иначе купленное некому продать).
+          #
+          # ПРОВЕРКА СТОИТ ВПЛОТНУЮ К ПЕРЕЗАПУСКУ, отдельным шагом прямо перед
+          # ним: между постановкой прогона в очередь и перезапуском проходят
+          # минуты, и за них позиция успевает открыться.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pered_perezapuskom_sluzhby.py"
+
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
@@ -817,6 +866,58 @@ jobs:
           echo "NRestarts=$RESTARTS"
           [ "$RESTARTS" -lt 3 ] || { echo "СБОЙ: служба уже перезапускалась $RESTARTS раз"; ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
           ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 40 --no-pager"
+
+      - name: "ВСЕ службы, делящие каталог кода, перезапущены (не только детектор)"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Слово владельца: перезапустить ВСЕ службы, которые делят
+          # модули, и подтвердить, что старт позже mtime. Детектор и продавец
+          # берут код из ОДНОГО каталога /home/bot/bloom_executor, и продавец
+          # держит на своём денежном пути bloom_own_send -- подпись и отправку
+          # своих продаж (OSW.podpisat, OSW.otpravit), кошелёк и ключ полосы,
+          # длину слота, стоимость сделки, проскальзывание группы.
+          #
+          # ЧТО БЫЛО БЕЗ ЭТОГО ШАГА. 30.09 деплой детектора прошёл в 02:27Z и
+          # 02:51Z, продавца никто не перезапустил, и прогон живучести в 03:11Z
+          # нашёл bloom-seller: STARYJ_KOD_V_PAMJATI (-4620 с). Правило держалось
+          # на внимании человека и это внимание подвело. Сделок в том окне не
+          # было, денег не стоило -- но следующая правка тихо применилась бы к
+          # одной службе и не применилась к другой.
+          #
+          # ОХРАНА НУЛЯ ПОЗИЦИЙ УЖЕ ПРОШЛА ШАГОМ ВЫШЕ и относится к обеим:
+          # она считает открытые позиции полосы, а полосу продаёт именно продавец.
+          for VSPOM in bloom-seller; do
+            if ! ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-unit-files $VSPOM.service --no-legend" | grep -q "$VSPOM"; then
+              echo "$VSPOM: юнита нет -- пропускаем"
+              continue
+            fi
+            echo "перезапускаю $VSPOM: код общий с $SVC"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl restart $VSPOM"
+            sleep 8
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl is-active --quiet $VSPOM" || {
+              echo "СБОЙ: $VSPOM не активна после перезапуска"
+              ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $VSPOM -n 60 --no-pager"; exit 1; }
+          done
+          # ДОКАЗАТЕЛЬСТВО, А НЕ НАДЕЖДА: старт каждой службы обязан быть позже
+          # самого свежего модуля в каталоге. Числа берутся НА ХОСТЕ его часами.
+          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "
+            MAXT=\$(stat -c '%Y' /home/bot/bloom_executor/*.py | sort -n | tail -1)
+            for S in $SVC bloom-seller; do
+              TS=\$(systemctl show -p ActiveEnterTimestamp --value \$S 2>/dev/null)
+              if [ -z \"\$TS\" ]; then echo \"\$S: ne zapuskalas\"; continue; fi
+              ST=\$(date -d \"\$TS\" +%s)
+              if [ \"\$ST\" -ge \"\$MAXT\" ]; then STATE=start_pozzhe_modulej; else STATE=STARYJ_KOD_V_PAMJATI; fi
+              printf '%s: start %s, moduli %s, %s (%s s)\\n' \"\$S\" \"\$(date -u -d @\$ST +%Y-%m-%dT%H:%M:%SZ)\" \"\$(date -u -d @\$MAXT +%Y-%m-%dT%H:%M:%SZ)\" \"\$STATE\" \"\$(( ST - MAXT ))\"
+            done")
+          echo "$OUT" | tee -a data/bloom_detector_deploy.txt
+          case "$OUT" in
+            *STARYJ_KOD_V_PAMJATI*)
+              echo "СБОЙ: после деплоя служба осталась на старом коде -- деньги на двух версиях общих модулей"
+              exit 1 ;;
+            *) echo "все службы каталога стартовали позже своих модулей" ;;
+          esac
 
       - name: "Признак жизни детектора должен появиться"
         if: ${{ inputs.enable_service == 'yes' }}

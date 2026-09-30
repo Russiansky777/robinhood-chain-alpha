@@ -62,6 +62,21 @@ DBC = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
 DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 CLMM = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
+# Orca Whirlpool -- ЗАПИСИ В SPECS У НЕГО НЕТ И НЕ ДОЛЖНО БЫТЬ: счета
+# делятся на A/B, а не на вход/выход, и roles_damm2 положил бы наш ATA не на
+# то место (у программы стоит constraint
+# token_owner_account_a.mint == whirlpool.token_mint_a). Он идёт СВОИМ
+# строителем через развилку в bloom_own_send.собрать(). Адрес нужен ГЕЙТУ
+# полосы: типы_полосы и имя_строителя_по_адресу читают его через
+# getattr(B, ИМЯ_КОНСТАНТЫ) -- без константы тип отпадает МОЛЧА, отказом
+# "тип пула вне полосы", неотличимым от "сигналов не было".
+WHIRLPOOL = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+# Raydium AMM v4 -- КОНСТАНТА НУЖНА ГЕЙТУ, А ЗАПИСИ В SPECS У ТИПА НЕТ И НЕ БУДЕТ.
+# Он идёт своим строителем (c2_ammv4_stroitel, Code-3): раскладка счетов у него
+# своя, а гейт полосы (типы_полосы -> getattr(B, ИМЯ)) без константы не пустил бы
+# тип вовсе -- отказ "тип пула вне полосы" пришёл бы ещё до реестра строителей.
+# Адрес взят программно из модуля Code-3 и сверен с метками детектора.
+AMMV4 = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
 # Pump.fun bonding curve -- кривая ДО миграции в Pump AMM. Отличий от прочих
 # типов три, и все три money-path: (1) котировка -- НАТИВНЫЙ SOL, токенового
 # счёта котировки нет вовсе, оборачивать нечего; (2) инструкция buy -- «точный

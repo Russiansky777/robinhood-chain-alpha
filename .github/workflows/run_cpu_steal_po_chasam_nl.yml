@@ -1,0 +1,100 @@
+name: "NL-хост: steal и занятость процессора, снимок в час (только чтение /proc)"
+
+# ЗАЧЕМ (слово владельца 29.09 ночью, п.5): "steal и загрузка ядра детектора по
+# часам". Такого источника не было вовсе: skorost_i_cpu делает один замер и
+# steal не снимает, а /proc/stat с загрузки даёт среднее за неделю -- по нему не
+# видно, был ли steal в минуту сделки.
+#
+# Снимок счётчиков дописывается строкой в журнал на хосте, доли считаются
+# разностью соседних строк. Первый снимок долей не даёт и говорит об этом
+# словами. Ни сети, ни ключей: только /proc и systemctl show MainPID.
+#
+# ЧАС ВЫБРАН НЕ РОВНЫЙ (:07): в :00 стоят другие прогоны, и незачем мерить
+# процессор ровно в ту минуту, когда его занимают наши же проверки.
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      sluzhby:
+        description: "службы, чьи такты снимать (через запятую)"
+        required: false
+        default: "bloom-detector,bloom-seller"
+
+concurrency:
+  group: cpu-steal-po-chasam
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  RABOTA: /tmp/cpu_steal
+  ZHURNAL_NA_HOSTE: /home/bot/bloom_executor_live_data/cpu_steal_po_chasam.jsonl
+  OUT_FILE: data/cpu_steal_po_chasam.jsonl
+
+jobs:
+  steal:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка (без сети)"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/cpu_steal_po_chasam.py
+          python3 deploy/checks/cpu_steal_po_chasam.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Снимок на хосте, строкой в журнал"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/cpu_steal_po_chasam.py" < deploy/checks/cpu_steal_po_chasam.py
+          # ЖУРНАЛ ЖИВЁТ НА ХОСТЕ И НЕ ПЕРЕЗАПИСЫВАЕТСЯ ИЗ РЕПОЗИТОРИЯ: доли
+          # считаются от ПРЕДЫДУЩЕЙ строки, и подмена журнала копией из
+          # репозитория сломала бы интервалы.
+          SLUZHBY="${{ inputs.sluzhby }}"
+          [ -n "$SLUZHBY" ] || SLUZHBY="bloom-detector,bloom-seller"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $RABOTA/cpu_steal_po_chasam.py --zhurnal $ZHURNAL_NA_HOSTE --sluzhby '$SLUZHBY'" | tail -5
+          # В репозиторий забираем ХВОСТ журнала: он растёт строкой в час, и
+          # целиком его таскать незачем.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "tail -n 2000 $ZHURNAL_NA_HOSTE 2>/dev/null || true" > /tmp/steal_tail.jsonl || true
+          if [ -s /tmp/steal_tail.jsonl ]; then
+            cp /tmp/steal_tail.jsonl "$OUT_FILE"
+            echo "obnovlen $OUT_FILE: $(wc -l < "$OUT_FILE") strok"
+          else
+            echo "SBOY: zhurnal pust"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "CPU i steal hosta: snimok v chas [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

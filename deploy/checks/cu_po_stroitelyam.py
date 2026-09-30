@@ -203,7 +203,8 @@ def main() -> int:
         return самопроверка()
     с_ts = разобрать_момент(а.since)
     поз = позиции_полосы(а.state_dir, с_ts)
-    ключ = os.environ.get("HELIUS_API_KEY") or ""
+    ключ = (os.environ.get("HELIUS_API_KEY2")
+            or os.environ.get("HELIUS_API_KEY") or "")
     if not ключ:
         print("SBOY: HELIUS_API_KEY ne zadan")
         return 2

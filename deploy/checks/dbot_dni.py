@@ -192,7 +192,8 @@ def главное() -> int:
     р.add_argument("--out", default="data/dbot_dni.json")
     а = р.parse_args()
 
-    ключ = (os.environ.get("HELIUS_API_KEY") or "").strip()
+    ключ = (os.environ.get("HELIUS_API_KEY2")
+            or os.environ.get("HELIUS_API_KEY") or "").strip()
     if not ключ:
         print("СТОП: HELIUS_API_KEY не задан", file=sys.stderr)
         return 2

@@ -53,6 +53,17 @@ def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--out-dir", default="/home/bot/shred_probe_data")
     р.add_argument("--json", default=None, help="куда положить числа (по желанию)")
+    # ОКНО ПО СЛОТУ. Файл slots.jsonl НЕ обнуляется при смене поставщика: в нём
+    # лежат и слоты BlockRazor с 26-27.09, и слоты Triton с 30.09. Без окна
+    # медиана считается по всем 255 тысячам слотов сразу, то есть отвечает про
+    # BlockRazor, а не про того поставщика, о котором спрашивают. Такое число
+    # выглядит как замер и им не является.
+    р.add_argument("--ot-slota", type=int, default=0,
+                   help="считать только слоты НЕ НИЖЕ этого (0 -- все)")
+    р.add_argument("--do-slota", type=int, default=0,
+                   help="считать только слоты НЕ ВЫШЕ этого (0 -- без предела)")
+    р.add_argument("--imya-okna", default="",
+                   help="как назвать окно в отчёте, например 'Triton с 11:25:32Z'")
     а = р.parse_args()
 
     пути = [os.path.join(а.out_dir, "slots.jsonl")]
@@ -61,15 +72,23 @@ def main() -> int:
         if os.path.isdir(а.out_dir) else []
 
     все, с_сигналом, разброс = [], [], []
-    слотов = шредов = с_ws = с_нашим = 0
+    слотов = шредов = с_ws = с_нашим = вне_окна = 0
     первый_слот = последний_слот = None
     for путь in пути:
         if not os.path.exists(путь):
             continue
         for з in строки(путь):
+            с = з.get("slot")
+            # ВНЕ ОКНА -- НЕ СЧИТАЕМ ВОВСЕ, включая счётчики: иначе "шредов
+            # принято" осталось бы про обоих поставщиков, а медиана -- про одного.
+            if а.ot_slota and (not isinstance(с, int) or с < а.ot_slota):
+                вне_окна += 1
+                continue
+            if а.do_slota and (not isinstance(с, int) or с > а.do_slota):
+                вне_окна += 1
+                continue
             слотов += 1
             шредов += int(з.get("shreds") or 0)
-            с = з.get("slot")
             if isinstance(с, int):
                 первый_слот = с if первый_слот is None else min(первый_слот, с)
                 последний_слот = с if последний_слот is None else max(последний_слот, с)
@@ -103,6 +122,13 @@ def main() -> int:
 
     итог = {
         "каталог": а.out_dir,
+        # ОКНО НАЗЫВАЕТСЯ В ОТЧЁТЕ ВСЕГДА, даже когда его нет: иначе по числу
+        # нельзя понять, о каком поставщике шредов оно говорит.
+        "окно_имя": а.imya_okna or ("все слоты файла" if not (а.ot_slota or а.do_slota)
+                                     else "окно по слоту"),
+        "окно_от_слота": а.ot_slota or None,
+        "окно_до_слота": а.do_slota or None,
+        "слотов_вне_окна_пропущено": вне_окна,
         "слотов_в_файле": слотов,
         "шредов_принято_по_слотам": шредов,
         "шредов_принято_по_признаку": признак.get("shreds"),
@@ -123,6 +149,10 @@ def main() -> int:
               f"p90 {с['p90_мс']} мс")
     print(f"шредов принято {итог['шредов_принято_по_слотам']}, "
           f"слотов покрыто {слотов} (с нашим сигналом {с_нашим})")
+    print(f"окно: {итог['окно_имя']}"
+          + (f", от слота {а.ot_slota}" if а.ot_slota else "")
+          + (f", до слота {а.do_slota}" if а.do_slota else "")
+          + f", пропущено вне окна {вне_окна} слотов")
     if а.json:
         with open(а.json, "w", encoding="utf-8") as ф:
             json.dump(итог, ф, ensure_ascii=False, indent=1)

@@ -78,6 +78,15 @@ jobs:
           set -o pipefail
           ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/vygr"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vygr/sdelki_polosy_vygruzka.py" < deploy/checks/sdelki_polosy_vygruzka.py
+          # КАРТА РЕГИОНОВ ЛИДЕРОВ ЕДЕТ ИЗ ВЕТКИ, А НЕ С ХОСТА: на хосте её нет,
+          # и без неё столбец region_lidera остался бы пустым. Это база "ДО" в
+          # метрике "S+0 до/после по не-EU лидерам" (владелец 29.09, п.2).
+          if [ -f data/leader_regions.json ]; then
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vygr/leader_regions.json" < data/leader_regions.json
+            echo "karta regionov dostavlena: epoha $(python3 -c "import json;print(json.load(open('data/leader_regions.json')).get('эпоха'))")"
+          else
+            echo "karty regionov v vetke net -- region_lidera ostanetsja s prichinoj"
+          fi
           # env хоста нужен ради HELIUS_API_KEY: место в блоке дозаполняется
           # по цепи (getSignatureStatuses + getBlock уровня signatures), и без
           # ключа столбец остался бы пустым, как он и был до 28.09.
@@ -87,7 +96,8 @@ jobs:
             BLOOM_CODE_DIR='$CODE_DIR' python3 /tmp/vygr/sdelki_polosy_vygruzka.py \
               --state-dir '$STATE_DIR' \
               --s '$S_OKNA' --do '$DO_OKNA' --polnye \
-              --out /tmp/vygr/sdelki.json" | tail -20
+              --karta-regionov /tmp/vygr/leader_regions.json \
+              --out /tmp/vygr/sdelki.json" | tail -24
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/vygr/sdelki.json 2>/dev/null || true" > /tmp/vygr_sdelki.json || true
           if python3 -c "import json; d=json.load(open('/tmp/vygr_sdelki.json')); print('sdelok:', d['сделок'])"; then
             cp /tmp/vygr_sdelki.json "$OUT_FILE"
