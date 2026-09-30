@@ -471,6 +471,27 @@ jobs:
             echo "ночной флаг: $pair"
           done
 
+      - name: "env: резервная копия ДО любой правки (имя копии -- в журнал)"
+        if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. Kopija dolzhna snimatsja DO pervoj pravki, inache sverka
+          # "kopija protiv novogo" ejo ne pojmaet. Ranshe cp -a stojal v shage
+          # s kljuchom DBot, a shag s kljuchami otpravitelej idjot RANSHE nego i
+          # uzhe delaet sed -i '/^NAME=/d': otsutstvie sekreta otpravitelja
+          # udaljalo stroku iz env, a v kopii ejo tozhe ne bylo -- sverka
+          # molchala. Teper kopija -- pervoe, chto delaet blok env.
+          IMJA="env.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            cp -a $ENV_DIR/env $ENV_DIR/$IMJA
+            chmod 600 $ENV_DIR/$IMJA
+            ls -l $ENV_DIR/$IMJA
+            grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/$IMJA" 2>&1 | tee -a data/bloom_detector_deploy.txt
+          echo "KOPIJA_ENV=$IMJA" >> "$GITHUB_ENV"
+          echo "kopija env snjata do pravok: $IMJA"
+
       - name: "env: ключи отправителей пула (значения только через stdin)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         env:
@@ -510,13 +531,12 @@ jobs:
             /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import json, bloom_senders as S; print(json.dumps(S.состояние_пула(), ensure_ascii=False)[:600])'" || \
             echo "состояние пула не прочитано (модуль ещё не доставлен) -- не страшно"
 
-      - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
+      - name: "env: дописать ключ DBot, если его там нет (копия уже снята выше)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         env:
           DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cp -a $ENV_DIR/env $ENV_DIR/env.bak.\$(date -u +%Y%m%dT%H%M%SZ)"
           # Ключ передаётся через stdin, а не аргументом: аргументы видны в ps.
           printf 'DBOT_API_KEY=%s\n' "$DBOT_API_KEY" | ssh $SSH_OPTS root@$TARGET_HOST "
             cat > /tmp/dbot_line
