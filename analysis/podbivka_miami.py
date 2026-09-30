@@ -5,7 +5,7 @@
 Маркер -- как zadacha_*.json: {"skript", "zapuski": [[args]...], "helius_rps_na_paket", "zachem"} и по желанию
 "parallelno" (процессов одновременно; по умолчанию min(запусков, 5) -- ядер 6, одно остаётся бегунку).
 Ключи Helius / Shyft отдаются процессу, только если helius_rps_na_paket > 0 (архиву PumpApi они не нужны).
-Предел Helius -- суммарно: helius_rps_na_paket × одновременных процессов ≤ 10 (днём 6) -- проверяется до старта.
+Предел Helius -- суммарно: helius_rps_na_paket × одновременных процессов ≤ 6 (слово владельца 30.09) -- проверяется до старта.
 После прогона -- чистка кэша до PODB_KESH_GB (по умолчанию 80) по давности чтения.
 Выход: код 1, если хоть один запуск упал; файлы, записанные запусками, -- в PODB_MANIFEST (коммитит шаг workflow).
 """
@@ -22,6 +22,7 @@ from pathlib import Path
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 КЛЮЧИ = ("HELIUS_API_KEY", "HELIUS_API_KEY2", "SHYFT_API_KEY")
+ПОТОЛОК_HELIUS = 6.0          # запросов/с суммарно на все процессы Code-2 (слово владельца 30.09)
 
 
 def запуски(маркеры: list) -> list:
@@ -30,8 +31,8 @@ def запуски(маркеры: list) -> list:
         м = json.loads(Path(путь).read_text(encoding="utf-8"))
         rps = float(м.get("helius_rps_na_paket") or 0)
         пар = int(м.get("parallelno") or min(len(м["zapuski"]), 5))
-        if rps * пар > 10:
-            raise SystemExit(f"{путь}: Helius {rps} × {пар} процессов > 10 запросов/с суммарно")
+        if rps * пар > ПОТОЛОК_HELIUS:
+            raise SystemExit(f"{путь}: Helius {rps} × {пар} процессов > {ПОТОЛОК_HELIUS:g} запросов/с суммарно")
         for н, арг in enumerate(м["zapuski"]):
             из_.append({"имя": f"{Path(путь).stem}_{н}", "skript": м["skript"], "args": [str(x) for x in арг],
                         "rps": rps, "пар": пар})
