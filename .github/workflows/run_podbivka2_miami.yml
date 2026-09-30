@@ -1,0 +1,81 @@
+name: "Podbivka-2: lab-miami -- razovye i arhivnye progony (tolko chtenie)"
+
+# ZACHEM. Razovye i arhivnye progony podbivki vtoroy sessii -- na laboratornom
+# begunke lab-miami (169.128.191.158, 6 yader; slovo vladel'ca 30.09). Marker
+# data/podbivka/zapusk/miami_*.json (poslednim kommitom pusha) -- kak
+# zadacha_*.json; vse zapuski idut ODNIM zadaniem parallel'nymi processami
+# (po sutkam arhiva), chasy PumpApi -- s lokal'nogo diska begunka
+# (PODB_ARHIV_KESH), povtornye progony ih ne kachayut.
+# Ezhednevnye 06:30Z / 07:00Z poka v oblake (run_podbivka2_zadacha.yml).
+# Na begunke net klyuchey koshel'kov, env polosy, torgovyh sluzhb; etot
+# workflow ih ne trebuet i ne kladet. Klyuchi Helius/Shyft processu otdayutsya,
+# tol'ko esli marker prosit Helius (helius_rps_na_paket > 0).
+on:
+  push:
+    branches:
+      - claude/podbivka
+    paths:
+      - "data/podbivka/zapusk/miami_*.json"
+
+concurrency:
+  group: podbivka2-miami
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: [self-hosted, lab-miami]
+    timeout-minutes: 1440
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+
+      - name: "Mesto i python"
+        run: |
+          set -e
+          echo "hostname: $(hostname), yader: $(nproc)"
+          df -h "$HOME" | tail -1
+          test -d "$HOME/pod_venv" || python3 -m venv "$HOME/pod_venv"
+          "$HOME/pod_venv/bin/pip" install -q requests solders zstandard
+          "$HOME/pod_venv/bin/python" -c "import requests, solders, zstandard; print('pod_venv: import proshel')"
+          mkdir -p "$HOME/arhiv_pumpapi"
+          echo "PY=$HOME/pod_venv/bin/python" >> "$GITHUB_ENV"
+          echo "PODB_ARHIV_KESH=$HOME/arhiv_pumpapi" >> "$GITHUB_ENV"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: "Run"
+        env:
+          SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          rm -f "$PODB_MANIFEST"
+          MARKERS=$(git diff --name-only HEAD~1 HEAD -- data/podbivka/zapusk/ | grep -E 'miami_.*[.]json$' || true)
+          echo "markers: $MARKERS"
+          $PY analysis/podbivka_miami.py $MARKERS
+
+      - name: "Final commit"
+        if: always()
+        env:
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          [ -s "$PODB_MANIFEST" ] || { echo "nothing written"; exit 0; }
+          # Only files the runs wrote (manifest); HEAD moved onto the fresh
+          # branch tip with reset --mixed -- no rebase in a shallow clone.
+          sort -u "$PODB_MANIFEST" > "$RUNNER_TEMP/mine.txt"
+          for i in 1 2 3 4 5 6 7 8; do
+            git fetch -q --depth=1 origin claude/podbivka
+            git reset -q FETCH_HEAD
+            xargs -a "$RUNNER_TEMP/mine.txt" -d '\n' git add -- || true
+            git diff --cached --quiet && { echo "already on branch"; exit 0; }
+            git commit -q -m "Podbivka-2: lab-miami [automated]"
+            git push -q origin HEAD:claude/podbivka && exit 0
+            sleep 4
+          done
+          exit 1

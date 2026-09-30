@@ -38,8 +38,10 @@ from __future__ import annotations
 import argparse
 import collections
 import calendar
+import contextlib
 import io
 import json
+import os
 import re
 import statistics
 import subprocess
@@ -243,6 +245,44 @@ def удержание(покупка: dict, ряд: list, окно: int = 150) 
             "секунд_до": {str(h): v for h, v in секунд.items()}}
 
 
+class _ЛокальныйЧас:
+    status_code = 200
+
+    def __init__(self, путь: Path):
+        os.utime(путь)                 # отметка «читали» -- по ней чистка кэша убирает давно не нужные часы
+        self.raw = open(путь, "rb")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.raw.close()
+
+
+def открыть_час(requests, url: str, ч: str):
+    """Без PODB_ARHIV_KESH -- поток прямо с replay.pumpapi.io (облако). С ним (бегунок lab-miami) -- час сперва целиком
+    на локальный диск (атомарно: .part → замена), дальше читается с диска; повторные прогоны качать уже не будут."""
+    кэш = os.environ.get("PODB_ARHIV_KESH")
+    if not кэш:
+        return requests.get(url, stream=True, timeout=120)
+    путь = Path(кэш) / f"{ч}.jsonl.zst"
+    if not путь.exists():
+        путь.parent.mkdir(parents=True, exist_ok=True)
+        часть = путь.with_name(f"{путь.name}.{os.getpid()}.part")
+        with requests.get(url, stream=True, timeout=120) as о:
+            if о.status_code != 200:
+                return contextlib.nullcontext(о)
+            длина = int(о.headers.get("Content-Length") or 0)
+            with open(часть, "wb") as ф:
+                for кусок in о.iter_content(1 << 20):
+                    ф.write(кусок)
+        if длина and часть.stat().st_size != длина:
+            часть.unlink(missing_ok=True)
+            raise IOError(f"час скачан не целиком: {длина} байт заявлено")
+        os.replace(часть, путь)
+    return _ЛокальныйЧас(путь)
+
+
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
            минты: set | None = None, не_sol: bool = False, окно_докупки: int | None = None) -> Path:
@@ -272,7 +312,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
         прочитано = 0            # строк часа уже обработано: после обрыва связи час качается заново, они пропускаются
         for попытка in range(4):
             try:
-                with requests.get(url, stream=True, timeout=120) as о:
+                with открыть_час(requests, url, ч) as о:
                     if о.status_code != 200:
                         счёт["ошибки"].append(f"{ч}: http {о.status_code}")
                         break
@@ -428,6 +468,8 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                 активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
                 break
             except Exception as exc:  # noqa: BLE001
+                if os.environ.get("PODB_ARHIV_KESH"):          # битый час на диске -- прочь, следующая попытка скачает заново
+                    (Path(os.environ["PODB_ARHIV_KESH"]) / f"{ч}.jsonl.zst").unlink(missing_ok=True)
                 if попытка == 3:
                     счёт["ошибки"].append(f"{ч}: {type(exc).__name__}: {str(exc)[:100]}")
                 else:
