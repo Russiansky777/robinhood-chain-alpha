@@ -29,6 +29,14 @@ on:
         description: "'yes' -- не спрашивать цепь (CU останутся без чисел)"
         required: false
         default: "no"
+      vypisat_programmy:
+        description: "адреса программ через запятую: выписать подписи НЕсобранных теней (пусто -- не выписывать)"
+        required: false
+        default: ""
+      vypisat_since:
+        description: "с какой метки UTC выписывать тени, например 2026-09-24T00:00:00Z"
+        required: false
+        default: ""
 
 concurrency:
   group: vecher-itog
@@ -39,6 +47,7 @@ env:
   STATE_DIR: /home/bot/bloom_executor_live_data
   TARGET_HOST: 127.0.0.1
   OUT_FILE: data/vecher_itog.json
+  VYPISKA_FILE: data/teni_ne_sobrany_po_programmam.json
 
 jobs:
   itog:
@@ -108,6 +117,32 @@ jobs:
         if: always()
         run: |
           [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+          [ -f "$VYPISKA_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$VYPISKA_FILE" || true
+
+      - name: "Выписка подписей несобранных теней по названным программам"
+        if: ${{ inputs.vypisat_programmy != '' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ТОЛЬКО ЧТЕНИЕ ЖУРНАЛА. Ни цепи, ни подписи, ни отправки: зонд
+          # перебирает decisions.jsonl* потоком (включая .gz) и отбирает
+          # stage=shadow нужных программ, которые НЕ собрались.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . $ENV_DIR/env; set +a
+            BLOOM_CODE_DIR=$CODE_DIR python3 /tmp/vech/signaly_stroitelej.py \
+              --state-dir $STATE_DIR \
+              --since '${{ inputs.vypisat_since }}' \
+              --vypisat-programmy '${{ inputs.vypisat_programmy }}' \
+              --vypisat-out /tmp/vech/teni_vypiska.json" | tail -40
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/vech/teni_vypiska.json 2>/dev/null || true" \
+            > /tmp/teni_vypiska.json || true
+          if python3 -c "import json; d=json.load(open('/tmp/teni_vypiska.json')); print('strok:', len(d['строки']), 'podhodjashchih:', d['подходящих_записей'])"; then
+            cp /tmp/teni_vypiska.json "$VYPISKA_FILE"
+            echo "obnovlen $VYPISKA_FILE"
+          else
+            echo "SBOY: vypiska ne sobralas"; exit 1
+          fi
 
       - name: "Коммит"
         if: always()
@@ -116,6 +151,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          [ -f "$VYPISKA_FILE" ] && git add "$VYPISKA_FILE"
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
           git commit -m "Vechernij itog polosy [automated]"
           for i in 1 2 3 4 5; do
