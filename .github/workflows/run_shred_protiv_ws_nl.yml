@@ -6,7 +6,20 @@ name: "Шреды против WS: на сколько наш сигнал по�
 #
 # Только чтение. Служба слушателя не трогается, журнал слотов читается потоком.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      ot_slota:
+        description: "считать только слоты НЕ НИЖЕ этого (0 -- все; Triton с 30.09 -- 451950611)"
+        required: false
+        default: "0"
+      do_slota:
+        description: "считать только слоты НЕ ВЫШЕ этого (0 -- без предела)"
+        required: false
+        default: "0"
+      imya_okna:
+        description: "как назвать окно в отчёте, например 'Triton с 11:25:32Z'"
+        required: false
+        default: ""
 
 concurrency:
   group: shred-protiv-ws
@@ -50,7 +63,9 @@ jobs:
             echo '--- признак жизни слушателя ---'
             cat $STATE_DIR/heartbeat.json 2>/dev/null || echo 'признака жизни нет'
             echo '--- числа ---'
-            nice -n 15 python3 /tmp/shred_protiv_ws.py --out-dir $STATE_DIR
+            nice -n 15 python3 /tmp/shred_protiv_ws.py --out-dir $STATE_DIR \
+              --ot-slota '${{ inputs.ot_slota }}' --do-slota '${{ inputs.do_slota }}' \
+              --imya-okna '${{ inputs.imya_okna }}'
             rc=\$?; rm -f /tmp/shred_protiv_ws.py; exit \$rc" | tee "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
