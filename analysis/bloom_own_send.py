@@ -706,6 +706,7 @@ def имя_строителя_по_адресу(адрес: str | None) -> str |
         return None
     имена = (("BONDING", "bonding"), ("PUMP_AMM", "pump_amm"), ("CPMM", "cpmm"),
              ("DAMM2", "damm2"), ("DBC", "dbc"), ("CLMM", "clmm"),
+             ("AMMV4", "amm_v4"),
              ("LAUNCHLAB", "launchlab"), ("DLMM", "dlmm"),
              ("WHIRLPOOL", "whirlpool"))
     for м in модули:
@@ -805,7 +806,7 @@ def _тип_по_флагу(имя: str, группа: str | None) -> bool:
 ИМЕНА_ТИПОВ = {"BONDING": "bonding", "DAMM2": "damm2", "DBC": "dbc",
                 "DLMM": "dlmm", "PUMP_AMM": "pump_amm", "CPMM": "cpmm",
                 "LAUNCHLAB": "launchlab", "CLMM": "clmm",
-                "WHIRLPOOL": "whirlpool"}
+                "WHIRLPOOL": "whirlpool", "AMMV4": "amm_v4"}
 # Имя двухшагового маршрута в списке lane_pools. Программы у него нет: это не
 # тип пула, а способ сборки (п.3 финального плана), поэтому в набор программ он
 # не попадает и спрашивается отдельно.
@@ -894,6 +895,23 @@ def clmm_включён(группа: str | None = None) -> bool:
     return _тип_включён("CLMM", группа)
 
 
+def ammv4_включён(группа: str | None = None) -> bool:
+    """Raydium AMM v4 -- по флагу LANE_AMMV4 / LANE_AMMV4_GROUPS.
+
+    Тип, которого у полосы не было: классический двухрезервный пул Raydium, и
+    записи в SPECS у него нет -- он идёт СВОИМ строителем (Code-3). Этот флаг
+    решает "брать ли тип", а BLOOM_AMMV4_STROITEL -- "считать ли цену"; нужны ОБА.
+
+    ЧТО НАДО ЗНАТЬ ПЕРЕД ВКЛЮЧЕНИЕМ. Ставка комиссии свопа у строителя -- 25/10000
+    ЧИСЛОМ, а не с цепи: она сошлась до единицы на 22 из 22 живых свопов, и
+    ставки 20 и 30 не дали ни одного совпадения. Но счёт пула (AmmInfo) строитель
+    не разбирает, поэтому у пула с нестандартным swap_fee_numerator потолок
+    комиссии пула у полосы становится неинформативным, а минимум выйдет
+    завышенным -- то есть откат, а не тихая потеря.
+    """
+    return _тип_включён("AMMV4", группа)
+
+
 def whirlpool_включён(группа: str | None = None) -> bool:
     """Orca Whirlpool -- по флагу LANE_WHIRLPOOL / LANE_WHIRLPOOL_GROUPS.
 
@@ -928,7 +946,7 @@ def launchlab_включён(группа: str | None = None) -> bool:
 ДОП_ТИПЫ_ПОЛОСЫ = (("BONDING", кривая_включена), ("DAMM2", damm2_включён),
                     ("DBC", dbc_включён), ("DLMM", dlmm_включён),
                     ("CLMM", clmm_включён), ("LAUNCHLAB", launchlab_включён),
-                    ("WHIRLPOOL", whirlpool_включён))
+                    ("WHIRLPOOL", whirlpool_включён), ("AMMV4", ammv4_включён))
 
 # ПОТОЛОК КОМИССИИ ПУЛА. У свежих пулов Meteora бывает расписание комиссии: в
 # живой сделке 26.09 комиссия пула была 50.9 % (и это правда, а не ошибка
@@ -2024,6 +2042,7 @@ def массивы_dlmm_сейчас(B, tpl: dict, mv: dict, *, лампорты
     "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK": "c2_clmm_stroitel",
     "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": "c2_whirlpool_stroitel",
     "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN": "c2_dbc_stroitel",
+    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": "c2_ammv4_stroitel",
 }
 ПРОГРАММА_TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 # Ставка налога, когда сторона базы на Token-2022, а ставку прочитать не удалось.
@@ -9067,12 +9086,23 @@ def self_test() -> int:
             and поколение_сборки(None) == 1, поколение_сборки(DLMM_П))
         # --- ТИПЫ СО СВОИМ СТРОИТЕЛЕМ: РЕЕСТР, ГЕЙТ, НАЛОГ (29.09, встраивание
         # работы Code-3). Сети здесь нет: проверяется провод, а не цена.
-        chk("реестр строителей -- ровно три программы, и значения ИМЕНА модулей",
-            set(МОДУЛИ_СТРОИТЕЛЕЙ) == {B_ж.CLMM, B_ж.WHIRLPOOL, B_ж.DBC}
+        chk("реестр строителей -- ровно четыре программы, и значения ИМЕНА модулей",
+            set(МОДУЛИ_СТРОИТЕЛЕЙ) == {B_ж.CLMM, B_ж.WHIRLPOOL, B_ж.DBC,
+                                        B_ж.AMMV4}
             and all(isinstance(v, str) for v in МОДУЛИ_СТРОИТЕЛЕЙ.values()),
             МОДУЛИ_СТРОИТЕЛЕЙ)
         chk("Whirlpool НЕ в SPECS -- и не должен быть там никогда",
             B_ж.WHIRLPOOL not in B_ж.SPECS)
+        # AMM v4 ТОЖЕ НЕ В SPECS: раскладка счетов у него своя, и записи там нет.
+        # Без КОНСТАНТЫ в c2_swap_build гейт не пустил бы тип вовсе -- проверяем
+        # и константу, и её отсутствие в SPECS одной парой.
+        chk("AMM v4: константа есть, а записи в SPECS нет",
+            isinstance(getattr(B_ж, "AMMV4", None), str)
+            and len(B_ж.AMMV4) == 44 and B_ж.AMMV4 not in B_ж.SPECS,
+            getattr(B_ж, "AMMV4", None))
+        chk("имя типа AMM v4 в lane_pools -- amm_v4",
+            ИМЕНА_ТИПОВ.get("AMMV4") == "amm_v4"
+            and имя_строителя_по_адресу(B_ж.AMMV4) == "amm_v4")
         chk("приёмка найдёт реестр под тем же именем",
             getattr(sys.modules[__name__], "МОДУЛИ_СТРОИТЕЛЕЙ", None) is not None)
         chk("каждый модуль реестра подтягивается лениво и имеет подготовить/включён",
