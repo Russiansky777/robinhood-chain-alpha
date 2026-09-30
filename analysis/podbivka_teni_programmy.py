@@ -123,10 +123,28 @@ def main() -> int:
         ноги = [р for р in рр if not any(ц["роль"] == "пул токена" for ц in р["цели"] if ц["программа"] == цель)]
         пары = collections.Counter(" / ".join("↔".join(ц["минты"]) for ц in р["цели"] if ц["программа"] == цель) for р in ноги)
         md += ["", "Нога маршрута -- пары минтов её вызова: " + (", ".join(f"{к or '—'} {v}" for к, v in пары.most_common(8)) or "нет"), "",
-               "| программа пула токена | сигналов | умеем (Code-1) | порт Code-2 |", "|---|---|---|---|"]
+               ] + (["| программа пула токена | сигналов | умеем (Code-1) | порт Code-2 |", "|---|---|---|---|"] if ноги else [])
         пулы = collections.Counter(p for р in ноги for p in (р["пулы_токена"] or [None]))
         for p, n in пулы.most_common():
             md.append(f"| {имя(p)} (`{(p or '')[:8]}`) | {n} | {'да' if p in УМЕЕМ_CODE1 else 'нет'} | {ПОРТ_CODE2.get(p, '—')} |")
+        пулы_р = [р for р in рр if р not in ноги]
+        pid = next(k for k, v in ЦЕЛИ.items() if v == цель)
+        пары_п = collections.Counter("/".join(ц["минты"]) for р in пулы_р for ц in р["цели"] if ц["программа"] == цель and ц["роль"] == "пул токена")
+        md += ["", "Пул токена -- пара минтов её вызова с хранилищем токена (сигналов): "
+               + ", ".join(f"{к} {v}" for к, v in пары_п.most_common(12)), ""]
+        другие = collections.Counter(" + ".join(f"{имя(p)} ({'умеем' if p in УМЕЕМ_CODE1 else 'не умеем'})"
+                                                for p in р["пулы_токена"] if p != pid) or "нет" for р in пулы_р)
+        md += ["| другие пулы того же токена в транзакции (маршрут разбит; умеем -- сборщик Code-1) | сигналов |", "|---|---|"]
+        md += [f"| {к} | {v} |" for к, v in другие.most_common()]
+        wsol = collections.Counter("/".join(ц["минты"]) for р in пулы_р if р["котировка_Code1"] == "WSOL"
+                                   for ц in р["цели"] if ц["программа"] == цель)
+        if wsol:
+            md += ["", f"Котировка WSOL в журнале Code-1 ({sum(1 for р in пулы_р if р['котировка_Code1'] == 'WSOL')} сигналов) -- пары вызовов "
+                   f"{цель} в этих транзакциях: " + ", ".join(f"{к} {v}" for к, v in wsol.most_common())]
+        трата = collections.Counter(" + ".join(sorted(к for к, v in р["дельта_источника"].items() if v < 0)) or "нет траты в токенах (натив SOL)" for р in пулы_р)
+        md += ["", "Что тратил источник (токен-счета, уменьшились): " + ", ".join(f"{к} {v}" for к, v in трата.most_common(6)),
+               f"Программа пула токена -- сама {цель}: умеем (Code-1) -- {'да' if pid in УМЕЕМ_CODE1 else 'нет'}, порт Code-2 -- нет "
+               "(закрытый код, без IDL).", ""]
         кот = collections.Counter((р["котировка_Code1"], "пул" if р not in ноги else "нога") for р in рр)
         md += ["", "Котировка по журналу Code-1 × роль: " + ", ".join(f"{к[0]} ({к[1]}) {v}" for к, v in кот.most_common()), ""]
     (КОРЕНЬ / "docs" / "podbivka_2026-09-30_teni_ojh1_tess.md").write_text("\n".join(md) + "\n", encoding="utf-8")
