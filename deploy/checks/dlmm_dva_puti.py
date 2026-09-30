@@ -83,6 +83,13 @@ def главное(а) -> int:
         стр = {"подпись": нч.get("подпись"), "минт": нч.get("минт"),
                 "источник": нч.get("источник"), "откуда": нч.get("откуда"),
                 "why_not": None}
+        def пропуск(причина: str):
+            """Строка не дошла до двух путей -- сказать почему, а не промолчать."""
+            стр["why_not"] = причина
+            строки.append(стр)
+            print(f"  {и}/{len(найдено['строки'])} {str(стр['подпись'])[:14]} "
+                   f"[{стр['откуда']}] НЕ ДОШЛА: {причина[:140]}")
+
         tx = нч.get("tx")
         if not isinstance(tx, dict):
             о = P.зов("getTransaction", [нч["подпись"], {
@@ -90,19 +97,16 @@ def главное(а) -> int:
                 "commitment": "confirmed"}])
             tx = (о.get("result") if о.get("ok") else None)
             if not isinstance(tx, dict):
-                стр["why_not"] = f"транзакция не прочиталась: {о.get('why_not')}"
-                строки.append(стр)
+                пропуск(f"транзакция не прочиталась: {о.get('why_not')}")
                 continue
         пул = C.identify_pool(tx, нч.get("источник") or "", нч.get("минт") or "")
         if not пул.get("ok"):
-            стр["why_not"] = f"пул: {пул.get('why_not')}"
-            строки.append(стр)
+            пропуск(f"пул: {пул.get('why_not')}")
             continue
         прог = PP.pool_program(tx, пул["pool_vault"], {}).get("pool_program")
         стр["pool_program"] = прог
         if прог != DLMM_ПРОГРАММА:
-            стр["why_not"] = f"это не DLMM, а {прог}"
-            строки.append(стр)
+            пропуск(f"это не DLMM, а {прог}")
             continue
         шаб = None
         порядок = [x for x in (нч.get("кандидаты") or []) if isinstance(x, str)]
@@ -113,8 +117,7 @@ def главное(а) -> int:
                 шаб = т
                 break
         if шаб is None:
-            стр["why_not"] = "шаблон инструкции DLMM не восстановился"
-            строки.append(стр)
+            пропуск("шаблон инструкции DLMM не восстановился")
             continue
         mv = B.mints_and_vaults(шаб, tx) or {}
         стр["база"] = mv.get("base_mint")
@@ -198,6 +201,7 @@ def главное(а) -> int:
                                for с in строки]),
             "два_p50": _p50([(с.get("два_чтения") or {}).get("чтений")
                               for с in строки])},
+        "почему_не_дошли": _причины(строки),
         "строки": строки,
     }
     печать = {к: v for к, v in итог.items() if к != "строки"}
@@ -207,6 +211,17 @@ def главное(а) -> int:
             json.dump(итог, ф, ensure_ascii=False, indent=1)
         print(f"отчёт записан: {а.out}")
     return 0
+
+
+def _причины(строки: list) -> dict:
+    """Счётчик причин, по которым строка не дошла до двух путей."""
+    из_ = {}
+    for с in строки:
+        if с.get("одно_чтение"):
+            continue
+        т = (с.get("why_not") or "без причины")[:120]
+        из_[т] = из_.get(т, 0) + 1
+    return dict(sorted(из_.items(), key=lambda x: -x[1]))
 
 
 def _p50(ряд):

@@ -78,7 +78,7 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA/kandidat"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA $RABOTA/kandidat"
           KOD=$CODE_DIR
           if [ -n "${{ inputs.vetka_kandidata }}" ]; then
             tar -czf - analysis | ssh $SSH_OPTS root@$TARGET_HOST "tar -xzf - -C $RABOTA && mv $RABOTA/analysis/* $RABOTA/kandidat/ && rmdir $RABOTA/analysis"
