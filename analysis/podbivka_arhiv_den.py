@@ -59,6 +59,7 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 ВЫХОДЫ = (6, 12, 24, 36, 72, 108, 150)   # 108 -- удержание живой полосы lane_s0
 БИЛЕТЫ = (0.3, 0.5)
 ОКНО_ВСЕМ = False       # --okno-vsem: правило окна докупки для всех наших адресов
+БЕЗ_АДРЕСОВ = False     # --bez-adresov: только цели (--celi) и их ряды -- без событий и сигналов наших адресов
 ИЗДЕРЖКИ = 0.002
 КЛЮЧИ = ("signature", "action", "pool", "poolId", "mint", "quoteMint", "txSigner", "tokenAmount", "quoteAmount",
          "tokensInPool", "quoteInPool", "vTokensInBondingCurve", "vQuoteInBondingCurve", "poolFeeRate",
@@ -289,7 +290,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     import requests  # noqa: PLC0415
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
     import zstandard  # noqa: PLC0415
-    адр = dict(json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"])
+    адр = {} if БЕЗ_АДРЕСОВ else dict(json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"])
     доп = доп or set()
     ист = ист or set()
     for a in доп | ист:
@@ -538,12 +539,14 @@ def main() -> int:
     р.add_argument("--bilety", default="0.3,0.5", help="билеты модели, SOL, через запятую (pyg9: 0.3,0.5,1,3)")
     р.add_argument("--okno-vsem", action="store_true",
                    help="правило Code-1 (--okno-dokupki) для ВСЕХ наших адресов, порог -- --porog (не только --istochniki)")
+    р.add_argument("--bez-adresov", action="store_true", help="только цели (--celi) и ряды их пулов, без наших адресов")
     р.add_argument("--okno-dokupki", type=int, default=None,
                    help="для --istochniki сигнал по правилу Code-1: нет покупки того же минта в предыдущие N слотов (1800)")
     а = р.parse_args()
-    global БИЛЕТЫ, ОКНО_ВСЕМ  # noqa: PLW0603
+    global БИЛЕТЫ, ОКНО_ВСЕМ, БЕЗ_АДРЕСОВ  # noqa: PLW0603
     БИЛЕТЫ = tuple(float(x) for x in а.bilety.split(",") if x.strip())
     ОКНО_ВСЕМ = а.okno_vsem
+    БЕЗ_АДРЕСОВ = а.bez_adresov
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
