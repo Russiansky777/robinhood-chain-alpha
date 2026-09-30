@@ -1,0 +1,115 @@
+name: "Тени, прошедшие правило сигнала: упущенные сделки по группам (только чтение)"
+
+# ЗАЧЕМ (вопрос владельца 30.09, ночь, п.4). Счёт несобранных теней сам по себе
+# завышает потерю: тень строится и на тот сигнал, который полоса всё равно не
+# взяла бы -- трата источника ниже порога или это не первый вход в минт. Здесь
+# тень сшивается с РЕШЕНИЕМ по подписи, и в счёт идут только сигналы, прошедшие
+# правило: трата >= порога И первый вход. Группа берётся из записи решения
+# (source_task), а не join-ом по файлу групп: файл меняется и вчерашнюю группу
+# уже не помнит.
+#
+# ТОЛЬКО ЧТЕНИЕ: журнал решений читается потоком под nice/ionice, на хосте
+# ничего не пишется, наружу уезжает только сводка числами.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "начало окна UTC, например 2026-09-30T00:00:00Z"
+        required: true
+      po:
+        description: "конец окна UTC"
+        required: true
+      porog:
+        description: "порог входа источника в SOL-эквиваленте"
+        required: false
+        default: "2.0"
+      gruppy:
+        description: "только эти группы через запятую (пусто -- все)"
+        required: false
+        default: ""
+      bez_rotacii:
+        description: "'yes' -- не читать ротированные .gz (быстрее, но без истории)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: teni-po-pravilu
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  RABOTA: /tmp/teni_po_pravilu
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT_FILE: data/teni_po_pravilu.json
+
+jobs:
+  teni:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО хоста (без сети)"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/teni_po_pravilu.py
+          python3 deploy/checks/teni_po_pravilu.py --self-test | tail -3
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Счёт на хосте: тени против правила сигнала"
+        run: |
+          set -e
+          set -o pipefail
+          BEZ=""
+          if [ "${{ inputs.bez_rotacii }}" = yes ]; then BEZ="--bez-rotacii"; fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "umask 077; cat > $RABOTA/teni_po_pravilu.py" < deploy/checks/teni_po_pravilu.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chmod 644 $RABOTA/teni_po_pravilu.py"
+          # ФАКТ О ЖУРНАЛЕ ДО СЧЁТА: пустая сводка иначе читается как "потерь
+          # нет", хотя причина может быть в пути или в ротации.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "ls -l $STATE_DIR/decisions.jsonl*; wc -l < $STATE_DIR/decisions.jsonl"
+          # nice/ionice: на этом хосте торгует детектор, и чтение журнала не
+          # должно его тормозить.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "nice -n 15 \$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true) $VENV/python $RABOTA/teni_po_pravilu.py --state-dir $STATE_DIR --s '${{ inputs.s }}' --po '${{ inputs.po }}' --porog '${{ inputs.porog }}' --gruppy '${{ inputs.gruppy }}' $BEZ --out $RABOTA/out.json" | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/teni_po_pravilu.json || true
+          if python3 -c "import json; json.load(open('/tmp/teni_po_pravilu.json'))" 2>/dev/null; then
+            cp /tmp/teni_po_pravilu.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: svodka ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Teni po pravilu signala: upushchennye sdelki po gruppam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
