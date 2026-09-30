@@ -49,7 +49,9 @@ concurrency:
 
 env:
   HOST: 169.128.191.158
-  RUNNER_VERSION: "2.321.0"
+  # Запасное число: заявленный GitHub минимум для регистрации на 30.09.
+  # Рабочее значение шаг "Версия бегунка" берёт у самого GitHub.
+  RUNNER_VERSION: "2.329.0"
   # Ожидаемое число ядер: подтверждение, что мы на ТОМ сервере. У торгового
   # NL-хоста их другое число, и промах адресом виден до любой правки.
   JADER_ZHDJOM: "6"
@@ -251,6 +253,36 @@ jobs:
           fi
           [ -s /tmp/reg_token ] || { echo "SBOY: token registracii pust"; exit 1; }
 
+      - name: "Версия бегунка: спросить у GitHub, не держать в файле"
+        if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
+        run: |
+          set -e
+          # GitHub отказал прошитой 2.321.0: "minimum runner version required
+          # to register with GitHub Actions is now 2.329.0". Минимум растёт, а
+          # прошитое число стареет молча, поэтому версию спрашиваем у GitHub;
+          # RUNNER_VERSION из env -- только запасной путь, и в отчёте видно,
+          # какой путь сработал.
+          HTTP_CODE=$(curl -sS -o /tmp/rel.json -w '%{http_code}' \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/actions/runner/releases/latest || echo 000)
+          VER=""
+          if [ "$HTTP_CODE" = "200" ]; then
+            VER=$(tr ',' '\n' < /tmp/rel.json | grep -m1 '"tag_name"' \
+                  | grep -o '[0-9][0-9.]*' | head -1)
+          fi
+          case "$VER" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) VER="" ;;
+          esac
+          if [ -z "$VER" ]; then
+            echo "versija begunka: u GitHub ne sprosili (http $HTTP_CODE, tag_name ne razobran) -- berjom zapasnoj minimum $RUNNER_VERSION" | tee -a "$OUT_FILE"
+          elif [ "$(printf '%s\n%s\n' "$VER" "$RUNNER_VERSION" | sort -V | head -1)" != "$RUNNER_VERSION" ]; then
+            echo "versija begunka: GitHub nazval $VER, eto men'she minimuma $RUNNER_VERSION -- berjom minimum" | tee -a "$OUT_FILE"
+          else
+            echo "versija begunka: $VER (poslednij vypusk actions/runner; zapasnoj minimum $RUNNER_VERSION)" | tee -a "$OUT_FILE"
+            echo "RUNNER_VERSION=$VER" >> "$GITHUB_ENV"
+          fi
+
       - name: "Бегунок lab-miami"
         if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
         run: |
@@ -262,12 +294,20 @@ jobs:
             set -e
             install -d -o $RUNNER_USER -g $RUNNER_USER -m 750 /home/$RUNNER_USER/actions-runner
             cd /home/$RUNNER_USER/actions-runner
-            if [ ! -x ./config.sh ]; then
+            # Метка версии рядом с пакетом: без неё уже распакованный старый
+            # бегунок остаётся лежать и снова не проходит регистрацию.
+            EST=net
+            [ -f .postavlennaja_versija ] && EST=\$(cat .postavlennaja_versija)
+            if [ ! -x ./config.sh ] || [ \$EST != '${RUNNER_VERSION}' ]; then
+              echo stavim paket begunka ${RUNNER_VERSION}, bylo \$EST
               curl -sSL -o /tmp/runner.tar.gz \
                 https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
               tar xzf /tmp/runner.tar.gz -C /home/$RUNNER_USER/actions-runner
+              echo '${RUNNER_VERSION}' > .postavlennaja_versija
               chown -R $RUNNER_USER:$RUNNER_USER /home/$RUNNER_USER/actions-runner
               rm -f /tmp/runner.tar.gz
+            else
+              echo paket begunka uzhe ${RUNNER_VERSION}
             fi
             ./bin/installdependencies.sh >/dev/null 2>&1 || true
             echo 'paket begunka na meste'" | tee -a "$OUT_FILE"
