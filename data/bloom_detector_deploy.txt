@@ -1,4 +1,4 @@
-progon 145, 2026-09-30T13:41:03Z
+progon 146, 2026-09-30T13:43:26Z
 --- znachenija flagov, kotorye pishet PEREPISAT ---
 BLOOM_MODE=dry
 BLOOM_TASKS=BATCH-5,BATCH-3
@@ -168,13 +168,6 @@ NOZOMI_API_KEY: est v env hosta
     }
   }
 }
-strok v kopii 70, v novom 70
---- imena strok, kotorye razoshlis (tolko imena) ---
-BLOOM_REGION_SEND
-imjon, razoshedshihsja NE po BLOOM_REGION_SEND: 0
-sverka proshla: kak mnozhestvo strok fajl otlichaetsja tolko BLOOM_REGION_SEND
-1
-BLOOM_REGION_SEND=1 stoit v env
   "balance_sol": 0.024620982,
   "min_balance_sol": 0.3,
   "dry_positions": 0,
@@ -205,7 +198,7 @@ BLOOM_REGION_SEND=1 stoit v env
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 6219,
+      "v2": 6318,
       "unreadable": 0
     },
     "positions": {
@@ -235,3 +228,779 @@ BLOOM_REGION_SEND=1 stoit v env
   БЛОКЕР: баланс 0.0246 SOL ниже порога 0.3
   примечание: у кошелька есть прежняя история: 27 сделок старше окна, самая свежая из них 2026-09-29T18:42:50Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
+признак жизни: 36 с назад; группы ['money', 'speed_only']; открытых 0, зависших 0
+МОЖНО: позиций 0, зависших 0, признак свежий, продажи разрешены
+bloom-detector: start 2026-09-30T13:44:08Z, moduli 2026-09-30T13:13:09Z, start_pozzhe_modulej (1859 s)
+bloom-seller: start 2026-09-30T13:44:19Z, moduli 2026-09-30T13:13:09Z, start_pozzhe_modulej (1870 s)
+{
+  "schema_version": 2,
+  "updated_utc": "2026-09-30T13:44:09Z",
+  "updated_ts": 1790775849.3216312,
+  "alive_since_utc": "2026-09-30T13:44:08Z",
+  "mode": "live",
+  "sources": 625,
+  "source_groups": {
+    "file": "/home/bot/data/sources_2026-09-25.json",
+    "why_not": null,
+    "hash": "a7626bb11d46",
+    "mtime_utc": "2026-09-30T01:17:19Z",
+    "alarm": null,
+    "in_file": {
+      "leader": 1,
+      "batch5": 12,
+      "lane_s0": 10,
+      "off": 9,
+      "log_only": 582,
+      "sniper_src": 3,
+      "kandidaty": 6
+    },
+    "subscribed": {
+      "batch5": 12,
+      "leader": 1,
+      "lane_s0": 10,
+      "sniper_src": 3,
+      "kandidaty": 6,
+      "off": 2
+    },
+    "policies": {
+      "leader": {
+        "lane_sol": 0.5,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.75,
+        "min_target_sol": 3,
+        "lane_open_max": 3,
+        "lane_pools": [
+          "pump_amm",
+          "cpmm",
+          "bonding",
+          "two_step",
+          "damm2",
+          "dbc"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": true,
+        "slippage": 0.2,
+        "slippage_thin_pool": 0.5,
+        "thin_pool_below_sol": 30,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 150.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.5
+      },
+      "batch5": {
+        "lane_sol": 0.3,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.45,
+        "min_target_sol": 2,
+        "lane_open_max": 3,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": true,
+        "slippage": 0.4,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.3
+      },
+      "lane_s0": {
+        "lane_sol": 0.3,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.45,
+        "min_target_sol": 2,
+        "lane_open_max": 3,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": 3,
+        "skip_flippers": true,
+        "allow_taxed_route": true,
+        "slippage": 0.4,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.3
+      },
+      "off": {
+        "lane_sol": null,
+        "bloom_trades": false,
+        "subscribe": false,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": null
+      },
+      "log_only": {
+        "lane_sol": null,
+        "bloom_trades": false,
+        "subscribe": false,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": null
+      },
+      "sniper_src": {
+        "lane_sol": 0.3,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.45,
+        "min_target_sol": 2,
+        "lane_open_max": 3,
+        "lane_pools": [
+          "pump_amm",
+          "cpmm",
+          "bonding",
+          "two_step",
+          "damm2",
+          "dbc",
+          "clmm",
+          "launchlab",
+          "dlmm"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": 1,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": 0.2,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 12.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.3
+      },
+      "kandidaty": {
+        "lane_sol": null,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": null
+      }
+    }
+  },
+  "sender_connections": {
+    "by_sender": {
+      "astralane": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "blockrazor": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "helius": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "jito": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "nozomi": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "zeroslot": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      }
+    },
+    "warm_period_s": 25.0,
+    "last_warm_s": 0.2,
+    "last_warm": {
+      "ok": 6,
+      "failed": 0
+    }
+  },
+  "bloom_skipped_by_group": 0,
+  "sources_from": "DBot живьём + групп источников: 605 + тестовых источников из окружения: 2",
+  "sources_generation": 0,
+  "subscribed_addresses": 53,
+  "unsubscribed_addresses": 591,
+  "credits": {
+    "за_сеанс": 7,
+    "за_час": 8700,
+    "за_прошлый_час": 10717,
+    "за_сутки": 196238,
+    "бюджет_за_сутки": 1000000,
+    "why_not": null
+  },
+  "subscribe_method": "transactionSubscribe",
+  "subscribe_drops": 0,
+  "signals_seen": 0,
+  "to_buy": 0,
+  "by_code": {},
+  "by_code_test_source": {},
+  "test_sources": [
+    "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+    "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
+  ],
+  "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+  "test_min_sol": 0.05,
+  "max_tx_version": 1,
+  "stale_slots": 10,
+  "clmm_fee_rates": {
+    "в_кэше": 9,
+    "ждут_чтения": 0,
+    "без_ставки": 0
+  },
+  "dlmm_bin_steps": {
+    "в_кэше": 11,
+    "ждут_чтения": 0,
+    "без_шага": 0
+  },
+  "lane_cu_limit": 140000,
+  "summary_minute": 2,
+  "summary_last_hour": "2026-09-30T12:00Z",
+  "summary_write_error": null,
+  "rate_source": "geckoterminal",
+  "rate_usd_sol": 120.67420256449051,
+  "rate_fresh": true,
+  "rate_stale_used": 0,
+  "rate_failures": [],
+  "kill_path": "/etc/bloom-executor/KILL",
+  "kill_readable": true,
+  "kill_active": false,
+  "kill_note": "путь рубильника доступен на чтение",
+  "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
+  "kill_bloom_active": false,
+  "kill_bloom_note": "",
+  "net_slot": 451981615,
+  "slot_notifications": 1,
+  "ws_baity_po_vidam": {},
+  "dlina_slota": {},
+  "dlina_slota_v_rabote": {
+    "длина_слота_с": 0.27065,
+    "источник": "замер",
+    "возраст_замера_с": 30.9,
+    "константа_в_коде_с": 0.4
+  },
+  "net_slot_age_s": 0.09,
+  "balance_sol": 0.024620982,
+  "balance_age_s": 0.23,
+  "rpc_calls": 7,
+  "rpc_by_method": {
+    "getMultipleAccounts": 2,
+    "getBalance": 2,
+    "getLatestBlockhash": 1,
+    "getSlot": 1,
+    "getAccountInfo": 1
+  },
+  "session_credits": 7,
+  "handler_crashes": 0,
+  "telegram": {
+    "enabled": true,
+    "configured": true,
+    "format2": false,
+    "format3": true,
+    "tracked_messages": 0,
+    "tracked_texts": 0,
+    "sent": 0,
+    "failed": 0,
+    "last_error": "",
+    "off_reason": "",
+    "log_configured": false,
+    "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
+    "by_target": {
+      "main": {
+        "sent": 0,
+        "failed": 0,
+        "last_error": ""
+      },
+      "log": {
+        "sent": 0,
+        "failed": 0,
+        "last_error": ""
+      }
+    }
+  },
+  "own_tx_seen": 0,
+  "chain_ok_backfilled": 0,
+  "block_position_backfilled": 0,
+  "block_position": {
+    "module_loaded": true,
+    "why_not": ""
+  },
+  "fallback_seconds": 0,
+  "fallback_window_s": 5.0,
+  "subscribe_main_path": true,
+  "fallback": {
+    "switches_total": 0,
+    "switches_short": 0,
+    "seconds_total": 0.0,
+    "hour_switches": 0,
+    "hour_seconds": 0.0,
+    "on_fallback_now": false,
+    "report_threshold_s": 30.0,
+    "silent_ticks": 0,
+    "tick_s": 2.0,
+    "breaks_by_reason": {}
+  },
+  "shadow": {
+    "enabled": true,
+    "built": 0,
+    "would_pass": 0,
+    "over_cap": 0,
+    "failed": 0,
+    "module_loaded": true,
+    "module_why_not": "",
+    "passed_in_row_by_pool": {},
+    "hour": {
+      "since_ts": 1790775848.8192596,
+      "since_utc": "2026-09-30T13:44:08Z",
+      "signals": 0,
+      "built": 0,
+      "sim_failed": 0,
+      "not_built": {},
+      "crashed": 0
+    },
+    "restarts": 0,
+    "last_restart_utc": "",
+    "credits_day": 180,
+    "credits_write_why_not": ""
+  },
+  "route_tax_filter": {
+    "price_curve_loaded": true,
+    "price_curve_why_not": "",
+    "module_loaded": true,
+    "module_why_not": "",
+    "code": "SKIP_TAXED_ROUTE",
+    "skipped": 0,
+    "skipped_test": 0
+  },
+  "own_send": {
+    "enabled": true,
+    "live": true,
+    "module_loaded": true,
+    "module_why_not": "",
+    "paths": 0,
+    "starts": 0,
+    "threads_alive": 0,
+    "sent": 0,
+    "by_stage": {},
+    "bought_backfilled": 0,
+    "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+    "own_wallet": true,
+    "wallet_ready": {
+      "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "own_wallet": true,
+      "ok": true,
+      "why_not": null
+    },
+    "balance_sol": 1.916061355,
+    "balance_day_threshold": {
+      "ok": true,
+      "kill": false,
+      "why": "просадка от 00:00 0.057674 SOL при пороге 2.0",
+      "threshold_sol": 2.0,
+      "day": "20260930",
+      "open_sol": 1.97373532,
+      "balance_sol": 1.916061355,
+      "drop_sol": 0.057673965,
+      "withdrawals_sol": 0.0,
+      "withdrawals_n": 0
+    },
+    "lane_daily_stop": {
+      "threshold_sol": 1.5,
+      "pnl_all_groups_sol": -0.057673965,
+      "stopped": false,
+      "why_not": null
+    },
+    "lane_chain_day": {
+      "годен": true,
+      "почему_нет": null,
+      "итог_sol": -0.057673965,
+      "день": "20260930",
+      "начало_суток_ts": 1790719200.0,
+      "как_считаются_сутки": "Europe/Madrid",
+      "баланс_sol": 1.916061355,
+      "возраст_баланса_с": 0.0,
+      "предел_возраста_с": 300.0,
+      "открытие_sol": 1.97373532,
+      "выводы_sol": 0.0,
+      "выводов": 0,
+      "кошелёк": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+    },
+    "balance_age_s": 0.2,
+    "sim_shadow": {
+      "done": 0,
+      "would_fail": 0
+    },
+    "blockhash_age_s": 0.2,
+    "blockhash_updates": 1,
+    "blockhash_why_not": "",
+    "last": {},
+    "lane_kill": [
+      false,
+      ""
+    ],
+    "limits": {
+      "open": 1,
+      "per_day": 50,
+      "open_by_group": {
+        "batch5": 3,
+        "kandidaty": 1,
+        "lane_s0": 3,
+        "leader": 3,
+        "log_only": 1,
+        "off": 1,
+        "sniper_src": 3
+      },
+      "size_sol": 0.05,
+      "ceiling_sol": 0.5,
+      "stop_failed_in_row": 5,
+      "stop_loss_sol": 0.3
+    },
+    "lane_state": {
+      "open": 0,
+      "stuck": 0,
+      "day": "20260930",
+      "day_start_ts": 1790719200.0,
+      "day_how": "Europe/Madrid",
+      "pnl_all_groups_sol": -0.057673965,
+      "today_all_groups": 9,
+      "today": 9,
+      "failed_in_row": 0,
+      "pnl_sol": -0.057673965,
+      "pnl_trade_sol": -0.019460525,
+      "spend_sol": 0.03821344,
+      "uncountable_today": 0,
+      "no_result_today": 0,
+      "uncountable_why": [],
+      "total": 31,
+      "group": "деньги (все группы кроме скорости)",
+      "day_turnover_sol": 1.917045,
+      "day_spend_sol": 0.03821344
+    },
+    "lane_state_by_group": {
+      "money": {
+        "open": 0,
+        "stuck": 0,
+        "day": "20260930",
+        "day_start_ts": 1790719200.0,
+        "day_how": "Europe/Madrid",
+        "pnl_all_groups_sol": -0.057673965,
+        "today_all_groups": 9,
+        "today": 9,
+        "failed_in_row": 0,
+        "pnl_sol": -0.057673965,
+        "pnl_trade_sol": -0.019460525,
+        "spend_sol": 0.03821344,
+        "uncountable_today": 0,
+        "no_result_today": 0,
+        "uncountable_why": [],
+        "total": 31,
+        "group": "деньги (все группы кроме скорости)",
+        "day_turnover_sol": 1.917045,
+        "day_spend_sol": 0.03821344
+      },
+      "speed_only": {
+        "open": 0,
+        "stuck": 0,
+        "day": "20260930",
+        "day_start_ts": 1790719200.0,
+        "day_how": "Europe/Madrid",
+        "pnl_all_groups_sol": -0.057673965,
+        "today_all_groups": 9,
+        "today": 0,
+        "failed_in_row": 0,
+        "pnl_sol": 0.0,
+        "pnl_trade_sol": 0.0,
+        "spend_sol": 0.0,
+        "uncountable_today": 0,
+        "no_result_today": 0,
+        "uncountable_why": [],
+        "total": 0,
+        "group": "speed_only",
+        "day_turnover_sol": 0,
+        "day_spend_sol": 0.0
+      }
+    },
+    "control": {
+      "enabled": false,
+      "senders_seen": 0,
+      "spent_today": {
+        "day": "20260930",
+        "n": 0,
+        "signals": 0,
+        "spent_lamports": 0,
+        "why_not": null,
+        "spent_sol": 0.0
+      },
+      "limits": {
+        "signals_per_day": 20,
+        "spend_sol_per_day": 0.1,
+        "per_sender_sol": 0.001
+      },
+      "by_sender": {}
+    },
+    "pool": {
+      "enabled": true,
+      "tip_cap_sol": 0.005,
+      "winners": {
+        "jito": 8,
+        "astralane": 9,
+        "nozomi": 7,
+        "helius": 1,
+        "zeroslot": 2,
+        "blockrazor": 4
+      }
+    },
+    "pool_nonce": {
+      "enabled": true,
+      "account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+      "wait_slots": 8,
+      "wait_s": 3.2,
+      "pending_shift": false,
+      "pending_why": null,
+      "shift_signature": null,
+      "warm": {
+        "есть": true,
+        "возраст_с": 0.18,
+        "почему": "",
+        "обновлений": 1,
+        "взят_тёплым": 0,
+        "взят_по_сети": 0,
+        "срок_с": 30.0
+      }
+    }
+  },
+  "leg_cache": {
+    "enabled": true,
+    "pools": 17,
+    "templates": {
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
+        "age_s": 0.3,
+        "flipped": false,
+        "sig": "5Z2dnoiBLyqBe63YnffNLVWWJAjAajpu4Vt7FP2gTpUCqPdUxen2aqJQeH5CDWo2gvznhCPdf6HqHFtxJCLsdgy4"
+      }
+    },
+    "fed": 0,
+    "no_tx": 0,
+    "failed": 0,
+    "luts": 18,
+    "luts_pending": 0,
+    "luts_warmed": 18,
+    "warm_why_not": "",
+    "luts_topped_up": 0,
+    "top_up_why_not": "",
+    "bytes": 0,
+    "credits": 0,
+    "credits_day": 93800,
+    "credits_before_start": 93800,
+    "credits_write_why_not": "",
+    "credit_budget": 0,
+    "credit_cap": "нет потолка",
+    "dropped": false,
+    "dropped_why": "",
+    "ingest_stats": {}
+  },
+  "leg_static": {
+    "fayl": "/home/bot/data/nogi_shablony.json",
+    "obrazcov": 1,
+    "zhivyh": 1,
+    "bez_shablona": 0,
+    "obnovleniy": 1,
+    "vozrast_s": 0.3,
+    "why_not": null,
+    "kotirovki": {
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "USDC"
+    },
+    "otkazy": {}
+  },
+  "two_step": {
+    "module": true,
+    "why_not": null,
+    "buy": true,
+    "sell": true
+  },
+  "telegram_commands": {
+    "enabled": true,
+    "why_not": "",
+    "accepted": 0,
+    "from_strangers": 0,
+    "errors": 0,
+    "last_error": "",
+    "last_command": "",
+    "last_command_utc": "",
+    "offset": 396350741,
+    "seen_chats": {}
+  },
+  "bloom_keepalive": {
+    "enabled": true,
+    "period_s": 20.0,
+    "ok": 2,
+    "failed": 0,
+    "skipped_while_buying": 0,
+    "last_code": 200,
+    "last_utc": "2026-09-30T13:44:09Z",
+    "last_error": ""
+  },
+  "executor_attached": true,
+  "executed": 0,
+  "exec_by_code": {},
+  "executor": {
+    "schema_version": 2,
+    "mode": "live",
+    "live_buy_enabled": true,
+    "live_test_enabled": false,
+    "dry_run": false,
+    "bump_sol": 0.005,
+    "buy_sol": 0.2,
+    "slippage_pct": 35.0,
+    "priority_fee": 0.001,
+    "processor_tip": 0.001,
+    "sell_after_s": 28.8,
+    "sell_slippage_pct": 40.0,
+    "sent": 0,
+    "refused": 0,
+    "last_error": "",
+    "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  "credits_logged": true,
+  "credits_log_error": "",
+  "decide_latency_ms": null
+}--- решений в журнале ---
+6441
+--- позиций в журнале (должно быть 0: покупать нечем) ---
+231
