@@ -62,6 +62,8 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Выборка потоком с хоста"
+        env:
+          OBRAZCY: ${{ inputs.patterns }}
         run: |
           set -e
           set -o pipefail
@@ -69,15 +71,38 @@ jobs:
             positions) SRC="$STATE_DIR/positions.jsonl" ;;
             *)         SRC="$STATE_DIR/decisions.jsonl" ;;
           esac
-          # Образцы -- ФИКСИРОВАННЫЕ строки (grep -F): подпись или адрес не
-          # регулярное выражение, и толковать их как образец значит искать не
-          # то. Каждый образец уходит отдельным -e.
-          ARGS=""
-          for P in $(echo "${{ inputs.patterns }}" | tr ',' ' '); do
-            [ -n "$P" ] && ARGS="$ARGS -e $P"
-          done
-          [ -n "$ARGS" ] || { echo "СБОЙ: образцов нет"; exit 1; }
+          # ОБРАЗЦЫ -- ФАЙЛОМ, А НЕ СПИСКОМ -e. Здесь стояло
+          # `for P in $(echo "$patterns" | tr ',' ' ')`, и образец со ПРОБЕЛОМ
+          # распадался на два: «предел полосы» искалось как «предел» ИЛИ
+          # «полосы». Выборка при этом выглядела полной -- ровно limit строк, --
+          # и по ней можно было посчитать что угодно. Теперь образцы делятся
+          # ТОЛЬКО по запятой, уезжают на хост файлом через stdin и читаются
+          # `grep -F -f`: ни пробелы, ни кавычки, ни кириллица больше ничего не
+          # ломают, а каждый образец печатается в журнал прогона, чтобы видеть,
+          # что именно искали.
           mkdir -p /tmp/jgrep
+          : > /tmp/jgrep/patterns.txt
+          # ДЕЛИМ ТОЛЬКО ПО ЗАПЯТОЙ: IFS=, оставляет пробелы внутри образца на
+          # месте. Без этого «предел полосы» распадалось на два образца.
+          STAR_IFS=$IFS
+          IFS=','
+          set -- $OBRAZCY
+          IFS=$STAR_IFS
+          for P in "$@"; do
+            P=$(printf '%s' "$P" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+            [ -n "$P" ] && printf '%s\n' "$P" >> /tmp/jgrep/patterns.txt
+          done
+          [ -s /tmp/jgrep/patterns.txt ] || { echo "СБОЙ: образцов нет"; exit 1; }
+          echo "--- образцы (по строке на образец) ---"
+          cat -A /tmp/jgrep/patterns.txt | sed 's/\$$//'
+          # ПУСТОЙ ОБРАЗЕЦ СОВПАЛ БЫ С КАЖДОЙ СТРОКОЙ, и выборка выглядела бы
+          # полной. Такой образец -- отказ, а не "нашли всё".
+          if grep -qx "" /tmp/jgrep/patterns.txt; then
+            echo "СБОЙ: среди образцов есть пустой -- он совпал бы с каждой строкой"
+            exit 1
+          fi
+          ssh $SSH_OPTS root@$HOST "umask 077; cat > /tmp/jgrep_patterns.txt" < /tmp/jgrep/patterns.txt
+          ssh -n $SSH_OPTS root@$HOST "wc -l < /tmp/jgrep_patterns.txt"
           # nice/ionice: детектор на этом же хосте торгует, и замер не должен
           # его тормозить. Вывод идёт потоком сразу в файл на бегунке.
           # Сначала ФАКТ о файле: есть ли он и какого размера. Без этого пустая
@@ -99,14 +124,15 @@ jobs:
           [ "${{ inputs.rotated }}" = "yes" ] && ROT="yes"
           ssh -n $SSH_OPTS root@$HOST \
             "ION=\$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true); \
-             { nice -n 15 \$ION grep -F $ARGS $SRC; \
+             { nice -n 15 \$ION grep -F -f /tmp/jgrep_patterns.txt $SRC; \
                if [ -n \"$ROT\" ]; then \
                  for G in $SRC.*.gz; do [ -e \"\$G\" ] || continue; \
-                   nice -n 15 \$ION zgrep -F $ARGS \"\$G\" || true; done; \
+                   nice -n 15 \$ION zgrep -F -f /tmp/jgrep_patterns.txt \"\$G\" || true; done; \
                fi; } | tail -n ${{ inputs.limit }}" \
             > /tmp/jgrep/hits.jsonl && RC=0 || RC=$?
           # grep без совпадений отдаёт 1 -- это не сбой, это ответ "нет такого".
           # Любой другой код -- сбой, и он виден, а не съеден.
+          ssh -n $SSH_OPTS root@$HOST "rm -f /tmp/jgrep_patterns.txt" || true
           echo "выборка завершилась кодом $RC"
           case "$RC" in 0|1) ;; *) echo "СБОЙ выборки"; exit "$RC" ;; esac
           echo "совпало строк: $(wc -l < /tmp/jgrep/hits.jsonl)"
