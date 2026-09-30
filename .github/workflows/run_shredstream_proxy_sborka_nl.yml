@@ -1,0 +1,180 @@
+name: "Шреды: сборка shredstream-proxy (только сборка, ничего не поднимает)"
+
+# ЗАЧЕМ. Прокси jito-labs/shredstream-proxy в режиме ForwardOnly принимает чужие
+# UDP-шреды на наш порт и отдаёт записи Solana по gRPC. Это единственный путь от
+# шредов к транзакциям, который не требует писать свой декодер (чтение кода --
+# docs/stroiteli_shredy_chtenie_koda.md). Прогон ТОЛЬКО СОБИРАЕТ бинарник; юнит,
+# запуск, порт и файрвол -- решение и руки Code-1 (docs/shredstream_proxy_kak_podnyat.md).
+#
+# ЧЕГО ПРОГОН НЕ ДЕЛАЕТ: не пишет юнит, не запускает службу, не трогает файрвол,
+# не открывает порты, не ходит в состояние исполнителя. На торговый путь не влияет
+# даже на своём бегунке: сборка идёт с nice 19 и ionice класса 3.
+#
+# КОММИТЫ ЗАКРЕПЛЕНЫ, И ЭТО ПРОВЕРЯЕТСЯ. Плавающий master значил бы, что собранный
+# бинарник не тот, который читали. Прогон сверяет SHA обоих репозиториев после
+# checkout и ПАДАЕТ при расхождении.
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "'cloud' -- собрать на бегунке GitHub (артефакт), 'host' -- на NL-хосте (бинарник сразу на месте)"
+        required: false
+        default: "cloud"
+      commit:
+        description: "коммит jito-labs/shredstream-proxy (по умолчанию закреплённый прочитанный)"
+        required: false
+        default: "b96e369f3165600c02182e3d8e1d01b6aada9fdb"
+
+concurrency:
+  group: shredstream-proxy-sborka
+  cancel-in-progress: false
+
+env:
+  # Прочитанный и закреплённый коммит прокси: 2026-07-13, версия 0.2.13,
+  # "Shredstream deprecation (#71)".
+  PIN_PROXY: "b96e369f3165600c02182e3d8e1d01b6aada9fdb"
+  # Подмодуль протоколов jito_protos/protos = jito-labs/mev-protos на этом коммите.
+  # БЕЗ ПОДМОДУЛЯ СБОРКА ПАДАЕТ: build.rs компилирует protos/*.proto.
+  PIN_PROTOS: "c9614089ef48fb83f01767d87e8f73e6c2e59c0b"
+  # Каталог сборки на хосте (только на host-бегунке). Ничего не устанавливает.
+  HOST_BUILD_DIR: /home/bot/shredstream_build
+
+jobs:
+  sborka:
+    # ubuntu-22.04, а не latest: бинарник, собранный на старой glibc, работает на
+    # новой, обратное -- нет. Если хост окажется старее 22.04, собирать надо
+    # runner=host.
+    runs-on: ${{ inputs.runner == 'host' && fromJSON('["self-hosted","nl-host"]') || 'ubuntu-22.04' }}
+    timeout-minutes: 90
+    steps:
+      - name: "Вход разобран"
+        run: |
+          set -e
+          C="${{ inputs.commit }}"
+          case "$C" in
+            ''|*[!0-9a-f]*) echo "СБОЙ: коммит не hex: $C"; exit 1;;
+          esac
+          if [ "${#C}" -ne 40 ]; then echo "СБОЙ: коммит не 40 знаков: $C"; exit 1; fi
+          echo "коммит прокси: $C"
+          echo "бегунок: ${{ inputs.runner }}"
+
+      - name: "Инструменты сборки (только на бегунке GitHub)"
+        if: ${{ inputs.runner != 'host' }}
+        run: |
+          set -e
+          sudo apt-get -qq update
+          # Тот же список, что в Dockerfile прокси: protobuf-src собирает protoc
+          # сам, и без cmake/clang/g++ сборка падает на build.rs.
+          sudo apt-get install -qq -y ca-certificates libssl-dev protobuf-compiler \
+            pkg-config libudev-dev zlib1g-dev llvm clang cmake make libprotobuf-dev g++
+
+      - name: "Инструменты на хосте -- только проверить, НЕ ставить"
+        if: ${{ inputs.runner == 'host' }}
+        run: |
+          set -e
+          нет=""
+          for b in cargo rustup cmake clang g++ pkg-config protoc; do
+            command -v "$b" >/dev/null 2>&1 || нет="$нет $b"
+          done
+          if [ -n "$нет" ]; then
+            echo "СБОЙ: на хосте нет:$нет"
+            echo "Ставить пакеты на торговом хосте этот прогон не будет -- это"
+            echo "решение владельца. Либо поставить вручную, либо собрать в облаке"
+            echo "(runner=cloud) и забрать артефакт."
+            exit 1
+          fi
+          echo "инструменты на месте"
+
+      - name: "Исходники прокси на ЗАКРЕПЛЁННОМ коммите, с подмодулем протоколов"
+        run: |
+          set -e
+          rm -rf shredstream-proxy
+          git clone --no-checkout https://github.com/jito-labs/shredstream-proxy shredstream-proxy
+          cd shredstream-proxy
+          git fetch --depth 1 origin "${{ inputs.commit }}"
+          git checkout --detach "${{ inputs.commit }}"
+          git submodule update --init --depth 1 jito_protos/protos
+          echo "proxy HEAD:  $(git rev-parse HEAD)"
+          echo "protos HEAD: $(git -C jito_protos/protos rev-parse HEAD)"
+
+      - name: "Коммиты сверены с прочитанными (иначе собрали бы НЕ ТО)"
+        run: |
+          set -e
+          cd shredstream-proxy
+          P="$(git rev-parse HEAD)"
+          S="$(git -C jito_protos/protos rev-parse HEAD)"
+          if [ "${{ inputs.commit }}" = "${{ env.PIN_PROXY }}" ] && [ "$S" != "${{ env.PIN_PROTOS }}" ]; then
+            echo "СБОЙ: подмодуль протоколов $S, а закреплён ${{ env.PIN_PROTOS }}"
+            exit 1
+          fi
+          test -s jito_protos/protos/shredstream.proto \
+            || { echo "СБОЙ: shredstream.proto не пришёл -- подмодуль пуст"; exit 1; }
+          # ЧТО ИМЕННО ПРОВЕРЯЕТСЯ В КОДЕ. Три утверждения, на которых стоит вся
+          # затея; уедут они -- командная строка и юнит станут неверными молча.
+          grep -q 'ForwardOnly(CommonArgs)' proxy/src/main.rs \
+            || { echo "СБОЙ: режима ForwardOnly в коде нет"; exit 1; }
+          grep -q 'grpc_service_port' proxy/src/main.rs \
+            || { echo "СБОЙ: флага --grpc-service-port нет"; exit 1; }
+          grep -q 'matches!(&shredstream_args, ProxySubcommands::Shredstream(_))' proxy/src/main.rs \
+            || { echo "СБОЙ: проверка даты отключения больше НЕ ограничена режимом Shredstream -- ForwardOnly может тоже отказать"; exit 1; }
+          echo "код тот, что читали: proxy $P, protos $S"
+
+      - name: "Сборка (nice 19, ionice 3 -- торговый путь не задевать)"
+        run: |
+          set -e
+          cd shredstream-proxy
+          export CARGO_TERM_COLOR=never
+          ionice -c 3 nice -n 19 cargo build --release --package jito-shredstream-proxy
+          ls -la target/release/jito-shredstream-proxy
+
+      - name: "Опознание бинарника и сумма"
+        id: opozn
+        run: |
+          set -e
+          cd shredstream-proxy
+          B=target/release/jito-shredstream-proxy
+          sha256sum "$B" | tee ../SHA256SUMS
+          file "$B" || true
+          ldd "$B" | sed -n 1,20p || true
+          # ВЕРСИЯ И РЕЖИМЫ -- ИЗ САМОГО БИНАРНИКА. Это единственная проверка,
+          # которая говорит, что собралось то самое: --help печатает подкоманды.
+          "$B" --version || true
+          "$B" --help || true
+          "$B" forward-only --help
+          {
+            echo "proxy_commit=$(git rev-parse HEAD)"
+            echo "protos_commit=$(git -C jito_protos/protos rev-parse HEAD)"
+            echo "built_on=$(uname -srm)"
+            echo "glibc=$(ldd --version | head -1)"
+            echo "sha256=$(sha256sum $B | cut -d' ' -f1)"
+          } > ../MANIFEST.txt
+          cat ../MANIFEST.txt
+
+      - name: "Артефакт (бегунок GitHub)"
+        if: ${{ inputs.runner != 'host' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jito-shredstream-proxy
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            shredstream-proxy/target/release/jito-shredstream-proxy
+            SHA256SUMS
+            MANIFEST.txt
+
+      - name: "На хосте: положить рядом, НИЧЕГО не поднимать"
+        if: ${{ inputs.runner == 'host' }}
+        run: |
+          set -e
+          mkdir -p "${{ env.HOST_BUILD_DIR }}"
+          cp shredstream-proxy/target/release/jito-shredstream-proxy "${{ env.HOST_BUILD_DIR }}/"
+          cp MANIFEST.txt SHA256SUMS "${{ env.HOST_BUILD_DIR }}/"
+          echo "бинарник: ${{ env.HOST_BUILD_DIR }}/jito-shredstream-proxy"
+          echo "юнит, порт и файрвол НЕ тронуты -- это отдельное решение;"
+          echo "как поднимать -- docs/shredstream_proxy_kak_podnyat.md"
+
+      - name: "Итог"
+        run: |
+          echo "СОБРАНО. Дальше вручную: юнит deploy/shredstream/shredstream-proxy.service,"
+          echo "страница docs/shredstream_proxy_kak_podnyat.md,"
+          echo "проверка deploy/checks/shredy_zapisi_protiv_ws.py"
