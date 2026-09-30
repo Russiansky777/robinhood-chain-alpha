@@ -51,9 +51,17 @@ import time
 
 def торгующие_группы() -> tuple[tuple[str, ...], str]:
     """Кто реально торгует -- из файла групп. Вторым значением -- откуда взято."""
+    # ГДЕ ИСКАТЬ МОДУЛЬ ГРУПП. Зонд на хосте живёт в /tmp/vech один, без
+    # analysis/ рядом, поэтому один путь "рядом с файлом" давал бы запасной
+    # список всегда и молча. Порядок: каталог кода службы из окружения, обычное
+    # место службы, затем analysis/ репозитория.
+    for кат in (os.environ.get("BLOOM_CODE_DIR", "").strip(),
+                 "/home/bot/bloom_executor",
+                 os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "..", "..", "analysis")):
+        if кат and os.path.isdir(кат) and кат not in sys.path:
+            sys.path.insert(0, кат)
     try:
-        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                         "..", "..", "analysis"))
         import bloom_source_groups as SG  # noqa: PLC0415
         гр = SG.загрузить()
     except Exception as e:  # noqa: BLE001 -- любая неясность: запасной список
