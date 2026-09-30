@@ -33,6 +33,14 @@ on:
         description: "у какой группы взять типы пулов"
         required: false
         default: "lane_s0"
+      perenesti_iz:
+        description: "группы через запятую, ИЗ которых можно вынуть адрес (пусто -- ниоткуда; все 10 адресов уже лежат: 9 в log_only, 6qudAN2k в sniper_src)"
+        required: false
+        default: ""
+      bez_vozvrata:
+        description: "'yes' -- откат без файла возврата: адреса никуда не вернутся"
+        required: false
+        default: "no"
 
 concurrency:
   group: gruppa-cand1
@@ -80,6 +88,8 @@ jobs:
         run: |
           set -e
           set -o pipefail
+          BEZ_VOZVRATA=""
+          if [ "${{ inputs.bez_vozvrata }}" = yes ]; then BEZ_VOZVRATA="--bez-vozvrata"; fi
           # ДВА ФАЙЛА: сам скрипт и модуль плана круга, у которого он берёт
           # чтение адресов. Забытая доставка второго дала бы ImportError уже на
           # хосте, поэтому едут оба, и оба -- с umask 077.
@@ -90,7 +100,7 @@ jobs:
           # ОКРУЖЕНИЕ И ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ python3 ПОД root: файл
           # групп называет сам детектор своим признаком жизни, и читать его надо
           # тем же, чем читает служба.
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/gruppa_cand1.py --rezhim '${{ inputs.rezhim }}' --podtverzhdenie '${{ inputs.podtverzhdenie }}' --puly-otkuda '${{ inputs.puly_otkuda }}' --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/gruppa_cand1.py --rezhim '${{ inputs.rezhim }}' --podtverzhdenie '${{ inputs.podtverzhdenie }}' --puly-otkuda '${{ inputs.puly_otkuda }}' --perenesti-iz '${{ inputs.perenesti_iz }}' $BEZ_VOZVRATA --out $RABOTA/out.json" | tail -60
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/gruppa_cand1.json || true
           if python3 -c "import json; json.load(open('/tmp/gruppa_cand1.json'))" 2>/dev/null; then
             cp /tmp/gruppa_cand1.json "$OUT_FILE"
