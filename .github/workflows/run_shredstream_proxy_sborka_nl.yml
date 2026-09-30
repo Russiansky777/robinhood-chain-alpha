@@ -72,12 +72,17 @@ jobs:
         if: ${{ inputs.runner == 'host' }}
         run: |
           set -e
-          нет=""
+          # IMJA PEREMENNOJ -- ASCII. Bash ne prinimaet kirillicheskie imena:
+          # stroka vypolnjaetsja kak komanda i dajot 'command not found' (127).
+          # Ohrana check_shell_ascii lovit eto i ronjaet SAMOPROVERKU DEPLOJA --
+          # to est slomannoe imja v ljubom progone blokiruet deploj denezhnogo
+          # puti, a ne tolko svoj progon.
+          net_instrumentov=""
           for b in cargo rustup cmake clang g++ pkg-config protoc; do
-            command -v "$b" >/dev/null 2>&1 || нет="$нет $b"
+            command -v "$b" >/dev/null 2>&1 || net_instrumentov="$net_instrumentov $b"
           done
-          if [ -n "$нет" ]; then
-            echo "СБОЙ: на хосте нет:$нет"
+          if [ -n "$net_instrumentov" ]; then
+            echo "СБОЙ: на хосте нет:$net_instrumentov"
             echo "Ставить пакеты на торговом хосте этот прогон не будет -- это"
             echo "решение владельца. Либо поставить вручную, либо собрать в облаке"
             echo "(runner=cloud) и забрать артефакт."
