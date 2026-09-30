@@ -5,7 +5,11 @@
 
 > **TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH -- Tessera V, проприетарный AMM Wintermute** (закрытый код, без IDL,
 > вызывается через агрегаторы) -- по слову штаба 30.09, не из цепи: на цепи имени нет (ниже).
-> Полный адрес ojh1: **ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch** -- имени нет ни на цепи, ни у штаба.
+> **ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch -- Scorch** (DefiLlama относит Scorch к Prop AMM на Solana) -- по слову
+> штаба 30.09, не из цепи.
+> Метки всех трёх есть в файле репозитория `data/solana_buyer_200/prior/current/buyer_100/dex_labels.json` (адрес →
+> имя): ojh19oja… «Scorch», TessVdML… «TesseraV», gatorLx9… «GatorSwap». На цепи (IDL, Program Metadata, security.txt)
+> имени нет ни у одной -- ниже.
 
 **Итог: имени на цепи нет ни у одной из трёх.** Ни IDL Anchor, ни счёта Program Metadata, ни security.txt в коде.
 Все три -- обновляемые, ключ обновления у каждой -- обычный кошелёк (счёт System, не мультиподпись).
