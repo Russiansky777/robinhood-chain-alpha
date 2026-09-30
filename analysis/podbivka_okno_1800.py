@@ -64,6 +64,10 @@ def main() -> int:
                   f"{ф(K.стат([K.пп(с, '72') for с in яч]))} | {ф(K.стат([K.пп(с, '108') for с in яч]))} |")
     md += ["", f"Файлов pyg10: {len(файлы)}; сигналов 34 источников в окне: {len(сс)}, из них по правилу Code-1: "
            f"{sum(len(v) for v in ряды.values())}."]
+    for вид in ("первая", "повторная"):
+        L = [с for с in ряды[вид] if с.get("pool") != "pump-amm"]
+        w = sum(1 for с in L if с.get("quoteMint") == K.WSOL)
+        md.append(f"Вне Pump AMM, {вид}: котировка WSOL {w}, другая котировка {len(L) - w} (в ячейки не входят).")
     (КОРЕНЬ / "docs" / "podbivka_2026-09-30_okno_1800.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
     return 0
