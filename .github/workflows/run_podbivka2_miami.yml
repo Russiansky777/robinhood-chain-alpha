@@ -44,6 +44,8 @@ jobs:
           mkdir -p "$HOME/arhiv_pumpapi"
           echo "PY=$HOME/pod_venv/bin/python" >> "$GITHUB_ENV"
           echo "PODB_ARHIV_KESH=$HOME/arhiv_pumpapi" >> "$GITHUB_ENV"
+          # disk 145G (135G svobodno 30.09), chas arhiva ~0.7 GB: 110 GB -- ~6.5 sutok v keshe
+          echo "PODB_KESH_GB=110" >> "$GITHUB_ENV"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
