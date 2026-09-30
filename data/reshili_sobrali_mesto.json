@@ -1,0 +1,1506 @@
+{
+ "snjato_utc": "2026-09-30T07:50:41Z",
+ "zachem": "слово владельца, ночь 29.09, пункт 5: решили / собрали / место минус место источника, сегодня против вчера; steal и загрузка ядра детектора по часам; были ли проверки на хосте в минуты сделок",
+ "fajly": {
+  "segodnja": "/home/user/robinhood-chain-alpha/data/sdelki_polosy_2026-09-30.json",
+  "vchera": "/home/user/robinhood-chain-alpha/data/sdelki_polosy_2026-09-29.json",
+  "cpu": "data/cpu_steal_po_chasam.jsonl",
+  "repo": "/home/user/robinhood-chain-alpha"
+ },
+ "oshibki_chtenija": {
+  "segodnja": null,
+  "vchera": null,
+  "git": null
+ },
+ "chto_znachat_chisla": {
+  "reshili_ms": "zapis.ts_decision - zapis.signal_recv_ts, мс",
+  "reshili_po_intent_ms": "zapis.ts_intent - zapis.signal_recv_ts, мс; ДРУГОЕ число: ts_intent пишется после ts_sent, мешать его с reshili_ms нельзя",
+  "sobrali_ms": "zapis.lane_build_ms, мс",
+  "mesto_raznica": "our_block_index - source_block_index; минус = мы раньше источника",
+  "s_plus": "landed_slot - source_slot, слотов"
+ },
+ "segodnja": {
+  "svod": {
+   "den": "сегодня",
+   "fajl": "/home/user/robinhood-chain-alpha/data/sdelki_polosy_2026-09-30.json",
+   "sdelok_v_vygruzke": 23,
+   "shapka": {
+    "снято_utc": "2026-09-30T06:19:51Z",
+    "с": "2026-09-29T06:00",
+    "до": "2026-09-30T06:00",
+    "полные_поля": true,
+    "строк_просмотрено": 9065,
+    "сделок": 23,
+    "с_севшей_подписью": 23,
+    "с_именем_токена": 23,
+    "с_минтом_и_слотом": 23
+   },
+   "chisla": {
+    "reshili_ms": {
+     "n": 23,
+     "mediana": 15.5,
+     "max": 30.155,
+     "net_pochemu": null
+    },
+    "reshili_po_intent_ms": {
+     "n": 23,
+     "mediana": 33.9,
+     "max": 141.077,
+     "net_pochemu": null
+    },
+    "sobrali_ms": {
+     "n": 23,
+     "mediana": 1.167,
+     "max": 55.708,
+     "net_pochemu": null
+    },
+    "mesto_raznica": {
+     "n": 22,
+     "mediana": 188,
+     "max": 1571,
+     "net_pochemu": null
+    },
+    "s_plus": {
+     "n": 23,
+     "mediana": 0,
+     "max": 2,
+     "net_pochemu": null
+    }
+   },
+   "net_chisla": {
+    "reshili_ms": {
+     "skolko": 0,
+     "stroki": []
+    },
+    "reshili_po_intent_ms": {
+     "skolko": 0,
+     "stroki": []
+    },
+    "sobrali_ms": {
+     "skolko": 0,
+     "stroki": []
+    },
+    "mesto_raznica": {
+     "skolko": 1,
+     "stroki": [
+      {
+       "utc": "2026-09-29T22:05:15Z",
+       "cid": "lane-own-45w1kYLjF1oR6q3n43Tvyrcm3kKd1mtzNRDJsU4y",
+       "prichina": "нет полей: source_block_index; причина в записи: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for sl"
+      }
+     ]
+    },
+    "s_plus": {
+     "skolko": 0,
+     "stroki": []
+    }
+   },
+   "bez_vseh_treh_chisel": {
+    "skolko": 0,
+    "utc": []
+   }
+  },
+  "sdelki": [
+   {
+    "utc": "2026-09-29T14:30:36Z",
+    "ts": 1790692236.0,
+    "group": "test_krug",
+    "istochnik": "frank",
+    "istochnik_imya_est": true,
+    "size_sol": 0.01,
+    "reshili_ms": 13.892,
+    "reshili_po_intent_ms": 26.837,
+    "sobrali_ms": 1.206,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.26,
+     "lane_send_ms": 31.77,
+     "lane_variants_ms": 5.69,
+     "lane_nonce_ms": 0.009
+    },
+    "mesto_raznica": -41,
+    "our_block_index": 44,
+    "source_block_index": 85,
+    "our_block_total": 764,
+    "our_block_total_otkuda": "zapis.block_total",
+    "source_block_total": 882,
+    "nasha_dolya_bloka": 0.0576,
+    "dolya_bloka_istochnika": 0.0964,
+    "s_plus": 1,
+    "seen_lag_ms": 22.0,
+    "lane_pool_winner": "zeroslot",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-3sbWtf1u4MWUGPzVyvCeqMpxD1ASTeNAXeneK7D8",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T15:23:11Z",
+    "ts": 1790695391.0,
+    "group": "test_krug",
+    "istochnik": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+    "istochnik_imya_est": false,
+    "size_sol": 0.01,
+    "reshili_ms": 14.058,
+    "reshili_po_intent_ms": 37.237,
+    "sobrali_ms": 2.126,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.35,
+     "lane_send_ms": 11.56,
+     "lane_variants_ms": 14.21,
+     "lane_nonce_ms": 0.01
+    },
+    "mesto_raznica": 1571,
+    "our_block_index": 1856,
+    "source_block_index": 285,
+    "our_block_total": 2031,
+    "our_block_total_otkuda": "source_block_total: тот же блок (landed_slot == source_slot)",
+    "source_block_total": 2031,
+    "nasha_dolya_bloka": 0.9138,
+    "dolya_bloka_istochnika": 0.1403,
+    "s_plus": 0,
+    "seen_lag_ms": 34.0,
+    "lane_pool_winner": "nozomi",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-4YWeufCG5jSk1rWwwrNeatq3rTc6dEPNAoi6KZNj",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T15:55:59Z",
+    "ts": 1790697359.0,
+    "group": "batch5",
+    "istochnik": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+    "istochnik_imya_est": false,
+    "size_sol": 0.1,
+    "reshili_ms": 12.615,
+    "reshili_po_intent_ms": 22.029,
+    "sobrali_ms": 0.923,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.28,
+     "lane_send_ms": 12.17,
+     "lane_variants_ms": 5.3,
+     "lane_nonce_ms": 0.008
+    },
+    "mesto_raznica": 355,
+    "our_block_index": 998,
+    "source_block_index": 643,
+    "our_block_total": 1159,
+    "our_block_total_otkuda": "source_block_total: тот же блок (landed_slot == source_slot)",
+    "source_block_total": 1159,
+    "nasha_dolya_bloka": 0.8611,
+    "dolya_bloka_istochnika": 0.5548,
+    "s_plus": 0,
+    "seen_lag_ms": 83.0,
+    "lane_pool_winner": "nozomi",
+    "stroitel": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+    "cid": "lane-own-4S9wCoY1yCcx9JGQeRzQv4iRQCmfb6DkWuCfUXgg",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T16:22:49Z",
+    "ts": 1790698969.0,
+    "group": "lane_s0",
+    "istochnik": "frank",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 12.044,
+    "reshili_po_intent_ms": 21.563,
+    "sobrali_ms": 1.16,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.28,
+     "lane_send_ms": 25.75,
+     "lane_variants_ms": 5.44,
+     "lane_nonce_ms": 0.009
+    },
+    "mesto_raznica": 281,
+    "our_block_index": 985,
+    "source_block_index": 704,
+    "our_block_total": 1092,
+    "our_block_total_otkuda": "zapis.block_total",
+    "source_block_total": 1092,
+    "nasha_dolya_bloka": 0.902,
+    "dolya_bloka_istochnika": 0.6447,
+    "s_plus": 0,
+    "seen_lag_ms": 117.0,
+    "lane_pool_winner": "blockrazor",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-2iTUS88H6ncidpbMD3PjQwMM9toUq5fuTczhVeVR",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T16:28:38Z",
+    "ts": 1790699318.0,
+    "group": "batch5",
+    "istochnik": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+    "istochnik_imya_est": false,
+    "size_sol": 0.1,
+    "reshili_ms": 15.534,
+    "reshili_po_intent_ms": 26.575,
+    "sobrali_ms": 1.141,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.3,
+     "lane_send_ms": 30.08,
+     "lane_variants_ms": 6.15,
+     "lane_nonce_ms": 0.025
+    },
+    "mesto_raznica": -355,
+    "our_block_index": 19,
+    "source_block_index": 374,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1391,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.2689,
+    "s_plus": 1,
+    "seen_lag_ms": 89.0,
+    "lane_pool_winner": "nozomi",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-51dnpBE6iuE4ctqZ4oqWpwBLCMe7iHcL4RKCTACF",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451695597'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T17:15:01Z",
+    "ts": 1790702101.0,
+    "group": "lane_s0",
+    "istochnik": "3Um4qsYQ",
+    "istochnik_imya_est": true,
+    "size_sol": 0.01,
+    "reshili_ms": 21.886,
+    "reshili_po_intent_ms": 34.783,
+    "sobrali_ms": 0.727,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.26,
+     "lane_send_ms": 35.09,
+     "lane_variants_ms": 7.57,
+     "lane_nonce_ms": 0.01
+    },
+    "mesto_raznica": 462,
+    "our_block_index": 716,
+    "source_block_index": 254,
+    "our_block_total": 1416,
+    "our_block_total_otkuda": "source_block_total: тот же блок (landed_slot == source_slot)",
+    "source_block_total": 1416,
+    "nasha_dolya_bloka": 0.5056,
+    "dolya_bloka_istochnika": 0.1794,
+    "s_plus": 0,
+    "seen_lag_ms": 38.0,
+    "lane_pool_winner": "blockrazor",
+    "stroitel": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+    "cid": "lane-own-5RBQ5AukY8sTF8LTatrfRoi8MZGLR3MtnpC6ysHx",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T17:25:44Z",
+    "ts": 1790702744.0,
+    "group": "lane_s0",
+    "istochnik": "Bitman",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 17.926,
+    "reshili_po_intent_ms": 37.925,
+    "sobrali_ms": 0.782,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.25,
+     "lane_send_ms": 47.91,
+     "lane_variants_ms": 11.09,
+     "lane_nonce_ms": 0.006
+    },
+    "mesto_raznica": 430,
+    "our_block_index": 857,
+    "source_block_index": 427,
+    "our_block_total": 1331,
+    "our_block_total_otkuda": "zapis.block_total",
+    "source_block_total": 1331,
+    "nasha_dolya_bloka": 0.6439,
+    "dolya_bloka_istochnika": 0.3208,
+    "s_plus": 0,
+    "seen_lag_ms": 57.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+    "cid": "lane-own-3WqaMDwH7uw6osWYWA9gJTanSUNoUG6yH9UHpwvo",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T17:45:08Z",
+    "ts": 1790703908.0,
+    "group": "batch5",
+    "istochnik": "Omakase",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 16.091,
+    "reshili_po_intent_ms": 29.453,
+    "sobrali_ms": 0.766,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.28,
+     "lane_send_ms": 9.24,
+     "lane_variants_ms": 7.43,
+     "lane_nonce_ms": 0.009
+    },
+    "mesto_raznica": -385,
+    "our_block_index": 751,
+    "source_block_index": 1136,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1468,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.7738,
+    "s_plus": 1,
+    "seen_lag_ms": 321.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-5uHohgjLw5pkrVnq44zwb3nir8vgAnFPDMzjPdf5",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451712697'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T19:05:05Z",
+    "ts": 1790708705.0,
+    "group": "batch5",
+    "istochnik": "Nach",
+    "istochnik_imya_est": true,
+    "size_sol": 0.01,
+    "reshili_ms": 24.072,
+    "reshili_po_intent_ms": 141.077,
+    "sobrali_ms": 48.624,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.33,
+     "lane_send_ms": 37.15,
+     "lane_variants_ms": 5.84,
+     "lane_nonce_ms": 0.008
+    },
+    "mesto_raznica": -172,
+    "our_block_index": 369,
+    "source_block_index": 541,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1475,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.3668,
+    "s_plus": 1,
+    "seen_lag_ms": 153.0,
+    "lane_pool_winner": "jito",
+    "stroitel": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+    "cid": "lane-own-ssRku8coQmLuJZ2qmcz4UAG3fpTHnjw1w7Ap6u5C",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451730600'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T20:06:02Z",
+    "ts": 1790712362.0,
+    "group": "batch5",
+    "istochnik": "Omakase",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 16.82,
+    "reshili_po_intent_ms": 31.488,
+    "sobrali_ms": 1.19,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.33,
+     "lane_send_ms": 33.57,
+     "lane_variants_ms": 6.41,
+     "lane_nonce_ms": 0.011
+    },
+    "mesto_raznica": 199,
+    "our_block_index": 616,
+    "source_block_index": 417,
+    "our_block_total": 1490,
+    "our_block_total_otkuda": "zapis.block_total",
+    "source_block_total": 1490,
+    "nasha_dolya_bloka": 0.4134,
+    "dolya_bloka_istochnika": 0.2799,
+    "s_plus": 0,
+    "seen_lag_ms": 76.0,
+    "lane_pool_winner": "nozomi",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-TVxdH8VxFju5YQC1FhZtAECQHCAbTSbgsTxNG13M",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T20:20:13Z",
+    "ts": 1790713213.0,
+    "group": "lane_s0",
+    "istochnik": "5pHeNs",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 18.984,
+    "reshili_po_intent_ms": 82.822,
+    "sobrali_ms": 55.708,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.28,
+     "lane_send_ms": 32.85,
+     "lane_variants_ms": 3.48,
+     "lane_nonce_ms": 0.011
+    },
+    "mesto_raznica": 853,
+    "our_block_index": 988,
+    "source_block_index": 135,
+    "our_block_total": 1037,
+    "our_block_total_otkuda": "source_block_total: тот же блок (landed_slot == source_slot)",
+    "source_block_total": 1037,
+    "nasha_dolya_bloka": 0.9527,
+    "dolya_bloka_istochnika": 0.1302,
+    "s_plus": 0,
+    "seen_lag_ms": 46.0,
+    "lane_pool_winner": "jito",
+    "stroitel": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+    "cid": "lane-own-2jRCe1BCqTy69KkEJMcCH1SV2tP1MsTkKFwUVsX2",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T20:24:29Z",
+    "ts": 1790713469.0,
+    "group": "batch5",
+    "istochnik": "MaxHuh",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 14.515,
+    "reshili_po_intent_ms": 64.17,
+    "sobrali_ms": 39.42,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.3,
+     "lane_send_ms": 17.86,
+     "lane_variants_ms": 4.35,
+     "lane_nonce_ms": 0.006
+    },
+    "mesto_raznica": -942,
+    "our_block_index": 78,
+    "source_block_index": 1020,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1101,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.9264,
+    "s_plus": 2,
+    "seen_lag_ms": 198.0,
+    "lane_pool_winner": "jito",
+    "stroitel": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+    "cid": "lane-own-3FDHoUcYtEN9D9tRL4rTBgs3ojroMjZAqk4tDS6r",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451748367'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T21:08:01Z",
+    "ts": 1790716081.0,
+    "group": "batch5",
+    "istochnik": "Omakase",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 30.155,
+    "reshili_po_intent_ms": 60.982,
+    "sobrali_ms": 1.394,
+    "podshagi_ms": {
+     "lane_sign_ms": 1.24,
+     "lane_send_ms": 52.95,
+     "lane_variants_ms": 15.22,
+     "lane_nonce_ms": 0.013
+    },
+    "mesto_raznica": 188,
+    "our_block_index": 362,
+    "source_block_index": 174,
+    "our_block_total": 1124,
+    "our_block_total_otkuda": "zapis.block_total",
+    "source_block_total": 1124,
+    "nasha_dolya_bloka": 0.3221,
+    "dolya_bloka_istochnika": 0.1548,
+    "s_plus": 0,
+    "seen_lag_ms": 64.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+    "cid": "lane-own-2c2nkRUhuKVJj8ozcWsbEzennbT3BUSf9fFFauez",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-29T21:40:06Z",
+    "ts": 1790718006.0,
+    "group": "lane_s0",
+    "istochnik": "3Um4qsYQ",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 20.498,
+    "reshili_po_intent_ms": 60.039,
+    "sobrali_ms": 1.237,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.26,
+     "lane_send_ms": 35.25,
+     "lane_variants_ms": 7.23,
+     "lane_nonce_ms": 0.009
+    },
+    "mesto_raznica": 64,
+    "our_block_index": 88,
+    "source_block_index": 24,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1127,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.0213,
+    "s_plus": 1,
+    "seen_lag_ms": 22.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-4NwKB2jfkM7DKVqSxgS8YDqEosY7MyGLFHHcaaAJ",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451765270'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T22:05:15Z",
+    "ts": 1790719515.0,
+    "group": "lane_s0",
+    "istochnik": "Brez",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 11.668,
+    "reshili_po_intent_ms": 21.796,
+    "sobrali_ms": 1.354,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.24,
+     "lane_send_ms": 32.11,
+     "lane_variants_ms": 6.21,
+     "lane_nonce_ms": 0.009
+    },
+    "mesto_raznica": null,
+    "our_block_index": 515,
+    "source_block_index": null,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": null,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": null,
+    "s_plus": 0,
+    "seen_lag_ms": 7.0,
+    "lane_pool_winner": "blockrazor",
+    "stroitel": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+    "cid": "lane-own-45w1kYLjF1oR6q3n43Tvyrcm3kKd1mtzNRDJsU4y",
+    "pochemu": {
+     "mesto_raznica": "нет полей: source_block_index; причина в записи: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for sl",
+     "source_block_total": "нет поля source_block_total",
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451770881'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T23:25:16Z",
+    "ts": 1790724316.0,
+    "group": "batch5",
+    "istochnik": "Nach",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 14.82,
+    "reshili_po_intent_ms": 50.95,
+    "sobrali_ms": 30.782,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.42,
+     "lane_send_ms": 10.12,
+     "lane_variants_ms": 2.83,
+     "lane_nonce_ms": 0.006
+    },
+    "mesto_raznica": -102,
+    "our_block_index": 37,
+    "source_block_index": 139,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1047,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.1328,
+    "s_plus": 1,
+    "seen_lag_ms": 88.0,
+    "lane_pool_winner": "jito",
+    "stroitel": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+    "cid": "lane-own-tSxYGoadU68Ws24JtZqPctGrknhnksNTUs1GuPL3",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451788734'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T23:46:29Z",
+    "ts": 1790725589.0,
+    "group": "batch5",
+    "istochnik": "Nach",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 10.765,
+    "reshili_po_intent_ms": 20.76,
+    "sobrali_ms": 1.004,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.3,
+     "lane_send_ms": 12.54,
+     "lane_variants_ms": 7.06,
+     "lane_nonce_ms": 0.007
+    },
+    "mesto_raznica": 145,
+    "our_block_index": 887,
+    "source_block_index": 742,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 850,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.8729,
+    "s_plus": 1,
+    "seen_lag_ms": 194.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-5KxHKYQnCwXJUSws8wHMNEUfMywf9LrQTtEd6sr4",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451793474'}"
+    }
+   },
+   {
+    "utc": "2026-09-30T01:02:29Z",
+    "ts": 1790730149.0,
+    "group": "lane_s0",
+    "istochnik": "Bitman",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 16.302,
+    "reshili_po_intent_ms": 35.543,
+    "sobrali_ms": 1.167,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.29,
+     "lane_send_ms": 33.68,
+     "lane_variants_ms": 7.68,
+     "lane_nonce_ms": 0.012
+    },
+    "mesto_raznica": -716,
+    "our_block_index": 17,
+    "source_block_index": 733,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1486,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.4933,
+    "s_plus": 1,
+    "seen_lag_ms": 50.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+    "cid": "lane-own-4CG72DwGkfo8Hw7yCYLpfd2F2ryrZirUMu5H1q8r",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451810561'}"
+    }
+   },
+   {
+    "utc": "2026-09-30T01:31:19Z",
+    "ts": 1790731879.0,
+    "group": "lane_s0",
+    "istochnik": "Brez",
+    "istochnik_imya_est": true,
+    "size_sol": 0.3,
+    "reshili_ms": 15.5,
+    "reshili_po_intent_ms": 33.9,
+    "sobrali_ms": 0.8,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.3,
+     "lane_send_ms": 10.27,
+     "lane_variants_ms": 6.14,
+     "lane_nonce_ms": 0.007
+    },
+    "mesto_raznica": 242,
+    "our_block_index": 871,
+    "source_block_index": 629,
+    "our_block_total": 1074,
+    "our_block_total_otkuda": "source_block_total: тот же блок (landed_slot == source_slot)",
+    "source_block_total": 1074,
+    "nasha_dolya_bloka": 0.811,
+    "dolya_bloka_istochnika": 0.5857,
+    "s_plus": 0,
+    "seen_lag_ms": 118.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-55AnAp6Bf5mtccyJW5ZPQzPxT5Nz3LS4xKteUBBN",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-30T02:37:33Z",
+    "ts": 1790735853.0,
+    "group": "lane_s0",
+    "istochnik": "Xk9onq",
+    "istochnik_imya_est": true,
+    "size_sol": 0.3,
+    "reshili_ms": 11.618,
+    "reshili_po_intent_ms": 23.636,
+    "sobrali_ms": 0.605,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.23,
+     "lane_send_ms": 28.17,
+     "lane_variants_ms": 5.48,
+     "lane_nonce_ms": 0.007
+    },
+    "mesto_raznica": 196,
+    "our_block_index": 945,
+    "source_block_index": 749,
+    "our_block_total": 1047,
+    "our_block_total_otkuda": "source_block_total: тот же блок (landed_slot == source_slot)",
+    "source_block_total": 1047,
+    "nasha_dolya_bloka": 0.9026,
+    "dolya_bloka_istochnika": 0.7154,
+    "s_plus": 0,
+    "seen_lag_ms": 108.0,
+    "lane_pool_winner": "jito",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-EDBPh6eyzFAYsTcZyk86BWuMpq9st7FM4JWTAcgE",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-30T02:48:27Z",
+    "ts": 1790736507.0,
+    "group": "lane_s0",
+    "istochnik": "3Um4qsYQ",
+    "istochnik_imya_est": true,
+    "size_sol": 0.3,
+    "reshili_ms": 10.961,
+    "reshili_po_intent_ms": 20.591,
+    "sobrali_ms": 0.804,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.39,
+     "lane_send_ms": 18.45,
+     "lane_variants_ms": 5.24,
+     "lane_nonce_ms": 0.008
+    },
+    "mesto_raznica": 265,
+    "our_block_index": 735,
+    "source_block_index": 470,
+    "our_block_total": 1039,
+    "our_block_total_otkuda": "source_block_total: тот же блок (landed_slot == source_slot)",
+    "source_block_total": 1039,
+    "nasha_dolya_bloka": 0.7074,
+    "dolya_bloka_istochnika": 0.4524,
+    "s_plus": 0,
+    "seen_lag_ms": 40.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-4qoK8cnLLjMSvyerwVqGXD6HPQi3cK2yyFtXNXBZ",
+    "pochemu": {}
+   },
+   {
+    "utc": "2026-09-30T02:59:39Z",
+    "ts": 1790737179.0,
+    "group": "lane_s0",
+    "istochnik": "Brez",
+    "istochnik_imya_est": true,
+    "size_sol": 0.3,
+    "reshili_ms": 18.937,
+    "reshili_po_intent_ms": 36.285,
+    "sobrali_ms": 1.24,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.35,
+     "lane_send_ms": 9.85,
+     "lane_variants_ms": 7.02,
+     "lane_nonce_ms": 0.022
+    },
+    "mesto_raznica": -617,
+    "our_block_index": 638,
+    "source_block_index": 1255,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1427,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.8795,
+    "s_plus": 1,
+    "seen_lag_ms": 205.0,
+    "lane_pool_winner": "zeroslot",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-dgUsmxZxkdc4S73UHDV5La2HxKRs1Td5AttkHUZb",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451836907'}"
+    }
+   },
+   {
+    "utc": "2026-09-30T05:23:46Z",
+    "ts": 1790745826.0,
+    "group": "batch5",
+    "istochnik": "Nach",
+    "istochnik_imya_est": true,
+    "size_sol": 0.3,
+    "reshili_ms": 12.698,
+    "reshili_po_intent_ms": 32.425,
+    "sobrali_ms": 0.82,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.27,
+     "lane_send_ms": 9.72,
+     "lane_variants_ms": 7.99,
+     "lane_nonce_ms": 0.01
+    },
+    "mesto_raznica": 453,
+    "our_block_index": 1092,
+    "source_block_index": 639,
+    "our_block_total": 1339,
+    "our_block_total_otkuda": "zapis.block_total",
+    "source_block_total": 1339,
+    "nasha_dolya_bloka": 0.8155,
+    "dolya_bloka_istochnika": 0.4772,
+    "s_plus": 0,
+    "seen_lag_ms": 31.0,
+    "lane_pool_winner": "blockrazor",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-4FCFVuUJ6gkdkQV9e7rj7Grkkd3uHT1uV7RFxWK1",
+    "pochemu": {}
+   }
+  ],
+  "proverki": {
+   "okno_minut": 2.0,
+   "ogranichenie": "время коммита -- КОНЕЦ прогона, а не его длительность: прогон, начавшийся за 10 минут до сделки и закончившийся в её минуту, виден как одна точка в конце. Прогон без коммита не виден вовсе, а коммит доказывает, что прогон завершился, но не что он шёл на торговом хосте.",
+   "kommitov_prosmotreno": 198,
+   "tolko_automated": true,
+   "po_sdelkam": [
+    {
+     "utc": "2026-09-29T14:30:36Z",
+     "cid": "lane-own-3sbWtf1u4MWUGPzVyvCeqMpxD1ASTeNAXeneK7D8",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T15:23:11Z",
+     "cid": "lane-own-4YWeufCG5jSk1rWwwrNeatq3rTc6dEPNAoi6KZNj",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T15:55:59Z",
+     "cid": "lane-own-4S9wCoY1yCcx9JGQeRzQv4iRQCmfb6DkWuCfUXgg",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T16:22:49Z",
+     "cid": "lane-own-2iTUS88H6ncidpbMD3PjQwMM9toUq5fuTczhVeVR",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T16:28:38Z",
+     "cid": "lane-own-51dnpBE6iuE4ctqZ4oqWpwBLCMe7iHcL4RKCTACF",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T17:15:01Z",
+     "cid": "lane-own-5RBQ5AukY8sTF8LTatrfRoi8MZGLR3MtnpC6ysHx",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T17:25:44Z",
+     "cid": "lane-own-3WqaMDwH7uw6osWYWA9gJTanSUNoUG6yH9UHpwvo",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T17:45:08Z",
+     "cid": "lane-own-5uHohgjLw5pkrVnq44zwb3nir8vgAnFPDMzjPdf5",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T19:05:05Z",
+     "cid": "lane-own-ssRku8coQmLuJZ2qmcz4UAG3fpTHnjw1w7Ap6u5C",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T20:06:02Z",
+     "cid": "lane-own-TVxdH8VxFju5YQC1FhZtAECQHCAbTSbgsTxNG13M",
+     "skolko": 1,
+     "proverki": [
+      {
+       "utc": "2026-09-29T20:04:58Z",
+       "tema": "Priemka stroitelya: bajt v bajt, sborka polosoj, simulyaciya [automated]",
+       "sdvig_s": -64.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T20:20:13Z",
+     "cid": "lane-own-2jRCe1BCqTy69KkEJMcCH1SV2tP1MsTkKFwUVsX2",
+     "skolko": 1,
+     "proverki": [
+      {
+       "utc": "2026-09-29T20:19:28Z",
+       "tema": "Solana ledger: шаг конвейера учёта [automated]",
+       "sdvig_s": -45.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T20:24:29Z",
+     "cid": "lane-own-3FDHoUcYtEN9D9tRL4rTBgs3ojroMjZAqk4tDS6r",
+     "skolko": 1,
+     "proverki": [
+      {
+       "utc": "2026-09-29T20:26:13Z",
+       "tema": "Vygruzka sdelok polosy za sutki dlya Code-2 [automated]",
+       "sdvig_s": 104.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T21:08:01Z",
+     "cid": "lane-own-2c2nkRUhuKVJj8ozcWsbEzennbT3BUSf9fFFauez",
+     "skolko": 1,
+     "proverki": [
+      {
+       "utc": "2026-09-29T21:07:57Z",
+       "tema": "Razbor prodazhi: zapis pozicii i vremena [automated]",
+       "sdvig_s": -4.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T21:40:06Z",
+     "cid": "lane-own-4NwKB2jfkM7DKVqSxgS8YDqEosY7MyGLFHHcaaAJ",
+     "skolko": 1,
+     "proverki": [
+      {
+       "utc": "2026-09-29T21:40:59Z",
+       "tema": "Vygruzka sdelok polosy za sutki dlya Code-2 [automated]",
+       "sdvig_s": 53.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T22:05:15Z",
+     "cid": "lane-own-45w1kYLjF1oR6q3n43Tvyrcm3kKd1mtzNRDJsU4y",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T23:25:16Z",
+     "cid": "lane-own-tSxYGoadU68Ws24JtZqPctGrknhnksNTUs1GuPL3",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T23:46:29Z",
+     "cid": "lane-own-5KxHKYQnCwXJUSws8wHMNEUfMywf9LrQTtEd6sr4",
+     "skolko": 2,
+     "proverki": [
+      {
+       "utc": "2026-09-29T23:47:31Z",
+       "tema": "Chto izmenit deploj: sha256 hosta protiv vetki [automated]",
+       "sdvig_s": 62.0
+      },
+      {
+       "utc": "2026-09-29T23:45:10Z",
+       "tema": "Lane_pools: polnyj spisok dlja vkljuchenija tipa [automated]",
+       "sdvig_s": -79.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-30T01:02:29Z",
+     "cid": "lane-own-4CG72DwGkfo8Hw7yCYLpfd2F2ryrZirUMu5H1q8r",
+     "skolko": 2,
+     "proverki": [
+      {
+       "utc": "2026-09-30T01:02:40Z",
+       "tema": "Lane_pools: vkljuchenie tipa polnym spiskom [automated]",
+       "sdvig_s": 11.0
+      },
+      {
+       "utc": "2026-09-30T01:01:17Z",
+       "tema": "Bloom: деплой сторожа продаж, отчёт [automated]",
+       "sdvig_s": -72.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-30T01:31:19Z",
+     "cid": "lane-own-55AnAp6Bf5mtccyJW5ZPQzPxT5Nz3LS4xKteUBBN",
+     "skolko": 2,
+     "proverki": [
+      {
+       "utc": "2026-09-30T01:30:54Z",
+       "tema": "Bloom: деплой детектора v2, отчёт [automated]",
+       "sdvig_s": -25.0
+      },
+      {
+       "utc": "2026-09-30T01:32:31Z",
+       "tema": "Okruzhenie: odna stroka po belomu spisku [automated]",
+       "sdvig_s": 72.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-30T02:37:33Z",
+     "cid": "lane-own-EDBPh6eyzFAYsTcZyk86BWuMpq9st7FM4JWTAcgE",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-30T02:48:27Z",
+     "cid": "lane-own-4qoK8cnLLjMSvyerwVqGXD6HPQi3cK2yyFtXNXBZ",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-30T02:59:39Z",
+     "cid": "lane-own-dgUsmxZxkdc4S73UHDV5La2HxKRs1Td5AttkHUZb",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-30T05:23:46Z",
+     "cid": "lane-own-4FCFVuUJ6gkdkQV9e7rj7Grkkd3uHT1uV7RFxWK1",
+     "skolko": 1,
+     "proverki": [
+      {
+       "utc": "2026-09-30T05:24:27Z",
+       "tema": "CPU i steal hosta: snimok v chas [automated]",
+       "sdvig_s": 41.0
+      }
+     ],
+     "pochemu": null
+    }
+   ],
+   "vsego_sovpadenij": 12,
+   "sdelok_bez_proverok": 14
+  }
+ },
+ "vchera": {
+  "svod": {
+   "den": "вчера",
+   "fajl": "/home/user/robinhood-chain-alpha/data/sdelki_polosy_2026-09-29.json",
+   "sdelok_v_vygruzke": 2,
+   "shapka": {
+    "снято_utc": "2026-09-29T22:17:33Z",
+    "с": "2026-09-29T21:20",
+    "до": "2026-09-30T06:00",
+    "полные_поля": true,
+    "строк_просмотрено": 8861,
+    "сделок": 2,
+    "с_севшей_подписью": 2,
+    "с_именем_токена": 2,
+    "с_минтом_и_слотом": 2
+   },
+   "chisla": {
+    "reshili_ms": {
+     "n": 2,
+     "mediana": 11.668,
+     "max": 20.498,
+     "net_pochemu": null
+    },
+    "reshili_po_intent_ms": {
+     "n": 2,
+     "mediana": 21.796,
+     "max": 60.039,
+     "net_pochemu": null
+    },
+    "sobrali_ms": {
+     "n": 2,
+     "mediana": 1.237,
+     "max": 1.354,
+     "net_pochemu": null
+    },
+    "mesto_raznica": {
+     "n": 1,
+     "mediana": 64,
+     "max": 64,
+     "net_pochemu": null
+    },
+    "s_plus": {
+     "n": 2,
+     "mediana": 0,
+     "max": 1,
+     "net_pochemu": null
+    }
+   },
+   "net_chisla": {
+    "reshili_ms": {
+     "skolko": 0,
+     "stroki": []
+    },
+    "reshili_po_intent_ms": {
+     "skolko": 0,
+     "stroki": []
+    },
+    "sobrali_ms": {
+     "skolko": 0,
+     "stroki": []
+    },
+    "mesto_raznica": {
+     "skolko": 1,
+     "stroki": [
+      {
+       "utc": "2026-09-29T22:05:15Z",
+       "cid": "lane-own-45w1kYLjF1oR6q3n43Tvyrcm3kKd1mtzNRDJsU4y",
+       "prichina": "нет полей: source_block_index; причина в записи: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for sl"
+      }
+     ]
+    },
+    "s_plus": {
+     "skolko": 0,
+     "stroki": []
+    }
+   },
+   "bez_vseh_treh_chisel": {
+    "skolko": 0,
+    "utc": []
+   }
+  },
+  "sdelki": [
+   {
+    "utc": "2026-09-29T21:40:06Z",
+    "ts": 1790718006.0,
+    "group": "lane_s0",
+    "istochnik": "3Um4qsYQ",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 20.498,
+    "reshili_po_intent_ms": 60.039,
+    "sobrali_ms": 1.237,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.26,
+     "lane_send_ms": 35.25,
+     "lane_variants_ms": 7.23,
+     "lane_nonce_ms": 0.009
+    },
+    "mesto_raznica": 64,
+    "our_block_index": 88,
+    "source_block_index": 24,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": 1127,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": 0.0213,
+    "s_plus": 1,
+    "seen_lag_ms": 22.0,
+    "lane_pool_winner": "astralane",
+    "stroitel": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+    "cid": "lane-own-4NwKB2jfkM7DKVqSxgS8YDqEosY7MyGLFHHcaaAJ",
+    "pochemu": {
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451765270'}"
+    }
+   },
+   {
+    "utc": "2026-09-29T22:05:15Z",
+    "ts": 1790719515.0,
+    "group": "lane_s0",
+    "istochnik": "Brez",
+    "istochnik_imya_est": true,
+    "size_sol": 0.1,
+    "reshili_ms": 11.668,
+    "reshili_po_intent_ms": 21.796,
+    "sobrali_ms": 1.354,
+    "podshagi_ms": {
+     "lane_sign_ms": 0.24,
+     "lane_send_ms": 32.11,
+     "lane_variants_ms": 6.21,
+     "lane_nonce_ms": 0.009
+    },
+    "mesto_raznica": null,
+    "our_block_index": 515,
+    "source_block_index": null,
+    "our_block_total": null,
+    "our_block_total_otkuda": null,
+    "source_block_total": null,
+    "nasha_dolya_bloka": null,
+    "dolya_bloka_istochnika": null,
+    "s_plus": 0,
+    "seen_lag_ms": 7.0,
+    "lane_pool_winner": "blockrazor",
+    "stroitel": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+    "cid": "lane-own-45w1kYLjF1oR6q3n43Tvyrcm3kKd1mtzNRDJsU4y",
+    "pochemu": {
+     "mesto_raznica": "нет полей: source_block_index; причина в записи: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for sl",
+     "source_block_total": "нет поля source_block_total",
+     "our_block_total": "block_total не получен: getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 451770881'}"
+    }
+   }
+  ],
+  "proverki": {
+   "okno_minut": 2.0,
+   "ogranichenie": "время коммита -- КОНЕЦ прогона, а не его длительность: прогон, начавшийся за 10 минут до сделки и закончившийся в её минуту, виден как одна точка в конце. Прогон без коммита не виден вовсе, а коммит доказывает, что прогон завершился, но не что он шёл на торговом хосте.",
+   "kommitov_prosmotreno": 198,
+   "tolko_automated": true,
+   "po_sdelkam": [
+    {
+     "utc": "2026-09-29T21:40:06Z",
+     "cid": "lane-own-4NwKB2jfkM7DKVqSxgS8YDqEosY7MyGLFHHcaaAJ",
+     "skolko": 1,
+     "proverki": [
+      {
+       "utc": "2026-09-29T21:40:59Z",
+       "tema": "Vygruzka sdelok polosy za sutki dlya Code-2 [automated]",
+       "sdvig_s": 53.0
+      }
+     ],
+     "pochemu": null
+    },
+    {
+     "utc": "2026-09-29T22:05:15Z",
+     "cid": "lane-own-45w1kYLjF1oR6q3n43Tvyrcm3kKd1mtzNRDJsU4y",
+     "skolko": 0,
+     "proverki": [],
+     "pochemu": null
+    }
+   ],
+   "vsego_sovpadenij": 1,
+   "sdelok_bez_proverok": 1
+  }
+ },
+ "sravnenie": {
+  "reshili_ms": {
+   "segodnja": {
+    "n": 23,
+    "mediana": 15.5,
+    "max": 30.155
+   },
+   "vchera": {
+    "n": 2,
+    "mediana": 11.668,
+    "max": 20.498
+   },
+   "sdvig_mediany": 3.832,
+   "sdvig_pochemu": null
+  },
+  "reshili_po_intent_ms": {
+   "segodnja": {
+    "n": 23,
+    "mediana": 33.9,
+    "max": 141.077
+   },
+   "vchera": {
+    "n": 2,
+    "mediana": 21.796,
+    "max": 60.039
+   },
+   "sdvig_mediany": 12.104,
+   "sdvig_pochemu": null
+  },
+  "sobrali_ms": {
+   "segodnja": {
+    "n": 23,
+    "mediana": 1.167,
+    "max": 55.708
+   },
+   "vchera": {
+    "n": 2,
+    "mediana": 1.237,
+    "max": 1.354
+   },
+   "sdvig_mediany": -0.07,
+   "sdvig_pochemu": null
+  },
+  "mesto_raznica": {
+   "segodnja": {
+    "n": 22,
+    "mediana": 188,
+    "max": 1571
+   },
+   "vchera": {
+    "n": 1,
+    "mediana": 64,
+    "max": 64
+   },
+   "sdvig_mediany": 124,
+   "sdvig_pochemu": null
+  },
+  "s_plus": {
+   "segodnja": {
+    "n": 23,
+    "mediana": 0,
+    "max": 2
+   },
+   "vchera": {
+    "n": 2,
+    "mediana": 0,
+    "max": 1
+   },
+   "sdvig_mediany": 0,
+   "sdvig_pochemu": null
+  }
+ },
+ "processor": {
+  "po_chasam": {
+   "fajl": "data/cpu_steal_po_chasam.jsonl",
+   "vid": "журнал снимков cpu_steal_po_chasam.py",
+   "est_po_chasam": true,
+   "chasy": [
+    {
+     "chas": "2026-09-29T20:17:30Z",
+     "interval_s": null,
+     "steal_proc": null,
+     "zanjato_proc": null,
+     "iowait_proc": null,
+     "jadro_detektora_proc": null,
+     "po_sluzhbam_proc": {},
+     "pochemu": "это первый снимок: доли считаются разностью двух, одного снимка мало"
+    },
+    {
+     "chas": "2026-09-29T21:24:03Z",
+     "interval_s": 3993.1,
+     "steal_proc": 0.1355,
+     "zanjato_proc": 9.6002,
+     "iowait_proc": 2.0726,
+     "jadro_detektora_proc": null,
+     "po_sluzhbam_proc": {
+      "bloom-detector": null,
+      "bloom-seller": null
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-29T22:23:06Z",
+     "interval_s": 3543.3,
+     "steal_proc": 0.0986,
+     "zanjato_proc": 7.6579,
+     "iowait_proc": 2.3019,
+     "jadro_detektora_proc": 1.788,
+     "po_sluzhbam_proc": {
+      "bloom-detector": 1.788,
+      "bloom-seller": 0.345
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-29T23:21:00Z",
+     "interval_s": 3473.5,
+     "steal_proc": 0.0514,
+     "zanjato_proc": 7.684,
+     "iowait_proc": 2.0229,
+     "jadro_detektora_proc": 1.579,
+     "po_sluzhbam_proc": {
+      "bloom-detector": 1.579,
+      "bloom-seller": 0.089
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T00:31:44Z",
+     "interval_s": 4244.1,
+     "steal_proc": 0.0425,
+     "zanjato_proc": 7.3605,
+     "iowait_proc": 2.1076,
+     "jadro_detektora_proc": null,
+     "po_sluzhbam_proc": {
+      "bloom-detector": null,
+      "bloom-seller": null
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T00:53:08Z",
+     "interval_s": 1284.6,
+     "steal_proc": 0.0476,
+     "zanjato_proc": 7.6925,
+     "iowait_proc": 2.1328,
+     "jadro_detektora_proc": 2.54,
+     "po_sluzhbam_proc": {
+      "bloom-detector": 2.54,
+      "bloom-seller": 0.121
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T01:24:07Z",
+     "interval_s": 1858.5,
+     "steal_proc": 0.0786,
+     "zanjato_proc": 10.986,
+     "iowait_proc": 3.0292,
+     "jadro_detektora_proc": null,
+     "po_sluzhbam_proc": {
+      "bloom-detector": null,
+      "bloom-seller": null
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T02:22:30Z",
+     "interval_s": 3502.9,
+     "steal_proc": 0.0518,
+     "zanjato_proc": 8.9441,
+     "iowait_proc": 2.348,
+     "jadro_detektora_proc": 0.548,
+     "po_sluzhbam_proc": {
+      "bloom-detector": 0.548,
+      "bloom-seller": 0.066
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T03:24:44Z",
+     "interval_s": 3734.7,
+     "steal_proc": 0.0434,
+     "zanjato_proc": 7.8019,
+     "iowait_proc": 2.1647,
+     "jadro_detektora_proc": null,
+     "po_sluzhbam_proc": {
+      "bloom-detector": null,
+      "bloom-seller": null
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T04:25:06Z",
+     "interval_s": 3621.4,
+     "steal_proc": 0.0369,
+     "zanjato_proc": 7.2218,
+     "iowait_proc": 2.2803,
+     "jadro_detektora_proc": 2.059,
+     "po_sluzhbam_proc": {
+      "bloom-detector": 2.059,
+      "bloom-seller": 0.205
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T05:24:27Z",
+     "interval_s": 3561.0,
+     "steal_proc": 0.0371,
+     "zanjato_proc": 7.1093,
+     "iowait_proc": 2.333,
+     "jadro_detektora_proc": 1.362,
+     "po_sluzhbam_proc": {
+      "bloom-detector": 1.362,
+      "bloom-seller": 0.207
+     },
+     "pochemu": null
+    },
+    {
+     "chas": "2026-09-30T06:29:10Z",
+     "interval_s": 3883.3,
+     "steal_proc": 0.0364,
+     "zanjato_proc": 7.1118,
+     "iowait_proc": 2.4415,
+     "jadro_detektora_proc": 1.301,
+     "po_sluzhbam_proc": {
+      "bloom-detector": 1.301,
+      "bloom-seller": 0.221
+     },
+     "pochemu": null
+    }
+   ],
+   "snimok": null,
+   "pochemu": null
+  },
+  "steal_s_zagruzki": {
+   "fajl": "/proc/stat",
+   "steal_proc": 0.177,
+   "zanjato_proc": 2.0,
+   "pochemu": null,
+   "chto_eto": "средняя доля с момента загрузки хоста, НЕ по часам"
+  }
+ }
+}
