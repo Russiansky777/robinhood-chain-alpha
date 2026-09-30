@@ -1,0 +1,212 @@
+name: "Опыт забора S+0 на NL-хосте (кошелёк LIVE_TESTS, 5 раундов)"
+
+# ЗАЧЕМ. Проверить на цепи то, что офлайн проверить нечем: садится ли покупка,
+# подписанная blockhash с lastValidBlockHeight = H-1 / H / H+1, где H -- высота
+# блока источника. Три самоперевода по 0.00001 SOL уходят ОДНОВРЕМЕННО (один
+# барьер, три потока), и по посадке видно, где граница. Модуль -- Code-3,
+# analysis/c2_zabor_s0_opyt.py (самопроверка 43/43 без сети).
+#
+# ЧТО ЭТОТ ПРОГОН ТРАТИТ. Настоящие SOL с кошелька опыта
+# D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph -- по три отправки на раунд плюс
+# комиссии. Потолок расхода модуль считает ЗАРАНЕЕ и печатает; он же отказывает,
+# если кошелёк не тот. Торгового кошелька здесь нет вовсе.
+#
+# СЕКРЕТ. LIVE_TESTS уходит на хост ФАЙЛОМ 600 и оттуда в ОКРУЖЕНИЕ. В argv он не
+# попадает ни разу (в argv его видно в `ps` любому на хосте), в журнал -- тоже:
+# отдельный шаг проверяет, что его нет в захваченном выводе, и роняет прогон, если
+# есть. На бегунке значение кладёт `printf` -- это ВСТРОЕННАЯ команда bash, она не
+# порождает процесса и в `ps` не видна.
+#
+# ДВОЙНЫХ КАВЫЧЕК ВНУТРИ ssh ЗДЕСЬ НЕТ НИ ОДНОЙ. 30.09 они дважды ломали прогоны:
+# внутри них подставляется и оболочка бегунка, и удалённая. Вся логика уехала в
+# deploy/zabor/*.sh и приезжает по stdin (`ssh ... bash -s < файл`), а два
+# оставшихся коротких вызова обёрнуты ОДИНАРНЫМИ кавычками, где подстановки нет.
+# Скрипты проверяются `bash -n` ДО первого ssh.
+on:
+  workflow_dispatch:
+    inputs:
+      otpravitel:
+        description: "отправитель"
+        required: true
+        type: choice
+        default: helius
+        options: [helius, astralane, triton]
+      raundov:
+        description: "раундов (по три отправки в каждом)"
+        required: false
+        default: "5"
+      rezhim:
+        description: "'kolco' -- только собрать кольцо, НИЧЕГО не отправлять; 'opyt' -- отправки"
+        required: false
+        type: choice
+        default: kolco
+        options: [kolco, opyt]
+      podtverzhdenie:
+        description: "для rezhim=opyt впишите otpravlyat -- иначе отправок не будет"
+        required: false
+        default: ""
+
+concurrency:
+  group: zabor-s0-opyt
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  RABOTA: /tmp/zabor_s0_opyt
+  VETKA: claude/nifty-sagan-r0polg
+  OUT_JSON: data/zabor_s0_opyt.json
+
+jobs:
+  opyt:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Проверки ДО хоста: синтаксис скриптов и самопроверки"
+        run: |
+          set -e
+          for f in deploy/zabor/na_hoste.sh deploy/zabor/zabrat.sh deploy/zabor/ubrat.sh; do
+            bash -n "$f"
+            echo "bash -n ok: $f"
+          done
+          python3 -m py_compile analysis/c2_zabor_s0_opyt.py deploy/checks/zabor_s0_stranica.py
+          # Страница -- чистая стандартная библиотека, её самопроверку гоняем прямо тут.
+          python3 deploy/checks/zabor_s0_stranica.py --self-test | tail -2
+          # Самопроверка САМОГО опыта идёт НА ХОСТЕ и на venv-питоне (deploy/zabor/
+          # na_hoste.sh): ей нужен solders, а на бегунке его может не быть, и
+          # проверять надо тот интерпретатор, который и будет считать.
+
+      - name: "Вход разобран и подтверждён"
+        env:
+          OTPRAVITEL: ${{ inputs.otpravitel }}
+          RAUNDOV: ${{ inputs.raundov }}
+          REZHIM: ${{ inputs.rezhim }}
+          PODTV: ${{ inputs.podtverzhdenie }}
+        run: |
+          set -e
+          case "$OTPRAVITEL" in
+            helius|astralane|triton) ;;
+            *) echo "SBOY: otpravitel: $OTPRAVITEL"; exit 1;;
+          esac
+          case "$RAUNDOV" in
+            ''|*[!0-9]*) echo "SBOY: raundov ne chislo: $RAUNDOV"; exit 1;;
+          esac
+          if [ "$RAUNDOV" -lt 1 ] || [ "$RAUNDOV" -gt 20 ]; then
+            echo "SBOY: raundov vne 1..20"; exit 1
+          fi
+          # ОТПРАВКИ -- ТОЛЬКО ПО ЯВНОМУ СЛОВУ. Это живые SOL; промах по кнопке
+          # не должен стоить денег.
+          if [ "$REZHIM" = opyt ] && [ "$PODTV" != otpravlyat ]; then
+            echo "SBOY: rezhim=opyt trebuet podtverzhdenie=otpravlyat"
+            exit 1
+          fi
+          echo "rezhim=$REZHIM otpravitel=$OTPRAVITEL raundov=$RAUNDOV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставка на хост: каталог, параметры, скрипт опыта"
+        env:
+          OTPRAVITEL: ${{ inputs.otpravitel }}
+          RAUNDOV: ${{ inputs.raundov }}
+          REZHIM: ${{ inputs.rezhim }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST 'rm -rf /tmp/zabor_s0_opyt; install -d -m 700 /tmp/zabor_s0_opyt'
+          # Параметры отдельным файлом: тогда в команде ssh нечего подставлять.
+          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\n' "$OTPRAVITEL" "$RAUNDOV" "$REZHIM" > /tmp/zabor_params
+          ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/params' < /tmp/zabor_params
+          ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/c2_zabor_s0_opyt.py' < analysis/c2_zabor_s0_opyt.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST 'ls -la /tmp/zabor_s0_opyt'
+          rm -f /tmp/zabor_params
+
+      - name: "Секрет LIVE_TESTS на хост файлом 600 (не в argv, не в лог)"
+        if: ${{ inputs.rezhim == 'opyt' }}
+        env:
+          LIVE_TESTS: ${{ secrets.LIVE_TESTS }}
+        run: |
+          set -e
+          [ -n "$LIVE_TESTS" ] || { echo "SBOY: sekret LIVE_TESTS ne zadan"; exit 1; }
+          # printf -- встроенная команда bash: значение не попадает ни в ps, ни в
+          # argv отдельного процесса. Образец для поиска в журнале -- тем же способом.
+          umask 077
+          printf '%s' "$LIVE_TESTS" > /tmp/zabor_kljuch
+          printf '%s' "$LIVE_TESTS" > /tmp/zabor_obrazec
+          ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/kljuch' < /tmp/zabor_kljuch
+          shred -u /tmp/zabor_kljuch 2>/dev/null || rm -f /tmp/zabor_kljuch
+          # Без пробелов в формате -- тогда и одинарных кавычек хватит без двойных.
+          ssh -n $SSH_OPTS root@$TARGET_HOST 'stat -c %a /tmp/zabor_s0_opyt/kljuch; ls -l /tmp/zabor_s0_opyt/kljuch'
+
+      - name: "Опыт на хосте"
+        id: opyt
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/na_hoste.sh 2>&1 | tee /tmp/zabor_log.txt
+          ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/zabrat.sh > /tmp/zabor_out.json
+
+      - name: "Секрета в журнале нет"
+        if: ${{ always() && inputs.rezhim == 'opyt' }}
+        run: |
+          set -e
+          if [ -s /tmp/zabor_obrazec ] && [ -s /tmp/zabor_log.txt ]; then
+            if grep -q -F -f /tmp/zabor_obrazec /tmp/zabor_log.txt; then
+              echo "SBOY: sekret popal v zhurnal progona -- zhurnal udalyon"
+              : > /tmp/zabor_log.txt
+              shred -u /tmp/zabor_obrazec 2>/dev/null || rm -f /tmp/zabor_obrazec
+              exit 1
+            fi
+            echo "sekreta v zhurnale net"
+          fi
+          shred -u /tmp/zabor_obrazec 2>/dev/null || rm -f /tmp/zabor_obrazec
+
+      - name: "Убрать за собой на хосте"
+        if: always()
+        run: |
+          set -e
+          ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/ubrat.sh || true
+
+      - name: "Страница и отчёт"
+        if: always()
+        run: |
+          set -e
+          if ! python3 -c "import json,sys; json.load(open('/tmp/zabor_out.json'))" 2>/dev/null; then
+            echo "otchyota net ili on ne json -- stranicu ne pishem"
+            exit 0
+          fi
+          cp /tmp/zabor_out.json "$OUT_JSON"
+          python3 deploy/checks/zabor_s0_stranica.py --otchet /tmp/zabor_out.json --katalog docs
+          ls -la docs/zabor_s0_opyt_*.md | tail -3
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # ТОЛЬКО СВОИ ФАЙЛЫ. `git add -A data` на хосте утащил бы в коммит
+          # чужие изменения состояния, оказавшиеся в дереве в этот момент.
+          git add docs/zabor_s0_opyt_*.md 2>/dev/null || true
+          [ -f "$OUT_JSON" ] && git add "$OUT_JSON"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Opyt zabora S+0: tablica progona [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:$VETKA && exit 0
+            git pull --rebase -X theirs origin $VETKA
+            sleep 3
+          done
+          exit 1
