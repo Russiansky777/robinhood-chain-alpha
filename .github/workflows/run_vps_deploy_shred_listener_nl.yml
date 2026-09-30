@@ -163,7 +163,7 @@ jobs:
                 # 30.09 istochnik uzhe Triton, i pravilo v ufw status nazyvalo by
                 # chuzhogo postavshchika -- po takoj podpisi pozzhe ne ponjat, chej
                 # eto port i mozhno li ego zakryvat.
-                ufw allow from $FROM_IP to any port $PORT proto udp comment "shredy ot $FROM_IP (zamer)"
+                ufw allow from $FROM_IP to any port $PORT proto udp comment \"shredy ot $FROM_IP (zamer)\"
                 ufw status | grep -F '$PORT' || true
               else
                 echo 'ufw нет -- правило не добавлено, скажите как открывать порт'
