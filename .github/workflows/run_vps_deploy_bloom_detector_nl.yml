@@ -507,10 +507,13 @@ jobs:
           for imya in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
             znach="${!imya}"
             if [ -z "$znach" ]; then
-              echo "$imya: PUSTO v sekretah repozitorija"
+              # V OTCHJOT TOZHE, a ne tolko v zhurnal progona: protokol dolzhen
+              # byt v fajle, kotoryj kommititsja, inache ego prihoditsja dobyvat
+              # iz zhurnala prognona zadnim chislom.
+              echo "$imya: PUSTO v sekretah repozitorija" | tee -a data/bloom_detector_deploy.txt
               NET=$((NET+1))
             else
-              echo "$imya: est (dlina ${#znach})"
+              echo "$imya: est v sekretah (dlina ${#znach})" | tee -a data/bloom_detector_deploy.txt
             fi
           done
           # Vtoraja polovina gejta: te zhe chetyre imeni na HOSTE. Rashozhdenie
@@ -837,7 +840,7 @@ jobs:
           "
 
       - name: "СВЕРКА env с копией: остатки байт в байт, 26 ключей как множество"
-        if: ${{ inputs.sverka_env_s_kopiej != '' }}
+        if: ${{ inputs.sverka_env_s_kopiej != '' || (inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT') }}
         run: |
           set -e
           set -o pipefail
@@ -854,6 +857,13 @@ jobs:
           #      edinstvennaja dopustimaja raznica -- BLOOM_REGION_SEND.
           # Znachenija 26 flagov -- ne sekrety; sekrety v etot spisok ne vhodjat.
           KOPIJA="${{ inputs.sverka_env_s_kopiej }}"
+          # PO UMOLCHANIJU -- KOPIJA, SNJATAJA ETIM ZHE PROGONOM. Shag (4) plana
+          # vladelca dolzhen idti srazu za (3) v odnom progone: imja kopii
+          # rozhdaetsja vnutri progona, i trebovat ego vhodom znachilo by
+          # otkladyvat sverku na sledujushchij progon.
+          [ -n "$KOPIJA" ] || KOPIJA="$KOPIJA_ENV"
+          [ -n "$KOPIJA" ] || { echo "SBOY: imeni kopii net ni vo vhode, ni v KOPIJA_ENV"; exit 1; }
+          echo "sverjaem s kopiej $KOPIJA"
           case "$KOPIJA" in
             env.bak.*) ;;
             *) echo "SBOY: imja kopii dolzhno nachinatsja s env.bak. -- poluchili $KOPIJA"; exit 1 ;;
@@ -863,16 +873,16 @@ jobs:
           esac
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
-            test -f $ENV_DIR/\$KOPIJA || { echo 'SBOY: kopii net: \$KOPIJA'; exit 1; }
+            test -f $ENV_DIR/$KOPIJA || { echo 'SBOY: kopii net na hoste'; exit 1; }
             KL='BLOOM_MODE|BLOOM_TASKS|BLOOM_EXEC|BLOOM_LIVE_TEST|BLOOM_LIVE_BUY|BLOOM_BUY_SOL|BLOOM_OWN_SEND|BLOOM_OWN_SEND_LIVE|BLOOM_OWN_SEND_SOL|BLOOM_SENDER_REGION|BLOOM_POOL_SEND|BLOOM_POOL_NONCE|BLOOM_LANE_CONTROL|BLOOM_SHADOW_LEGS|BLOOM_SHADOW_LEGS_CREDITS|BLOOM_TELEGRAM_LIVE_TEST|BLOOM_TELEGRAM_REAL|BLOOM_CLOSE_ON_SELL|BLOOM_TG_FORMAT|BLOOM_REGION_SEND|BLOOM_LANE_MAX_POOL_FEE|BLOOM_COPIERS_FILE|BLOOM_TEST_SOURCES|BLOOM_TEST_MIN_SOL|BLOOM_TEST_BUY_SOL|BLOOM_TEST_BUY_SOL_BUMP'
             echo '--- 1) ostatki bez 26 upravljaemyh kljuchej ---'
-            A=\$(grep -vE \"^(\$KL)=\" $ENV_DIR/\$KOPIJA | sha256sum | cut -c1-16)
+            A=\$(grep -vE \"^(\$KL)=\" $ENV_DIR/$KOPIJA | sha256sum | cut -c1-16)
             B=\$(grep -vE \"^(\$KL)=\" $ENV_DIR/env | sha256sum | cut -c1-16)
             echo \"kopija \$A  novyj \$B\"
             test \"\$A\" = \"\$B\" || { echo 'SBOY: ostatki NE sovpali -- izmenilas stroka, kotoruju progon trogat ne dolzhen'; exit 1; }
             echo 'ostatki sovpali: nekhozjajstvennye stroki pobajtno te zhe'
             echo '--- 2) 26 kljuchej kak mnozhestvo imja=znachenie ---'
-            grep -E \"^(\$KL)=\" $ENV_DIR/\$KOPIJA | sort > /tmp/env_kl_do
+            grep -E \"^(\$KL)=\" $ENV_DIR/$KOPIJA | sort > /tmp/env_kl_do
             grep -E \"^(\$KL)=\" $ENV_DIR/env | sort > /tmp/env_kl_posle
             diff /tmp/env_kl_do /tmp/env_kl_posle > /tmp/env_kl_diff || true
             cat /tmp/env_kl_diff
