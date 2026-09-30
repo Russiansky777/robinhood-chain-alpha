@@ -138,14 +138,39 @@ def кошелёк_проверен(секрет: str | None = None) -> dict:
 
 # --------------------------------------------------------------- (а) кольцо
 
+def _результат(ответ):
+    """Результат вызова узла при ЛЮБОМ из двух соглашений.
+
+    ЗАЧЕМ ЭТО ОТДЕЛЬНОЙ ФУНКЦИЕЙ. Зонд писался под СЫРОЕ ТЕЛО ответа
+    (`{"result": ...}`), а на хосте вызов идёт через
+    `solana_rpc_client.SolanaRpc.call`, который отдаёт УЖЕ РАЗВЁРНУТЫЙ
+    `result` -- у него последняя строка `return body.get("result")`. Прежний
+    приём `о = о if isinstance(о, dict) else {}` подменял всё не-словарное
+    пустым словарём, и оба соглашения переставали работать на СКАЛЯРНОМ и на
+    ПУСТОМ результате:
+
+      * getBlockHeight отдаёт ЧИСЛО. Число подменялось на {}, и раунд отказывал
+        словами "узел вернул не высоту: {}". Опыт 30.09 (прогон 36740613644)
+        упал так все 5 раундов: отправок 0, комиссий 0.
+      * getTransaction отдаёт None, когда сделки ещё нет. None подменялся на {},
+        а {} -- словарь, и посадка объявляла сделку СЕВШЕЙ со слотом None и
+        комиссией None. Это молчаливое искажение: правило «сошлось/не сошлось»
+        считалось бы по несуществующей посадке.
+
+    Поэтому разворачиваем ОДНИМ местом и не подменяем ничего пустым словарём.
+    """
+    if isinstance(ответ, dict) and "result" in ответ:
+        return ответ["result"]
+    return ответ
+
+
 def запись_кольца(ответ: dict, *, сейчас: float | None = None) -> dict | None:
     """Одна запись кольца из ответа getLatestBlockhash.
 
     `lastValidBlockHeight` берётся КАК ОТДАЛ УЗЕЛ. Высота самого blockhash'а
     выводится из него только для чтения глазами и в выборе НЕ участвует.
     """
-    о = ответ if isinstance(ответ, dict) else {}
-    рез = о.get("result") if "result" in о else о
+    рез = _результат(ответ)
     if not isinstance(рез, dict):
         return None
     зн = рез.get("value") if isinstance(рез.get("value"), dict) else None
@@ -383,8 +408,7 @@ def посадка(rpc_call, подпись: str) -> dict:
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
         return из_
-    о = о if isinstance(о, dict) else {}
-    рез = о.get("result") if "result" in о else о
+    рез = _результат(о)
     if рез is None:
         из_.update(ok=True, села=False)
         return из_
@@ -409,8 +433,7 @@ def высота_слота(rpc_call, слот: int) -> dict:
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:120]}"
         return из_
-    о = о if isinstance(о, dict) else {}
-    рез = о.get("result") if "result" in о else о
+    рез = _результат(о)
     if not isinstance(рез, dict) or рез.get("blockHeight") is None:
         из_["why_not"] = "узел не отдал blockHeight этого слота"
         return из_
@@ -451,9 +474,9 @@ def раунд(rpc_call, *, кольцо: list, имя_отправителя: s
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"высота не прочитана: {type(exc).__name__}"
         return из_
-    о = о if isinstance(о, dict) else {}
-    H = о.get("result") if "result" in о else о
-    if not isinstance(H, int):
+    H = _результат(о)
+    # bool -- подклассы int: True прошло бы как высота 1.
+    if not isinstance(H, int) or isinstance(H, bool):
         из_["why_not"] = f"узел вернул не высоту: {str(о)[:100]}"
         return из_
     из_["H"] = H
@@ -768,21 +791,54 @@ def self_test(кольцо_файл: str | None = None) -> int:  # noqa: C901
     chk("нет blockHeight -- отказ, а не ноль",
         высота_слота(lambda м, п: {"result": {}}, 7)["ok"] is False)
 
+    # --- ДВА СОГЛАШЕНИЯ ОТВЕТА. Узел на хосте (SolanaRpc.call) отдаёт УЖЕ
+    # развёрнутый result: у getBlockHeight это ЧИСЛО, у getTransaction это None,
+    # когда сделки ещё нет. Прежний разбор подменял и то и другое пустым
+    # словарём: высота не читалась вовсе (опыт 30.09 -- 5 раундов из 5 отказали),
+    # а «не села» превращалась в «села» со слотом None и комиссией None.
+    chk("развёрнутый None -- не села, а не села-с-пустыми-полями",
+        (lambda о: о["ok"] and о["села"] is False and о.get("комиссия") is None)(
+            посадка(lambda м, п: None, "S")))
+    chk("развёрнутая сделка -- села, со слотом и комиссией",
+        (lambda о: о["ok"] and о["села"] and о["слот"] == 7 and о["комиссия"] == 5000)(
+            посадка(lambda м, п: {"slot": 7, "meta": {"fee": 5000, "err": None}}, "S")))
+    chk("развёрнутый getBlock -- высота читается",
+        высота_слота(lambda м, п: {"blockHeight": 99}, 7)["высота"] == 99)
+    chk("развёрнутый getLatestBlockhash -- запись кольца собирается",
+        (запись_кольца({"context": {"slot": 5},
+                         "value": {"blockhash": "BH", "lastValidBlockHeight": 77}})
+         or {}).get("lastValid") == 77)
+    chk("пустой ответ узла записью кольца не становится",
+        запись_кольца({}) is None and запись_кольца(None) is None)
+
     # --- РАУНД ЦЕЛИКОМ, на подставном узле и подставном отправителе
     os.environ[ИМЯ_КЛЮЧА] = "не-секрет-а-заглушка"
     посаженные = {}
 
-    def _узел(метод, парам):
-        if метод == "getBlockHeight":
-            return {"result": H}
-        if метод == "getTransaction":
-            п = парам[0]
-            if посаженные.get(п):
-                return {"result": {"slot": 4242, "meta": {"fee": 5000, "err": None}}}
-            return {"result": None}
-        if метод == "getBlock":
-            return {"result": {"blockHeight": H + 1, "blockhash": "BH"}}
-        raise OSError(f"лишний вызов {метод}")
+    def _узел_согл(сырое: bool):
+        """Подставной узел в ОДНОМ из двух соглашений ответа.
+
+        `сырое=True` -- сырое тело ({"result": ...}), как писался зонд.
+        `сырое=False` -- развёрнутый result, как отдаёт SolanaRpc.call на хосте.
+        Раунд прогоняется ПО ОБОИМ: иначе разбор ответа снова разойдётся с
+        настоящим узлом, и это опять вскроется только на хосте.
+        """
+        def _обёртка(р):
+            return {"result": р} if сырое else р
+
+        def _узел(метод, парам):
+            if метод == "getBlockHeight":
+                return _обёртка(H)
+            if метод == "getTransaction":
+                п = парам[0]
+                if посаженные.get(п):
+                    return _обёртка({"slot": 4242,
+                                      "meta": {"fee": 5000, "err": None}})
+                return _обёртка(None)
+            if метод == "getBlock":
+                return _обёртка({"blockHeight": H + 1, "blockhash": "BH"})
+            raise OSError(f"лишний вызов {метод}")
+        return _узел
 
     def _подпись(tx_base64, вариант, секрет=None):
         return {"ok": True, "signature": f"SIG{вариант['сдвиг']}",
@@ -797,12 +853,20 @@ def self_test(кольцо_файл: str | None = None) -> int:  # noqa: C901
     глоб_кошелёк = globals()["кошелёк_проверен"]
     globals()["подписать_вариант"] = _подпись
     globals()["кошелёк_проверен"] = lambda секрет=None: {"ok": True}
+    раунды = {}
     try:
-        р = раунд(_узел, кольцо=кольцо, имя_отправителя="тест",
-                   отправить=_отправка, ждать_с=0.0, спать=lambda _с: None)
+        for имя_согл, сырое in (("сырое тело", True), ("развёрнутый result", False)):
+            раунды[имя_согл] = раунд(_узел_согл(сырое), кольцо=кольцо,
+                                      имя_отправителя="тест", отправить=_отправка,
+                                      ждать_с=0.0, спать=lambda _с: None)
     finally:
         globals()["подписать_вариант"] = глоб_подпись
         globals()["кошелёк_проверен"] = глоб_кошелёк
+    for имя_согл, рр in раунды.items():
+        chk(f"раунд прошёл на соглашении «{имя_согл}»",
+            рр["ok"] and рр["H"] == H and len(рр["строки"]) == 3,
+            рр.get("why_not"))
+    р = раунды["развёрнутый result"]
     chk("раунд прошёл и дал три строки", р["ok"] and len(р["строки"]) == 3, р.get("why_not"))
     если = {с["сдвиг"]: с for с in р.get("строки") or []}
     chk("села только та, у которой lastValid >= высоты посадки (H+1)",
