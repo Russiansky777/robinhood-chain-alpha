@@ -114,7 +114,8 @@ def калибровка_pump_amm(пары: list, fee: float, f_по: str = "х�
     """Pump AMM, v6 (analysis/podbivka_sverka_leader.py): пары (предыдущее событие ряда, событие) окна.
     f -- по хранилищам: x0·dy / ((y0 − dy)·dx), dx -- прирост quoteInPool, dy -- убыль tokensInPool к предыдущему
     событию (f_по="quoteAmount" -- dx = quoteAmount, dy = tokenAmount, как у прочих x*y=k); до 30 прямых покупок,
-    [0.5, 1.0]. g -- на руки продавцу: quoteAmount·(y0 + dy)/(x0·dy), dy = tokenAmount; до 30 продаж, [0.5, 1.6]
+    [0.5, 1.0]. g -- на руки продавцу: quoteAmount·(1 − poolFeeRate)·(y0 + dy)/(x0·dy), dy = tokenAmount (quoteAmount
+    продажи в архиве -- до комиссии пула); до 30 продаж, [0.5, 1.6]
     (лишний остаток токена в хранилище E: g ≈ (1 − fee)/(1 − E/y) > 1 -- прежний потолок 1.0 их отбрасывал).
     Нет покупок / продаж -- 1 − fee."""
     fs, gs = [], []
@@ -136,7 +137,10 @@ def калибровка_pump_amm(пары: list, fee: float, f_по: str = "х�
                 if 0.5 <= v <= 1.0:
                     fs.append(v)
         elif e.get("action") == "sell" and len(gs) < V6_ДО:
-            dy, dx = float(e.get("tokenAmount") or 0), float(e.get("quoteAmount") or 0)
+            # quoteAmount продажи в архиве -- ДО комиссии пула: на руки = quoteAmount·(1 − poolFeeRate)
+            # (наши 9 продаж 28.09: quoteAmount / полученное по цепи = 1/(1 − poolFeeRate) × 1.001)
+            dy = float(e.get("tokenAmount") or 0)
+            dx = float(e.get("quoteAmount") or 0) * (1 - float(e.get("poolFeeRate") or 0))
             if dy > 0 and dx > 0 and x0 > 0:
                 v = dx * (y0 + dy) / (x0 * dy)
                 if 0.5 <= v <= V6_G_ВЕРХ:
