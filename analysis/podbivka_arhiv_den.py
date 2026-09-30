@@ -22,6 +22,7 @@
     vQuoteInBondingCurve / vTokensInBondingCurve;
   * доля траты f и доля продажи g (x*y=k) -- медианы по ВСЕМ покупкам / продажам
     пула в окне (состояние до -- предыдущее событие ряда); нет -- 1 − poolFeeRate;
+    Pump AMM (v6, 01.10) -- калибровка_pump_amm: f по хранилищам, g до 1.6, окно s0…s0+150 (≤ 150 событий);
     кривая -- комиссия poolFeeRate сверху при покупке и из выручки при продаже;
   * входы: S0 -- сразу после сделки источника; S0_дно -- после последнего события
     слота s0 (порядок внутри слота -- порядок файла, timestamp мс; оценка);
@@ -105,6 +106,45 @@ def ст(e: dict):
     return float(x), float(y)
 
 
+PUMP_AMM_V6 = True      # модель Pump AMM v6 (сверка по цепи 28–30.09): f по хранилищам, g до 1.6, окно как у v6
+V6_ГОРИЗОНТ, V6_МАКС_СОБЫТИЙ, V6_ДО, V6_G_ВЕРХ = 150, 150, 30, 1.6
+
+
+def калибровка_pump_amm(пары: list, fee: float, f_по: str = "хранилищам") -> dict:
+    """Pump AMM, v6 (analysis/podbivka_sverka_leader.py): пары (предыдущее событие ряда, событие) окна.
+    f -- по хранилищам: x0·dy / ((y0 − dy)·dx), dx -- прирост quoteInPool, dy -- убыль tokensInPool к предыдущему
+    событию (f_по="quoteAmount" -- dx = quoteAmount, dy = tokenAmount, как у прочих x*y=k); до 30 прямых покупок,
+    [0.5, 1.0]. g -- на руки продавцу: quoteAmount·(y0 + dy)/(x0·dy), dy = tokenAmount; до 30 продаж, [0.5, 1.6]
+    (лишний остаток токена в хранилище E: g ≈ (1 − fee)/(1 − E/y) > 1 -- прежний потолок 1.0 их отбрасывал).
+    Нет покупок / продаж -- 1 − fee."""
+    fs, gs = [], []
+    for пред, e in пары:
+        с0 = ст(пред)
+        if not с0:
+            continue
+        x0, y0 = с0
+        if e.get("action") == "buy" and len(fs) < V6_ДО:
+            if f_по == "хранилищам":
+                с1 = ст(e)
+                if not с1:
+                    continue
+                dx, dy = с1[0] - x0, y0 - с1[1]
+            else:
+                dx, dy = float(e.get("quoteAmount") or 0), float(e.get("tokenAmount") or 0)
+            if dx > 0 and y0 > dy > 0:
+                v = x0 * dy / ((y0 - dy) * dx)
+                if 0.5 <= v <= 1.0:
+                    fs.append(v)
+        elif e.get("action") == "sell" and len(gs) < V6_ДО:
+            dy, dx = float(e.get("tokenAmount") or 0), float(e.get("quoteAmount") or 0)
+            if dy > 0 and dx > 0 and x0 > 0:
+                v = dx * (y0 + dy) / (x0 * dy)
+                if 0.5 <= v <= V6_G_ВЕРХ:
+                    gs.append(v)
+    return {"f": statistics.median(fs) if fs else 1 - fee, "g": statistics.median(gs) if gs else 1 - fee,
+            "f_n": len(fs), "g_n": len(gs)}
+
+
 def модель(сигнал: dict, ряд: list) -> dict:
     """Ряд -- события пула в порядке файла, первым -- событие сигнала (или раньше).
     Котировка не SOL: билет и издержки в единицах котировки по курсу сигнала
@@ -118,7 +158,13 @@ def модель(сигнал: dict, ряд: list) -> dict:
     ряд = ряд[i0:]
     fee = float(ряд[0].get("poolFeeRate") or 0)
     из_ = {"f": None, "g": None, "fee": fee}
-    if пул in XYK:
+    if пул == "pump-amm" and PUMP_AMM_V6:
+        # окно v6: события после сигнала до s0+150, не больше 150 (в этих пределах ряд непрерывен -- пул под
+        # наблюдением с сигнала; дальше ряд мог прерваться и снова начаться с другого сигнала)
+        окно = [e for e in ряд[1:] if (e.get("block") or 0) <= s0 + V6_ГОРИЗОНТ][:V6_МАКС_СОБЫТИЙ]
+        из_.update(калибровка_pump_amm(list(zip([ряд[0]] + окно, окно)), fee))
+        из_["модель_pump_amm"] = "v6"
+    elif пул in XYK:
         fs, gs = [], []
         for пред, e in zip(ряд, ряд[1:]):
             с0 = ст(пред)
