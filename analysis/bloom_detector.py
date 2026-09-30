@@ -4724,9 +4724,34 @@ class Детектор:
                 # читает их из записи.
                 имя_ист_л = self.имя_источника(поз.get("source"))
                 try:
+                    # РЕГИОН ЛИДЕРА -- В ЗАПИСЬ, РЯДОМ С lane_region.
+                    # Просьба Code-3 (диф докладчика 30.09 22:27Z): полоса
+                    # пишет только СВОИ регионы (lane_region -- регион, куда
+                    # отправляли), а регион ЛИДЕРА слота считала лишь выгрузка.
+                    # Из-за этого в боевой строке BUY регион лидера был
+                    # прочерком при любом S+. Считается ровно для того слота,
+                    # где покупка села, тем же модулем, что и у выгрузки;
+                    # отказ -- причиной в запись, а не тихим пропуском.
+                    рег_лид = None
+                    рег_лид_почему = None
+                    try:
+                        import bloom_region_send as RS  # noqa: PLC0415
+
+                        рег = RS.регион_слота(self.helius.call, int(слот or 0))
+                        рег_лид = (рег or {}).get("регион")
+                        if not рег_лид or рег_лид == "неизвестно":
+                            рег_лид_почему = (
+                                "лидер слота не в карте регионов"
+                                if (рег or {}).get("лидер")
+                                else "расписание лидеров на этот слот не отдалось")
+                            рег_лид = None
+                    except Exception as exc:  # noqa: BLE001
+                        рег_лид_почему = f"{type(exc).__name__}"
                     self.состояние.update_position(
                         cid, token_name=имя_ток_л, source_name=имя_ист_л,
                         token_name_why_not=имя_ток_почему,
+                        lane_region_leader=рег_лид,
+                        lane_region_leader_why_not=рег_лид_почему,
                         lane_landed_slot=слот)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("имена в позицию полосы не записаны: %s",
@@ -4800,6 +4825,37 @@ class Детектор:
         if когда is None or сейчас - когда > ДОКЛАД_ОКНО_S:
             return None
         return когда
+
+    def ждущие_количества(self) -> list:
+        """Открытые сделки полосы, у которых количества ещё нет. [(cid, поз)].
+
+        ЗАЧЕМ ОТДЕЛЬНО ОТ ждущие_доклада. Догон количества жил на круге
+        доклада, а круг работает только пока кто-то ЖДЁТ доклада; BUY уходит
+        не позже 3 с после посадки, и сразу после него круг замолкал. Второй
+        звонарь -- 60-секундный пульс, но он пропускает ЗАКРЫТЫЕ позиции, а
+        удержание полосы 12..108 слотов (3..30 с), то есть позиция успевает
+        закрыться раньше пульса. Итог 30.09 18:26Z: количество не добралось ни
+        разу (lane_bought_tries в записи нет вовсе), сторож ждал его до предела
+        10 с и продал по остатку кошелька -- удержание 35 слотов вместо 12.
+        Теперь у догона свой признак "кому он нужен", и круг зовёт его, даже
+        когда доклад уже ушёл.
+        """
+        try:
+            позиции = self.состояние.positions()
+        except Exception:  # noqa: BLE001
+            return []
+        из_ = []
+        for cid, p_ in (позиции or {}).items():
+            if not (p_ or {}).get("lane"):
+                continue
+            if not ST.is_real_mode(p_.get("mode")):
+                continue
+            if p_.get("lane_bought_raw") is not None:
+                continue
+            if p_.get("state") in (ST.STATE_CLOSED, "closed"):
+                continue
+            из_.append((cid, p_))
+        return из_
 
     def ждущие_доклада(self, *, сейчас: float | None = None) -> list:
         """Сделки полосы, по которым BUY ещё не ушёл. [(cid, позиция)]."""
@@ -7345,6 +7401,16 @@ async def доклады(детектор: Детектор, стоп_через
             return
         try:
             ждут = детектор.ждущие_доклада()
+            if not ждут and детектор.ждущие_количества():
+                # ДОГОН КОЛИЧЕСТВА НЕ ЖДЁТ ТИКА ДОКЛАДА. Он нужен ДО продажи, а
+                # продажа идёт через 12..108 слотов -- раньше, чем придёт
+                # 60-секундный пульс. Один шаг, без остальных догонов: они не
+                # решают, по чему продавать.
+                try:
+                    await asyncio.to_thread(детектор.догнать_купленное_полосы)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("догон количества (без доклада) упал: %s: %s",
+                                type(exc).__name__, str(exc)[:120])
             if ждут:
                 # СНАЧАЛА ДОКЛАД, ПОТОМ ДОГОН (слово владельца 28.09, п.3а:
                 # "BUY уходит не позже 3 с после посадки покупки с тем, что
@@ -12452,6 +12518,101 @@ def self_test() -> int:
                 not any(cid == "лп3" for cid, _ in дет_л.ждущие_доклада())
                 and дет_л.доложить_покупки_полосы()["sent"] == 0,
                 дет_л.ждущие_доклада())
+
+            # ДОГОН КОЛИЧЕСТВА НЕ ПРИВЯЗАН К ТИКУ ДОКЛАДА. Круг 30.09 18:26Z:
+            # BUY ушёл через 3 с после посадки, ждущих доклада не осталось, и
+            # круг замолчал -- вместе с ним замолчал догон количества. Сторож
+            # ждал количество до предела 10 с и продал по остатку кошелька:
+            # удержание 35 слотов вместо 12, итог "несчитаемый". Теперь у
+            # догона свой признак "кому он нужен", и он не пуст ровно тогда,
+            # когда ждущих доклада уже нет.
+            st_л.write_intent(client_order_id="лк1", mint="МИНТ_БЕЗ_КОЛИЧЕСТВА",
+                              source_sig="ИСТ_ПОДПИСЬ_К", source_slot=400,
+                              sol_in=0.05, pool=None, program=None, taxed=None,
+                              tax_bps=None, mode=ST.MODE_LIVE, sell_after_s=4.8,
+                              lane=ST.МЕТКА_ПОЛОСЫ, lane_group="lane_s0")
+            st_л.update_position("лк1", source="SRC", state="bought",
+                                 doklad_buy_sent=True, doklad_buy_full=True,
+                                 ts_accepted=time.time())
+            ждут_д = [cid for cid, _ in дет_л.ждущие_доклада()]
+            ждут_к = [cid for cid, _ in дет_л.ждущие_количества()]
+            chk("доклад по сделке ушёл, а количества нет -- догон всё равно нужен",
+                "лк1" not in ждут_д and "лк1" in ждут_к, (ждут_д, ждут_к))
+            # И ТРИ ГРАНИЦЫ, ЧТОБЫ ДОГОН НЕ ХОДИЛ ПОПУСТУ: количество уже есть;
+            # позиция закрыта; сделка не боевая.
+            st_л.update_position("лк1", lane_bought_raw=123456)
+            chk("количество добралось -- сделка из очереди догона уходит",
+                "лк1" not in [cid for cid, _ in дет_л.ждущие_количества()],
+                дет_л.ждущие_количества())
+            st_л.write_intent(client_order_id="лк2", mint="МИНТ_ЗАКРЫТЫЙ",
+                              source_sig="ИСТ_ПОДПИСЬ_К2", source_slot=401,
+                              sol_in=0.05, pool=None, program=None, taxed=None,
+                              tax_bps=None, mode=ST.MODE_LIVE, sell_after_s=4.8,
+                              lane=ST.МЕТКА_ПОЛОСЫ, lane_group="lane_s0")
+            st_л.update_position("лк2", source="SRC", state=ST.STATE_CLOSED)
+            st_л.write_intent(client_order_id="лк3", mint="МИНТ_СУХОЙ",
+                              source_sig="ИСТ_ПОДПИСЬ_К3", source_slot=402,
+                              sol_in=0.05, pool=None, program=None, taxed=None,
+                              tax_bps=None, mode=ST.MODE_DRY, sell_after_s=4.8,
+                              lane=ST.МЕТКА_ПОЛОСЫ, lane_group="lane_s0")
+            st_л.update_position("лк3", source="SRC", state="bought")
+            очередь_к = [cid for cid, _ in дет_л.ждущие_количества()]
+            chk("закрытая и не боевая сделки догону не нужны",
+                "лк2" not in очередь_к and "лк3" not in очередь_к, очередь_к)
+
+            # РЕГИОН ЛИДЕРА -- В ЗАПИСЬ ПОЗИЦИИ НА ПОСАДКЕ. Просьба Code-3 от
+            # 30.09 22:27Z: полоса писала только СВОИ регионы (куда отправляли),
+            # а регион лидера считала лишь выгрузка, поэтому в боевой строке BUY
+            # он был прочерком при любом S+. Тут он берётся тем же модулем, что
+            # и у выгрузки, ровно для слота посадки.
+            import bloom_region_send as RSt  # noqa: PLC0415
+            было_рс = RSt.регион_слота
+            спрошено: list = []
+            try:
+                RSt.регион_слота = lambda зов, слот: (
+                    спрошено.append(слот)
+                    or {"лидер": "ЛИД", "регион": "EU", "слот": слот})
+                st_л.write_intent(client_order_id="лр1", mint="МИНТ_РЕГИОНА",
+                                  source_sig="ИСТ_ПОДПИСЬ_Р", source_slot=500,
+                                  sol_in=0.05, pool=None, program=None,
+                                  taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                                  sell_after_s=4.8, lane=ST.МЕТКА_ПОЛОСЫ,
+                                  lane_group="lane_s0")
+                st_л.update_position("лр1", source="SRC")
+                дет_л.отметить_полосу_в_потоке(
+                    cid="лр1", поз=st_л.positions()["лр1"],
+                    подпись="ПОДПИСЬ_Р", слот=501,
+                    tx={"meta": {"err": None}}, t_recv=time.time(), цепь_ок=True)
+                зап_р = st_л.positions()["лр1"]
+                chk("регион лидера записан рядом с lane_landed_slot",
+                    зап_р.get("lane_region_leader") == "EU"
+                    and зап_р.get("lane_landed_slot") == 501,
+                    (зап_р.get("lane_region_leader"), зап_р.get("lane_landed_slot")))
+                chk("и спрошен ровно про слот посадки, а не про слот источника",
+                    спрошено == [501], спрошено)
+                # НЕИЗВЕСТНЫЙ ЛИДЕР -- ПРИЧИНОЙ В ЗАПИСЬ, А НЕ ТИХИМ ПРОЧЕРКОМ.
+                RSt.регион_слота = lambda зов, слот: {
+                    "лидер": None, "регион": "неизвестно", "слот": слот}
+                st_л.write_intent(client_order_id="лр2", mint="МИНТ_РЕГИОНА_2",
+                                  source_sig="ИСТ_ПОДПИСЬ_Р2", source_slot=510,
+                                  sol_in=0.05, pool=None, program=None,
+                                  taxed=None, tax_bps=None, mode=ST.MODE_LIVE,
+                                  sell_after_s=4.8, lane=ST.МЕТКА_ПОЛОСЫ,
+                                  lane_group="lane_s0")
+                st_л.update_position("лр2", source="SRC")
+                дет_л.отметить_полосу_в_потоке(
+                    cid="лр2", поз=st_л.positions()["лр2"],
+                    подпись="ПОДПИСЬ_Р2", слот=511,
+                    tx={"meta": {"err": None}}, t_recv=time.time(), цепь_ок=True)
+                зап_р2 = st_л.positions()["лр2"]
+                chk("нет лидера -- регион пуст, но причина названа: "
+                    f"«{зап_р2.get('lane_region_leader_why_not')}»",
+                    зап_р2.get("lane_region_leader") is None
+                    and зап_р2.get("lane_region_leader_why_not"),
+                    (зап_р2.get("lane_region_leader"),
+                     зап_р2.get("lane_region_leader_why_not")))
+            finally:
+                RSt.регион_слота = было_рс
     finally:
         if было_ф3 is None:
             os.environ.pop("BLOOM_TG_FORMAT", None)
