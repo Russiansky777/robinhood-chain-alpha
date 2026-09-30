@@ -40,20 +40,46 @@ case "$OTPRAVITEL" in
   helius|astralane|triton) ;;
   *) echo "SBOY: neizvestnyj otpravitel: $OTPRAVITEL"; exit 1;;
 esac
+case "$REZHIM" in
+  kolco|opyt|gonka) ;;
+  *) echo "SBOY: rezhim ne kolco, ne opyt i ne gonka: $REZHIM"; exit 1;;
+esac
+# GONKA: SPISOK OTPRAVITELEJ, I KAZHDOE IMJA PROVERJAETSJA. Opechatka v imeni
+# dolzhna byt otkazom zdes, a ne "otpravitelju ne naznacheny chaevye" posle
+# nachala raunda.
+if [ "$REZHIM" = gonka ]; then
+  : "${OTPRAVITELI:?SBOY: OTPRAVITELI ne zadany}"
+  for O in $(echo "$OTPRAVITELI" | tr ',' ' '); do
+    case "$O" in
+      helius|astralane|triton) ;;
+      *) echo "SBOY: neizvestnyj otpravitel v spiske: $O"; exit 1;;
+    esac
+  done
+fi
 case "$RAUNDOV" in
   ''|*[!0-9]*) echo "SBOY: raundov ne chislo"; exit 1;;
 esac
-if [ "$RAUNDOV" -lt 1 ] || [ "$RAUNDOV" -gt 20 ]; then
-  echo "SBOY: raundov vne 1..20: $RAUNDOV"
+# GRANICA RAUNDOV RAZNAJA. U opyta odna otpravka na raund, u gonki -- po odnoj
+# KAZHDOMU otpravitelju, i vladelec prosil 25 raundov (nochnoj paket). Dengi
+# storozhit ne eta granica, a potolok rashoda v module: on schitaet cenu DO
+# pervoj otpravki. Granica zdes -- tolko ot promaha vvodom.
+PREDEL_RAUNDOV=20
+if [ "$REZHIM" = gonka ]; then
+  PREDEL_RAUNDOV=30
+fi
+if [ "$RAUNDOV" -lt 1 ] || [ "$RAUNDOV" -gt "$PREDEL_RAUNDOV" ]; then
+  echo "SBOY: raundov vne 1..$PREDEL_RAUNDOV pri rezhime $REZHIM: $RAUNDOV"
   exit 1
 fi
-case "$REZHIM" in
-  kolco|opyt) ;;
-  *) echo "SBOY: rezhim ne kolco i ne opyt: $REZHIM"; exit 1;;
-esac
 
 if [ ! -s "$RABOTA/c2_zabor_s0_opyt.py" ]; then
   echo "SBOY: skript opyta ne dostavlen v $RABOTA"
+  exit 1
+fi
+# MODUL GONKI TOZHE DOLZHEN PRIEHAT. Bez etoj proverki rezhim gonka upal by
+# pozzhe i mutnee -- ModuleNotFoundError iz-pod sudo, uzhe posle samoproverki.
+if [ "$REZHIM" = gonka ] && [ ! -s "$RABOTA/c2_zabor_gonka.py" ]; then
+  echo "SBOY: modul gonki c2_zabor_gonka.py ne dostavlen v $RABOTA"
   exit 1
 fi
 
@@ -70,6 +96,9 @@ fi
 # root. Prava 600 na njom proverjajutsja otdelno nizhe.
 chgrp bot "$RABOTA" && chmod 770 "$RABOTA"
 chgrp bot "$RABOTA/c2_zabor_s0_opyt.py" && chmod 640 "$RABOTA/c2_zabor_s0_opyt.py"
+if [ -s "$RABOTA/c2_zabor_gonka.py" ]; then
+  chgrp bot "$RABOTA/c2_zabor_gonka.py" && chmod 640 "$RABOTA/c2_zabor_gonka.py"
+fi
 echo "dostup dlja bot: katalog $(stat -c %a:%U:%G "$RABOTA"), skript $(stat -c %a:%U:%G "$RABOTA/c2_zabor_s0_opyt.py")"
 
 # ОКРУЖЕНИЕ СЛУЖБЫ -- ТОЛЬКО ЧИТАЕМ. Узел, отправители и их ключи берутся оттуда
@@ -87,7 +116,7 @@ set +a
 export BLOOM_ZABOR_S0_OPYT=1
 
 # КЛЮЧ -- ИЗ ФАЙЛА В ОКРУЖЕНИЕ. Только в режиме opyt: кольцу он не нужен вовсе.
-if [ "$REZHIM" = opyt ]; then
+if [ "$REZHIM" = opyt ] || [ "$REZHIM" = gonka ]; then
   if [ ! -s "$KLJUCH" ]; then
     echo "SBOY: sekret LIVE_TESTS ne dostavlen (net $KLJUCH)"
     exit 1
@@ -131,18 +160,25 @@ echo "rabochij katalog opyta: $(pwd)"
 # takom vide opyt ne proshjol by nikogda.
 sudo -u bot -E env PYTHONPATH="$CODE_DIR" BLOOM_CODE_DIR="$CODE_DIR" \
   "$VENV/python" "$RABOTA/c2_zabor_s0_opyt.py" --self-test | tail -2
+# U GONKI SVOJA SAMOPROVERKA, i ona tozhe gejt PERED otpravkami: schjot ceny,
+# potolok, barjer, pauza po slotam.
+if [ "$REZHIM" = gonka ]; then
+  sudo -u bot -E env PYTHONPATH="$CODE_DIR:$RABOTA" BLOOM_CODE_DIR="$CODE_DIR" \
+    "$VENV/python" "$RABOTA/c2_zabor_gonka.py" --self-test | tail -2
+fi
 
-echo "zapusk: rezhim=$REZHIM otpravitel=$OTPRAVITEL raundov=$RAUNDOV"
+echo "zapusk: rezhim=$REZHIM otpravitel=$OTPRAVITEL raundov=$RAUNDOV otpraviteli=${OTPRAVITELI:-net}"
 
 # ЗАПУСК ОТ bot, А НЕ ОТ root. -E сохраняет окружение, то есть и рубильник, и
 # секрет доходят, оставаясь вне argv. PYTHONPATH -- код службы: опыт зовёт
 # bloom_senders, bloom_own_send, c2_swap_build и bloom_detector, и они должны быть
 # ТЕ ЖЕ, что у полосы.
 set +e
-sudo -u bot -E env PYTHONPATH="$CODE_DIR" BLOOM_CODE_DIR="$CODE_DIR" \
+sudo -u bot -E env PYTHONPATH="$CODE_DIR:$RABOTA" BLOOM_CODE_DIR="$CODE_DIR" \
   "$VENV/python" "$RABOTA/c2_zabor_s0_opyt.py" \
   --rezhim "$REZHIM" \
   --otpravitel "$OTPRAVITEL" \
+  --otpraviteli "${OTPRAVITELI:-helius,astralane}" \
   --raundov "$RAUNDOV" \
   --out "$RABOTA/out.json"
 KOD=$?

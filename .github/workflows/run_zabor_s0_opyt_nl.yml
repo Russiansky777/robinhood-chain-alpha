@@ -1,4 +1,4 @@
-name: "Опыт забора S+0 на NL-хосте (кошелёк LIVE_TESTS, 5 раундов)"
+name: "Забор S+0 и ГОНКА отправителей на NL-хосте (кошелёк LIVE_TESTS)"
 
 # ЗАЧЕМ. Проверить на цепи то, что офлайн проверить нечем: садится ли покупка,
 # подписанная blockhash с lastValidBlockHeight = H-1 / H / H+1, где H -- высота
@@ -11,7 +11,9 @@ name: "Опыт забора S+0 на NL-хосте (кошелёк LIVE_TESTS, 
 # ЧТО ЭТОТ ПРОГОН ТРАТИТ. Настоящие SOL с кошелька опыта
 # D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph -- ОДНА отправка на раунд:
 # комиссия плюс ЧАЕВЫЕ по минимуму отправителя (без чаевых платный путь Helius
-# отказывает: -32602, минимум 200 000 лампортов). Потолок 0.005 SOL и остаток на
+# отказывает: -32602, минимум 200 000 лампортов). В режиме gonka на раунд уходит
+# по ОДНОЙ отправке КАЖДОМУ отправителю, то есть раунд стоит столько же раз.
+# Потолок расхода (0.07 SOL -- слово владельца в ночь 30.09->01.10) и остаток на
 # кошельке не меньше 0.001 SOL модуль проверяет ЗАРАНЕЕ и отказывается начинать,
 # если не влезает; он же отказывает, если кошелёк не тот. Торгового кошелька
 # здесь нет вовсе.
@@ -41,13 +43,17 @@ on:
         required: false
         default: "15"
       rezhim:
-        description: "'kolco' -- только собрать кольцо, НИЧЕГО не отправлять; 'opyt' -- отправки"
+        description: "'kolco' -- только кольцо, НИЧЕГО не отправлять; 'opyt' -- отправки одним отправителем; 'gonka' -- по одной КАЖДОМУ отправителю"
         required: false
         type: choice
         default: kolco
-        options: [kolco, opyt]
+        options: [kolco, opyt, gonka]
+      otpraviteli:
+        description: "gonka: отправители через запятую (triton как ОТПРАВИТЕЛЬ у нас не настроен -- у него нет точки входа отправки)"
+        required: false
+        default: "helius,astralane"
       podtverzhdenie:
-        description: "для rezhim=opyt впишите otpravlyat -- иначе отправок не будет"
+        description: "для rezhim=opyt и rezhim=gonka впишите otpravlyat -- иначе отправок не будет"
         required: false
         default: ""
 
@@ -79,7 +85,8 @@ jobs:
             bash -n "$f"
             echo "bash -n ok: $f"
           done
-          python3 -m py_compile analysis/c2_zabor_s0_opyt.py deploy/checks/zabor_s0_stranica.py
+          python3 -m py_compile analysis/c2_zabor_s0_opyt.py \
+            analysis/c2_zabor_gonka.py deploy/checks/zabor_s0_stranica.py
           # Страница -- чистая стандартная библиотека, её самопроверку гоняем прямо тут.
           python3 deploy/checks/zabor_s0_stranica.py --self-test | tail -2
           # Самопроверка САМОГО опыта идёт НА ХОСТЕ и на venv-питоне (deploy/zabor/
@@ -89,6 +96,7 @@ jobs:
       - name: "Вход разобран и подтверждён"
         env:
           OTPRAVITEL: ${{ inputs.otpravitel }}
+          OTPRAVITELI: ${{ inputs.otpraviteli }}
           RAUNDOV: ${{ inputs.raundov }}
           REZHIM: ${{ inputs.rezhim }}
           PODTV: ${{ inputs.podtverzhdenie }}
@@ -98,19 +106,35 @@ jobs:
             helius|astralane|triton) ;;
             *) echo "SBOY: otpravitel: $OTPRAVITEL"; exit 1;;
           esac
+          if [ "$REZHIM" = gonka ]; then
+            [ -n "$OTPRAVITELI" ] || { echo "SBOY: gonka bez spiska otpravitelej"; exit 1; }
+            for O in $(echo "$OTPRAVITELI" | tr ',' ' '); do
+              case "$O" in
+                helius|astralane|triton) ;;
+                *) echo "SBOY: neizvestnyj otpravitel v spiske: $O"; exit 1;;
+              esac
+            done
+          fi
           case "$RAUNDOV" in
             ''|*[!0-9]*) echo "SBOY: raundov ne chislo: $RAUNDOV"; exit 1;;
           esac
-          if [ "$RAUNDOV" -lt 1 ] || [ "$RAUNDOV" -gt 20 ]; then
-            echo "SBOY: raundov vne 1..20"; exit 1
+          # GRANICA RAUNDOV RAZNAJA: u gonki na raund po odnoj otpravke KAZHDOMU
+          # otpravitelju, i vladelec prosil 25. Dengi storozhit potolok rashoda v
+          # module (schitaetsja DO pervoj otpravki), a eta granica -- ot promaha.
+          PREDEL=20
+          [ "$REZHIM" = gonka ] && PREDEL=30
+          if [ "$RAUNDOV" -lt 1 ] || [ "$RAUNDOV" -gt "$PREDEL" ]; then
+            echo "SBOY: raundov vne 1..$PREDEL pri rezhime $REZHIM"; exit 1
           fi
           # ОТПРАВКИ -- ТОЛЬКО ПО ЯВНОМУ СЛОВУ. Это живые SOL; промах по кнопке
-          # не должен стоить денег.
-          if [ "$REZHIM" = opyt ] && [ "$PODTV" != otpravlyat ]; then
-            echo "SBOY: rezhim=opyt trebuet podtverzhdenie=otpravlyat"
+          # не должен стоить денег. Гонка тратит БОЛЬШЕ опыта, поэтому слово
+          # нужно и ей.
+          if { [ "$REZHIM" = opyt ] || [ "$REZHIM" = gonka ]; } \
+             && [ "$PODTV" != otpravlyat ]; then
+            echo "SBOY: rezhim=$REZHIM trebuet podtverzhdenie=otpravlyat"
             exit 1
           fi
-          echo "rezhim=$REZHIM otpravitel=$OTPRAVITEL raundov=$RAUNDOV"
+          echo "rezhim=$REZHIM otpravitel=$OTPRAVITEL raundov=$RAUNDOV otpraviteli=${OTPRAVITELI:-net}"
 
       - name: "SSH key"
         env:
@@ -126,6 +150,7 @@ jobs:
       - name: "Доставка на хост: каталог, параметры, скрипт опыта"
         env:
           OTPRAVITEL: ${{ inputs.otpravitel }}
+          OTPRAVITELI: ${{ inputs.otpraviteli }}
           RAUNDOV: ${{ inputs.raundov }}
           REZHIM: ${{ inputs.rezhim }}
         run: |
@@ -133,14 +158,18 @@ jobs:
           set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST 'rm -rf /tmp/zabor_s0_opyt; install -d -m 700 /tmp/zabor_s0_opyt'
           # Параметры отдельным файлом: тогда в команде ssh нечего подставлять.
-          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\n' "$OTPRAVITEL" "$RAUNDOV" "$REZHIM" > /tmp/zabor_params
+          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\nOTPRAVITELI=%s\n' \
+            "$OTPRAVITEL" "$RAUNDOV" "$REZHIM" "$OTPRAVITELI" > /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/params' < /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/c2_zabor_s0_opyt.py' < analysis/c2_zabor_s0_opyt.py
+          # МОДУЛЬ ГОНКИ ЕДЕТ ВСЕГДА, а не только в режиме gonka: лишний файл
+          # безвреден, а забытая доставка стоила бы прогона на живых SOL.
+          ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/c2_zabor_gonka.py' < analysis/c2_zabor_gonka.py
           ssh -n $SSH_OPTS root@$TARGET_HOST 'ls -la /tmp/zabor_s0_opyt'
           rm -f /tmp/zabor_params
 
       - name: "Секрет LIVE_TESTS на хост файлом 600 (не в argv, не в лог)"
-        if: ${{ inputs.rezhim == 'opyt' }}
+        if: ${{ inputs.rezhim == 'opyt' || inputs.rezhim == 'gonka' }}
         env:
           LIVE_TESTS: ${{ secrets.LIVE_TESTS }}
         run: |
@@ -169,8 +198,27 @@ jobs:
           # kolco". Takoj otchjot huzhe otsutstvija -- ego prochli by kak itog
           # opyta. Teper upavshij progon pokazat chuzhie chisla ne mozhet.
           rm -f /tmp/zabor_out.json
+          # OTCHJOT ZABIRAETSJA VSEGDA, A NE TOLKO PRI USPEHE.
+          # ZACHEM. Ranshe zabrat.sh stojal posle na_hoste.sh pod set -e: opyt,
+          # zakonchivshijsja OTKAZOM (kod 2), obryval shag, i otchjot ostavalsja
+          # LEZHAT NA HOSTE, a na begunok ne popadal vovse. Sledujushchij shag
+          # govoril "otchyota net -- stranicu ne pishem", i prichina otkaza byla
+          # vidna tolko v hvoste zhurnala shaga. Tak poterjany otchjoty trjoh
+          # progonov 30.09 (16:26Z, 17:02Z astralane, 17:08Z helius) -- a imenno
+          # v nih i lezhat chisla "ne ushlo i pochemu". Teper kod opyta
+          # zapominaetsja, otchjot zabiraetsja, i tolko potom shag padaet.
+          set +e
           ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/na_hoste.sh 2>&1 | tee /tmp/zabor_log.txt
-          ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/zabrat.sh > /tmp/zabor_out.json
+          KOD_OPYTA=${PIPESTATUS[0]}
+          set -e
+          ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/zabrat.sh > /tmp/zabor_out.json || true
+          if [ -s /tmp/zabor_out.json ]; then
+            echo "otchjot zabran s hosta: $(wc -c < /tmp/zabor_out.json) bajt"
+          else
+            echo "otchjota na hoste net -- zabirat nechego"
+          fi
+          echo "kod opyta: $KOD_OPYTA"
+          exit "$KOD_OPYTA"
 
       - name: "Если хост отказал -- показать конец его журнала"
         if: failure()
@@ -188,7 +236,7 @@ jobs:
           fi
 
       - name: "Секрета в журнале нет"
-        if: ${{ always() && inputs.rezhim == 'opyt' }}
+        if: ${{ always() && (inputs.rezhim == 'opyt' || inputs.rezhim == 'gonka') }}
         run: |
           set -e
           if [ -s /tmp/zabor_obrazec ] && [ -s /tmp/zabor_log.txt ]; then
