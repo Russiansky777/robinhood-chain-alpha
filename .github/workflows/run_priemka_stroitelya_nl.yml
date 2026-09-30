@@ -14,7 +14,7 @@ name: "Приёмка строителя любого типа пула (тол�
 # кладётся только сам харнесс, во временный каталог.
 #
 # СВОЙ КЛЮЧ HELIUS (п.4 слова владельца): если задан секрет
-# HELIUS_API_KEY_CHECKS, прогон кладёт его в HELIUS_API_KEY_CHECKS, и харнесс
+# HELIUS_API_KEY2, прогон кладёт его в HELIUS_API_KEY2, и харнесс
 # берёт именно его -- ключ служб при этом не трогается и перезапуск не нужен.
 # Секрета нет -- харнесс честно скажет, что взял общий ключ.
 #
@@ -168,7 +168,7 @@ jobs:
 
       - name: "Приёмка на хосте (ни подписи, ни отправки)"
         env:
-          KLJUCH_CHECKS: ${{ secrets.HELIUS_API_KEY_CHECKS }}
+          KLJUCH_CHECKS: ${{ secrets.HELIUS_API_KEY2 }}
         run: |
           set -e
           set -o pipefail
@@ -206,7 +206,7 @@ jobs:
           # процесса видны всем в ps, переменная окружения -- нет.
           if [ -n "$KLJUCH_CHECKS" ]; then
             printf '%s' "$KLJUCH_CHECKS" | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/kljuch; chmod 600 $RABOTA/kljuch; chown bot:bot $RABOTA/kljuch"
-            echo "kljuch harnessov zadan otdelno (HELIUS_API_KEY_CHECKS)"
+            echo "kljuch harnessov zadan otdelno (HELIUS_API_KEY2)"
           else
             echo "otdelnogo kljucha net -- harness vozmet obshchij i skazhet ob etom strokoj"
           fi
@@ -231,7 +231,7 @@ jobs:
           fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
-            if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY_CHECKS=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY_CHECKS; fi
+            if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY2=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY2; fi
             cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$KOD:$CODE_DIR BLOOM_CODE_DIR=$KOD $FLAGI \
               $VENV/python $RABOTA/priemka_stroitelya.py \
                 --program '${{ inputs.program }}' \

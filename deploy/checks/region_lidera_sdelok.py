@@ -33,7 +33,7 @@ HELIUS = "https://mainnet.helius-rpc.com"
 
 
 def урл() -> str:
-    к = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    к = (os.environ.get("HELIUS_API_KEY2")
          or os.environ.get("HELIUS_API_KEY")
          or os.environ.get("HELIUS_API") or "").strip()
     return f"{HELIUS}/?api-key={к}" if к else "https://api.mainnet-beta.solana.com"

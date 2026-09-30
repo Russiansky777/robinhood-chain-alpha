@@ -614,7 +614,7 @@ def main() -> int:
     # ветки, и счёт чужих продаж ниже падал бы NameError ровно в тех прогонах,
     # где место в блоке дозаполнять было не нужно.
     узел = None
-    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    ключ = (os.environ.get("HELIUS_API_KEY2")
             or os.environ.get("HELIUS_API_KEY") or "")
     нужны = [р_ for р_ in ряды if р_.get("our_block_index") is None]
     if а.bez_seti:

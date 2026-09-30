@@ -53,7 +53,7 @@ Whirlpool whirlpool, у следующего типа будет третье и
 корзин не хватает", отказ CLMM "уходит за край массива тиков" и общий "котировка
 пула не SOL" попадают куда надо без единой правки здесь.
 
-КЛЮЧ HELIUS -- СВОЙ: HELIUS_API_KEY_CHECKS, и только если его нет -- общий
+КЛЮЧ HELIUS -- СВОЙ: HELIUS_API_KEY2, и только если его нет -- общий
 HELIUS_API_KEY. Имя ключа печатается, значение -- никогда. Перезапуск служб для
 этого не нужен: меняется окружение прогона, а не хоста.
 
@@ -107,7 +107,7 @@ def ключ_и_имя() -> tuple:
 
     Значение ключа наружу не отдаётся никогда: печатается только имя.
     """
-    for имя in ("HELIUS_API_KEY_CHECKS", "HELIUS_API_KEY", "HELIUS_API"):
+    for имя in ("HELIUS_API_KEY2", "HELIUS_API_KEY", "HELIUS_API"):
         зн = (os.environ.get(имя) or "").strip()
         if зн:
             return зн, имя
@@ -1080,16 +1080,16 @@ def self_test() -> int:
 
     # КЛЮЧ: свой первым, значение не печатается.
     было = {и: os.environ.get(и) for и in
-             ("HELIUS_API_KEY_CHECKS", "HELIUS_API_KEY", "HELIUS_API")}
+             ("HELIUS_API_KEY2", "HELIUS_API_KEY", "HELIUS_API")}
     try:
         os.environ["HELIUS_API_KEY"] = "общий"
-        os.environ.pop("HELIUS_API_KEY_CHECKS", None)
+        os.environ.pop("HELIUS_API_KEY2", None)
         chk("без своего ключа берётся общий, и имя названо",
             ключ_и_имя() == ("общий", "HELIUS_API_KEY"), ключ_и_имя()[1])
-        os.environ["HELIUS_API_KEY_CHECKS"] = "свой"
+        os.environ["HELIUS_API_KEY2"] = "свой"
         chk("свой ключ харнессов важнее общего",
-            ключ_и_имя() == ("свой", "HELIUS_API_KEY_CHECKS"), ключ_и_имя()[1])
-        for и in ("HELIUS_API_KEY_CHECKS", "HELIUS_API_KEY", "HELIUS_API"):
+            ключ_и_имя() == ("свой", "HELIUS_API_KEY2"), ключ_и_имя()[1])
+        for и in ("HELIUS_API_KEY2", "HELIUS_API_KEY", "HELIUS_API"):
             os.environ.pop(и, None)
         chk("ключа нет вовсе -- имя 'не задан', а не пустая строка ключа",
             ключ_и_имя() == ("", "не задан"), ключ_и_имя())

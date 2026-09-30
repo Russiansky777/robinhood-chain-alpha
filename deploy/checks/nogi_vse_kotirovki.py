@@ -63,7 +63,7 @@ USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 
 
 def узел() -> str:
-    к = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    к = (os.environ.get("HELIUS_API_KEY2")
          or os.environ.get("HELIUS_API")
          or os.environ.get("HELIUS_API_KEY") or "").strip()
     if not к:

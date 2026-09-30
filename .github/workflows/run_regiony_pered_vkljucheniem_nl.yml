@@ -67,7 +67,7 @@ jobs:
 
       - name: "Свежесть карты регионов лидеров (эпоха и неизвестные лидеры)"
         env:
-          KLJUCH_CHECKS: ${{ secrets.HELIUS_API_KEY_CHECKS }}
+          KLJUCH_CHECKS: ${{ secrets.HELIUS_API_KEY2 }}
         run: |
           set -e
           set -o pipefail
@@ -100,7 +100,7 @@ jobs:
           esac
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
-            if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY_CHECKS=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY_CHECKS; fi
+            if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY2=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY2; fi
             cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python \
               $RABOTA/svezhest_karty_regionov.py \
               --karta $KARTA_PUT \

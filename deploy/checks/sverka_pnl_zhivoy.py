@@ -30,7 +30,7 @@ import requests
 
 
 def узел() -> str:
-    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    ключ = (os.environ.get("HELIUS_API_KEY2")
             or os.environ.get("HELIUS_API_KEY") or "")
     if not ключ:
         print("СТОП: HELIUS_API_KEY не задан -- цепь читать нечем", file=sys.stderr)

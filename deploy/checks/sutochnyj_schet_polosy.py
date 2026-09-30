@@ -35,7 +35,7 @@ HELIUS = "https://mainnet.helius-rpc.com"
 def зов(метод, параметры, *, таймаут=25.0):
     import urllib.request  # noqa: PLC0415
 
-    к = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    к = (os.environ.get("HELIUS_API_KEY2")
          or os.environ.get("HELIUS_API_KEY")
          or os.environ.get("HELIUS_API") or "").strip()
     тело = json.dumps({"jsonrpc": "2.0", "id": 1, "method": метод,

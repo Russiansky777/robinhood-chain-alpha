@@ -306,7 +306,7 @@ def main() -> int:
         try:
             import urllib.request  # noqa: PLC0415
 
-            ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+            ключ = (os.environ.get("HELIUS_API_KEY2")
                     or os.environ.get("HELIUS_API_KEY")
                     or os.environ.get("HELIUS_API") or "").strip()
             урл_ = f"https://mainnet.helius-rpc.com/?api-key={ключ}"

@@ -43,7 +43,7 @@ PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 
 
 def узел() -> str:
-    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    ключ = (os.environ.get("HELIUS_API_KEY2")
             or os.environ.get("HELIUS_API_KEY") or "")
     if not ключ:
         raise SystemExit("SBOY: net HELIUS_API_KEY v okruzhenii")

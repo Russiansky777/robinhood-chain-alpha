@@ -27,7 +27,7 @@ WSOL = "So11111111111111111111111111111111111111112"
 
 
 def узел() -> str:
-    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    ключ = (os.environ.get("HELIUS_API_KEY2")
             or os.environ.get("HELIUS_API")
             or os.environ.get("HELIUS_API_KEY") or "").strip()
     if not ключ:

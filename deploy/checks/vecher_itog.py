@@ -205,7 +205,7 @@ def длина_слота_замер(*, окно_с: float = 30.0) -> dict:
     """
     из_ = {"окно_с": окно_с, "константа_в_коде_с": 0.4, "измерено_с": None,
             "слотов": None, "why_not": None}
-    ключ = (os.environ.get("HELIUS_API_KEY_CHECKS")
+    ключ = (os.environ.get("HELIUS_API_KEY2")
             or os.environ.get("HELIUS_API_KEY") or "")
     if not ключ:
         из_["why_not"] = "HELIUS_API_KEY не задан"
