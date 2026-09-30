@@ -276,6 +276,13 @@ jobs:
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
           set -e
+          # pipefail ОБJAZATELEN: nizhe kod vozvrata pitona reshaet, byli shredy
+          # ili net, no on stoit v konvejere "python | tee", i bez pipefail
+          # pipeline otdajot kod TEE, to est vsegda nol. Iz-za etogo SHREDS_OK
+          # byl "yes" pri SHREDOV 0 (progon 36708373119), otchjot pechatal
+          # "shredy idut -- tcpdump ne nuzhen", a diagnostika pri nule shredov
+          # ne zapuskalas NIKOGDA.
+          set -o pipefail
           {
             echo ""
             echo "--- первые 60 секунд работы ---"
