@@ -1,0 +1,125 @@
+# Юнит: jito-shredstream-proxy в режиме ForwardOnly. НЕ ТОРГУЕТ, НЕ ПОДПИСЫВАЕТ.
+#
+# Что делает: принимает чужие UDP-шреды на 20001, собирает из них записи Solana и
+# отдаёт их по gRPC на 9999. Ни блок-энджина Jito, ни ключа, ни регионов здесь нет:
+# режим ForwardOnly объявлен в коде как "Does not request shreds from Jito", и поток
+# пульса (единственное место, где нужна аутентификация) запускается ТОЛЬКО в режиме
+# Shredstream.
+#
+# ДАТА ОТКЛЮЧЕНИЯ ShredStream (5 сентября 2026) НАС НЕ КАСАЕТСЯ, и это проверено по
+# коду, а не по надежде: проверка стоит под `if matches!(&shredstream_args,
+# ProxySubcommands::Shredstream(_))`, то есть только в том режиме. ForwardOnly
+# запускается и после этой даты. Прогон сборки проверяет это условие и падает, если
+# оно уедет.
+#
+# ПОРЯДОК: сначала прочитать docs/shredstream_proxy_kak_podnyat.md. Здесь только
+# юнит, и он НЕ поднимается сам.
+#
+# ---------------------------------------------------------------- ЧТО ПРАВИТЬ
+#  1. ExecStart: --src-bind-port -- порт, на который шлёт ИСТОЧНИК (у нас 20001,
+#     он уже открыт в ufw на два адреса замера).
+#  2. --grpc-service-port -- порт записей. НАРУЖУ ЕГО ОТКРЫВАТЬ НЕЛЬЗЯ: смотри ниже.
+#  3. IPAddressAllow -- раскомментировать ТОЛЬКО вместе с адресом источника, иначе
+#     шреды перестанут приходить совсем.
+#
+# ------------------------------------------- gRPC НА LOCALHOST: ФЛАГА ТАКОГО НЕТ
+# Это надо знать до запуска. Сервер записей биндится НА ВСЕ АДРЕСА, и адрес зашит
+# в коде:
+#     server::start_server_thread(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port), ...)
+# Флага для адреса у прокси НЕТ вовсе. Значит "gRPC только на localhost" делается
+# СНАРУЖИ процесса, двумя независимыми способами, и оба нужны:
+#   а) ufw: на хосте политика "deny (incoming)" по умолчанию, то есть порт записей
+#      снаружи и так закрыт -- плюс явное правило-ремень (см. страницу);
+#   б) systemd IPAddressDeny/IPAddressAllow ниже -- фильтр на самом юните.
+# Ни одно из двух не является "он слушает только localhost": он слушает всё, а мы
+# не даём до него дойти. Разница важная, и писать её надо честно.
+[Unit]
+Description=Jito shredstream proxy (ForwardOnly): chuzhie shredy -> zapisi Solana po gRPC
+Documentation=file:///home/bot/robinhood-chain-alpha/docs/shredstream_proxy_kak_podnyat.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bot
+Group=bot
+
+# ЖУРНАЛ. info хватает: прокси сам печатает принятое/отправленное каждые 60 с.
+# debug сюда ставить нельзя -- он пишет строку на шред.
+Environment=RUST_LOG=info
+
+# --------------------------------------------------------------- КОМАНДНАЯ СТРОКА
+# --dest-ip-ports ОБЯЗАТЕЛЕН, даже когда нам нужны только записи: без него и без
+# --endpoint-discovery-url прокси выходит с "No destinations found. You must provide
+# values for --dest-ip-ports or --endpoint-discovery-url." Поэтому ставим тупик на
+# себя: 127.0.0.1:20099, где никто не слушает. Пакеты туда уходят в никуда (ядро
+# отвечает себе же ICMP port unreachable), наружу не идёт ничего.
+#
+# --multicast-subscribe-port ОТВЕДЁН ОТ 20001 НАРОЧНО. По умолчанию он РАВЕН 20001,
+# и если на устройстве найдётся многоадресный маршрут, прокси попробует занять
+# 0.0.0.0:20001 вторым сокетом -- ровно тот порт, на котором мы слушаем источника.
+# Наше устройство (--multicast-device, по умолчанию doublezero1) на хосте не
+# существует, и тогда многоадресный слушатель просто пропускается; но полагаться на
+# отсутствие устройства нельзя -- порт разведён.
+#
+# --num-threads 2: прокси по умолчанию берёт до 4. Торговый путь важнее шредов.
+ExecStart=/home/bot/shredstream/jito-shredstream-proxy \
+  forward-only \
+  --src-bind-addr 0.0.0.0 \
+  --src-bind-port 20001 \
+  --multicast-subscribe-port 20098 \
+  --dest-ip-ports 127.0.0.1:20099 \
+  --grpc-service-port 9999 \
+  --num-threads 2 \
+  --metrics-report-interval-ms 60000
+
+Restart=on-failure
+RestartSec=5
+# Прокси не пишет состояния вовсе -- каталог только для порядка и прав.
+WorkingDirectory=/home/bot/shredstream
+
+# ------------------------------------------------- НЕ ЗАДЕВАТЬ ТОРГОВЫЙ ПУТЬ
+# Те же рычаги, что у слушателя шредов: приоритет ниже всех, доля процессора
+# ограничена, ввод-вывод в последнюю очередь.
+Nice=19
+CPUWeight=20
+IOWeight=20
+CPUQuota=120%
+MemoryMax=2G
+IOSchedulingClass=idle
+
+# ------------------------------------------------- ПЕСОЧНИЦА
+# Прокси не пишет файлов, не нужен ему и доступ к дому: всё только на чтение.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/bot/shredstream
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+# Прокси читает многоадресные маршруты через `ip --json route show` -- это
+# подпроцесс, и запрещать их нельзя, иначе в журнале будет непонятный сбой.
+# AF_NETLINK нужен самому `ip`.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+# ------------------------------------------------- ФИЛЬТР АДРЕСОВ (ремень к ufw)
+# СТРОКИ НИЖЕ РАСКОММЕНТИРОВАТЬ ВМЕСТЕ И ТОЛЬКО ПОСЛЕ ТОГО, КАК ВПИСАН АДРЕС
+# ИСТОЧНИКА ШРЕДОВ. IPAddressDeny=any закрывает юниту и вход, и выход, поэтому без
+# строки источника шреды перестанут приходить ВОВСЕ, и это будет выглядеть как
+# "прокси не работает".
+#
+# Проверить, кто на самом деле шлёт, можно до запуска -- страница показывает как.
+# Адреса, которые уже открыты в ufw на 20001 по замеру: 64.130.43.48 и 67.209.53.15.
+#
+# IPAddressDeny=any
+# IPAddressAllow=localhost
+# IPAddressAllow=64.130.43.48/32
+# IPAddressAllow=67.209.53.15/32
+
+[Install]
+WantedBy=multi-user.target

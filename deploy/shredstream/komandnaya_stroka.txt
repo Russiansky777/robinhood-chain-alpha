@@ -1,0 +1,47 @@
+КОМАНДНАЯ СТРОКА ForwardOnly -- одной строкой, для проверки руками до юнита.
+Прочитано по коммиту b96e369f3165600c02182e3d8e1d01b6aada9fdb (версия 0.2.13).
+
+  RUST_LOG=info /home/bot/shredstream/jito-shredstream-proxy \
+    forward-only \
+    --src-bind-addr 0.0.0.0 \
+    --src-bind-port 20001 \
+    --multicast-subscribe-port 20098 \
+    --dest-ip-ports 127.0.0.1:20099 \
+    --grpc-service-port 9999 \
+    --num-threads 2 \
+    --metrics-report-interval-ms 60000
+
+ПОЧЕМУ ИМЕННО ТАК -- по строкам кода, а не по вкусу:
+
+  forward-only                 подкоманда ProxySubcommands::ForwardOnly(CommonArgs):
+                               "Does not request shreds from Jito". Ни --block-engine-url,
+                               ни --auth-keypair, ни --desired-regions не нужны и не
+                               принимаются. Проверка даты отключения ShredStream
+                               (5 сентября 2026) стоит только в ветке Shredstream --
+                               этот режим она не касается.
+  --src-bind-port 20001        ОДНОАДРЕСНЫЙ приём, то есть то, куда шлёт источник.
+                               По умолчанию 20000; у нас в ufw открыт 20001.
+  --multicast-subscribe-port   по умолчанию РАВЕН 20001 и мог бы столкнуться с
+    20098                      приёмом выше. Разведён нарочно.
+  --dest-ip-ports 127.0.0.1:   ОБЯЗАТЕЛЕН. Без него (и без --endpoint-discovery-url)
+    20099                      прокси выходит: "No destinations found." Нам нужны
+                               только записи, поэтому тупик на себя, где никто не
+                               слушает.
+  --grpc-service-port 9999     "GRPC port for serving decoded shreds as Solana
+                               entries". Лежит в CommonArgs, то есть работает и в
+                               ForwardOnly. ВАЖНО: сервер биндится на 0.0.0.0, адрес
+                               зашит в коде, флага для него НЕТ -- закрывать порт
+                               надо снаружи (ufw + фильтр юнита).
+  --num-threads 2              по умолчанию до 4. Торговый путь важнее.
+  --metrics-report-interval-ms прокси печатает сводку принятого/отправленного;
+    60000                      15 000 по умолчанию -- слишком часто для журнала.
+
+ЧЕГО В СТРОКЕ НЕТ И ПОЧЕМУ:
+  --public-ip        не нужен: его читают только в потоке пульса (режим Shredstream).
+                     В ForwardOnly обращения к ifconfig.me не происходит вовсе.
+  --debug-trace-shred НЕ ставить: пишет строку на шред.
+  --endpoint-discovery-url / --discovered-endpoints-port -- только парой, и нам не нужны.
+
+Все флаги объявлены с `env`, то есть то же самое можно задать переменными
+(SRC_BIND_PORT, GRPC_SERVICE_PORT, DEST_IP_PORTS и так далее). В юните оставлены
+флаги: в командной строке видно, что именно запущено.
