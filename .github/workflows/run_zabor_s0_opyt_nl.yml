@@ -156,8 +156,31 @@ jobs:
         run: |
           set -e
           set -o pipefail
+          # OTCHJOT PROSHLOGO PROGONA UBIRAETSJA DO ZAPUSKA. Pri set -o pipefail
+          # padenie na_hoste.sh obryvaet shag, i zabrat.sh NE zapuskaetsja -- a
+          # /tmp/zabor_out.json na begunke ostajotsja OT PROSHLOGO PROGONA.
+          # Imenno tak 30.09 15:55Z progon opyt upal, a stranica sobralas iz
+          # otchjota kolco: bajt v bajt ta zhe, 861 bajt, s zagolovkom "rezhim
+          # kolco". Takoj otchjot huzhe otsutstvija -- ego prochli by kak itog
+          # opyta. Teper upavshij progon pokazat chuzhie chisla ne mozhet.
+          rm -f /tmp/zabor_out.json
           ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/na_hoste.sh 2>&1 | tee /tmp/zabor_log.txt
           ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/zabrat.sh > /tmp/zabor_out.json
+
+      - name: "Если хост отказал -- показать конец его журнала"
+        if: failure()
+        run: |
+          set -e
+          # ZACHEM. Prichina otkaza na hoste ostavalas tolko v zhurnale shaga, i
+          # ejo prihodilos dobyvat hvostami zadnim chislom. Teper progon sam
+          # pokazyvaet konec /tmp/zabor_log.txt -- sekret v njom uzhe proveren
+          # otdelnym shagom, a pri padenii do nego zhurnal vsjo ravno nuzhen.
+          if [ -s /tmp/zabor_log.txt ]; then
+            echo "--- konec zhurnala hosta (40 strok) ---"
+            tail -40 /tmp/zabor_log.txt
+          else
+            echo "zhurnala hosta net ili on pust -- otkaz sluchilsja do zapuska"
+          fi
 
       - name: "Секрета в журнале нет"
         if: ${{ always() && inputs.rezhim == 'opyt' }}
