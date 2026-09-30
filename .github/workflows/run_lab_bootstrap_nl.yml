@@ -1,0 +1,471 @@
+name: "Лаборатория (Miami / AMS): свой ключ, бегунок lab-*, окружение зондов"
+
+# ЗАЧЕМ (пакеты владельца 30.09: вечерний п.3 и ночной п.1). ДВА
+# ЛАБОРАТОРНЫХ сервера ExtraVM, на каждом ровно три вещи: свой ключ, бегунок с
+# меткой lab-<машина> и питон как у зондов.
+#   miami  169.128.191.158  6 ядер  -- под архивы Code-2
+#   ams    216.73.157.61    2 ядра  -- под зонды
+# Машина выбирается входом `mashina`, и ОДИН прогон служит обеим: два почти
+# одинаковых файла разошлись бы правками, и гейт, добавленный в один, тихо
+# отсутствовал бы в другом.
+#
+# ЧЕГО НА НЁМ НЕ ДОЛЖНО БЫТЬ НИКОГДА (слово владельца): ключей кошельков, env
+# полосы, торговых служб. Это не пожелание, а проверка: шаг "лаборатория чиста"
+# ищет их на хосте и роняет прогон, если нашёл. Лучше отказ установки, чем
+# лабораторный сервер, на котором однажды оказался ключ кошелька.
+#
+# ПОЧЕМУ ОТДЕЛЬНЫЙ КЛЮЧ, А НЕ ОБЩИЙ. При установке ExtraVM положил на хост
+# ОБЩИЙ ключ «Claude» -- тот же, которым открывается торговый NL-хост. Пока он
+# там, лаборатория и деньги живут на одном ключе: доступ к лаборатории есть
+# доступ к торговому хосту. Поэтому прогон работает ТОЛЬКО со своим
+# ключом машины (VPS_SSH_KEY_MIAMI / VPS_SSH_KEY_AMS), а общий убирает
+# ОТДЕЛЬНЫМ входом и лишь после того, как
+# свой ключ доказал, что работает (иначе мы закрыли бы себе дверь снаружи).
+on:
+  workflow_dispatch:
+    inputs:
+      mashina:
+        description: "какая лаборатория: miami (6 ядер) или ams (2 ядра)"
+        required: false
+        default: "miami"
+        type: choice
+        options: ["miami", "ams"]
+      labels:
+        description: "метки бегунка через запятую (пусто -- lab-<машина>)"
+        required: false
+        default: ""
+      runner_user:
+        description: "системный пользователь бегунка (не root)"
+        required: false
+        default: "ghrunner"
+      stavit_begunok:
+        description: "'yes' -- ставить бегунок; 'no' -- только проверки и окружение"
+        required: false
+        default: "yes"
+      postavit_svoj_kljuch:
+        description: "'yes' -- поставить публичную половину ключа машины в authorized_keys хоста, подключившись ОБЩИМ ключом (один раз, до первой установки)"
+        required: false
+        default: "no"
+      ubrat_obshchij_kljuch:
+        description: "'UBRAT' -- убрать общий ключ «Claude» из authorized_keys root (только после того, как свой ключ сработал)"
+        required: false
+        default: ""
+      remove:
+        description: "'yes' -- снять бегунок и удалить его службу"
+        required: false
+        default: "no"
+
+concurrency:
+  group: lab-${{ inputs.mashina }}-bootstrap
+  cancel-in-progress: false
+
+env:
+  # Запасное число: заявленный GitHub минимум для регистрации на 30.09.
+  # Рабочее значение шаг "Версия бегунка" берёт у самого GitHub.
+  RUNNER_VERSION: "2.329.0"
+  # HOST, JADER_ZHDJOM, METKA_OSN и OUT_FILE ставит первый шаг по входу
+  # `mashina`: держать их здесь значило бы держать два файла прогона.
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "КАКАЯ МАШИНА: адрес, ядра, метка, файл отчёта"
+        run: |
+          set -e
+          # ЗАЧЕМ ЗДЕСЬ, А НЕ В env. Один прогон обслуживает обе лаборатории, и
+          # адрес с числом ядер -- не украшение, а гейт: ядра сверяются на
+          # хосте, и промах адресом виден до любой правки. Неизвестная машина --
+          # отказ, а не "возьмём Miami по умолчанию".
+          case "${{ inputs.mashina }}" in
+            miami) HOST=169.128.191.158; JADER=6 ;;
+            ams)   HOST=216.73.157.61;   JADER=2 ;;
+            *) echo "OTKAZ: mashina '${{ inputs.mashina }}' neizvestna -- tolko miami ili ams"; exit 1 ;;
+          esac
+          METKA_OSN="lab-${{ inputs.mashina }}"
+          METKI="${{ inputs.labels }}"
+          [ -n "$METKI" ] || METKI="$METKA_OSN"
+          OUT="data/lab_${{ inputs.mashina }}_bootstrap.txt"
+          {
+            echo "HOST=$HOST"
+            echo "JADER_ZHDJOM=$JADER"
+            echo "METKA_OSN=$METKA_OSN"
+            echo "METKI=$METKI"
+            echo "OUT_FILE=$OUT"
+          } >> "$GITHUB_ENV"
+          echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT"
+          echo "mashina ${{ inputs.mashina }}, host $HOST, jader zhdjom $JADER, metki $METKI" >> "$OUT"
+
+      - name: "СВОЙ ключ этой машины -- иначе прогон не идёт"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+          KLJUCH_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
+        run: |
+          set -e
+          # У КАЖДОЙ ЛАБОРАТОРИИ СВОЙ КЛЮЧ, и берётся он по выбранной машине.
+          # Оба секрета приходят сюда, но на диск ложится ровно один: ключ
+          # чужой машины не должен оказаться в файле, которым идут шаги.
+          case "${{ inputs.mashina }}" in
+            miami) KLJUCH="$KLJUCH_MIAMI"; IMJA_SEKRETA=VPS_SSH_KEY_MIAMI ;;
+            ams)   KLJUCH="$KLJUCH_AMS";   IMJA_SEKRETA=VPS_SSH_KEY_AMS ;;
+          esac
+          if [ -z "$KLJUCH" ]; then
+            echo "OTKAZ: sekreta $IMJA_SEKRETA net."
+            echo "Lab-server ne stavitsja na OBSHCHEM kljuche: poka on tot zhe, chto"
+            echo "u torgovogo NL-hosta, dostup k laboratorii = dostup k dengam."
+            echo "Nuzhno ODNO dejstvie vladelca:"
+            echo "  1) ssh-keygen -t ed25519 -f ~/.ssh/lab_${{ inputs.mashina }} -C $METKA_OSN -N ''"
+            echo "  2) soderzhimoe fajla (PRIVATNAJA polovina) -- v sekret $IMJA_SEKRETA"
+            echo "Publichnuju polovinu na host postavit SAM progon: zapustite ego s"
+            echo "vhodom postavit_svoj_kljuch=yes -- on vychislit ejo iz privatnoj i"
+            echo "dopishet v authorized_keys, podkljuchivshis obshchim kljuchom."
+            exit 1
+          fi
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KLJUCH" > ~/.ssh/lab_key
+          chmod 600 ~/.ssh/lab_key
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+          echo "kljuch $IMJA_SEKRETA prinjat: dlina $(wc -c < ~/.ssh/lab_key) bajt, sha256 $(sha256sum ~/.ssh/lab_key | cut -c1-16)…" >> "$OUT_FILE"
+
+      - name: "Свой ключ поставить на хост ОБЩИМ ключом (один раз)"
+        if: ${{ inputs.postavit_svoj_kljuch == 'yes' }}
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ЭТОТ ШАГ. Секрет с ПРИВАТНОЙ половиной может положить только
+          # владелец. А вот ПУБЛИЧНУЮ половину на хост поставить можно и здесь:
+          # она вычисляется из приватной (`ssh-keygen -y`), и приватная при этом
+          # никуда не печатается. Так действие владельца ровно одно -- завести
+          # секрет; дверь своим ключом открывает уже прогон.
+          #
+          # ПОДКЛЮЧАЕМСЯ ОБЩИМ КЛЮЧОМ, и это единственное место, где он нужен:
+          # дальше все шаги идут своим. Общий ключ убирается отдельным входом и
+          # только после того, как свой доказал, что работает.
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: obshchego kljucha VPS_SSH_KEY net -- postavit svoj nechem"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/obshchij_key
+          chmod 600 ~/.ssh/obshchij_key
+          SVOJ_PUB=$(ssh-keygen -y -f ~/.ssh/lab_key)
+          echo "svoj publichnyj kljuch (nachalo): $(echo "$SVOJ_PUB" | cut -c1-40)…" | tee -a "$OUT_FILE"
+          printf '%s\n' "$SVOJ_PUB" | ssh -i ~/.ssh/obshchij_key -o ConnectTimeout=15 \
+            -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@$HOST "
+            set -e
+            SVOJ=\$(cat)
+            install -d -m 700 /root/.ssh
+            touch /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys
+            if grep -qF \"\$SVOJ\" /root/.ssh/authorized_keys; then
+              echo 'svoj kljuch v authorized_keys uzhe est -- nichego ne menjaju'
+            else
+              cp -a /root/.ssh/authorized_keys /root/.ssh/authorized_keys.bak.\$(date -u +%Y%m%dT%H%M%SZ)
+              printf '%s\n' \"\$SVOJ\" >> /root/.ssh/authorized_keys
+              echo 'svoj kljuch dopisan v authorized_keys (kopija rjadom)'
+            fi
+            echo \"strok v authorized_keys: \$(wc -l < /root/.ssh/authorized_keys)\"" | tee -a "$OUT_FILE"
+          # И СРАЗУ ПРОВЕРЯЕМ СВОИМ: без этого "поставили" -- это обещание.
+          ssh -n $SSH_OPTS root@$HOST "echo 'svoj kljuch rabotaet: soedinenie proshlo'" | tee -a "$OUT_FILE"
+          rm -f ~/.ssh/obshchij_key
+
+      - name: "ТОТ ЛИ СЕРВЕР: адрес, ядра, время"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Промах адресом на лабораторном прогоне безобиден, а на
+          # торговом -- нет. Проверка ядер ловит подмену адреса до любой правки:
+          # у miami их 6, у ams 2.
+          ssh -n $SSH_OPTS root@$HOST "
+            echo \"hostname: \$(hostname)\"
+            echo \"jader: \$(nproc)\"
+            echo \"adresa: \$(hostname -I)\"
+            echo \"vremja: \$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" | tee -a "$OUT_FILE"
+          JADER=$(ssh -n $SSH_OPTS root@$HOST "nproc")
+          [ "$JADER" = "$JADER_ZHDJOM" ] || {
+            echo "OTKAZ: jader $JADER, a u ${{ inputs.mashina }} dolzhno byt $JADER_ZHDJOM -- adres ne tot"; exit 1; }
+          echo "server tot: jader $JADER" | tee -a "$OUT_FILE"
+
+      - name: "ЛАБОРАТОРИЯ ЧИСТА: ни ключей кошельков, ни env полосы, ни торговых служб"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ЭТО ПРОВЕРКОЙ, А НЕ ОБЕЩАНИЕМ. Слово владельца: "ключей
+          # кошельков, env полосы, торговых служб -- никогда". Обещание живёт
+          # ровно до первого прогона, который что-то скопирует "на минутку";
+          # проверка роняет прогон и называет находку.
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            NAJDENO=0
+            for P in /etc/bloom-executor /home/bot/bloom_executor /home/bot/bloom_executor_live_data; do
+              if [ -e \"\$P\" ]; then echo \"NAJDENO: \$P\"; NAJDENO=1; fi
+            done
+            for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe shred-listener; do
+              if systemctl list-unit-files \"\$S.service\" 2>/dev/null | grep -q \"\$S\"; then
+                echo \"NAJDENO: sluzhba \$S\"; NAJDENO=1
+              fi
+            done
+            # Имена ключей кошельков ищутся ПО ИМЕНИ ПЕРЕМЕННОЙ, значения не
+            # печатаются никогда.
+            if grep -rlE '(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)' /etc /home 2>/dev/null | head -3 | grep -q .; then
+              echo 'NAJDENO: imja kljucha koshelka v fajlah /etc ili /home'
+              NAJDENO=1
+            fi
+            if [ \"\$NAJDENO\" = 1 ]; then
+              echo 'OTKAZ: eto ne chistaja laboratorija -- na nej est torgovoe'
+              exit 1
+            fi
+            echo 'laboratorija chista: ni env polosy, ni torgovyh sluzhb, ni imjon kljuchej koshelkov'" | tee -a "$OUT_FILE"
+
+      - name: "Питон как у зондов (venv пользователя бегунка, без ключей)"
+        if: ${{ inputs.remove != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          RUNNER_USER="${{ inputs.runner_user }}"
+          # ЗАЧЕМ ИМЕННО ЭТИ ПАКЕТЫ. Зонды на NL-хосте живут в venv и просят
+          # requests (узел), websockets (подписка), grpcio+protobuf (дешред),
+          # solders+base58 (разбор транзакций). Ставим тот же набор: иначе
+          # перенос зонда на лабораторию упадёт на импорте, и это выяснится
+          # посреди замера.
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            id -u $RUNNER_USER >/dev/null 2>&1 || useradd -m -s /bin/bash $RUNNER_USER
+            apt-get update -qq >/dev/null 2>&1 || true
+            apt-get install -y --no-install-recommends python3-venv python3-pip curl tar git >/dev/null 2>&1 || true
+            sudo -u $RUNNER_USER bash -lc '
+              set -e
+              test -d ~/venv || python3 -m venv ~/venv
+              ~/venv/bin/pip -q install --upgrade pip
+              ~/venv/bin/pip -q install requests websockets grpcio protobuf solders base58
+              ~/venv/bin/python -c \"import requests, websockets, grpc, google.protobuf, solders, base58; print(\\\"okruzhenie zondov: import proshjol\\\")\"
+            '" | tee -a "$OUT_FILE"
+
+      - name: "Снять бегунок (по входу remove=yes)"
+        if: ${{ inputs.remove == 'yes' }}
+        run: |
+          set -e
+          RUNNER_USER="${{ inputs.runner_user }}"
+          ssh -n $SSH_OPTS root@$HOST "
+            systemctl stop 'actions.runner.*' 2>/dev/null || true
+            if [ -d /home/$RUNNER_USER/actions-runner ]; then
+              cd /home/$RUNNER_USER/actions-runner
+              # 'svc.sh uninstall' ot polzovatelja begunka NE mozhet udalit
+              # junit iz /etc/systemd/system -- imenno poetomu junit ostalsja
+              # i ustanovka v progone 6 upala ('error: exists ...'). Snimaem ot
+              # root i proverjaem, chto junita bolshe net.
+              ./svc.sh uninstall >/dev/null 2>&1 || true
+              # Bez etogo 'snjali' znachilo by tolko sluzhbu: nastrojka
+              # ostavalas, i sledujushchaja ustanovka padala.
+              sudo -u $RUNNER_USER ./config.sh remove --local >/dev/null 2>&1 || true
+              rm -f .runner .credentials .credentials_rsaparams
+            fi
+            OSTALOS=\$(ls /etc/systemd/system/actions.runner.*.service 2>/dev/null | wc -l)
+            if [ \$OSTALOS != 0 ]; then
+              rm -f /etc/systemd/system/actions.runner.*.service
+              systemctl daemon-reload
+              echo junitov begunka ubrali vruchnuju: \$OSTALOS
+            fi
+            echo 'sluzhba i nastrojka begunka snjaty'" | tee -a "$OUT_FILE"
+
+      - name: "Токен регистрации: из PAT или готовый из секрета"
+        if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
+        env:
+          GH_RUNNER_PAT: ${{ secrets.GH_RUNNER_PAT }}
+          GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+        run: |
+          set -e
+          if [ -n "$GH_RUNNER_TOKEN" ]; then
+            echo "::add-mask::$GH_RUNNER_TOKEN"
+            printf '%s' "$GH_RUNNER_TOKEN" > /tmp/reg_token
+            echo "token registracii iz sekreta GH_RUNNER_TOKEN"
+          elif [ -n "$GH_RUNNER_PAT" ]; then
+            HTTP_CODE=$(curl -sS -o /tmp/reg.json -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $GH_RUNNER_PAT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runners/registration-token")
+            if [ "$HTTP_CODE" != "201" ]; then
+              echo "SBOY: API vernul $HTTP_CODE (nuzhno pravo administration:write)"
+              python3 -c "import json;print(json.load(open('/tmp/reg.json')).get('message','bez soobshchenija'))" || true
+              exit 1
+            fi
+            python3 -c "import json;print(json.load(open('/tmp/reg.json'))['token'],end='')" > /tmp/reg_token
+            echo "::add-mask::$(cat /tmp/reg_token)"
+            echo "token registracii vzjat po PAT"
+          else
+            echo "SBOY: net ni GH_RUNNER_TOKEN, ni GH_RUNNER_PAT"
+            exit 1
+          fi
+          [ -s /tmp/reg_token ] || { echo "SBOY: token registracii pust"; exit 1; }
+
+      - name: "Версия бегунка: спросить у GitHub, не держать в файле"
+        if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
+        run: |
+          set -e
+          # GitHub отказал прошитой 2.321.0: "minimum runner version required
+          # to register with GitHub Actions is now 2.329.0". Минимум растёт, а
+          # прошитое число стареет молча, поэтому версию спрашиваем у GitHub;
+          # RUNNER_VERSION из env -- только запасной путь, и в отчёте видно,
+          # какой путь сработал.
+          HTTP_CODE=$(curl -sS -o /tmp/rel.json -w '%{http_code}' \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/actions/runner/releases/latest || echo 000)
+          VER=""
+          if [ "$HTTP_CODE" = "200" ]; then
+            VER=$(tr ',' '\n' < /tmp/rel.json | grep -m1 '"tag_name"' \
+                  | grep -o '[0-9][0-9.]*' | head -1)
+          fi
+          case "$VER" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) VER="" ;;
+          esac
+          if [ -z "$VER" ]; then
+            echo "versija begunka: u GitHub ne sprosili (http $HTTP_CODE, tag_name ne razobran) -- berjom zapasnoj minimum $RUNNER_VERSION" | tee -a "$OUT_FILE"
+          elif [ "$(printf '%s\n%s\n' "$VER" "$RUNNER_VERSION" | sort -V | head -1)" != "$RUNNER_VERSION" ]; then
+            echo "versija begunka: GitHub nazval $VER, eto men'she minimuma $RUNNER_VERSION -- berjom minimum" | tee -a "$OUT_FILE"
+          else
+            echo "versija begunka: $VER (poslednij vypusk actions/runner; zapasnoj minimum $RUNNER_VERSION)" | tee -a "$OUT_FILE"
+            echo "RUNNER_VERSION=$VER" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Бегунок lab-<машина>"
+        if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          RUNNER_USER="${{ inputs.runner_user }}"
+          RUNNER_LABELS="$METKI"
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            install -d -o $RUNNER_USER -g $RUNNER_USER -m 750 /home/$RUNNER_USER/actions-runner
+            cd /home/$RUNNER_USER/actions-runner
+            # Метка версии рядом с пакетом: без неё уже распакованный старый
+            # бегунок остаётся лежать и снова не проходит регистрацию.
+            EST=net
+            [ -f .postavlennaja_versija ] && EST=\$(cat .postavlennaja_versija)
+            if [ ! -x ./config.sh ] || [ \$EST != '${RUNNER_VERSION}' ]; then
+              echo stavim paket begunka ${RUNNER_VERSION}, bylo \$EST
+              curl -sSL -o /tmp/runner.tar.gz \
+                https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
+              tar xzf /tmp/runner.tar.gz -C /home/$RUNNER_USER/actions-runner
+              echo '${RUNNER_VERSION}' > .postavlennaja_versija
+              chown -R $RUNNER_USER:$RUNNER_USER /home/$RUNNER_USER/actions-runner
+              rm -f /tmp/runner.tar.gz
+            else
+              echo paket begunka uzhe ${RUNNER_VERSION}
+            fi
+            ./bin/installdependencies.sh >/dev/null 2>&1 || true
+            echo 'paket begunka na meste'" | tee -a "$OUT_FILE"
+          # Токен -- через stdin: в argv его видно в ps любому на хосте.
+          cat /tmp/reg_token | ssh $SSH_OPTS root@$HOST "
+            set -e
+            REG_TOKEN=\$(cat)
+            cd /home/$RUNNER_USER/actions-runner
+            # Sluzhbu snimaem PERVOJ i ot root: './svc.sh install' otkazyvaet,
+            # poka junit lezhit ('error: exists /etc/systemd/system/...'), a ot
+            # polzovatelja begunka junit ne udalit. Progon 6 upal imenno zdes.
+            systemctl stop 'actions.runner.*' 2>/dev/null || true
+            [ -f .service ] && ./svc.sh uninstall >/dev/null 2>&1 || true
+            OSTALOS=\$(ls /etc/systemd/system/actions.runner.*.service 2>/dev/null | wc -l)
+            if [ \$OSTALOS != 0 ]; then
+              rm -f /etc/systemd/system/actions.runner.*.service
+              systemctl daemon-reload
+              echo junitov begunka ubrali vruchnuju: \$OSTALOS
+            fi
+            # Staryj _diag ubiraem DO nastrojki: inache proverka 'Listening for
+            # Jobs' nashla by stroku proshlogo begunka i pozelenela by vpustuju.
+            rm -rf _diag
+            # I staruju MESTNUJU nastrojku tozhe: --replace menjaet zapis na
+            # storone GitHub, a mestnyj .runner ostajotsja, i config.sh
+            # otkazyvaet: 'Cannot configure the runner because it is already
+            # configured'. Imenno na etom upal progon 5.
+            if [ -f .runner ]; then
+              sudo -u $RUNNER_USER ./config.sh remove --local >/dev/null 2>&1 || true
+              rm -f .runner .credentials .credentials_rsaparams
+              echo staruju mestnuju nastrojku begunka ubrali
+            fi
+            sudo -u $RUNNER_USER ./config.sh --unattended --replace \
+              --url https://github.com/${{ github.repository }} \
+              --token \$REG_TOKEN --name $METKA_OSN --labels '$RUNNER_LABELS' --work _work
+            ./svc.sh install $RUNNER_USER
+            ./svc.sh start
+            sleep 3
+            systemctl list-units 'actions.runner.*' --no-legend | head -3" | tee -a "$OUT_FILE"
+
+      - name: "Проверка: бегунок активен и зарегистрирован"
+        if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          RUNNER_USER="${{ inputs.runner_user }}"
+          ssh -n $SSH_OPTS root@$HOST "
+            set -e
+            systemctl list-units 'actions.runner.*' --no-legend > /tmp/units
+            test -s /tmp/units || { echo 'SBOY: sluzhby begunka net'; exit 1; }
+            grep -q ' active ' /tmp/units || { echo 'SBOY: sluzhba begunka ne active'; cat /tmp/units; exit 1; }
+            test -s /home/$RUNNER_USER/actions-runner/.runner || { echo 'SBOY: registracii net'; exit 1; }
+            # 'active' cherez 3 ms posle starta ne govorit nichego: slushatel
+            # mozhet upast srazu posle. Zhdjom ego sobstvennoj stroki
+            # 'Listening for Jobs' v diag-zhurnale -- ona znachit, chto begunok
+            # soedinjon s GitHub i gotov brat rabotu.
+            GOTOV=net
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+              if grep -rqs 'Listening for Jobs' /home/$RUNNER_USER/actions-runner/_diag/; then GOTOV=da; break; fi
+              sleep 2
+            done
+            [ \$GOTOV = da ] || { echo 'SBOY: v zhurnale net Listening for Jobs za 30 s'; tail -5 /home/$RUNNER_USER/actions-runner/_diag/Runner_*.log 2>/dev/null; exit 1; }
+            grep -rhs 'Listening for Jobs' /home/$RUNNER_USER/actions-runner/_diag/ | tail -1
+            echo 'begunok aktiven, zaregistrirovan i slushaet raboty'" | tee -a "$OUT_FILE"
+
+      - name: "Общий ключ «Claude» убрать -- только по слову и только после своего"
+        if: ${{ inputs.ubrat_obshchij_kljuch == 'UBRAT' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ПОРЯДОК ЗДЕСЬ -- ГЛАВНОЕ. Сначала доказываем, что СВОЙ ключ уже
+          # работает (мы им и подключились -- все шаги выше прошли), и только
+          # потом убираем общий. Обратный порядок один раз закрывает дверь
+          # снаружи, и открыть её будет нечем: у лаборатории нет второго пути.
+          #
+          # Свой публичный ключ вычисляется ИЗ ПРИВАТНОГО на бегунке -- так
+          # строка, которую надо сохранить, не берётся на слово.
+          SVOJ_PUB=$(ssh-keygen -y -f ~/.ssh/lab_key)
+          echo "svoj publichnyj kljuch (nachalo): $(echo "$SVOJ_PUB" | cut -c1-40)…" | tee -a "$OUT_FILE"
+          printf '%s\n' "$SVOJ_PUB" | ssh $SSH_OPTS root@$HOST "
+            set -e
+            SVOJ=\$(cat)
+            F=/root/.ssh/authorized_keys
+            test -s \$F || { echo 'SBOY: authorized_keys pust -- ubirat nechego'; exit 1; }
+            cp -a \$F \$F.bak.\$(date -u +%Y%m%dT%H%M%SZ)
+            # СВОЙ ключ обязан быть в файле ДО правки: иначе мы уберём всё.
+            grep -qF \"\$SVOJ\" \$F || { echo 'SBOY: svoego kljucha v authorized_keys net -- nichego ne ubiraju'; exit 1; }
+            # Оставляем РОВНО свой ключ. Остальные строки (в том числе общий
+            # «Claude») уходят; копия рядом, если понадобится вернуть.
+            printf '%s\n' \"\$SVOJ\" > \$F.new
+            chmod 600 \$F.new && chown root:root \$F.new
+            STROK_BYLO=\$(wc -l < \$F); STROK_STALO=\$(wc -l < \$F.new)
+            mv \$F.new \$F
+            echo \"authorized_keys: bylo strok \$STROK_BYLO, stalo \$STROK_STALO (kopija rjadom)\"" | tee -a "$OUT_FILE"
+          # И СРАЗУ ПРОВЕРЯЕМ, что дверь открывается: новое соединение своим ключом.
+          ssh -n $SSH_OPTS root@$HOST "echo 'svoj kljuch posle pravki rabotaet'" | tee -a "$OUT_FILE"
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT_FILE" 2>/dev/null || true
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Lab ${{ inputs.mashina }}: bootstrap, otchjot [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
