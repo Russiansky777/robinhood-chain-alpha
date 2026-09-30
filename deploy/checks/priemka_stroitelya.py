@@ -575,7 +575,13 @@ def разбор(нч: dict, *, программа: str, кошелёк: str, л
         return из_
     из_["сборка"] = {к: сб.get(к) for к in (
         "ok", "why_not", "pool_program", "pool_label", "min_out", "expected_out",
-        "build_ms", "tip_account", "size", "cu_units", "fee_share", "dlmm",
+        # ИМЕНА КЛЮЧЕЙ -- РОВНО ТЕ, ЧТО КЛАДЁТ СБОРКА. Здесь стояли cu_units и
+        # fee_share, каких у неё нет вовсе: bloom_own_send кладёт cu_limit
+        # (:2499) и pool_fee_share (:2458). В отчёте оба выходили null ВСЕГДА, и
+        # проверить потолок комиссии пула по отчёту было нечем -- а это деньги.
+        # Нашёл Code-3, docs/stroiteli_2026-09-30_vladelcu.md, п.3.
+        "build_ms", "tip_account", "size", "cu_limit", "pool_fee_share",
+        "cu_units", "fee_share", "dlmm",
         "ценозависимые", "lane_route", "new_pool_size_sol")}
     из_["why_not"] = сб.get("why_not")
     tx64 = сб.get("tx_base64")

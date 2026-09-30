@@ -37,7 +37,7 @@ import time
     "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": "launchlab",
     "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": "dlmm",
     "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": "whirlpool",
-    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUtu": "amm_v4",
+    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": "amm_v4",
 }
 # Группы, которые ТОРГУЮТ полосой. Остальные (log_only, off, kandidaty) считаются
 # отдельно: сигнал по ним не станет сделкой, сколько его ни ждать.
