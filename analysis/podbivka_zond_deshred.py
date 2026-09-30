@@ -749,9 +749,14 @@ def _стат(ряды: list) -> dict:
             "ничья": sum(1 for x in р if x == 0)}
 
 
-def свод(строки: list, лидеры: Лидеры | None = None) -> dict:
+def свод(строки: list, лидеры: Лидеры | None = None, метки: dict | None = None) -> dict:
+    """метки -- {лидер: "BAM" | "Harmonic" | …} (файл --metki-liderov); лидер без метки -- «прочие», без лидера -- «неизвестно»."""
     пп = пары(строки, лидеры)
     ряды = пп["ряды"]
+    по_движку: dict = {}
+    for x in ряды:
+        к = (метки or {}).get(x["leader"], "прочие") if x["leader"] else "неизвестно"
+        по_движку.setdefault(к, []).append(x)
     по_крупно = {г: _стат([x for x in ряды if x["region_group"] == г]) for г in КРУПНО}
     подробно = {}
     for x in ряды:
@@ -771,6 +776,7 @@ def свод(строки: list, лидеры: Лидеры | None = None) -> di
             "только_шреды": пп["только"][КАНАЛ_ШРЕДЫ], "только_ws": пп["только"][КАНАЛ_WS],
             "все": _стат(ряды), "по_регионам": по_крупно,
             "по_регионам_подробно": {к: _стат(v) for к, v in sorted(подробно.items())},
+            "по_движку_лидера": {к: _стат(v) for к, v in sorted(по_движку.items())} if метки is not None else None,
             "слот_шредов_не_равен_слоту_ws": sum(1 for x in ряды if x["slot_ws"] and x["slot"] != x["slot_ws"]),
             "ws_упавших_в_парах": sum(1 for x in ряды if x["ws_err"]),
             "стенные_против_моно_макс_мс": round(max(расх), 3) if расх else None,
@@ -793,6 +799,9 @@ def таблица_md(св: dict) -> str:
     md += [стр(г, св["по_регионам"][г]) for г in КРУПНО]
     md += ["", "Подробно по карте регионов:", "", "| регион карты | пар | p50, мс | p90, мс | шреды раньше |",
            "|---|---|---|---|---|"] + [стр(к, v) for к, v in св["по_регионам_подробно"].items()]
+    if св.get("по_движку_лидера") is not None:
+        md += ["", "По движку лидера (метки -- файл --metki-liderov):", "", "| движок лидера | пар | p50, мс | p90, мс | шреды раньше |",
+               "|---|---|---|---|---|"] + [стр(к, v) for к, v in св["по_движку_лидера"].items()]
     return "\n".join(md) + "\n"
 
 
@@ -1098,6 +1107,7 @@ def main() -> int:
     р.add_argument("--report-log", nargs="*", default=None, help="только свод: журнал(ы) зонда")
     р.add_argument("--report-out", default=None)
     р.add_argument("--report-md", default=None)
+    р.add_argument("--metki-liderov", default=None, help="json {\"по_лидеру\": {лидер: BAM|Harmonic}} -- разбивка свода по движку лидера")
     а = р.parse_args()
     if а.self_test:
         return self_test()
@@ -1113,7 +1123,8 @@ def main() -> int:
     лидеры = Лидеры(rpc=rpc_helius(кл_h) if кл_h else None, карта=карта, каталог=а.state_dir)
 
     if а.report_log is not None:
-        св = свод(читать_журнал(а.report_log), лидеры)
+        метки = (json.loads(Path(а.metki_liderov).read_text(encoding="utf-8")).get("по_лидеру") or {}) if а.metki_liderov else None
+        св = свод(читать_журнал(а.report_log), лидеры, метки)
         св["карта_регионов"] = str(карта_путь) if карта_путь else None
         print(json.dumps({к: v for к, v in св.items() if к != "ряды"}, ensure_ascii=False, indent=2))
         if а.report_out:
