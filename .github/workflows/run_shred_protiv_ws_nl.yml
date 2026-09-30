@@ -20,6 +20,10 @@ on:
         description: "как назвать окно в отчёте, например 'Triton с 11:25:32Z'"
         required: false
         default: ""
+      razobrat_bez_shredov:
+        description: "'yes' -- слоты без шредов разделить на пропуски лидера и наши потери (getBlocks, один вызов)"
+        required: false
+        default: "no"
 
 concurrency:
   group: shred-protiv-ws
@@ -28,6 +32,7 @@ concurrency:
 env:
   HOST: 45.59.170.76
   STATE_DIR: /home/bot/shred_probe_data
+  ENV_DIR: /etc/bloom-executor
   OUT: data/shred_protiv_ws.txt
 
 jobs:
@@ -59,13 +64,20 @@ jobs:
           set -o pipefail
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/shred_protiv_ws.py" < deploy/checks/shred_protiv_ws.py
           ssh -n $SSH_OPTS root@"$HOST" "
+            # ENV HOSTA NUZHEN TOLKO DLJA RAZBORA slotov bez shredov: on zovjot
+            # getBlocks i berjot kljuch iz okruzhenija (HELIUS_API_KEY2 pervym).
+            # Bez etoj stroki razbor otkazyval by "kljuch ne zadan" -- i chislo
+            # "propusk lidera protiv nashej poteri" nikogda by ne poluchilos.
+            # Sami medianny WS/shred kljucha ne trebujut: oni iz slots.jsonl.
+            set -a; . $ENV_DIR/env 2>/dev/null || true; set +a
             test -d $STATE_DIR || { echo 'СБОЙ: каталога замера нет -- служба не поднималась'; exit 1; }
             echo '--- признак жизни слушателя ---'
             cat $STATE_DIR/heartbeat.json 2>/dev/null || echo 'признака жизни нет'
             echo '--- числа ---'
             nice -n 15 python3 /tmp/shred_protiv_ws.py --out-dir $STATE_DIR \
               --ot-slota '${{ inputs.ot_slota }}' --do-slota '${{ inputs.do_slota }}' \
-              --imya-okna '${{ inputs.imya_okna }}'
+              --imya-okna '${{ inputs.imya_okna }}' \
+              ${{ inputs.razobrat_bez_shredov == 'yes' && '--razobrat-bez-shredov' || '' }}
             rc=\$?; rm -f /tmp/shred_protiv_ws.py; exit \$rc" | tee "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
