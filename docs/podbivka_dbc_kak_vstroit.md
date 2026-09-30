@@ -23,7 +23,11 @@
 
 Своп exact_in -- `swap2` с `swap_mode = 0`: данные `sha256("global:swap2")[:8] | amount_0 u64 (вход) | amount_1 u64
 (min_out) | swap_mode u8`. Если у пула transfer hook на base (Token-2022) -- обычный swap2 программа отвергнет
-(`PoolTypeMismatch`), нужен `swap2_with_transfer_hook` + счета хука в остатке (у источников 3–5 счетов).
+(`PoolTypeMismatch`), нужен `swap2_with_transfer_hook` + счета хука в остатке (у источников 3–5 счетов). **Данные
+`swap2_with_transfer_hook` -- не 25 байт, а 25 + `TransferHookAccountsInfo`** (borsh `Vec<RemainingAccountsSlice>`: u32 число
+срезов, затем на срез `accounts_type u8` (0 -- хук base, 1 -- хук base для реферала) и `length u8`); при одном срезе -- **31 байт**.
+`length` -- число счетов остатка в этом срезе: программа отрезает ровно `length` счетов из remaining_accounts
+(`utils/remaining_accounts.rs::parse_transfer_hook_accounts`, f552f20); срез с `length` 0 пропускается.
 
 Счета (15): pool_authority (`FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM`, одна на программу), config (из пула), pool,
 наш счёт входа, наш счёт выхода, base_vault, quote_vault (оба из пула), base_mint, quote_mint, payer, token_base_program,
