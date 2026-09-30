@@ -1,4 +1,4 @@
-progon 144, 2026-09-30T13:34:54Z
+progon 145, 2026-09-30T13:41:03Z
 --- znachenija flagov, kotorye pishet PEREPISAT ---
 BLOOM_MODE=dry
 BLOOM_TASKS=BATCH-5,BATCH-3
@@ -19,7 +19,7 @@ BLOOM_TELEGRAM_LIVE_TEST=1
 BLOOM_TELEGRAM_REAL=1
 BLOOM_CLOSE_ON_SELL=1
 BLOOM_TG_FORMAT=3
-BLOOM_REGION_SEND=0
+BLOOM_REGION_SEND=1
 BLOOM_LANE_MAX_POOL_FEE=0.05
 BLOOM_COPIERS_FILE=/home/bot/bloom_executor_live_data/kopirovshchiki.json
 BLOOM_TEST_SOURCES=DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX,8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA
@@ -108,8 +108,6 @@ BLOCKRAZOR_AUTH_TOKEN: est v env hosta
 ASTRALANE_API_KEY: est v env hosta
 ZEROX_API: est v env hosta
 NOZOMI_API_KEY: est v env hosta
--rw------- 1 root root 2544 Sep 30 03:32 /etc/bloom-executor/env.bak.20260930T133529Z
-70
   "slippage_pct": 35.0,
   "priority_fee": 0.001,
   "processor_tip": 0.001,
@@ -170,6 +168,70 @@ NOZOMI_API_KEY: est v env hosta
     }
   }
 }
---- 1) ostatki bez 26 upravljaemyh kljuchej ---
-kopija 6269430b6ff11441  novyj 397e755a777f4fa9
-SBOY: ostatki NE sovpali -- izmenilas stroka, kotoruju progon trogat ne dolzhen
+strok v kopii 70, v novom 70
+--- imena strok, kotorye razoshlis (tolko imena) ---
+BLOOM_REGION_SEND
+imjon, razoshedshihsja NE po BLOOM_REGION_SEND: 0
+sverka proshla: kak mnozhestvo strok fajl otlichaetsja tolko BLOOM_REGION_SEND
+1
+BLOOM_REGION_SEND=1 stoit v env
+  "balance_sol": 0.024620982,
+  "min_balance_sol": 0.3,
+  "dry_positions": 0,
+  "real_open_positions": 0,
+  "real_open_mints": [],
+  "kill_readable": true,
+  "kill_active": false,
+  "foreign_activity": {
+    "known": true,
+    "checked": 40,
+    "window_h": 24.0,
+    "boundary_from": "метка начала стенда",
+    "boundary_utc": "2026-09-30T11:10:04Z",
+    "recent": [],
+    "recent_count": 0,
+    "older_count": 27,
+    "newest_older_utc": "2026-09-29T18:42:50Z",
+    "truncated": true,
+    "foreign_count": 27
+  },
+  "stand_start": {
+    "set": true,
+    "path": "/home/bot/bloom_executor_live_data/stand_start.json",
+    "stand_start_ts": 1790766604.779387,
+    "stand_start_utc": "2026-09-30T11:10:04Z",
+    "note": "начало стенда, подтверждено владельцем"
+  },
+  "journal": {
+    "decisions": {
+      "v1": 0,
+      "v2": 6219,
+      "unreadable": 0
+    },
+    "positions": {
+      "v1": 0,
+      "v2": 231,
+      "unreadable": 0
+    },
+    "mixed": false
+  },
+  "otlozhennye_ne_prochitany": {},
+  "notes": [
+    "у кошелька есть прежняя история: 27 сделок старше окна, самая свежая из них 2026-09-29T18:42:50Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
+    "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
+  ],
+  "blockers": [
+    "баланс 0.0246 SOL ниже порога 0.3"
+  ],
+  "clean": false,
+  "verdict": "старт заблокирован, причин 1"
+}
+--- коротко ---
+режим: live, вердикт: старт заблокирован, причин 1
+кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.024620982 SOL при пороге 0.3
+чужая активность: известно=True, свежих за 24.0 ч 0, прежних 27 (самая свежая 2026-09-29T18:42:50Z)
+граница чужой активности: метка начала стенда (2026-09-30T11:10:04Z)
+позиции: dry-run 0, настоящих открытых 0
+  БЛОКЕР: баланс 0.0246 SOL ниже порога 0.3
+  примечание: у кошелька есть прежняя история: 27 сделок старше окна, самая свежая из них 2026-09-29T18:42:50Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
+  примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
