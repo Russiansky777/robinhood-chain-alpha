@@ -46,6 +46,18 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Самопроверка зонда ДО сети"
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. U zonda pojavilas samoproverka (--self-test), a progon ejo ne
+          # zval vovse. Po etim chislam reshaetsja "medlennyj potok ili pozdnij
+          # hvost", i ZNAK raznicy tut reshaet vsjo: pereputannyj znak pomenjal by
+          # vyvod na obratnyj. PIPEFAIL objazatelen: bez nego kod vyhoda python
+          # terjaetsja v tail i upavshaja samoproverka vygljadit projdennoj.
+          python3 -m py_compile deploy/checks/shred_protiv_ws.py
+          python3 deploy/checks/shred_protiv_ws.py --self-test | tail -1
+
       - name: "SSH key"
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
