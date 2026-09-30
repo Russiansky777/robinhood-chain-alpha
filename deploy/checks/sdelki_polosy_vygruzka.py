@@ -548,6 +548,17 @@ def main() -> int:
             "hold_s_plan": п.get("sell_after_s"),
             "slot_len_at_buy_s": п.get("slot_len_at_buy_s"),
             "hold_slots_fact": удержание_в_слотах(п),
+            # ТИП ПУЛА И ЧТЕНИЯ DLMM -- ПРОСТО ПЕРЕНОС ПОЛЕЙ ЗАПИСИ, без логики.
+            # Без pool_program в выгрузке нельзя сказать, какого типа была сделка,
+            # то есть нельзя дать строку "первая сделка нового типа" по фактам.
+            # lane_dlmm_* пишет полоса в позицию при успешной отправке (п.1 ночи
+            # 29->30.09); без них разложить 39-56 мс сборки DLMM нечем, а
+            # lane_dlmm_odno_godilos -- это и есть "сошлось/нет" для одного чтения.
+            "pool_program": п.get("pool_program"),
+            "lane_dlmm_reads": п.get("lane_dlmm_reads"),
+            "lane_dlmm_reads_ms": п.get("lane_dlmm_reads_ms"),
+            "lane_dlmm_odno_godilos": п.get("lane_dlmm_odno_godilos"),
+            "lane_dlmm_odno_why_not": п.get("lane_dlmm_odno_why_not"),
             # S+0 И РЕГИОНАЛЬНАЯ ОТПРАВКА -- ДЛЯ МЕТРИКИ "ДО/ПОСЛЕ ПО НЕ-EU
             # ЛИДЕРАМ" (слово владельца 29.09 ночью, п.2). s_plus заполняется
             # ниже, после дозаполнения слота посадки по цепи: до него landed_slot
