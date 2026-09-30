@@ -95,6 +95,10 @@ on:
         description: "'1' -- вариант пула на долговечном nonce: по транзакции на сервис, только его чаевые (нужен созданный аккаунт nonce)"
         required: false
         default: "0"
+      protokol_env:
+        description: "'yes' -- напечатать значения флагов BLOOM_* и имена всех ключей env (только чтение, секреты не печатаются)"
+        required: false
+        default: "no"
       keep_env:
         description: "env на хосте НЕ трогать: ТОЛЬКО 'yes'. Иное значение требует perepisat_env"
         required: false
@@ -391,6 +395,40 @@ jobs:
             echo 'проба записи во временный файл того же каталога:'
             (touch $ENV_DIR/.proba_zapisi && echo 'каталог пишется' && rm -f $ENV_DIR/.proba_zapisi) || echo 'каталог НЕ пишется'
           "
+
+      - name: "ПРОТОКОЛ перед переписью env: значения флагов и множество имён (только чтение)"
+        if: ${{ inputs.protokol_env == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM (poruchenie vladelca 30.09, variant (a) shag 2). Progon
+          # PEREPISAT udaljaet i zapisyvaet zanovo 26 svoih kljuchej. Chtoby
+          # perepisat ih TEMI ZHE znachenijami, znachenija nado snachala
+          # PROCHITAT, a ne vspomnit. Zdes pechatajutsja tolko flagi BLOOM_*,
+          # kotorye progon i pishet: sredi nih sekretov net ni odnogo (sekrety --
+          # HELIUS_API_KEY, DBOT_API_KEY, TELEGRAM_BOT_TOKEN, LIVE_PRIVATE, kljuchi
+          # otpravitelej -- v etot spisok ne vhodjat i ne pechatajutsja).
+          #
+          # Vtoraja polovina: MNOZHESTVO IMJON. Pechatajutsja imena VSEH kljuchej
+          # env (tolko imena), chtoby bylo vidno, chego progon ne kasaetsja.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            echo '--- znachenija flagov, kotorye pishet PEREPISAT ---'
+            for K in BLOOM_MODE BLOOM_TASKS BLOOM_EXEC BLOOM_LIVE_TEST BLOOM_LIVE_BUY \
+                     BLOOM_BUY_SOL BLOOM_OWN_SEND BLOOM_OWN_SEND_LIVE BLOOM_OWN_SEND_SOL \
+                     BLOOM_SENDER_REGION BLOOM_POOL_SEND BLOOM_POOL_NONCE BLOOM_LANE_CONTROL \
+                     BLOOM_SHADOW_LEGS BLOOM_SHADOW_LEGS_CREDITS BLOOM_TELEGRAM_LIVE_TEST \
+                     BLOOM_TELEGRAM_REAL BLOOM_CLOSE_ON_SELL BLOOM_TG_FORMAT BLOOM_REGION_SEND \
+                     BLOOM_LANE_MAX_POOL_FEE BLOOM_COPIERS_FILE BLOOM_TEST_SOURCES \
+                     BLOOM_TEST_MIN_SOL BLOOM_TEST_BUY_SOL BLOOM_TEST_BUY_SOL_BUMP; do
+              echo \"\$(grep -m1 \"^\$K=\" $ENV_DIR/env || echo \"\$K= NET_V_ENV\")\"
+            done
+            echo '--- imena VSEH kljuchej env (tolko imena) ---'
+            grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d '=' | sort
+            echo '--- skolko strok i skolko prisvaivanij ---'
+            wc -l < $ENV_DIR/env
+            grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
 
       - name: "Ночные флаги: разобрать одну строку входа в пять значений"
         env:
