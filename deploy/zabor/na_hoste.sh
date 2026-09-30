@@ -96,7 +96,15 @@ fi
 # САМОПРОВЕРКА МОДУЛЯ -- НА ТОМ ЖЕ ПИТОНЕ, ЧТО И ОПЫТ. Ей нужен solders, и
 # проверять надо именно этот интерпретатор: сломанное окружение должно вскрыться
 # ДО первой отправки, а не после списанной комиссии.
-"$VENV/python" "$RABOTA/c2_zabor_s0_opyt.py" --self-test | tail -2
+# PYTHONPATH SAMOPROVERKE NUZHEN TOT ZHE, CHTO OPYTU. Bez nego ona padaet
+# ModuleNotFoundError: No module named 'c2_swap_build' -- modul sborki lezhit v
+# kataloge koda sluzhby, a v rabochij katalog kopiruetsja tolko sam zond.
+# Progon kolca 30.09 15:43Z upal imenno tak. Zamysel kommentarija vyshe veren
+# ("na tom zhe pitone, chto i opyt"), no odnogo pitona malo -- nuzhna ta zhe
+# SREDA. I eto ne kosmetika: samoproverka -- gejt PERED pervoj otpravkoj, i v
+# takom vide opyt ne proshjol by nikogda.
+sudo -u bot -E env PYTHONPATH="$CODE_DIR" BLOOM_CODE_DIR="$CODE_DIR" \
+  "$VENV/python" "$RABOTA/c2_zabor_s0_opyt.py" --self-test | tail -2
 
 echo "zapusk: rezhim=$REZHIM otpravitel=$OTPRAVITEL raundov=$RAUNDOV"
 
