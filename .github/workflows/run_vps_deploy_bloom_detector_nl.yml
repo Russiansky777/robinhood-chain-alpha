@@ -839,28 +839,34 @@ jobs:
             echo 'каталог состояния пишется службой'
           "
 
-      - name: "СВЕРКА env с копией: остатки байт в байт, 26 ключей как множество"
+      - name: "СВЕРКА env с копией: весь файл как МНОЖЕСТВО строк (порядок не считается)"
         if: ${{ inputs.sverka_env_s_kopiej != '' || (inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT') }}
         run: |
           set -e
           set -o pipefail
-          # ZACHEM (poruchenie vladelca 30.09, variant (a) shag 2, po moej versii).
-          # Progon PEREPISAT ne perezapisyvaet env celikom: dlja kazhdogo svoego
-          # kljucha on delaet sed -i '/^KEY=/d' i dopisyvaet znachenie v KONEC. To
-          # est vse 26 strok MENJAJUT MESTO, i sverka "sha256 fajla bez odnoj
-          # stroki" rashoditsja VSEGDA, dazhe kogda vsjo pravilno. Poetomu sverka
-          # dvuh urovnej:
-          #   1) iz kopii i iz novogo fajla ubiraem stroki VSEH 26 upravljaemyh
-          #      kljuchej i sravnivaem sha256 ostatkov -- eto dokazyvaet, chto
-          #      kazhdaja neupravljaemaja stroka (vse sekrety) pobajtno ta zhe;
-          #   2) 26 kljuchej sravnivaem kak MNOZHESTVO imja=znachenie, otsortirovav:
-          #      edinstvennaja dopustimaja raznica -- BLOOM_REGION_SEND.
-          # Znachenija 26 flagov -- ne sekrety; sekrety v etot spisok ne vhodjat.
+          # ZACHEM I POCHEMU PEREPISANO (progon 144, 13:35Z).
+          # Progon PEREPISAT nichego ne perezapisyvaet celikom: dlja kazhdogo
+          # svoego kljucha on delaet sed -i '/^KEY=/d' i dopisyvaet znachenie v
+          # KONEC. Znachit PORJADOK STROK menjaetsja zakonno, i ljuboe sravnenie
+          # PO PORJADKU rashoditsja vsegda.
+          #
+          # Pervaja versija etogo shaga uchityvala tolko 26 upravljaemyh kljuchej
+          # BLOOM_*, a progon peredvigaet ESHCHJO PJAT strok: chetyre kljucha
+          # otpravitelej i DBOT_API_KEY. Oni popadali v "ostatki", ostatki
+          # sravnivalis pobajtno -- i shag skazal "izmenilas stroka, kotoruju
+          # progon trogat ne dolzhen" na progone, gde nichego ne propalo.
+          # Eto ta zhe bolezn, chto my lovim v drugih mestah: proverka ruhnula
+          # ne po toj prichine, kotoruju nazvala.
+          #
+          # TEPER SRAVNIVAETSJA VES FAJL KAK MNOZHESTVO STROK. Porjadok ne
+          # uchastvuet vovse, i poterja ili izmenenie LJUBOJ stroki -- vkljuchaja
+          # sekrety i kljuchi koshelkov -- vidna. Dopustimoe razlichie rovno
+          # odno: BLOOM_REGION_SEND.
+          #
+          # ZNACHENIJA NE PECHATAJUTSJA: v vyvod idut tolko IMENA razoshedshihsja
+          # strok (cut -d= -f1). Inache izmenivshijsja sekret popal by v zhurnal
+          # progona i v otchjot.
           KOPIJA="${{ inputs.sverka_env_s_kopiej }}"
-          # PO UMOLCHANIJU -- KOPIJA, SNJATAJA ETIM ZHE PROGONOM. Shag (4) plana
-          # vladelca dolzhen idti srazu za (3) v odnom progone: imja kopii
-          # rozhdaetsja vnutri progona, i trebovat ego vhodom znachilo by
-          # otkladyvat sverku na sledujushchij progon.
           [ -n "$KOPIJA" ] || KOPIJA="$KOPIJA_ENV"
           [ -n "$KOPIJA" ] || { echo "SBOY: imeni kopii net ni vo vhode, ni v KOPIJA_ENV"; exit 1; }
           echo "sverjaem s kopiej $KOPIJA"
@@ -874,23 +880,18 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             test -f $ENV_DIR/$KOPIJA || { echo 'SBOY: kopii net na hoste'; exit 1; }
-            KL='BLOOM_MODE|BLOOM_TASKS|BLOOM_EXEC|BLOOM_LIVE_TEST|BLOOM_LIVE_BUY|BLOOM_BUY_SOL|BLOOM_OWN_SEND|BLOOM_OWN_SEND_LIVE|BLOOM_OWN_SEND_SOL|BLOOM_SENDER_REGION|BLOOM_POOL_SEND|BLOOM_POOL_NONCE|BLOOM_LANE_CONTROL|BLOOM_SHADOW_LEGS|BLOOM_SHADOW_LEGS_CREDITS|BLOOM_TELEGRAM_LIVE_TEST|BLOOM_TELEGRAM_REAL|BLOOM_CLOSE_ON_SELL|BLOOM_TG_FORMAT|BLOOM_REGION_SEND|BLOOM_LANE_MAX_POOL_FEE|BLOOM_COPIERS_FILE|BLOOM_TEST_SOURCES|BLOOM_TEST_MIN_SOL|BLOOM_TEST_BUY_SOL|BLOOM_TEST_BUY_SOL_BUMP'
-            echo '--- 1) ostatki bez 26 upravljaemyh kljuchej ---'
-            A=\$(grep -vE \"^(\$KL)=\" $ENV_DIR/$KOPIJA | sha256sum | cut -c1-16)
-            B=\$(grep -vE \"^(\$KL)=\" $ENV_DIR/env | sha256sum | cut -c1-16)
-            echo \"kopija \$A  novyj \$B\"
-            test \"\$A\" = \"\$B\" || { echo 'SBOY: ostatki NE sovpali -- izmenilas stroka, kotoruju progon trogat ne dolzhen'; exit 1; }
-            echo 'ostatki sovpali: nekhozjajstvennye stroki pobajtno te zhe'
-            echo '--- 2) 26 kljuchej kak mnozhestvo imja=znachenie ---'
-            grep -E \"^(\$KL)=\" $ENV_DIR/$KOPIJA | sort > /tmp/env_kl_do
-            grep -E \"^(\$KL)=\" $ENV_DIR/env | sort > /tmp/env_kl_posle
-            diff /tmp/env_kl_do /tmp/env_kl_posle > /tmp/env_kl_diff || true
-            cat /tmp/env_kl_diff
-            CHUZHIH=\$(grep -E '^[<>]' /tmp/env_kl_diff | grep -vcE '^[<>] BLOOM_REGION_SEND=' || true)
-            echo \"strok razlichija ne po BLOOM_REGION_SEND: \$CHUZHIH\"
-            rm -f /tmp/env_kl_do /tmp/env_kl_posle /tmp/env_kl_diff
-            test \"\$CHUZHIH\" = 0 || { echo 'SBOY: izmenilos ne tolko BLOOM_REGION_SEND'; exit 1; }
-            echo 'sverka proshla: razlichie tolko v BLOOM_REGION_SEND'" \
+            umask 077
+            sort $ENV_DIR/$KOPIJA > /tmp/env_do
+            sort $ENV_DIR/env     > /tmp/env_posle
+            echo \"strok v kopii \$(wc -l < /tmp/env_do), v novom \$(wc -l < /tmp/env_posle)\"
+            echo '--- imena strok, kotorye razoshlis (tolko imena) ---'
+            comm -3 /tmp/env_do /tmp/env_posle | sed 's/^[[:space:]]*//' | cut -d= -f1 | sort -u
+            RAZN=\$(comm -3 /tmp/env_do /tmp/env_posle | sed 's/^[[:space:]]*//' | cut -d= -f1 | sort -u | grep -vxc 'BLOOM_REGION_SEND' || true)
+            shred -u /tmp/env_do /tmp/env_posle
+            echo \"imjon, razoshedshihsja NE po BLOOM_REGION_SEND: \$RAZN\"
+            test \"\$RAZN\" = 0 || { echo 'SBOY: razoshlos ne tolko BLOOM_REGION_SEND -- vernut kopiju i doklad'; exit 1; }
+            echo 'sverka proshla: kak mnozhestvo strok fajl otlichaetsja tolko BLOOM_REGION_SEND'
+            grep -c '^BLOOM_REGION_SEND=1' $ENV_DIR/env && echo 'BLOOM_REGION_SEND=1 stoit v env' || echo 'VNIMANIE: BLOOM_REGION_SEND=1 v env NET'" \
             2>&1 | tee -a data/bloom_detector_deploy.txt
 
       - name: "Метка начала стенда (только по явному входу владельца)"
