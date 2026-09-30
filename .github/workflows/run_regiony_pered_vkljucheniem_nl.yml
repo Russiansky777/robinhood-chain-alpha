@@ -74,9 +74,16 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/svezhest_karty_regionov.py" < deploy/checks/svezhest_karty_regionov.py
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zhivy_li_regionalnye_tochki.py" < deploy/checks/zhivy_li_regionalnye_tochki.py
-          # КАРТА ЧИТАЕТСЯ ТА, ЧТО ВИДИТ СЛУЖБА. bloom_region_send ищет её
-          # рядом с собой: <корень кода>/data/leader_regions.json. Копию из
-          # репозитория сюда НЕ кладём -- смысл проверки в том, какая карта у
+          # КАРТА ЧИТАЕТСЯ ТА, ЧТО ВИДИТ СЛУЖБА. Путь СПРАШИВАЕМ У МОДУЛЯ, а не
+          # пишем здесь: bloom_region_send считает его как
+          # Path(__file__).parent.parent/data, то есть от РОДИТЕЛЯ каталога кода
+          # (/home/bot/data), а здесь стояло $CODE_DIR/data -- на уровень глубже.
+          # Из-за этого прогон 08:12:23Z 30.09 ответил "карта не прочитана:
+          # FileNotFoundError" про файл, которого служба и не читает, и вывел
+          # "неизвестных лидеров 668 из 668" -- вывод о ЧУЖОМ пути. Проверка
+          # живости точек в этом же прогоне при этом нашла адреса у 24 пар из 24,
+          # то есть sender_regions.json рядом со службой лежит. Копию из
+          # репозитория на хост НЕ кладём -- смысл проверки в том, какая карта у
           # службы, а не какая в репозитории.
           if [ -n "$KLJUCH_CHECKS" ]; then
             printf '%s' "$KLJUCH_CHECKS" | ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/kljuch; chmod 600 $RABOTA/kljuch"
@@ -86,12 +93,17 @@ jobs:
           fi
           STROGO=""
           if [ "${{ inputs.strogo }}" = "yes" ]; then STROGO="--strogo"; fi
+          KARTA_PUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python -c 'import bloom_region_send as m; print(m.ФАЙЛ_ЛИДЕРОВ)'" | tail -1 | tr -d '\r')
+          case "$KARTA_PUT" in
+            /*leader_regions.json) echo "put karty u sluzhby: $KARTA_PUT" ;;
+            *) echo "SBOY: modul ne nazval put karty (poluchili: $KARTA_PUT)"; exit 1 ;;
+          esac
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
             if [ -s $RABOTA/kljuch ]; then HELIUS_API_KEY_CHECKS=\$(cat $RABOTA/kljuch); export HELIUS_API_KEY_CHECKS; fi
             cd $CODE_DIR && PYTHONPATH=$CODE_DIR $VENV/python \
               $RABOTA/svezhest_karty_regionov.py \
-              --karta $CODE_DIR/data/leader_regions.json \
+              --karta $KARTA_PUT \
               --out $RABOTA/karta.json $STROGO" | tail -30
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/karta.json 2>/dev/null || true" > /tmp/karta.json || true
           if python3 -c "import json; json.load(open('/tmp/karta.json'))" 2>/dev/null; then
