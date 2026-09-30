@@ -66,8 +66,8 @@ jobs:
           ssh -n $SSH_OPTS root@"$HOST" "
             # ENV HOSTA NUZHEN TOLKO DLJA RAZBORA slotov bez shredov: on zovjot
             # getBlocks i berjot kljuch iz okruzhenija (HELIUS_API_KEY2 pervym).
-            # Bez etoj stroki razbor otkazyval by "kljuch ne zadan" -- i chislo
-            # "propusk lidera protiv nashej poteri" nikogda by ne poluchilos.
+            # Bez etoj stroki razbor otkazyval by s prichinoj -- kljuch ne zadan,
+            # i chislo propusk lidera protiv nashej poteri ne poluchilos by.
             # Sami medianny WS/shred kljucha ne trebujut: oni iz slots.jsonl.
             set -a; . $ENV_DIR/env 2>/dev/null || true; set +a
             test -d $STATE_DIR || { echo 'СБОЙ: каталога замера нет -- служба не поднималась'; exit 1; }

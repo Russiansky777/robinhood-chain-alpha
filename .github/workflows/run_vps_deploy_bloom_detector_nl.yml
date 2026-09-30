@@ -471,6 +471,51 @@ jobs:
             echo "ночной флаг: $pair"
           done
 
+      - name: "ГЕЙТ: четыре ключа отправителей не пусты (иначе PEREPISAT сотрёт их строки)"
+        if: ${{ inputs.protokol_env == 'yes' || (inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT') }}
+        env:
+          BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
+          ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
+          ZEROX_API: ${{ secrets.ZEROX_API }}
+          NOZOMI_API_KEY: ${{ secrets.NOZOMI_API_KEY }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. Zhjostkij gejt "sekrety ne pusty" pokryvaet HELIUS_API,
+          # DBOT_API_KEY i VPS_SSH_KEY, no NE chetyre kljucha otpravitelej.
+          # A shag zapisi kljuchej otpravitelej pri pustom sekrete delaet
+          # sed -i '/^NAME=/d' -- to est MOLCHA otkljuchaet otpravitelja ot
+          # pula, ostavljaja odnu strochku v zhurnale progona. Progon,
+          # zadumannyj kak "perepisat temi zhe znachenijami", takim obrazom
+          # menjaet sostav pula. Zdes eto stanovitsja OTKAZOM PROGONA, a ne
+          # strokoj: proverka stoit DO ljuboj pravki env.
+          #
+          # Znachenija ne pechatajutsja: tolko dlina nulevaja ili net.
+          NET=0
+          for imya in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
+            znach="${!imya}"
+            if [ -z "$znach" ]; then
+              echo "$imya: PUSTO v sekretah repozitorija"
+              NET=$((NET+1))
+            else
+              echo "$imya: est (dlina ${#znach})"
+            fi
+          done
+          # Vtoraja polovina gejta: te zhe chetyre imeni na HOSTE. Rashozhdenie
+          # "sekret est, a v env net" (ili naoborot) tozhe nado videt do pravki.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            for K in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
+              if grep -q \"^\$K=\" $ENV_DIR/env; then echo \"\$K: est v env hosta\"; else echo \"\$K: NET v env hosta\"; fi
+            done" 2>&1 | tee -a data/bloom_detector_deploy.txt
+          if [ "$NET" != "0" ]; then
+            if [ "${{ inputs.perepisat_env }}" = "PEREPISAT" ] && [ "${{ inputs.keep_env }}" != "yes" ]; then
+              echo "OTKAZ: $NET iz 4 kljuchej otpravitelej pusty, a progon sobiralsja pisat env."
+              echo "Bez etih sekretov PEREPISAT udalil by ih stroki i izmenil sostav pula."
+              exit 1
+            fi
+            echo "PROTOKOL: $NET iz 4 pusty. Eto NE otkaz, poka progon nichego ne pishet (keep_env=yes)."
+          fi
+
       - name: "env: резервная копия ДО любой правки (имя копии -- в журнал)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         run: |
