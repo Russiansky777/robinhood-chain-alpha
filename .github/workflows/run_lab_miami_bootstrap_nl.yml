@@ -30,6 +30,10 @@ on:
         description: "'yes' -- ставить бегунок; 'no' -- только проверки и окружение"
         required: false
         default: "yes"
+      postavit_svoj_kljuch:
+        description: "'yes' -- поставить публичную половину VPS_SSH_KEY_MIAMI в authorized_keys хоста, подключившись ОБЩИМ ключом (один раз, до первой установки)"
+        required: false
+        default: "no"
       ubrat_obshchij_kljuch:
         description: "'UBRAT' -- убрать общий ключ «Claude» из authorized_keys root (только после того, как свой ключ сработал)"
         required: false
@@ -77,11 +81,13 @@ jobs:
             echo "OTKAZ: sekreta VPS_SSH_KEY_MIAMI net."
             echo "Lab-server ne stavitsja na OBSHCHEM kljuche: poka on tot zhe, chto"
             echo "u torgovogo NL-hosta, dostup k laboratorii = dostup k dengam."
-            echo "Nuzhno ODIN raz, so svoej mashiny:"
-            echo "  ssh-keygen -t ed25519 -f ~/.ssh/miami_lab -C lab-miami -N ''"
-            echo "  (publichnuju polovinu ~/.ssh/miami_lab.pub dat etomu progonu"
-            echo "   vhodom net -- ejo postavit vladelec na hoste ili prishljot sjuda,"
-            echo "   a PRIVATNUJU polovinu polozhit v sekret VPS_SSH_KEY_MIAMI)"
+            echo "Nuzhno ODNO dejstvie vladelca:"
+            echo "  1) ssh-keygen -t ed25519 -f ~/.ssh/miami_lab -C lab-miami -N ''"
+            echo "  2) soderzhimoe ~/.ssh/miami_lab (PRIVATNAJA polovina) -- v sekret"
+            echo "     repozitorija VPS_SSH_KEY_MIAMI"
+            echo "Publichnuju polovinu na host postavit SAM progon: zapustite ego s"
+            echo "vhodom postavit_svoj_kljuch=yes -- on vychislit ejo iz privatnoj i"
+            echo "dopishet v authorized_keys, podkljuchivshis obshchim kljuchom."
             exit 1
           fi
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -89,6 +95,46 @@ jobs:
           chmod 600 ~/.ssh/miami_key
           echo "SSH_OPTS=-i $HOME/.ssh/miami_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
           echo "kljuch Miami prinjat: dlina $(wc -c < ~/.ssh/miami_key) bajt, sha256 $(sha256sum ~/.ssh/miami_key | cut -c1-16)…" >> "$OUT_FILE"
+
+      - name: "Свой ключ поставить на хост ОБЩИМ ключом (один раз)"
+        if: ${{ inputs.postavit_svoj_kljuch == 'yes' }}
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ЭТОТ ШАГ. Секрет с ПРИВАТНОЙ половиной может положить только
+          # владелец. А вот ПУБЛИЧНУЮ половину на хост поставить можно и здесь:
+          # она вычисляется из приватной (`ssh-keygen -y`), и приватная при этом
+          # никуда не печатается. Так действие владельца ровно одно -- завести
+          # секрет; дверь своим ключом открывает уже прогон.
+          #
+          # ПОДКЛЮЧАЕМСЯ ОБЩИМ КЛЮЧОМ, и это единственное место, где он нужен:
+          # дальше все шаги идут своим. Общий ключ убирается отдельным входом и
+          # только после того, как свой доказал, что работает.
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: obshchego kljucha VPS_SSH_KEY net -- postavit svoj nechem"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/obshchij_key
+          chmod 600 ~/.ssh/obshchij_key
+          SVOJ_PUB=$(ssh-keygen -y -f ~/.ssh/miami_key)
+          echo "svoj publichnyj kljuch (nachalo): $(echo "$SVOJ_PUB" | cut -c1-40)…" | tee -a "$OUT_FILE"
+          printf '%s\n' "$SVOJ_PUB" | ssh -i ~/.ssh/obshchij_key -o ConnectTimeout=15 \
+            -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@$HOST "
+            set -e
+            SVOJ=\$(cat)
+            install -d -m 700 /root/.ssh
+            touch /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys
+            if grep -qF \"\$SVOJ\" /root/.ssh/authorized_keys; then
+              echo 'svoj kljuch v authorized_keys uzhe est -- nichego ne menjaju'
+            else
+              cp -a /root/.ssh/authorized_keys /root/.ssh/authorized_keys.bak.\$(date -u +%Y%m%dT%H%M%SZ)
+              printf '%s\n' \"\$SVOJ\" >> /root/.ssh/authorized_keys
+              echo 'svoj kljuch dopisan v authorized_keys (kopija rjadom)'
+            fi
+            echo \"strok v authorized_keys: \$(wc -l < /root/.ssh/authorized_keys)\"" | tee -a "$OUT_FILE"
+          # И СРАЗУ ПРОВЕРЯЕМ СВОИМ: без этого "поставили" -- это обещание.
+          ssh -n $SSH_OPTS root@$HOST "echo 'svoj kljuch rabotaet: soedinenie proshlo'" | tee -a "$OUT_FILE"
+          rm -f ~/.ssh/obshchij_key
 
       - name: "ТОТ ЛИ СЕРВЕР: адрес, ядра, время"
         run: |
