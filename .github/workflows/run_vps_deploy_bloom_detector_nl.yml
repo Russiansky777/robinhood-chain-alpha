@@ -867,6 +867,58 @@ jobs:
           [ "$RESTARTS" -lt 3 ] || { echo "СБОЙ: служба уже перезапускалась $RESTARTS раз"; ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 80 --no-pager"; exit 1; }
           ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC -n 40 --no-pager"
 
+      - name: "ВСЕ службы, делящие каталог кода, перезапущены (не только детектор)"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Слово владельца: перезапустить ВСЕ службы, которые делят
+          # модули, и подтвердить, что старт позже mtime. Детектор и продавец
+          # берут код из ОДНОГО каталога /home/bot/bloom_executor, и продавец
+          # держит на своём денежном пути bloom_own_send -- подпись и отправку
+          # своих продаж (OSW.podpisat, OSW.otpravit), кошелёк и ключ полосы,
+          # длину слота, стоимость сделки, проскальзывание группы.
+          #
+          # ЧТО БЫЛО БЕЗ ЭТОГО ШАГА. 30.09 деплой детектора прошёл в 02:27Z и
+          # 02:51Z, продавца никто не перезапустил, и прогон живучести в 03:11Z
+          # нашёл bloom-seller: STARYJ_KOD_V_PAMJATI (-4620 с). Правило держалось
+          # на внимании человека и это внимание подвело. Сделок в том окне не
+          # было, денег не стоило -- но следующая правка тихо применилась бы к
+          # одной службе и не применилась к другой.
+          #
+          # ОХРАНА НУЛЯ ПОЗИЦИЙ УЖЕ ПРОШЛА ШАГОМ ВЫШЕ и относится к обеим:
+          # она считает открытые позиции полосы, а полосу продаёт именно продавец.
+          for VSPOM in bloom-seller; do
+            if ! ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-unit-files $VSPOM.service --no-legend" | grep -q "$VSPOM"; then
+              echo "$VSPOM: юнита нет -- пропускаем"
+              continue
+            fi
+            echo "перезапускаю $VSPOM: код общий с $SVC"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl restart $VSPOM"
+            sleep 8
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl is-active --quiet $VSPOM" || {
+              echo "СБОЙ: $VSPOM не активна после перезапуска"
+              ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $VSPOM -n 60 --no-pager"; exit 1; }
+          done
+          # ДОКАЗАТЕЛЬСТВО, А НЕ НАДЕЖДА: старт каждой службы обязан быть позже
+          # самого свежего модуля в каталоге. Числа берутся НА ХОСТЕ его часами.
+          OUT=$(ssh -n $SSH_OPTS root@$TARGET_HOST "
+            MAXT=\$(stat -c '%Y' /home/bot/bloom_executor/*.py | sort -n | tail -1)
+            for S in $SVC bloom-seller; do
+              TS=\$(systemctl show -p ActiveEnterTimestamp --value \$S 2>/dev/null)
+              if [ -z \"\$TS\" ]; then echo \"\$S: ne zapuskalas\"; continue; fi
+              ST=\$(date -d \"\$TS\" +%s)
+              if [ \"\$ST\" -ge \"\$MAXT\" ]; then STATE=start_pozzhe_modulej; else STATE=STARYJ_KOD_V_PAMJATI; fi
+              printf '%s: start %s, moduli %s, %s (%s s)\\n' \"\$S\" \"\$(date -u -d @\$ST +%Y-%m-%dT%H:%M:%SZ)\" \"\$(date -u -d @\$MAXT +%Y-%m-%dT%H:%M:%SZ)\" \"\$STATE\" \"\$(( ST - MAXT ))\"
+            done")
+          echo "$OUT" | tee -a data/bloom_detector_deploy.txt
+          case "$OUT" in
+            *STARYJ_KOD_V_PAMJATI*)
+              echo "СБОЙ: после деплоя служба осталась на старом коде -- деньги на двух версиях общих модулей"
+              exit 1 ;;
+            *) echo "все службы каталога стартовали позже своих модулей" ;;
+          esac
+
       - name: "Признак жизни детектора должен появиться"
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
