@@ -40,6 +40,10 @@ on:
         description: "адрес источника шредов: правило только с него (пусто -- отказ открывать)"
         required: false
         default: ""
+      rmem_max:
+        description: "поднять net.core.rmem_max до этого числа байт перед запуском (0 -- не трогать)"
+        required: false
+        default: "0"
 
 concurrency:
   group: shred-listener-deploy
@@ -182,6 +186,35 @@ jobs:
           printf '%s' "$ADR" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$' \
             || { echo "СБОЙ: внешний адрес хоста не прочитался (получили: $ADR)"; exit 1; }
           echo "vneshnij adres hosta: $ADR, port UDP: $PORT" | tee -a data/shred_listener_deploy.txt
+
+      - name: "Буфер приёма UDP: поднять net.core.rmem_max (по явному входу)"
+        if: ${{ inputs.rmem_max != '0' && inputs.rmem_max != '' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. Slushatel PROSIT SO_RCVBUF 16 MB, no jadro rezhet po
+          # net.core.rmem_max: 30.09 v 11:40 dejstvujushchij bufer byl 425 984 bajt
+          # (to est rmem_max okolo 212 992 s udvoeniem), i pri 6 044 paketah v
+          # sekundu eto 6 452 poterjannyh datagrammy za 60 s -- 1,80 %. Podnjatie
+          # rmem_max tolko podnimaet POTOLOK: pamjat vydeljaetsja po faktu, i na
+          # torgovyj put eto ne vlijaet.
+          RM="${{ inputs.rmem_max }}"
+          case "$RM" in ''|*[!0-9]*) echo "SBOY: rmem_max ne chislo: $RM"; exit 1;; esac
+          if [ "$RM" -lt 262144 ] || [ "$RM" -gt 268435456 ]; then
+            echo "SBOY: rmem_max vne 262144..268435456: $RM"; exit 1
+          fi
+          {
+            echo ""
+            echo "--- bufer prijoma UDP ---"
+          } >> data/shred_listener_deploy.txt
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            echo 'do:'; sysctl net.core.rmem_max net.core.rmem_default
+            sysctl -w net.core.rmem_max=$RM
+            printf 'net.core.rmem_max = %s\n' $RM > /etc/sysctl.d/90-shred-rcvbuf.conf
+            echo 'posle:'; sysctl net.core.rmem_max net.core.rmem_default
+            echo 'fajl dlja perezagruzki:'; cat /etc/sysctl.d/90-shred-rcvbuf.conf" \
+            2>&1 | tee -a data/shred_listener_deploy.txt
 
       - name: "env слушателя (без ключей в аргументах)"
         if: ${{ inputs.enable_service == 'yes' }}
