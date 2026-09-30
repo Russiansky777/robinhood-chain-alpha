@@ -1,4 +1,4 @@
---- слушатель шредов: доставка 36708047984 ---
+--- слушатель шредов: доставка 36708373119 ---
 websockets: есть
   [ok  ] признак жизни считает шреды и слоты
   [ok  ] старые слоты уходят на диск строкой JSON
@@ -28,25 +28,25 @@ table ip filter {
 	}
 
 	chain ufw-before-input {
-		iifname "lo" counter packets 3922868 bytes 1252809153 accept
-		ct state related,established counter packets 29841340 bytes 113960788312 accept
+		iifname "lo" counter packets 3925988 bytes 1253245504 accept
+		ct state related,established counter packets 29852609 bytes 113970851113 accept
 		ct state invalid counter packets 2316 bytes 515965 jump ufw-logging-deny
 		ct state invalid counter packets 2316 bytes 515965 drop
 		ip protocol icmp icmp type destination-unreachable counter packets 0 bytes 0 accept
 		ip protocol icmp icmp type time-exceeded counter packets 0 bytes 0 accept
 		ip protocol icmp icmp type parameter-problem counter packets 0 bytes 0 accept
-		ip protocol icmp icmp type echo-request counter packets 413828 bytes 35093955 accept
-		udp sport 67 udp dport 68 counter packets 56886 bytes 18658608 accept
-		counter packets 559104765 bytes 692556378639 jump ufw-not-local
+		ip protocol icmp icmp type echo-request counter packets 414046 bytes 35112522 accept
+		udp sport 67 udp dport 68 counter packets 56916 bytes 18668448 accept
+		counter packets 559106026 bytes 692556455624 jump ufw-not-local
 		ip daddr 224.0.0.251 udp dport 5353 counter packets 0 bytes 0 accept
 		ip daddr 239.255.255.250 udp dport 1900 counter packets 0 bytes 0 accept
-		counter packets 559104765 bytes 692556378639 jump ufw-user-input
+		counter packets 559106026 bytes 692556455624 jump ufw-user-input
 	}
 
 	chain ufw-before-output {
-		oifname "lo" counter packets 3922868 bytes 1252809153 accept
-		ct state related,established counter packets 26930769 bytes 3322041710 accept
-		counter packets 1230051 bytes 79181782 jump ufw-user-output
+		oifname "lo" counter packets 3925988 bytes 1253245504 accept
+		ct state related,established counter packets 26943156 bytes 3323813542 accept
+		counter packets 1231017 bytes 79244616 jump ufw-user-output
 	}
 
 	chain ufw-before-forward {
@@ -57,3 +57,56 @@ table ip filter {
 		ip protocol icmp icmp type echo-request counter packets 0 bytes 0 accept
 		counter packets 0 bytes 0 jump ufw-user-forward
 	}
+Rule added
+20001/udp                  ALLOW       64.130.43.48               # BlockRazor shreds (zamer)
+20001/udp                  ALLOW       67.209.53.15               # shredy ot 67.209.53.15 (zamer)
+vneshnij adres hosta: 45.59.170.76, port UDP: 20001
+Created symlink /etc/systemd/system/multi-user.target.wants/shred-listener.service → /etc/systemd/system/shred-listener.service.
+active
+{
+ "updated_utc": "2026-09-30T11:25:52Z",
+ "uptime_s": 20.0,
+ "shreds": 0,
+ "bytes": 0,
+ "packets_out_of_window": 0,
+ "slots_in_memory": 107,
+ "slots_with_shreds": 0,
+ "slots_with_ws": 107,
+ "slots_with_our_signal": 5,
+ "udp_rcvbuf_bytes": 425984,
+ "ws_messages": 524,
+ "ws_signals": 5,
+ "ws_breaks": 0,
+ "last_ws_slot": 451950611,
+ "mono_to_wall_offset_s": 1790418666.909354
+}--- порт слушается? ---
+UNCONN 0      0            0.0.0.0:20001      0.0.0.0:*    users:(("python",pid=1667304,fd=3))      
+--- приоритет процесса ---
+1667304  15  1.1 31332 /home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/shred_probe/shred_listener.py
+
+--- первые 60 секунд работы ---
+{
+ "updated_utc": "2026-09-30T11:26:52Z",
+ "uptime_s": 80.0,
+ "shreds": 0,
+ "bytes": 0,
+ "packets_out_of_window": 0,
+ "slots_in_memory": 331,
+ "slots_with_shreds": 0,
+ "slots_with_ws": 331,
+ "slots_with_our_signal": 15,
+ "udp_rcvbuf_bytes": 425984,
+ "ws_messages": 2093,
+ "ws_signals": 16,
+ "ws_breaks": 0,
+ "last_ws_slot": 451950834,
+ "mono_to_wall_offset_s": 1790418666.909354
+}--- слушает ли порт ---
+UNCONN 0      0            0.0.0.0:20001      0.0.0.0:*    users:(("python",pid=1667304,fd=3))      
+--- журнал службы: подключился ли WS ---
+Sep 30 13:25:32 claude-nl systemd[1]: Started shred-listener.service - Slushatel shredov BlockRazor: slot i indeks, zamer (ne torguet).
+Sep 30 13:25:32 claude-nl python[1667304]: {"порт": 20001, "каталог": "/home/bot/shred_probe_data", "источников_в_подписке": 70, "ws": true}
+Sep 30 13:25:33 claude-nl python[1667304]: WS подключён, подписок на источники: 70
+ШРЕДОВ 0 СЛОТОВ С ШРЕДАМИ 0 СЛОТОВ С WS 341 СИГНАЛОВ WS 17 ОБРЫВОВ WS 0 ПАКЕТОВ ВНЕ ОКНА 0
+часы WS идут
+шреды идут -- tcpdump не нужен
