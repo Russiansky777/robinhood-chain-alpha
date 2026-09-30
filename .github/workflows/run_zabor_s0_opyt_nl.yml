@@ -169,8 +169,27 @@ jobs:
           # kolco". Takoj otchjot huzhe otsutstvija -- ego prochli by kak itog
           # opyta. Teper upavshij progon pokazat chuzhie chisla ne mozhet.
           rm -f /tmp/zabor_out.json
+          # OTCHJOT ZABIRAETSJA VSEGDA, A NE TOLKO PRI USPEHE.
+          # ZACHEM. Ranshe zabrat.sh stojal posle na_hoste.sh pod set -e: opyt,
+          # zakonchivshijsja OTKAZOM (kod 2), obryval shag, i otchjot ostavalsja
+          # LEZHAT NA HOSTE, a na begunok ne popadal vovse. Sledujushchij shag
+          # govoril "otchyota net -- stranicu ne pishem", i prichina otkaza byla
+          # vidna tolko v hvoste zhurnala shaga. Tak poterjany otchjoty trjoh
+          # progonov 30.09 (16:26Z, 17:02Z astralane, 17:08Z helius) -- a imenno
+          # v nih i lezhat chisla "ne ushlo i pochemu". Teper kod opyta
+          # zapominaetsja, otchjot zabiraetsja, i tolko potom shag padaet.
+          set +e
           ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/na_hoste.sh 2>&1 | tee /tmp/zabor_log.txt
-          ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/zabrat.sh > /tmp/zabor_out.json
+          KOD_OPYTA=${PIPESTATUS[0]}
+          set -e
+          ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/zabrat.sh > /tmp/zabor_out.json || true
+          if [ -s /tmp/zabor_out.json ]; then
+            echo "otchjot zabran s hosta: $(wc -c < /tmp/zabor_out.json) bajt"
+          else
+            echo "otchjota na hoste net -- zabirat nechego"
+          fi
+          echo "kod opyta: $KOD_OPYTA"
+          exit "$KOD_OPYTA"
 
       - name: "Если хост отказал -- показать конец его журнала"
         if: failure()
