@@ -56,6 +56,7 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 КРИВЫЕ = {"pump", "raydium-launchpad"}
 ВЫХОДЫ = (6, 12, 24, 36, 72, 108, 150)   # 108 -- удержание живой полосы lane_s0
 БИЛЕТЫ = (0.3, 0.5)
+ОКНО_ВСЕМ = False       # --okno-vsem: правило окна докупки для всех наших адресов
 ИЗДЕРЖКИ = 0.002
 КЛЮЧИ = ("signature", "action", "pool", "poolId", "mint", "quoteMint", "txSigner", "tokenAmount", "quoteAmount",
          "tokensInPool", "quoteInPool", "vTokensInBondingCurve", "vQuoteInBondingCurve", "poolFeeRate",
@@ -405,7 +406,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                 активные[pid] = max(активные.get(pid, 0), (e.get("block") or 0) + окно)
                             порог_t = porog_доп if (t in ист and porog_доп is not None) else porog
                             по_окну = None
-                            if окно_докупки and t in ист and e["action"] == "buy":
+                            if окно_докупки and (t in ист or ОКНО_ВСЕМ) and e["action"] == "buy":
                                 кл = (t, e.get("mint"))
                                 пред = последняя_пок.get(кл)
                                 по_окну = пред is None or (e.get("block") or 0) - пред > окно_докупки
@@ -493,11 +494,14 @@ def main() -> int:
     р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
     р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
     р.add_argument("--bilety", default="0.3,0.5", help="билеты модели, SOL, через запятую (pyg9: 0.3,0.5,1,3)")
+    р.add_argument("--okno-vsem", action="store_true",
+                   help="правило Code-1 (--okno-dokupki) для ВСЕХ наших адресов, порог -- --porog (не только --istochniki)")
     р.add_argument("--okno-dokupki", type=int, default=None,
                    help="для --istochniki сигнал по правилу Code-1: нет покупки того же минта в предыдущие N слотов (1800)")
     а = р.parse_args()
-    global БИЛЕТЫ  # noqa: PLW0603
+    global БИЛЕТЫ, ОКНО_ВСЕМ  # noqa: PLW0603
     БИЛЕТЫ = tuple(float(x) for x in а.bilety.split(",") if x.strip())
+    ОКНО_ВСЕМ = а.okno_vsem
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
