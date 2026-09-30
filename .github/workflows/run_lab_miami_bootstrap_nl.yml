@@ -316,6 +316,9 @@ jobs:
             set -e
             REG_TOKEN=\$(cat)
             cd /home/$RUNNER_USER/actions-runner
+            # Staryj _diag ubiraem DO nastrojki: inache proverka 'Listening for
+            # Jobs' nashla by stroku proshlogo begunka i pozelenela by vpustuju.
+            rm -rf _diag
             sudo -u $RUNNER_USER ./config.sh --unattended --replace \
               --url https://github.com/${{ github.repository }} \
               --token \$REG_TOKEN --name lab-miami --labels '$RUNNER_LABELS' --work _work
@@ -336,7 +339,18 @@ jobs:
             test -s /tmp/units || { echo 'SBOY: sluzhby begunka net'; exit 1; }
             grep -q ' active ' /tmp/units || { echo 'SBOY: sluzhba begunka ne active'; cat /tmp/units; exit 1; }
             test -s /home/$RUNNER_USER/actions-runner/.runner || { echo 'SBOY: registracii net'; exit 1; }
-            echo 'begunok aktiven i zaregistrirovan'" | tee -a "$OUT_FILE"
+            # 'active' cherez 3 ms posle starta ne govorit nichego: slushatel
+            # mozhet upast srazu posle. Zhdjom ego sobstvennoj stroki
+            # 'Listening for Jobs' v diag-zhurnale -- ona znachit, chto begunok
+            # soedinjon s GitHub i gotov brat rabotu.
+            GOTOV=net
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+              if grep -rqs 'Listening for Jobs' /home/$RUNNER_USER/actions-runner/_diag/; then GOTOV=da; break; fi
+              sleep 2
+            done
+            [ \$GOTOV = da ] || { echo 'SBOY: v zhurnale net Listening for Jobs za 30 s'; tail -5 /home/$RUNNER_USER/actions-runner/_diag/Runner_*.log 2>/dev/null; exit 1; }
+            grep -rhs 'Listening for Jobs' /home/$RUNNER_USER/actions-runner/_diag/ | tail -1
+            echo 'begunok aktiven, zaregistrirovan i slushaet raboty'" | tee -a "$OUT_FILE"
 
       - name: "Общий ключ «Claude» убрать -- только по слову и только после своего"
         if: ${{ inputs.ubrat_obshchij_kljuch == 'UBRAT' }}
