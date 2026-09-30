@@ -49,7 +49,7 @@ jobs:
           set -e
           cd analysis
           python3 check_shell_ascii.py --self-test
-          python3 check_shell_ascii.py ../.github/workflows
+          python3 check_shell_ascii.py ../.github/workflows ../deploy
 
       - name: "SSH key"
         env:

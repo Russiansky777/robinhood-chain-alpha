@@ -154,7 +154,7 @@ jobs:
           "$PY" bloom_seller.py --self-test
           "$PY" bloom_detector.py --self-test
           "$PY" check_shell_ascii.py --self-test
-          python3 check_shell_ascii.py ../.github/workflows
+          python3 check_shell_ascii.py ../.github/workflows ../deploy
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
