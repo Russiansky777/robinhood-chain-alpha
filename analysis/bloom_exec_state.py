@@ -482,6 +482,16 @@ class ExecState:
         self.kill_lane_path = self.base / "KILL_OWN_SEND"
         self.positions_path = self.base / "positions.jsonl"
         self.decisions_path = self.base / "decisions.jsonl"
+        # НАШИ СЛУЖЕБНЫЕ ПОДПИСИ -- не сделки, но НАШИ.
+        # Сверка при старте считает своими только подписи из записей позиций.
+        # Поэтому любая наша НЕторговая транзакция на кошельке (закрытие пустых
+        # токен-счетов и возврат ренты, спасение, перевод по белому списку)
+        # выглядела ЧУЖОЙ и давала блокер "мы в кошельке не одни". 29.09 в
+        # 18:42:50Z это и случилось: подпись нашего же закрытия 9 счетов
+        # (вернулось 0.02381504 SOL) сверка объявила чужой свежей активностью.
+        # На стенде такой блокер смертелен, а регулярно врущий блокер учит
+        # не читать настоящий. Имя файла -- ASCII: его называют и прогоны.
+        self.sluzhebnye_podpisi_path = self.base / "nashi_sluzhebnye_podpisi.jsonl"
         self.api_path = self.base / "api_calls.jsonl"
         self.counters_path = self.base / "counters.json"
         self.budget_path = self.base / "bloom_budget.json"
@@ -964,6 +974,23 @@ class ExecState:
         if lane_group:
             row["lane_group"] = lane_group
         append_jsonl_fsync(self.positions_path, row)
+
+    def zapisat_sluzhebnuju_podpis(self, подпись: str, *, кто: str,
+                                    почему: str = "") -> bool:
+        """Записать НАШУ служебную (неторговую) подпись. True -- записана.
+
+        Пустая или не-строка не пишется: мусорная строка в этом файле сделала бы
+        своей чужую подпись, а это прямо обратное тому, зачем файл нужен.
+        """
+        if not isinstance(подпись, str) or not подпись.strip():
+            return False
+        append_jsonl_fsync(self.sluzhebnye_podpisi_path,
+                            {SCHEMA_VERSION_KEY: SCHEMA_VERSION,
+                             "ts_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                      time.gmtime()),
+                             "signature": подпись.strip(),
+                             "kto": кто, "pochemu": почему})
+        return True
         return row
 
     def update_position(self, client_order_id: str, **поля) -> dict:

@@ -180,6 +180,33 @@ def our_signatures(state: ST.ExecState) -> set:
         out |= _подписи_из_записи(p)
     for путь in sorted(state.base.glob(f"{state.positions_path.name}.*")):
         out |= _подписи_из_файла(путь)
+    # НАШИ СЛУЖЕБНЫЕ ПОДПИСИ -- ТОЖЕ НАШИ. Закрытие пустых токен-счетов, возврат
+    # ренты, спасение: это НЕ сделки, поэтому в записях позиций их нет, и без
+    # этого файла каждая такая транзакция шла в "чужую свежую активность".
+    # 29.09 в 18:42:50Z подпись нашего же закрытия 9 счетов дала блокер "мы в
+    # кошельке не одни" -- при том что кошелёк наш, ключ наш и получатель ренты
+    # по инструкции тоже наш.
+    служебный = getattr(state, "sluzhebnye_podpisi_path", None)
+    if служебный is not None and служебный.exists():
+        # ЧИТАЕМ СВОИМ ЧТЕЦОМ, А НЕ _подписи_из_файла: тот ищет ключи
+        # "signatures"/"last_sell_signatures" записи позиции, а здесь ключ один и
+        # называется "signature". Добавлять его в КЛЮЧИ_ПОДПИСЕЙ нельзя: тогда он
+        # начал бы читаться и из записей позиций, где значит другое.
+        #
+        # ОТСУТСТВИЕ ФАЙЛА -- НОРМА, а не причина тревоги: служебных транзакций
+        # могло не случиться ни одной. Поэтому exists() проверяется здесь, до
+        # чтения, и в НЕПРОЧИТАННЫЕ_ЖУРНАЛЫ ничего не попадает.
+        for line in _строки_журнала(служебный):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            п_ = r.get("signature")
+            if isinstance(п_, str) and п_.strip():
+                out.add(п_.strip())
     return out
 
 
@@ -1029,6 +1056,40 @@ def self_test() -> int:
         наши = our_signatures(st)
         chk("подпись из НЕсжатого отложенного журнала читается по-прежнему",
             подпись_текстом in наши, sorted(наши))
+
+    # НАШИ СЛУЖЕБНЫЕ ПОДПИСИ. Ровно случай 29.09 18:42:50Z: наша же подпись
+    # закрытия пустых токен-счетов шла в "чужую свежую активность".
+    with tempfile.TemporaryDirectory() as d:
+        st = состояние(d)
+        подпись_служебная = "SIGSLUZH" + "q" * 80
+        # СНАЧАЛА -- КАК БЫЛО: без записи в журнал подпись считается чужой.
+        r0 = reconcile(st, mode=ST.MODE_DRY,
+                       helius=HeliusЗаглушка([{"signature": подпись_служебная,
+                                                "blockTime": time.time()}],
+                                              баланс=0.35))
+        chk("без журнала служебных наша подпись выглядит чужой (так и было)",
+            not r0["clean"], r0["blockers"])
+        # ТЕПЕРЬ -- ЗАПИСЬ, И ТА ЖЕ СВЕРКА ДОЛЖНА СТАТЬ ЧИСТОЙ.
+        chk("служебная подпись записана",
+            st.zapisat_sluzhebnuju_podpis(подпись_служебная,
+                                          кто="close_empty_token_accounts",
+                                          почему="закрытие пустых счетов") is True)
+        chk("пустая служебная подпись НЕ пишется",
+            st.zapisat_sluzhebnuju_podpis("   ", кто="x") is False)
+        chk("не-строка тоже не пишется",
+            st.zapisat_sluzhebnuju_podpis(None, кто="x") is False)
+        chk("подпись из журнала служебных считается НАШЕЙ",
+            подпись_служебная in our_signatures(st), sorted(our_signatures(st)))
+        r1 = reconcile(st, mode=ST.MODE_DRY,
+                       helius=HeliusЗаглушка([{"signature": подпись_служебная,
+                                                "blockTime": time.time()}],
+                                              баланс=0.35))
+        chk("после записи та же сверка ЧИСТАЯ -- блокера про чужих нет",
+            r1["clean"], r1["blockers"])
+        chk("отсутствие файла служебных -- не причина тревоги",
+            "nashi_sluzhebnye_podpisi" not in json.dumps(
+                r0.get("otlozhennye_ne_prochitany") or {}, ensure_ascii=False),
+            r0.get("otlozhennye_ne_prochitany"))
 
     chk("все ключи сводки латинские",
         all(k.isascii() for k in reconcile(
