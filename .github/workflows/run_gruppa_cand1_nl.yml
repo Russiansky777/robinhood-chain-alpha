@@ -1,0 +1,129 @@
+name: "Группа cand1 (0.1 SOL): показать, применить по слову, откатить"
+
+# ЗАЧЕМ. Добавка владельца к ночному пакету 30.09->01.10, п.0, и она УСЛОВНАЯ:
+# "если владелец скажет «да» по cand1". Поэтому по умолчанию прогон ТОЛЬКО
+# ПОКАЗЫВАЕТ: читает живой файл групп, строит группу cand1 в памяти, проверяет
+# список условий и печатает, чем станет файл. Запись идёт лишь при
+# rezhim=primenit И слове подтверждения PRIMENIT.
+#
+# ЧТО ЭТО МЕНЯЕТ В ДЕНЬГАХ (когда слово будет). Появляется новая ТОРГУЮЩАЯ
+# группа: 10 адресов со страницы Code-2, размер 0.1 SOL, порог входа источника
+# 2 SOL, удержание 108 слотов, стоп группы 0.3 SOL за сутки, не более 3
+# открытых, типы пулов -- как у lane_s0 (берутся его живым значением, а не
+# переписываются списком). Перезапуск НЕ нужен: файл групп служба перечитывает
+# по mtime.
+#
+# ГЛАВНЫЙ ГЕЙТ -- ОДИН АДРЕС В ДВУХ ГРУППАХ: отказ по имени. Пределы, удержание
+# и стоп полоса считает ПО ГРУППЕ, и адрес в двух группах дал бы два входа на
+# один сигнал, а каждый стоп видел бы лишь свою половину.
+on:
+  workflow_dispatch:
+    inputs:
+      rezhim:
+        description: "pokazat -- только читать (по умолчанию); primenit -- записать группу cand1; otkatit -- убрать её"
+        required: false
+        type: choice
+        default: pokazat
+        options: [pokazat, primenit, otkatit]
+      podtverzhdenie:
+        description: "для primenit и otkatit впишите PRIMENIT -- иначе файл не тронут"
+        required: false
+        default: ""
+      puly_otkuda:
+        description: "у какой группы взять типы пулов"
+        required: false
+        default: "lane_s0"
+
+concurrency:
+  group: gruppa-cand1
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  ENV_DIR: /etc/bloom-executor
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  RABOTA: /tmp/gruppa_cand1
+  OUT_FILE: data/gruppa_cand1.json
+
+jobs:
+  cand1:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО хоста (без сети)"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/gruppa_cand1.py \
+            deploy/checks/plan_test_krug.py
+          python3 deploy/checks/gruppa_cand1.py --self-test | tail -3
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Показать / применить / откатить на живом файле групп"
+        run: |
+          set -e
+          set -o pipefail
+          # ДВА ФАЙЛА: сам скрипт и модуль плана круга, у которого он берёт
+          # чтение адресов. Забытая доставка второго дала бы ImportError уже на
+          # хосте, поэтому едут оба, и оба -- с umask 077.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "umask 077; cat > $RABOTA/gruppa_cand1.py" < deploy/checks/gruppa_cand1.py
+          ssh $SSH_OPTS root@$TARGET_HOST "umask 077; cat > $RABOTA/plan_test_krug.py" < deploy/checks/plan_test_krug.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chmod 644 $RABOTA/*.py"
+          # ОКРУЖЕНИЕ И ПИТОН СЛУЖБЫ, А НЕ СИСТЕМНЫЙ python3 ПОД root: файл
+          # групп называет сам детектор своим признаком жизни, и читать его надо
+          # тем же, чем читает служба.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/gruppa_cand1.py --rezhim '${{ inputs.rezhim }}' --podtverzhdenie '${{ inputs.podtverzhdenie }}' --puly-otkuda '${{ inputs.puly_otkuda }}' --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/gruppa_cand1.json || true
+          if python3 -c "import json; json.load(open('/tmp/gruppa_cand1.json'))" 2>/dev/null; then
+            cp /tmp/gruppa_cand1.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: otchjot ne sobralsja"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Проверка по признаку жизни: что видит служба"
+        if: ${{ always() && inputs.rezhim != 'pokazat' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ. "Записали" -- это ещё не "служба читает".
+          # Файл групп перечитывается по mtime, и увидеть группу надо ЕГО
+          # глазами: hash файла и состав групп лежат в признаке жизни.
+          sleep 20
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c \"import json; s=json.load(open('/home/bot/bloom_executor_live_data/detector_status.json')); g=s.get('source_groups') or {}; print('mtime', g.get('mtime_utc'), 'hash', g.get('hash')); print('v fajle', g.get('in_file')); print('podpisano', g.get('subscribed')); print('trevoga', g.get('alarm'))\""
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Gruppa cand1: plan i proverka [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
