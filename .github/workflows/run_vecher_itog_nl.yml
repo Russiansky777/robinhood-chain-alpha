@@ -127,6 +127,15 @@ jobs:
           # ТОЛЬКО ЧТЕНИЕ ЖУРНАЛА. Ни цепи, ни подписи, ни отправки: зонд
           # перебирает decisions.jsonl* потоком (включая .gz) и отбирает
           # stage=shadow нужных программ, которые НЕ собрались.
+          #
+          # ЗОНД КЛАДЁМ СВОИМ ШАГОМ, А НЕ НАДЕЕМСЯ НА ПРЕДЫДУЩИЙ. Прогон
+          # 36712008104 упал на "can't open file /tmp/vech/signaly_stroitelej.py":
+          # шаг выше в конце делает rm -rf /tmp/vech, и к этому моменту каталога
+          # уже нет. Шаг обязан быть самодостаточным -- иначе он ломается от
+          # любой правки порядка шагов, и виноват будет не тот, кто правил.
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/vech"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vech/signaly_stroitelej.py" \
+            < deploy/checks/signaly_stroitelej.py
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
             set -a; . $ENV_DIR/env; set +a
@@ -143,6 +152,7 @@ jobs:
           else
             echo "SBOY: vypiska ne sobralas"; exit 1
           fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf /tmp/vech" || true
 
       - name: "Коммит"
         if: always()
