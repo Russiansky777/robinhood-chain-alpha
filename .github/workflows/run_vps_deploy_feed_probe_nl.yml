@@ -119,7 +119,7 @@ jobs:
           # Правило владельца: зонд не обгоняет детектор по расходу Helius.
           "$PY" -c "import sys; sys.path.insert(0,'.'); from solana_rpc_client import DAILY_BUDGET as B; p=B.get('grpc_feed_probe'); d=B.get('bloom_detector'); import solana_rpc_client as R; assert p and p <= R.ОБЩИЙ_ПОТОЛОК_СУТКИ, 'предел зонда выше общего потолка'; print('предел зонда', p, 'кредитов в сутки, детектор', d, ', общий потолок', R.ОБЩИЙ_ПОТОЛОК_СУТКИ)"
           "$PY" check_shell_ascii.py --self-test
-          "$PY" check_shell_ascii.py ../.github/workflows
+          "$PY" check_shell_ascii.py ../.github/workflows ../deploy
 
       - name: "SSH key"
         env:

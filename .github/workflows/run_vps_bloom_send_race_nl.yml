@@ -93,7 +93,7 @@ jobs:
           "$PY" bloom_api.py --self-test
           "$PY" bloom_jupiter_sell.py --self-test
           "$PY" check_shell_ascii.py --self-test
-          python3 check_shell_ascii.py ../.github/workflows
+          python3 check_shell_ascii.py ../.github/workflows ../deploy
 
       - name: "Режим и рубильник живых денег"
         run: |

@@ -1,14 +1,22 @@
 --- до ---
+active
+enabled
+MainPID=1670587
+CPUUsageNSec=415038046000
+ActiveEnterTimestamp=Wed 2026-09-30 13:51:10 CEST
+    PID %CPU     ELAPSED COMMAND
+1670587  3.0    03:49:21 python
+--- нагрузка хоста ---
+0.65 0.32 0.22 1/229 1753022
+--- код и юнит на месте (проверяется в ЛЮБОМ режиме) ---
+-rw-r--r-- 1 root root 667 Sep 30 13:51 /etc/systemd/system/shred-listener.service
+-rw-r--r-- 1 bot bot 23142 Sep 30 13:50 /home/bot/shred_probe/shred_listener.py
+Removed "/etc/systemd/system/multi-user.target.wants/shred-listener.service".
+--- после ---
 inactive
 disabled
-MainPID=0
-CPUUsageNSec=[not set]
-ActiveEnterTimestamp=
---- нагрузка хоста ---
-0.04 0.08 0.09 1/224 225196
---- код и юнит на месте (проверяется в ЛЮБОМ режиме) ---
--rw-r--r-- 1 root root 667 Sep 26 20:24 /etc/systemd/system/shred-listener.service
--rw-r--r-- 1 bot bot 22314 Sep 26 20:24 /home/bot/shred_probe/shred_listener.py
+--- нагрузка хоста после ---
+0.68 0.34 0.22 2/225 1753130
 bloom-detector: active
 bloom-seller: active
 dbot-sold-guard: active

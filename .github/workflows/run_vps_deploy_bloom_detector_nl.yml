@@ -223,7 +223,7 @@ jobs:
           # Имена переменных оболочки -- только ASCII. Кириллическое имя Bash
           # не принимает, и деплой падает посреди дела (проверено 11:24Z).
           "$PY" check_shell_ascii.py --self-test
-          python3 check_shell_ascii.py ../.github/workflows
+          python3 check_shell_ascii.py ../.github/workflows ../deploy
           # КАВЫЧКИ В УДАЛЁННЫХ КОМАНДАХ. 25.09 деплой упал ТРИЖДЫ из-за кавычек
           # в комментарии внутри ssh: они закрывали аргумент, и остаток скрипта
           # выполнялся ЛОКАЛЬНО под ghrunner, которому env читать нельзя.

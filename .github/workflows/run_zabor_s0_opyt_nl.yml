@@ -2,14 +2,19 @@ name: "Опыт забора S+0 на NL-хосте (кошелёк LIVE_TESTS, 
 
 # ЗАЧЕМ. Проверить на цепи то, что офлайн проверить нечем: садится ли покупка,
 # подписанная blockhash с lastValidBlockHeight = H-1 / H / H+1, где H -- высота
-# блока источника. Три самоперевода по 0.00001 SOL уходят ОДНОВРЕМЕННО (один
-# барьер, три потока), и по посадке видно, где граница. Модуль -- Code-3,
-# analysis/c2_zabor_s0_opyt.py (самопроверка 43/43 без сети).
+# блока источника. В каждом раунде уходит ОДНА транзакция, сдвиг (-1 / 0 / +1)
+# идёт по кругу по раундам: платный путь Helius на три сразу отвечает 429, а
+# замеру одновременность не нужна -- у каждой отправки в отчёте своя высота в
+# момент отправки и свой lastValid. Модуль -- Code-3,
+# analysis/c2_zabor_s0_opyt.py (самопроверка 80/80 без сети).
 #
 # ЧТО ЭТОТ ПРОГОН ТРАТИТ. Настоящие SOL с кошелька опыта
-# D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph -- по три отправки на раунд плюс
-# комиссии. Потолок расхода модуль считает ЗАРАНЕЕ и печатает; он же отказывает,
-# если кошелёк не тот. Торгового кошелька здесь нет вовсе.
+# D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph -- ОДНА отправка на раунд:
+# комиссия плюс ЧАЕВЫЕ по минимуму отправителя (без чаевых платный путь Helius
+# отказывает: -32602, минимум 200 000 лампортов). Потолок 0.005 SOL и остаток на
+# кошельке не меньше 0.001 SOL модуль проверяет ЗАРАНЕЕ и отказывается начинать,
+# если не влезает; он же отказывает, если кошелёк не тот. Торгового кошелька
+# здесь нет вовсе.
 #
 # СЕКРЕТ. LIVE_TESTS уходит на хост ФАЙЛОМ 600 и оттуда в ОКРУЖЕНИЕ. В argv он не
 # попадает ни разу (в argv его видно в `ps` любому на хосте), в журнал -- тоже:
@@ -32,9 +37,9 @@ on:
         default: helius
         options: [helius, astralane, triton]
       raundov:
-        description: "раундов (по три отправки в каждом)"
+        description: "раундов (по ОДНОЙ отправке в каждом; сдвиг -1/0/+1 по кругу)"
         required: false
-        default: "5"
+        default: "15"
       rezhim:
         description: "'kolco' -- только собрать кольцо, НИЧЕГО не отправлять; 'opyt' -- отправки"
         required: false
@@ -156,8 +161,31 @@ jobs:
         run: |
           set -e
           set -o pipefail
+          # OTCHJOT PROSHLOGO PROGONA UBIRAETSJA DO ZAPUSKA. Pri set -o pipefail
+          # padenie na_hoste.sh obryvaet shag, i zabrat.sh NE zapuskaetsja -- a
+          # /tmp/zabor_out.json na begunke ostajotsja OT PROSHLOGO PROGONA.
+          # Imenno tak 30.09 15:55Z progon opyt upal, a stranica sobralas iz
+          # otchjota kolco: bajt v bajt ta zhe, 861 bajt, s zagolovkom "rezhim
+          # kolco". Takoj otchjot huzhe otsutstvija -- ego prochli by kak itog
+          # opyta. Teper upavshij progon pokazat chuzhie chisla ne mozhet.
+          rm -f /tmp/zabor_out.json
           ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/na_hoste.sh 2>&1 | tee /tmp/zabor_log.txt
           ssh $SSH_OPTS root@$TARGET_HOST bash -s < deploy/zabor/zabrat.sh > /tmp/zabor_out.json
+
+      - name: "Если хост отказал -- показать конец его журнала"
+        if: failure()
+        run: |
+          set -e
+          # ZACHEM. Prichina otkaza na hoste ostavalas tolko v zhurnale shaga, i
+          # ejo prihodilos dobyvat hvostami zadnim chislom. Teper progon sam
+          # pokazyvaet konec /tmp/zabor_log.txt -- sekret v njom uzhe proveren
+          # otdelnym shagom, a pri padenii do nego zhurnal vsjo ravno nuzhen.
+          if [ -s /tmp/zabor_log.txt ]; then
+            echo "--- konec zhurnala hosta (40 strok) ---"
+            tail -40 /tmp/zabor_log.txt
+          else
+            echo "zhurnala hosta net ili on pust -- otkaz sluchilsja do zapuska"
+          fi
 
       - name: "Секрета в журнале нет"
         if: ${{ always() && inputs.rezhim == 'opyt' }}

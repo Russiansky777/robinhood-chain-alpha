@@ -14,18 +14,23 @@
 set -euo pipefail
 
 RABOTA=/tmp/zabor_s0_opyt
-ПАРАМЕТРЫ=$RABOTA/params
-КЛЮЧ=$RABOTA/kljuch
+# IMENA PEREMENNYH -- TOLKO ASCII. Bash kirillicheskie imena ne prinimaet:
+# stroka ispolnjaetsja kak komanda i dajot 'command not found' (kod 127).
+# Progon kolca 30.09 15:40Z na etom i upal: 'PARAMETRY=...: No such file or
+# directory', exit 127, do hosta delo ne doshlo vovse. Zatronuty byli i
+# KLJUCH s PRAVA, to est proverka prav 600 na sekret tozhe ne rabotala by.
+PARAMETRY=$RABOTA/params
+KLJUCH=$RABOTA/kljuch
 ENV_DIR=/etc/bloom-executor
 CODE_DIR=/home/bot/bloom_executor
 VENV=/home/bot/robinhood-chain-alpha/venv/bin
 
-if [ ! -s "$ПАРАМЕТРЫ" ]; then
-  echo "SBOY: net faila parametrov $ПАРАМЕТРЫ"
+if [ ! -s "$PARAMETRY" ]; then
+  echo "SBOY: net faila parametrov $PARAMETRY"
   exit 1
 fi
 # shellcheck disable=SC1090
-. "$ПАРАМЕТРЫ"
+. "$PARAMETRY"
 
 : "${OTPRAVITEL:?SBOY: OTPRAVITEL ne zadan}"
 : "${RAUNDOV:?SBOY: RAUNDOV ne zadan}"
@@ -52,6 +57,21 @@ if [ ! -s "$RABOTA/c2_zabor_s0_opyt.py" ]; then
   exit 1
 fi
 
+# DOSTUP DLJA bot. Progon sozdajot $RABOTA rezhimom 700 ot root i kladjot fajly
+# s umask 077, to est 600 root:root. A i samoproverka, i SAM OPYT zapuskajutsja
+# cherez sudo -u bot -- i bot ni prochitat skript, ni zapisat out.json v etot
+# katalog ne mozhet: "Permission denied", kod 2. Progon kolca 30.09 15:44Z upal
+# imenno tak. Eto sorvalo by i opyt: on idjot tem zhe sudo -u bot, prosto gejt
+# samoproverki padal ranshe i do nego delo ne dohodilo.
+#
+# Dajom dostup GRUPPE bot, a ne vsem: katalog 770 i skript 640 s gruppoj bot.
+# FAJL SEKRETA ETIM NE OTKRYVAETSJA: on ostajotsja 600 root:root, i bot ego ne
+# chitaet -- sekret v opyt popadaet cherez okruzhenie (sudo -E), a chitaet ego
+# root. Prava 600 na njom proverjajutsja otdelno nizhe.
+chgrp bot "$RABOTA" && chmod 770 "$RABOTA"
+chgrp bot "$RABOTA/c2_zabor_s0_opyt.py" && chmod 640 "$RABOTA/c2_zabor_s0_opyt.py"
+echo "dostup dlja bot: katalog $(stat -c %a:%U:%G "$RABOTA"), skript $(stat -c %a:%U:%G "$RABOTA/c2_zabor_s0_opyt.py")"
+
 # ОКРУЖЕНИЕ СЛУЖБЫ -- ТОЛЬКО ЧИТАЕМ. Узел, отправители и их ключи берутся оттуда
 # же, откуда их берёт полоса: иначе опыт мерил бы не ту дорогу.
 if [ ! -r "$ENV_DIR/env" ]; then
@@ -68,16 +88,16 @@ export BLOOM_ZABOR_S0_OPYT=1
 
 # КЛЮЧ -- ИЗ ФАЙЛА В ОКРУЖЕНИЕ. Только в режиме opyt: кольцу он не нужен вовсе.
 if [ "$REZHIM" = opyt ]; then
-  if [ ! -s "$КЛЮЧ" ]; then
-    echo "SBOY: sekret LIVE_TESTS ne dostavlen (net $КЛЮЧ)"
+  if [ ! -s "$KLJUCH" ]; then
+    echo "SBOY: sekret LIVE_TESTS ne dostavlen (net $KLJUCH)"
     exit 1
   fi
-  ПРАВА=$(stat -c %a "$КЛЮЧ")
-  if [ "$ПРАВА" != 600 ]; then
-    echo "SBOY: u faila sekreta prava $ПРАВА, a dolzhny byt 600"
+  PRAVA=$(stat -c %a "$KLJUCH")
+  if [ "$PRAVA" != 600 ]; then
+    echo "SBOY: u faila sekreta prava $PRAVA, a dolzhny byt 600"
     exit 1
   fi
-  BLOOM_LIVE_TESTS_KEY=$(cat "$КЛЮЧ")
+  BLOOM_LIVE_TESTS_KEY=$(cat "$KLJUCH")
   export BLOOM_LIVE_TESTS_KEY
   if [ -z "$BLOOM_LIVE_TESTS_KEY" ]; then
     echo "SBOY: sekret pustoj"
@@ -88,10 +108,29 @@ else
   echo "rezhim kolco: sekret ne nuzhen i ne chitaetsya"
 fi
 
+# РАБОЧИЙ КАТАЛОГ -- КАТАЛОГ КОДА СЛУЖБЫ, А НЕ ДОМАШНИЙ КАТАЛОГ root.
+# ЗАЧЕМ. Реестр отправителей bloom_senders ищет "data/senders.json" ОТНОСИТЕЛЬНО
+# рабочего каталога. Команда приезжает по ssh от root, то есть рабочий каталог --
+# /root, где лежит свой data/senders.json с правами root. Опыт идёт от bot, и
+# каждая отправка падала с "PermissionError: [Errno 13] Permission denied:
+# 'data/senders.json'": 30.09 16:14Z в сеть не ушло НИ ОДНОЙ из шести попыток.
+# Полоса работает из каталога кода службы -- опыт должен стоять там же, иначе он
+# меряет не ту дорогу. Пути $RABOTA и $KLJUCH абсолютные, их это не задевает.
+cd "$CODE_DIR" || { echo "SBOY: net katalaga koda $CODE_DIR"; exit 1; }
+echo "rabochij katalog opyta: $(pwd)"
+
 # САМОПРОВЕРКА МОДУЛЯ -- НА ТОМ ЖЕ ПИТОНЕ, ЧТО И ОПЫТ. Ей нужен solders, и
 # проверять надо именно этот интерпретатор: сломанное окружение должно вскрыться
 # ДО первой отправки, а не после списанной комиссии.
-"$VENV/python" "$RABOTA/c2_zabor_s0_opyt.py" --self-test | tail -2
+# PYTHONPATH SAMOPROVERKE NUZHEN TOT ZHE, CHTO OPYTU. Bez nego ona padaet
+# ModuleNotFoundError: No module named 'c2_swap_build' -- modul sborki lezhit v
+# kataloge koda sluzhby, a v rabochij katalog kopiruetsja tolko sam zond.
+# Progon kolca 30.09 15:43Z upal imenno tak. Zamysel kommentarija vyshe veren
+# ("na tom zhe pitone, chto i opyt"), no odnogo pitona malo -- nuzhna ta zhe
+# SREDA. I eto ne kosmetika: samoproverka -- gejt PERED pervoj otpravkoj, i v
+# takom vide opyt ne proshjol by nikogda.
+sudo -u bot -E env PYTHONPATH="$CODE_DIR" BLOOM_CODE_DIR="$CODE_DIR" \
+  "$VENV/python" "$RABOTA/c2_zabor_s0_opyt.py" --self-test | tail -2
 
 echo "zapusk: rezhim=$REZHIM otpravitel=$OTPRAVITEL raundov=$RAUNDOV"
 
@@ -106,14 +145,14 @@ sudo -u bot -E env PYTHONPATH="$CODE_DIR" BLOOM_CODE_DIR="$CODE_DIR" \
   --otpravitel "$OTPRAVITEL" \
   --raundov "$RAUNDOV" \
   --out "$RABOTA/out.json"
-КОД=$?
+KOD=$?
 set -e
 
 # СЕКРЕТ УБИРАЕТСЯ СРАЗУ, а не в конце прогона: между шагами он на диске не нужен.
-if [ -f "$КЛЮЧ" ]; then
-  shred -u "$КЛЮЧ" 2>/dev/null || rm -f "$КЛЮЧ"
+if [ -f "$KLJUCH" ]; then
+  shred -u "$KLJUCH" 2>/dev/null || rm -f "$KLJUCH"
 fi
 unset BLOOM_LIVE_TESTS_KEY
 
-echo "kod vozvrata opyta: $КОД"
-exit "$КОД"
+echo "kod vozvrata opyta: $KOD"
+exit "$KOD"
