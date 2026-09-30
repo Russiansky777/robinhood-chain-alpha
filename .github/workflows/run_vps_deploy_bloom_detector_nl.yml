@@ -809,6 +809,31 @@ jobs:
           } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/systemd/system/$SVC.service"
           ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl daemon-reload && echo 'юнит записан'"
 
+      - name: "НУЛЬ ПОЗИЦИЙ перед перезапуском (та же охрана, что у остальных прогонов)"
+        if: ${{ inputs.enable_service == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Правило "перезапуск только при НУЛЕ открытых позиций"
+          # держалось здесь на внимании человека, а не на проверке: этот прогон
+          # перезапускает детектор чаще всех, и охраны в нём не было ВОВСЕ,
+          # тогда как в run_vps_env_flag_nl, run_vps_group_policy_nl,
+          # run_vps_lane_curve_flag_nl, run_vps_nochnaya_konfiguraciya_nl,
+          # run_lane_wallet_env_nl и run_vps_autoupdate_guard_nl она стоит.
+          # Позиция в воздухе на время перезапуска остаётся без своего сторожа.
+          #
+          # ОХРАНА ТА ЖЕ САМАЯ, а не своя копия: расходятся именно копии.
+          # Она требует нуля открытых и нуля зависших ПО ВСЕМ группам, признак
+          # жизни детектора не старше 10 минут (иначе числам о позициях верить
+          # нельзя) и снятый рубильник продаж (иначе купленное некому продать).
+          #
+          # ПРОВЕРКА СТОИТ ВПЛОТНУЮ К ПЕРЕЗАПУСКУ, отдельным шагом прямо перед
+          # ним: между постановкой прогона в очередь и перезапуском проходят
+          # минуты, и за них позиция успевает открыться.
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pered_perezapuskom_sluzhby.py"
+
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
         if: ${{ inputs.enable_service == 'yes' }}
         run: |
