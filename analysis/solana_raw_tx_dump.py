@@ -20,7 +20,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-OUT_PATH = REPO_ROOT / "data" / "solana_raw_tx_dump.json"
+# ВЫВОД СБОРЩИКА -- СВОЁ ИМЯ, А НЕ ИМЯ ОБРАЗЦА. Раньше он писал в
+# data/solana_raw_tx_dump.json, и этот же файл читает самопроверка
+# c2_common как ОБРАЗЕЦ транзакций. 29.09 прогон Правила 11 записал сюда
+# свои 30 549 байт вместо прежних 86 259 -- транзакция 4yFJdscf исчезла, и
+# случай "пул с самовладеющими хранилищами не должен сбить пару" перестал
+# проверяться МОЛЧА: chk отвечал "транзакция найдена: нет", остальные
+# проверки этого блока стоят под "if t:" и просто не выполнялись (40/41).
+# Образец теперь неприкосновенен, а сборщик кладёт вывод отдельно.
+OUT_PATH = REPO_ROOT / "data" / "solana_raw_tx_dump_vyvod.json"
 CACHE_PATH = REPO_ROOT / "data" / "solana_pilot_block_autopsy_cache.json"
 
 
