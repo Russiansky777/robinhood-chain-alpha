@@ -220,8 +220,12 @@ jobs:
             if [ -d /home/$RUNNER_USER/actions-runner ]; then
               cd /home/$RUNNER_USER/actions-runner
               sudo -u $RUNNER_USER ./svc.sh uninstall 2>/dev/null || true
+              # Bez etogo 'snjali' znachilo by tolko sluzhbu: nastrojka
+              # ostavalas, i sledujushchaja ustanovka padala.
+              sudo -u $RUNNER_USER ./config.sh remove --local >/dev/null 2>&1 || true
+              rm -f .runner .credentials .credentials_rsaparams
             fi
-            echo 'sluzhba begunka snjata'" | tee -a "$OUT_FILE"
+            echo 'sluzhba i nastrojka begunka snjaty'" | tee -a "$OUT_FILE"
 
       - name: "Токен регистрации: из PAT или готовый из секрета"
         if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
@@ -319,6 +323,15 @@ jobs:
             # Staryj _diag ubiraem DO nastrojki: inache proverka 'Listening for
             # Jobs' nashla by stroku proshlogo begunka i pozelenela by vpustuju.
             rm -rf _diag
+            # I staruju MESTNUJU nastrojku tozhe: --replace menjaet zapis na
+            # storone GitHub, a mestnyj .runner ostajotsja, i config.sh
+            # otkazyvaet: 'Cannot configure the runner because it is already
+            # configured'. Imenno na etom upal progon 5.
+            if [ -f .runner ]; then
+              sudo -u $RUNNER_USER ./config.sh remove --local >/dev/null 2>&1 || true
+              rm -f .runner .credentials .credentials_rsaparams
+              echo staruju mestnuju nastrojku begunka ubrali
+            fi
             sudo -u $RUNNER_USER ./config.sh --unattended --replace \
               --url https://github.com/${{ github.repository }} \
               --token \$REG_TOKEN --name lab-miami --labels '$RUNNER_LABELS' --work _work
