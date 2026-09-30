@@ -28,6 +28,10 @@
 срезов, затем на срез `accounts_type u8` (0 -- хук base, 1 -- хук base для реферала) и `length u8`); при одном срезе -- **31 байт**.
 `length` -- число счетов остатка в этом срезе: программа отрезает ровно `length` счетов из remaining_accounts
 (`utils/remaining_accounts.rs::parse_transfer_hook_accounts`, f552f20); срез с `length` 0 пропускается.
+Проверено на 55 живых инструкциях источников по сырым транзакциям (data/podbivka/dbc_ist_tx.json.gz): swap -- 24 байта (6),
+swap2 -- 25 (27), swap2_with_transfer_hook -- **31 байт у 22 из 22**, у всех один срез типа 0, `length` 3 или 4. Внешний вызов (2):
+остаток = `length` счетов; вызов из агрегатора (20): остаток = `length` + 1 -- лишний последний счёт агрегатора, программа
+его не берёт (читает первые `length`).
 
 Счета (15): pool_authority (`FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM`, одна на программу), config (из пула), pool,
 наш счёт входа, наш счёт выхода, base_vault, quote_vault (оба из пула), base_mint, quote_mint, payer, token_base_program,
