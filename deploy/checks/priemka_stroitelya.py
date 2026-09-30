@@ -582,6 +582,11 @@ def разбор(нч: dict, *, программа: str, кошелёк: str, л
         # Нашёл Code-3, docs/stroiteli_2026-09-30_vladelcu.md, п.3.
         "build_ms", "tip_account", "size", "cu_limit", "pool_fee_share",
         "cu_units", "fee_share", "dlmm",
+        # ЧТЕНИЕ НАЛОГА TOKEN-2022: сколько чтений узла и сколько это стоило
+        # миллисекунд. Владелец 30.09: "1 чтение только на таких минтах -- время
+        # замерить на хосте". Без этих полей замер был бы разговором.
+        "base_program", "base_fee_bps", "base_fee_from", "base_fee_reads",
+        "base_fee_ms", "base_fee_epoch_known", "base_fee_read_why_not",
         "ценозависимые", "lane_route", "new_pool_size_sol")}
     из_["why_not"] = сб.get("why_not")
     tx64 = сб.get("tx_base64")
@@ -644,6 +649,31 @@ def происхождение_сборки() -> dict:
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"отпечаток не снялся: {type(exc).__name__}"
     return из_
+
+
+def _налог_свод(строки: list) -> dict:
+    """Чтение налога Token-2022: сколько строк читало узел и сколько это стоило.
+
+    Владелец 30.09: "1 чтение только на таких минтах -- время замерить на хосте".
+    Здесь именно это: строк с одним чтением, строк без чтения (классический SPL и
+    кеш), p50 и max миллисекунд чтения, и сколько раз эпоха осталась неизвестной.
+    """
+    сб = [(с.get("сборка") or {}) for с in строки]
+    чт = [с.get("base_fee_reads") for с in сб if isinstance(с.get("base_fee_reads"), int)]
+    мс = [с.get("base_fee_ms") for с in сб if isinstance(с.get("base_fee_ms"), (int, float))]
+    откуда = {}
+    for с in сб:
+        о = с.get("base_fee_from")
+        if о:
+            откуда[str(о)[:80]] = откуда.get(str(о)[:80], 0) + 1
+    return {"строк_с_чтением": sum(1 for x in чт if x == 1),
+             "строк_без_чтения": sum(1 for x in чт if x == 0),
+             "чтений_больше_одного": sum(1 for x in чт if x > 1),
+             "мс_p50": процентиль(мс, 0.5), "мс_max": (max(мс) if мс else None),
+             "замеров_мс": len(мс),
+             "эпоха_неизвестна": sum(1 for с in сб
+                                      if с.get("base_fee_epoch_known") is False),
+             "откуда": dict(sorted(откуда.items(), key=lambda x: -x[1]))}
 
 
 def _по_целевому_типу(строки: list, программа: str) -> dict:
@@ -766,6 +796,7 @@ def свод(строки: list, *, программа: str, метка: str | N
         # только первый шаг. Отдать такие три числа за числа Whirlpool значило бы
         # соврать владельцу. Поэтому: корзины и CU ОТДЕЛЬНО по целевому типу.
         **_по_целевому_типу(строки, программа),
+        "налог_2022": _налог_свод(строки),
         "причины_отказов": dict(sorted(причины.items(), key=lambda x: -x[1])),
         "что_значит_совпало": (
             "данные: раскладка инструкции верна и она разобралась; "
