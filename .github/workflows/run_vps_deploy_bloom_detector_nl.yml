@@ -99,6 +99,10 @@ on:
         description: "'yes' -- напечатать значения флагов BLOOM_* и имена всех ключей env (только чтение, секреты не печатаются)"
         required: false
         default: "no"
+      sverka_env_s_kopiej:
+        description: "имя файла копии env (env.bak.*) -- сверить остатки и множество 26 ключей; пусто -- не сверять"
+        required: false
+        default: ""
       keep_env:
         description: "env на хосте НЕ трогать: ТОЛЬКО 'yes'. Иное значение требует perepisat_env"
         required: false
@@ -140,6 +144,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: claude/nifty-sagan-r0polg
+
+      - name: "Отчёт прогона: начать с чистого файла (обнуление РОВНО ОДИН раз)"
+        run: |
+          set -e
+          # ZACHEM. Otchjot sobiraetsja shagami cherez tee -a i kommititsja v konce.
+          # Shag "--check-only" pisal v nego cherez tee BEZ -a, to est OBNULJAL fajl
+          # v seredine progona: vsjo, chto shagi vyshe uspeli zapisat, propadalo do
+          # kommita. Imenno tak propal PROTOKOL env -- shag otrabotal uspeshno, a v
+          # fajle ego stroki ne dozhili do konca. Teper obnulenie stoit odin raz i
+          # v nachale, a vse shagi pishut tolko cherez tee -a.
+          : > data/bloom_detector_deploy.txt
+          echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> data/bloom_detector_deploy.txt
 
       - name: "ГЕЙТ: переписывать env можно только по явному слову"
         # ЗАЧЕМ (слово владельца 28.09 ночью, п.3): "keep_env=yes сделать
@@ -467,6 +483,75 @@ jobs:
             echo "ночной флаг: $pair"
           done
 
+      - name: "ГЕЙТ: четыре ключа отправителей не пусты (иначе PEREPISAT сотрёт их строки)"
+        if: ${{ inputs.protokol_env == 'yes' || (inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT') }}
+        env:
+          BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
+          ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
+          ZEROX_API: ${{ secrets.ZEROX_API }}
+          NOZOMI_API_KEY: ${{ secrets.NOZOMI_API_KEY }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. Zhjostkij gejt "sekrety ne pusty" pokryvaet HELIUS_API,
+          # DBOT_API_KEY i VPS_SSH_KEY, no NE chetyre kljucha otpravitelej.
+          # A shag zapisi kljuchej otpravitelej pri pustom sekrete delaet
+          # sed -i '/^NAME=/d' -- to est MOLCHA otkljuchaet otpravitelja ot
+          # pula, ostavljaja odnu strochku v zhurnale progona. Progon,
+          # zadumannyj kak "perepisat temi zhe znachenijami", takim obrazom
+          # menjaet sostav pula. Zdes eto stanovitsja OTKAZOM PROGONA, a ne
+          # strokoj: proverka stoit DO ljuboj pravki env.
+          #
+          # Znachenija ne pechatajutsja: tolko dlina nulevaja ili net.
+          NET=0
+          for imya in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
+            znach="${!imya}"
+            if [ -z "$znach" ]; then
+              # V OTCHJOT TOZHE, a ne tolko v zhurnal progona: protokol dolzhen
+              # byt v fajle, kotoryj kommititsja, inache ego prihoditsja dobyvat
+              # iz zhurnala prognona zadnim chislom.
+              echo "$imya: PUSTO v sekretah repozitorija" | tee -a data/bloom_detector_deploy.txt
+              NET=$((NET+1))
+            else
+              echo "$imya: est v sekretah (dlina ${#znach})" | tee -a data/bloom_detector_deploy.txt
+            fi
+          done
+          # Vtoraja polovina gejta: te zhe chetyre imeni na HOSTE. Rashozhdenie
+          # "sekret est, a v env net" (ili naoborot) tozhe nado videt do pravki.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            for K in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
+              if grep -q \"^\$K=\" $ENV_DIR/env; then echo \"\$K: est v env hosta\"; else echo \"\$K: NET v env hosta\"; fi
+            done" 2>&1 | tee -a data/bloom_detector_deploy.txt
+          if [ "$NET" != "0" ]; then
+            if [ "${{ inputs.perepisat_env }}" = "PEREPISAT" ] && [ "${{ inputs.keep_env }}" != "yes" ]; then
+              echo "OTKAZ: $NET iz 4 kljuchej otpravitelej pusty, a progon sobiralsja pisat env."
+              echo "Bez etih sekretov PEREPISAT udalil by ih stroki i izmenil sostav pula."
+              exit 1
+            fi
+            echo "PROTOKOL: $NET iz 4 pusty. Eto NE otkaz, poka progon nichego ne pishet (keep_env=yes)."
+          fi
+
+      - name: "env: резервная копия ДО любой правки (имя копии -- в журнал)"
+        if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. Kopija dolzhna snimatsja DO pervoj pravki, inache sverka
+          # "kopija protiv novogo" ejo ne pojmaet. Ranshe cp -a stojal v shage
+          # s kljuchom DBot, a shag s kljuchami otpravitelej idjot RANSHE nego i
+          # uzhe delaet sed -i '/^NAME=/d': otsutstvie sekreta otpravitelja
+          # udaljalo stroku iz env, a v kopii ejo tozhe ne bylo -- sverka
+          # molchala. Teper kopija -- pervoe, chto delaet blok env.
+          IMJA="env.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            cp -a $ENV_DIR/env $ENV_DIR/$IMJA
+            chmod 600 $ENV_DIR/$IMJA
+            ls -l $ENV_DIR/$IMJA
+            grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/$IMJA" 2>&1 | tee -a data/bloom_detector_deploy.txt
+          echo "KOPIJA_ENV=$IMJA" >> "$GITHUB_ENV"
+          echo "kopija env snjata do pravok: $IMJA"
+
       - name: "env: ключи отправителей пула (значения только через stdin)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         env:
@@ -506,13 +591,12 @@ jobs:
             /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import json, bloom_senders as S; print(json.dumps(S.состояние_пула(), ensure_ascii=False)[:600])'" || \
             echo "состояние пула не прочитано (модуль ещё не доставлен) -- не страшно"
 
-      - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
+      - name: "env: дописать ключ DBot, если его там нет (копия уже снята выше)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         env:
           DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cp -a $ENV_DIR/env $ENV_DIR/env.bak.\$(date -u +%Y%m%dT%H%M%SZ)"
           # Ключ передаётся через stdin, а не аргументом: аргументы видны в ps.
           printf 'DBOT_API_KEY=%s\n' "$DBOT_API_KEY" | ssh $SSH_OPTS root@$TARGET_HOST "
             cat > /tmp/dbot_line
@@ -698,7 +782,7 @@ jobs:
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_detector.py --check-only --config $CODE_DIR/konfig_snapshot.json
             echo '--- исполнитель ---'
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_executor.py --check-only
-          " 2>&1 | tail -60 | tee data/bloom_detector_deploy.txt
+          " 2>&1 | tail -60 | tee -a data/bloom_detector_deploy.txt
 
       - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
         run: |
@@ -754,6 +838,61 @@ jobs:
             sudo -n -u bot test -w $STATE_DIR || { echo 'СБОЙ: bot не может писать в $STATE_DIR'; exit 1; }
             echo 'каталог состояния пишется службой'
           "
+
+      - name: "СВЕРКА env с копией: весь файл как МНОЖЕСТВО строк (порядок не считается)"
+        if: ${{ inputs.sverka_env_s_kopiej != '' || (inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT') }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM I POCHEMU PEREPISANO (progon 144, 13:35Z).
+          # Progon PEREPISAT nichego ne perezapisyvaet celikom: dlja kazhdogo
+          # svoego kljucha on delaet sed -i '/^KEY=/d' i dopisyvaet znachenie v
+          # KONEC. Znachit PORJADOK STROK menjaetsja zakonno, i ljuboe sravnenie
+          # PO PORJADKU rashoditsja vsegda.
+          #
+          # Pervaja versija etogo shaga uchityvala tolko 26 upravljaemyh kljuchej
+          # BLOOM_*, a progon peredvigaet ESHCHJO PJAT strok: chetyre kljucha
+          # otpravitelej i DBOT_API_KEY. Oni popadali v "ostatki", ostatki
+          # sravnivalis pobajtno -- i shag skazal "izmenilas stroka, kotoruju
+          # progon trogat ne dolzhen" na progone, gde nichego ne propalo.
+          # Eto ta zhe bolezn, chto my lovim v drugih mestah: proverka ruhnula
+          # ne po toj prichine, kotoruju nazvala.
+          #
+          # TEPER SRAVNIVAETSJA VES FAJL KAK MNOZHESTVO STROK. Porjadok ne
+          # uchastvuet vovse, i poterja ili izmenenie LJUBOJ stroki -- vkljuchaja
+          # sekrety i kljuchi koshelkov -- vidna. Dopustimoe razlichie rovno
+          # odno: BLOOM_REGION_SEND.
+          #
+          # ZNACHENIJA NE PECHATAJUTSJA: v vyvod idut tolko IMENA razoshedshihsja
+          # strok (cut -d= -f1). Inache izmenivshijsja sekret popal by v zhurnal
+          # progona i v otchjot.
+          KOPIJA="${{ inputs.sverka_env_s_kopiej }}"
+          [ -n "$KOPIJA" ] || KOPIJA="$KOPIJA_ENV"
+          [ -n "$KOPIJA" ] || { echo "SBOY: imeni kopii net ni vo vhode, ni v KOPIJA_ENV"; exit 1; }
+          echo "sverjaem s kopiej $KOPIJA"
+          case "$KOPIJA" in
+            env.bak.*) ;;
+            *) echo "SBOY: imja kopii dolzhno nachinatsja s env.bak. -- poluchili $KOPIJA"; exit 1 ;;
+          esac
+          case "$KOPIJA" in
+            */*|*..*) echo "SBOY: v imeni kopii ne dolzhno byt putej"; exit 1 ;;
+          esac
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            test -f $ENV_DIR/$KOPIJA || { echo 'SBOY: kopii net na hoste'; exit 1; }
+            umask 077
+            sort $ENV_DIR/$KOPIJA > /tmp/env_do
+            sort $ENV_DIR/env     > /tmp/env_posle
+            echo \"strok v kopii \$(wc -l < /tmp/env_do), v novom \$(wc -l < /tmp/env_posle)\"
+            echo '--- imena strok, kotorye razoshlis (tolko imena) ---'
+            comm -3 /tmp/env_do /tmp/env_posle | sed 's/^[[:space:]]*//' | cut -d= -f1 | sort -u
+            RAZN=\$(comm -3 /tmp/env_do /tmp/env_posle | sed 's/^[[:space:]]*//' | cut -d= -f1 | sort -u | grep -vxc 'BLOOM_REGION_SEND' || true)
+            shred -u /tmp/env_do /tmp/env_posle
+            echo \"imjon, razoshedshihsja NE po BLOOM_REGION_SEND: \$RAZN\"
+            test \"\$RAZN\" = 0 || { echo 'SBOY: razoshlos ne tolko BLOOM_REGION_SEND -- vernut kopiju i doklad'; exit 1; }
+            echo 'sverka proshla: kak mnozhestvo strok fajl otlichaetsja tolko BLOOM_REGION_SEND'
+            grep -c '^BLOOM_REGION_SEND=1' $ENV_DIR/env && echo 'BLOOM_REGION_SEND=1 stoit v env' || echo 'VNIMANIE: BLOOM_REGION_SEND=1 v env NET'" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
 
       - name: "Метка начала стенда (только по явному входу владельца)"
         if: ${{ inputs.mark_stand_start == 'yes' }}

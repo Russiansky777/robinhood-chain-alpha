@@ -1,0 +1,298 @@
+name: "Зонд deshred против WS: час на NL-хосте (только замер, денег не касается)"
+
+# ЗАЧЕМ (слово владельца 30.09): секреты TRITON_DESHRED_URL и
+# TRITON_DESHRED_TOKEN залиты, endpoint tier3 активирован. Зонд Code-2
+# analysis/podbivka_zond_deshred.py поднимается ОТДЕЛЬНЫМ ПРОЦЕССОМ ровно на
+# час и отвечает на один вопрос: даёт ли поток дешреда транзакцию источника
+# РАНЬШЕ, чем Helius WS. Час зонда не мешает протоколу env и региону -- они
+# идут своим порядком, этот прогон их не ждёт и они не ждут его.
+#
+# ЗОНД ТОЛЬКО СЛУШАЕТ: ничего не подписывает и не отправляет, кошельков и
+# ключей полосы не касается, службы детектора и продавца не перезапускаются.
+#
+# РУННЕР НЕ ДЕРЖИМ ЧАС. Единственный self-hosted раннер нужен деплоям,
+# поэтому зонд поднимается временной службой systemd (systemd-run --unit),
+# а прогон выходит через ~2.5 минуты, отдав первую строку: подключился и
+# записи идут -- или ТОЧНЫЙ текст отказа (по нему владелец пишет Triton).
+# Погасить раньше срока: systemctl stop zond-deshred.service.
+#
+# ДЕНЬГИ. Плата -- за бету Triton, по балансу кабинета: владелец записал
+# $113.91 на 13:11Z ДО часа; после часа значение сверяется в кабинете.
+# Ни SOL, ни чаевые, ни покупки этот прогон не тратит.
+#
+# КЛЮЧИ НЕ ПОПАДАЮТ В argv. Оба секрета уезжают на хост через stdin в файлы
+# правами 600, а службе передаются именами _FILE: значение в командной
+# строке было бы видно в ps любому на хосте.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "сколько держать оба потока, секунд (час = 3600)"
+        required: false
+        default: "3600"
+      pervaya_stroka_cherez:
+        description: "через сколько секунд забрать первую строку (слово владельца -- 2 минуты)"
+        required: false
+        default: "120"
+      ostanovit:
+        description: "'yes' -- ТОЛЬКО погасить зонд и забрать журнал, ничего не поднимать"
+        required: false
+        default: "no"
+      balans_do:
+        description: "баланс кабинета Triton ДО часа, для протокола"
+        required: false
+        default: "113.91 USD на 13:11Z"
+
+concurrency:
+  group: zond-deshred-chas
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  ZOND_DIR: /home/bot/zond_deshred
+  VENV: /home/bot/triton_venv
+  SVC: zond-deshred
+
+jobs:
+  zond:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка зонда ДО любой сети"
+        run: |
+          set -e
+          set -o pipefail
+          # PIPEFAIL OBJAZATELEN: bez nego kod vyhoda python terjaetsja v tail
+          # i upavshaja samoproverka vygljadit kak projdennaja (poymano 30.09
+          # na shage shredov -- "shredy idut" pri nule shredov).
+          python3 -m py_compile analysis/podbivka_zond_deshred.py
+          # SISTEMNYJ python3 BEGUNKA NE VIDIT protobuf i grpcio, a samoproverka
+          # zonda podnimaet nastojashchij grpc-server na 127.0.0.1 i razbiraet
+          # zaglushki geyser_pb2 -- bez etih paketov ona padaet ModuleNotFoundError
+          # (tak i vyshlo na pervom progone 13:25Z). Mestno ona prohodila potomu,
+          # chto v moej pesochnice pakety est: raznica sredy, a ne koda.
+          if python3 -c "import grpc, google.protobuf" 2>/dev/null; then
+            PYZ=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/zond_venv"
+            "$RUNNER_TEMP/zond_venv/bin/pip" install -q --upgrade pip
+            "$RUNNER_TEMP/zond_venv/bin/pip" install -q grpcio protobuf
+            PYZ="$RUNNER_TEMP/zond_venv/bin/python"
+          fi
+          echo "samoproverka na $PYZ"
+          cd analysis
+          "$PYZ" podbivka_zond_deshred.py --self-test | tail -1
+
+      - name: "Секреты заведены (значения не печатаются)"
+        env:
+          TRITON_DESHRED_URL: ${{ secrets.TRITON_DESHRED_URL }}
+          TRITON_DESHRED_TOKEN: ${{ secrets.TRITON_DESHRED_TOKEN }}
+        run: |
+          set -e
+          NET=0
+          for imya in TRITON_DESHRED_URL TRITON_DESHRED_TOKEN; do
+            znach="${!imya}"
+            if [ -z "$znach" ]; then echo "$imya: PUSTO"; NET=$((NET+1));
+            else echo "$imya: est (dlina ${#znach})"; fi
+          done
+          [ "$NET" = "0" ] || { echo "SBOY: sekrety zonda ne zality -- potoki ne otkryvaem"; exit 1; }
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Погасить зонд и забрать журнал (по запросу)"
+        if: ${{ inputs.ostanovit == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl stop $SVC.service 2>/dev/null || true; sleep 3; systemctl reset-failed $SVC.service 2>/dev/null || true"
+          install -d data/zond_deshred
+          ssh -n $SSH_OPTS root@$TARGET_HOST "ls -l $ZOND_DIR" | tee -a data/zond_deshred/progon.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $ZOND_DIR/status_deshred.json 2>/dev/null || echo 'priznaka net'" | tee -a data/zond_deshred/progon.txt
+          # ZHURNAL ZABIRAEM SZHATYM: za chas strok mnogo, a v repozitorij idjot fajl.
+          IMYA=$(ssh -n $SSH_OPTS root@$TARGET_HOST "ls -1t $ZOND_DIR/deshred_*.jsonl 2>/dev/null | head -1")
+          if [ -n "$IMYA" ]; then
+            ssh -n $SSH_OPTS root@$TARGET_HOST "gzip -9 -c $IMYA" > "data/zond_deshred/$(basename "$IMYA").gz"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "cat $ZOND_DIR/status_deshred.json" > data/zond_deshred/status_deshred.json 2>/dev/null || true
+            ls -l data/zond_deshred/
+          else
+            echo "zhurnala zonda na hoste net -- brat nechego"
+          fi
+
+      - name: "Доставка зонда, заглушек протокола и адресов"
+        if: ${{ inputs.ostanovit != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $ZOND_DIR $ZOND_DIR/proto"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $ZOND_DIR/podbivka_zond_deshred.py" < analysis/podbivka_zond_deshred.py
+          # ZAGLUSHKI YELLOWSTONE UZHE V REPOZITORII, generirovat nechego: zond
+          # ishchet ih v proto/ rjadom s soboj libo v GEYSER_PROTO_DIR.
+          for M in geyser_pb2.py geyser_pb2_grpc.py solana_storage_pb2.py solana_storage_pb2_grpc.py; do
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $ZOND_DIR/proto/$M" < "analysis/proto/$M"
+          done
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $ZOND_DIR/adresa_istochnikov.txt" < data/podbivka/zond_deshred/adresa_istochnikov.txt
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $ZOND_DIR/leader_regions.json" < data/leader_regions.json
+          # SVERKA sha256, A NE "ssh proshjol": pustoj fajl na hoste vygljadel by
+          # uspehom dostavki.
+          for F in podbivka_zond_deshred.py adresa_istochnikov.txt leader_regions.json; do
+            case "$F" in
+              podbivka_zond_deshred.py) MEST="analysis/$F" ;;
+              adresa_istochnikov.txt)   MEST="data/podbivka/zond_deshred/$F" ;;
+              *)                        MEST="data/$F" ;;
+            esac
+            A=$(sha256sum "$MEST" | cut -d' ' -f1)
+            B=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $ZOND_DIR/$F | cut -d' ' -f1")
+            [ "$A" = "$B" ] || { echo "SBOY: $F na hoste otlichaetsja"; exit 1; }
+            echo "$F: sha256 soshlas"
+          done
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            if [ ! -x $VENV/bin/python ]; then
+              python3 -m venv $VENV
+              $VENV/bin/pip install -q --upgrade pip
+              $VENV/bin/pip install -q grpcio protobuf
+            fi
+            $VENV/bin/python -c 'import grpc, google.protobuf; print(\"grpcio\", grpc.__version__, \"protobuf ok\")'
+            wc -l < $ZOND_DIR/adresa_istochnikov.txt"
+
+      - name: "Ключи -- файлами правами 600 (в argv не попадают)"
+        if: ${{ inputs.ostanovit != 'yes' }}
+        env:
+          TRITON_DESHRED_URL: ${{ secrets.TRITON_DESHRED_URL }}
+          TRITON_DESHRED_TOKEN: ${{ secrets.TRITON_DESHRED_TOKEN }}
+        run: |
+          set -e
+          set -o pipefail
+          printf '%s' "$TRITON_DESHRED_URL"   | ssh $SSH_OPTS root@$TARGET_HOST "umask 077; cat > $ZOND_DIR/deshred_url"
+          printf '%s' "$TRITON_DESHRED_TOKEN" | ssh $SSH_OPTS root@$TARGET_HOST "umask 077; cat > $ZOND_DIR/deshred_token"
+          # KLJUCH HELIUS -- OBSHCHIJ, poka HELIUS_API_KEY2 ne na hoste (slovo
+          # vladelca 30.09). Berjotsja ISTOCHNIKOM env, a ne grep'om: stroka
+          # mozhet stojat kak "export KEY=...", i grep po '^KEY=' otdal by pustotu.
+          ssh -n $SSH_OPTS root@$TARGET_HOST 'set -a; . /etc/bloom-executor/env; set +a; umask 077; printf "%s" "$HELIUS_API_KEY" > /home/bot/zond_deshred/helius_key'
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            chmod 600 $ZOND_DIR/deshred_url $ZOND_DIR/deshred_token $ZOND_DIR/helius_key
+            for F in deshred_url deshred_token helius_key; do
+              echo \"\$F: bajt \$(wc -c < $ZOND_DIR/\$F)\"
+            done"
+
+      - name: "Поднять зонд временной службой ровно на час"
+        if: ${{ inputs.ostanovit != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          echo "ZOND_STAMP=$STAMP" >> "$GITHUB_ENV"
+          echo "balans kabineta Triton DO chasa: ${{ inputs.balans_do }}"
+          # ZAMOK I PREZHNJAJA SLUZHBA SNIMAJUTSJA DO STARTA: signal mog ubit
+          # proshlyj progon do finally, i togda novyj potok ne podnjalsja by.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl stop $SVC.service 2>/dev/null || true; sleep 2; systemctl reset-failed $SVC.service 2>/dev/null || true"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemd-run --unit=$SVC --description='Zond deshred protiv WS, chas zamera' \
+            --setenv=TRITON_DESHRED_URL_FILE=$ZOND_DIR/deshred_url \
+            --setenv=TRITON_DESHRED_TOKEN_FILE=$ZOND_DIR/deshred_token \
+            --setenv=HELIUS_API_KEY_FILE=$ZOND_DIR/helius_key \
+            --setenv=LEADER_REGIONS_FILE=$ZOND_DIR/leader_regions.json \
+            --setenv=TRITON_STATE_DIR=$ZOND_DIR \
+            --setenv=GEYSER_PROTO_DIR=$ZOND_DIR/proto \
+            --setenv=PYTHONPATH=$KOD_HOSTA:$ZOND_DIR \
+            --working-directory=$ZOND_DIR \
+            $VENV/bin/python $ZOND_DIR/podbivka_zond_deshred.py \
+              --accounts-file $ZOND_DIR/adresa_istochnikov.txt \
+              --leader-regions $ZOND_DIR/leader_regions.json \
+              --seconds '${{ inputs.seconds }}' \
+              --out $ZOND_DIR/deshred_$STAMP.jsonl \
+              --status $ZOND_DIR/status_deshred.json \
+              --state-dir $ZOND_DIR"
+          echo "zond podnyat, edinica $SVC.service, zhurnal deshred_$STAMP.jsonl"
+
+      - name: "Первая строка: подключился и записи идут -- или точный текст отказа"
+        if: ${{ inputs.ostanovit != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ETOT SHAG -- I EST PERVAJA STROKA VLADELCU. On dolzhen otvechat
+          # odnoznachno: libo zapisi idut s chislami, libo TOCHNYJ tekst otkaza
+          # (Unimplemented / PermissionDenied / inoe) -- po nemu vladelec pishet
+          # Triton. "Sluzhba aktivna" bez zapisej otvetom NE schitaetsja.
+          sleep "${{ inputs.pervaya_stroka_cherez }}"
+          install -d data/zond_deshred
+          {
+            echo "=== zond deshred, pervaya stroka cherez ${{ inputs.pervaya_stroka_cherez }} s ==="
+            echo "balans kabineta Triton DO chasa: ${{ inputs.balans_do }}"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl is-active $SVC.service || true"
+            echo "--- zhurnal edinicy (poslednie 40 strok) ---"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u $SVC.service -n 40 --no-pager || true"
+            echo "--- priznak zhizni ---"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "cat $ZOND_DIR/status_deshred.json 2>/dev/null || echo 'priznaka poka net'"
+            echo "--- strok v zhurnale zonda po kanalam ---"
+            # OBRAZCY BEZ DVOJNYH KAVYCHEK: tochka na meste kavychki JSON.
+            # Uzor 'feed.: .deshred' lovit "feed": "deshred" i ne trebuet
+            # vlozhennogo ekranirovanija, na kotorom 30.09 slomalsja shag ufw.
+            ssh -n $SSH_OPTS root@$TARGET_HOST "
+              F=\$(ls -1t $ZOND_DIR/deshred_*.jsonl 2>/dev/null | head -1)
+              if [ -z \"\$F\" ]; then echo 'zhurnala net vovse'; exit 0; fi
+              echo \"fajl \$F, vsego strok \$(wc -l < \$F)\"
+              awk '/feed.: .deshred/ {d++; if (/kind.: .transaction/) dt++}
+                   /feed.: .helius_ws/ {w++; if (/kind.: .transaction/) wt++}
+                   END{printf \"deshred strok %d, iz nih tranzakcij %d; helius_ws strok %d, iz nih tranzakcij %d\\n\", d+0, dt+0, w+0, wt+0}' \"\$F\"
+              echo '--- pervye tri tranzakcii kanala deshred ---'
+              grep 'feed.: .deshred' \$F | grep 'kind.: .transaction' | head -3 || true
+              echo '--- otkazy potoka, esli est ---'
+              grep -E 'stream_error|Unimplemented|PermissionDenied|Unauthenticated|ResourceExhausted|InvalidArgument' \$F | head -5 || true"
+          } 2>&1 | tee -a data/zond_deshred/progon.txt
+          # VERDIKT SCHITAEM PO CHISLAM, a ne po glazam: esli zapisej kanala
+          # deshred nol, eto otkaz ili tishina, i tak i nado skazat.
+          # SCHITAEM TOLKO TRANZAKCII, a ne vse stroki kanala: stroka
+          # stream_error tozhe imeet feed=deshred, i schjot po feed dal by
+          # "zapisi idut" imenno v tot moment, kogda potok otkazal. Eto tot zhe
+          # molchalivyj klass, chto "shredy idut" pri nule shredov 30.09.
+          # CHISLO OBJAZANO BYT ODNOJ STROKOJ. Uzor "[ -n \$F ] && grep -c ... || echo 0"
+          # pri nule sovpadenij pechataet DVE stroki: grep -c vydajot 0 i vozvrashchaet 1,
+          # posle chego srabatyvaet vetka || echo 0. Togda [ "0\n0" -gt 0 ] -- ne chislo,
+          # rc=2, i pri set -e shag padal by SRAZU POSLE pravilnogo verdikta.
+          # awk pechataet rovno odno chislo i vsegda vyhodit s nuljom.
+          N=$(ssh -n $SSH_OPTS root@$TARGET_HOST "F=\$(ls -1t $ZOND_DIR/deshred_*.jsonl 2>/dev/null | head -1); if [ -n \"\$F\" ]; then awk '/feed.: .deshred/ && /kind.: .transaction/ {n++} END{print n+0}' \"\$F\"; else echo 0; fi")
+          E=$(ssh -n $SSH_OPTS root@$TARGET_HOST "F=\$(ls -1t $ZOND_DIR/deshred_*.jsonl 2>/dev/null | head -1); if [ -n \"\$F\" ]; then awk '/stream_error/ {n++} END{print n+0}' \"\$F\"; else echo 0; fi")
+          echo "tranzakcij kanala deshred za pervye ${{ inputs.pervaya_stroka_cherez }} s: $N, strok stream_error: $E" | tee -a data/zond_deshred/progon.txt
+          if [ "${N:-0}" -gt 0 ]; then
+            echo "VERDIKT: podkljuchilsja, tranzakcii kanala deshred idut ($N za ${{ inputs.pervaya_stroka_cherez }} s)" | tee -a data/zond_deshred/progon.txt
+            # "|| true" OBJAZATELEN: pri E=0 test vozvrashchaet 1, && korotko
+            # zamykaetsja, i pri set -e shag upal by SRAZU POSLE vernogo verdikta.
+            if [ "${E:-0}" -gt 0 ]; then
+              echo "OGOVORKA: pri etom est $E strok stream_error -- potok rvjotsja i pereotkryvaetsja" | tee -a data/zond_deshred/progon.txt
+            fi
+          else
+            echo "VERDIKT: TRANZAKCIJ kanala deshred NET (strok stream_error $E) -- tekst otkaza vyshe, po nemu pisat Triton" | tee -a data/zond_deshred/progon.txt
+          fi
+
+      - name: "Коммит первой строки"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/zond_deshred 2>/dev/null || true
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Zond deshred: pervaya stroka chasa [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
