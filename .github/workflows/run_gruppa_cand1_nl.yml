@@ -111,16 +111,36 @@ jobs:
           fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
 
-      - name: "Проверка по признаку жизни: что видит служба"
+      - name: "Проверка по признаку жизни: служба ВИДИТ группу"
         if: ${{ always() && inputs.rezhim != 'pokazat' }}
         run: |
           set -e
           set -o pipefail
-          # ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ. "Записали" -- это ещё не "служба читает".
-          # Файл групп перечитывается по mtime, и увидеть группу надо ЕГО
-          # глазами: hash файла и состав групп лежат в признаке жизни.
-          sleep 20
-          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c \"import json; s=json.load(open('/home/bot/bloom_executor_live_data/detector_status.json')); g=s.get('source_groups') or {}; print('mtime', g.get('mtime_utc'), 'hash', g.get('hash')); print('v fajle', g.get('in_file')); print('podpisano', g.get('subscribed')); print('trevoga', g.get('alarm'))\""
+          # ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ И ПОЧЕМУ ЖДЁМ В ЦИКЛЕ. "Записали" -- это ещё не
+          # "служба читает": файл групп перечитывается по mtime СВОИМ тактом.
+          # Первый вид этого шага просто спал 20 с и печатал, что нашёл, --
+          # 30.09 21:02Z он напечатал СТАРЫЙ hash (3f523906a378, группы cand1
+          # нет) и остался зелёным, хотя запись прошла. Такой шаг хуже
+          # отсутствия: он выдаёт "проверено" за "посмотрели рано". Теперь ждём
+          # до трёх минут, пока признак жизни не назовёт группу cand1 (или не
+          # перестанет её называть при откате), и роняем прогон, если не назвал.
+          ZHDJOM=cand1
+          NUZHNO=est
+          if [ "${{ inputs.rezhim }}" = otkatit ]; then NUZHNO=net; fi
+          VIDNO=net
+          for i in $(seq 1 18); do
+            EST=$(ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c \"import json; s=json.load(open('/home/bot/bloom_executor_live_data/detector_status.json')); g=s.get('source_groups') or {}; f=g.get('in_file') or {}; p=(g.get('policies') or {}).get('$ZHDJOM') or {}; print('est' if '$ZHDJOM' in f else 'net', f.get('$ZHDJOM'), g.get('mtime_utc'), g.get('hash'), p.get('lane_trades'), p.get('lane_size'), p.get('hold_slots'), p.get('min_target_sol'), p.get('stop_loss_sol'), p.get('lane_open_max'), g.get('alarm'))\"")
+            echo "priznak zhizni: $EST"
+            case "$EST" in
+              "$NUZHNO "*) VIDNO=da; break;;
+            esac
+            sleep 10
+          done
+          if [ "$VIDNO" != da ]; then
+            echo "SBOY: sluzhba za 3 minuty ne uvidela ozhidaemoe sostojanie gruppy $ZHDJOM (nuzhno: $NUZHNO)"
+            exit 1
+          fi
+          echo "sluzhba vidit gruppu $ZHDJOM tak, kak nuzhno: $NUZHNO"
 
       - name: "Коммит"
         if: always()
