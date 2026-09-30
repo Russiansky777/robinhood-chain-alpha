@@ -1594,6 +1594,17 @@ class Helius:
         данные = val.get("data")
         разбор = данные.get("parsed") if isinstance(данные, dict) else None
         info = разбор.get("info") if isinstance(разбор, dict) else None
+        # РАЗОБРАН ЛИ СЧЁТ ВООБЩЕ -- ОТДЕЛЬНЫМИ ПРИЗНАКАМИ, А НЕ ПО НАЛОГУ. Ниже
+        # стоит taxed = bool(fee_bps), и без них ДВА разных случая сливались в
+        # одно "taxed: False": (1) счёт разобран, список расширений есть, налога
+        # среди них нет -- ноль ДОКАЗАН; (2) счёт не разобран вовсе (узел отдал
+        # data списком, адрес оказался не минтом, ответ без parsed) -- про налог
+        # не известно НИЧЕГО, а token_program при этом уже записан из owner, то
+        # есть Token-2022. Полоса по второму случаю считала ноль доказанным и
+        # ставила ЗАВЫШЕННЫЙ минимум -- покупка откатывалась бы на каждой
+        # попытке, сжигая приоритет и чаевые. Признаки читает bloom_own_send.
+        out["разобран"] = isinstance(info, dict) and bool(info)
+        out["расширения_есть"] = isinstance(info, dict) and "extensions" in info
         if not isinstance(info, dict):
             info = {}
         out["decimals"] = info.get("decimals")
@@ -1613,6 +1624,10 @@ class Helius:
                 out["fee_authority"] = st.get("transferFeeConfigAuthority")
                 out["withdraw_authority"] = st.get("withdrawWithheldAuthority")
         out["taxed"] = bool(out.get("fee_bps"))
+        out["ноль_доказан"] = bool(
+            out.get("разобран") and out.get("расширения_есть")
+            and (out.get("fee_bps") is None
+                 or int(out.get("fee_bps") or 0) == 0))
         return out
 
     def налоги_минтов(self, минты: list) -> dict:
@@ -1687,6 +1702,17 @@ class Helius:
         данные = val.get("data")
         разбор = данные.get("parsed") if isinstance(данные, dict) else None
         info = разбор.get("info") if isinstance(разбор, dict) else None
+        # РАЗОБРАН ЛИ СЧЁТ ВООБЩЕ -- ОТДЕЛЬНЫМИ ПРИЗНАКАМИ, А НЕ ПО НАЛОГУ. Ниже
+        # стоит taxed = bool(fee_bps), и без них ДВА разных случая сливались в
+        # одно "taxed: False": (1) счёт разобран, список расширений есть, налога
+        # среди них нет -- ноль ДОКАЗАН; (2) счёт не разобран вовсе (узел отдал
+        # data списком, адрес оказался не минтом, ответ без parsed) -- про налог
+        # не известно НИЧЕГО, а token_program при этом уже записан из owner, то
+        # есть Token-2022. Полоса по второму случаю считала ноль доказанным и
+        # ставила ЗАВЫШЕННЫЙ минимум -- покупка откатывалась бы на каждой
+        # попытке, сжигая приоритет и чаевые. Признаки читает bloom_own_send.
+        out["разобран"] = isinstance(info, dict) and bool(info)
+        out["расширения_есть"] = isinstance(info, dict) and "extensions" in info
         if not isinstance(info, dict):
             info = {}
         out["decimals"] = info.get("decimals")
@@ -1703,6 +1729,10 @@ class Helius:
                 st = (e.get("state") or {})
                 out["fee_bps"] = (st.get("newerTransferFee") or {}).get("transferFeeBasisPoints")
         out["taxed"] = bool(out.get("fee_bps"))
+        out["ноль_доказан"] = bool(
+            out.get("разобран") and out.get("расширения_есть")
+            and (out.get("fee_bps") is None
+                 or int(out.get("fee_bps") or 0) == 0))
         self._кеш_минтов[минт] = out
         return out
 
@@ -12191,6 +12221,48 @@ def self_test() -> int:
             os.environ.pop("BLOOM_TG_FORMAT", None)
         else:
             os.environ["BLOOM_TG_FORMAT"] = было_ф3
+
+    # НАЛОГ МИНТА: "НЕ РАЗОБРАН" -- НЕ ТО ЖЕ, ЧТО "НАЛОГА НЕТ". Живой след:
+    # полоса брала taxed=False за доказанный ноль и ставила завышенный минимум.
+    _T22 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+    _разобран = Helius._налог_из_счёта("М", {
+        "owner": _T22,
+        "data": {"parsed": {"info": {"decimals": 6, "extensions": []}}}})
+    chk("расширения есть, налога среди них нет -- ноль ДОКАЗАН",
+        _разобран["разобран"] and _разобран["расширения_есть"]
+        and _разобран["ноль_доказан"] and _разобран["taxed"] is False,
+        _разобран)
+    # УЗЕЛ ОТДАЛ data СПИСКОМ (адрес не минт либо разобрать нечем).
+    _не_разобран = Helius._налог_из_счёта("М", {
+        "owner": _T22, "data": ["AAAA", "base64"]})
+    chk("счёт не разобран -- ноль НЕ доказан, хотя taxed тоже False",
+        _не_разобран["разобран"] is False
+        and _не_разобран["ноль_доказан"] is False
+        and _не_разобран["taxed"] is False
+        and _не_разобран["token_program"] == _T22, _не_разобран)
+    # РАЗОБРАН, НО БЕЗ СПИСКА РАСШИРЕНИЙ -- тоже не доказательство.
+    _без_списка = Helius._налог_из_счёта("М", {
+        "owner": _T22, "data": {"parsed": {"info": {"decimals": 9}}}})
+    chk("разобран, а списка расширений нет -- ноль НЕ доказан",
+        _без_списка["разобран"] is True
+        and _без_списка["расширения_есть"] is False
+        and _без_списка["ноль_доказан"] is False, _без_списка)
+    _со_ставкой = Helius._налог_из_счёта("М", {
+        "owner": _T22,
+        "data": {"parsed": {"info": {"extensions": [
+            {"extension": "transferFeeConfig",
+              "state": {"newerTransferFee": {"transferFeeBasisPoints": 150,
+                                              "maximumFee": 7}}}]}}}})
+    chk("ставка прочитана -- налог есть, ноль не доказан",
+        _со_ставкой["fee_bps"] == 150 and _со_ставкой["taxed"] is True
+        and _со_ставкой["ноль_доказан"] is False, _со_ставкой)
+    _нулевая = Helius._налог_из_счёта("М", {
+        "owner": _T22,
+        "data": {"parsed": {"info": {"extensions": [
+            {"extension": "transferFeeConfig",
+              "state": {"newerTransferFee": {"transferFeeBasisPoints": 0}}}]}}}})
+    chk("ставка явно нулевая -- ноль доказан",
+        _нулевая["fee_bps"] == 0 and _нулевая["ноль_доказан"] is True, _нулевая)
 
     прошло = sum(1 for _, ок, _ in проверки if ок)
     for имя, ок, факт in проверки:
