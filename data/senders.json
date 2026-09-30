@@ -196,5 +196,13 @@
     "видно_в_цепи": "4LmNfJiSzJhL8XQngSczG1dZV8bVABWK1EeipaLc5ZNqq7ndEhZjxHntbVGmHn3hTD5NndNmRKJ1JtHa1qd93XaA"
    }
   ]
+ },
+ "_triton_pochemu_ne_v_spiske": {
+  "что": "triton в этом реестре отсутствует намеренно: как ОТПРАВИТЕЛЬ транзакций он у нас не настроен",
+  "что_есть": "Triton есть только как ФИД предподтверждений: preconfs.rpcpool.com:443, gRPC, заголовок x-token, секрет TRITON_X_TOKEN (analysis/triton_preconfs_probe.py, ТОЧКА_ВХОДА)",
+  "чего_нет": "точки входа отправки и её ключа. У Triton отправка идёт через Cascade Transaction Submission API (их собственный указатель data/docs/triton/triton_llms.txt: 'Transaction Submission API ... Direct HTTP endpoint for submitting Solana transactions through Cascade'), но ни адреса этой точки, ни ключа к ней в проекте нет, а сохранённой документации по ней тоже нет -- в data/docs/triton/ лежат только предподтверждения",
+  "подтверждение_живым": "запись сделки полосы 30.09 18:26Z: lane_pool_senders = [astralane, blockrazor, helius, jito, nozomi, zeroslot] -- шести отправителей полоса знает, triton среди них нет",
+  "что_нужно_чтобы_появился": "одна строка владельца: адрес точки отправки Cascade для нашего проекта и имя секрета с ключом к ней. Выдумывать адрес нельзя -- деньги ушли бы в ничто",
+  "когда": "2026-09-30, ночной пакет (забор triton 10 раундов запрошен и НЕ сделан по этой причине)"
  }
 }
