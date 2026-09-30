@@ -27,6 +27,10 @@ on:
         description: "размер пробной покупки в лампортах (только счёт цены)"
         required: false
         default: "10000000"
+      zhdat:
+        description: "ждать СВЕЖИХ строк журнала столько секунд (0 -- брать готовые; свежие мерят путь как в бою)"
+        required: false
+        default: "0"
       vetka_kandidata:
         description: "ветка, чей analysis/ мерить (пусто -- то, что на хосте)"
         required: false
@@ -48,7 +52,7 @@ env:
 jobs:
   dva_puti:
     runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
-    timeout-minutes: 15
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -104,6 +108,7 @@ jobs:
                 --skolko '${{ inputs.skolko }}' \
                 --otkuda '${{ inputs.otkuda }}' \
                 --lamportov '${{ inputs.lamportov }}' \
+                --zhdat '${{ inputs.zhdat }}' \
                 --sbory $RABOTA/kandidat \
                 --state-dir $STATE_DIR \
                 --out $RABOTA/out.json" | tail -90
