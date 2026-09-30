@@ -707,9 +707,12 @@ def _процентиль(ряд: list, доля: float):
 
 
 def читать_журнал(пути: list) -> list:
+    """Журнал(ы) зонда: .jsonl или сжатый gzip (.jsonl.gz, как велит страница запуска) -- по первым байтам, не по имени."""
     строки = []
     for путь in пути:
-        with open(путь, encoding="utf-8") as ф:
+        with open(путь, "rb") as сырой:
+            сжат = сырой.read(2) == b"\x1f\x8b"
+        with (gzip.open(путь, "rt", encoding="utf-8") if сжат else open(путь, encoding="utf-8")) as ф:
             for с in ф:
                 с = с.strip()
                 if с:
@@ -1087,6 +1090,16 @@ def self_test() -> int:
     chk("WS-цикл: подписка, транзакция с адресом, обрыв в журнале без ключа",
         [с["kind"] for с in ст3][:3] == ["subscribed", "transaction", "stream_error"]
         and ст3[1]["address"] == "A1" and "hk-456" not in ж3.ф.getvalue(), ст3)
+    # свод читает журнал и сжатым: .jsonl и .jsonl.gz с одними строками дают одно и то же
+    import tempfile  # noqa: PLC0415
+    with tempfile.TemporaryDirectory() as кат:
+        текст = "\n".join(json.dumps({"feed": КАНАЛ_ШРЕДЫ, "kind": "transaction", "signature": f"s{i}", "t_recv": 1.0 + i})
+                          for i in range(3)) + "\n{битая строка\n"
+        простой, сжатый = Path(кат) / "ж.jsonl", Path(кат) / "ж.jsonl.gz"
+        простой.write_text(текст, encoding="utf-8")
+        сжатый.write_bytes(gzip.compress(текст.encode("utf-8")))
+        а1, а2 = читать_журнал([str(простой)]), читать_журнал([str(сжатый)])
+    chk("свод читает .jsonl.gz так же, как .jsonl (битая строка пропускается)", а1 == а2 and len(а1) == 3, (len(а1), len(а2)))
     # обрыв посреди подписки: старый поток подписки не шлёт в закрытый сокет и кончается до нового соединения
     соединения: list = []
 
