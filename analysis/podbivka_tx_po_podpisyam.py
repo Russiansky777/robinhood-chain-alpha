@@ -31,9 +31,9 @@ def скачать(уз, подписи: list) -> dict:
     return из_
 
 
-def окно(уз, адрес: str, от_слота: int, до_слота: int) -> list:
-    """Подписи адреса со слотом в [от_слота, до_слота], от новых к старым, постранично."""
-    сп, до = [], None
+def окно(уз, адрес: str, от_слота: int, до_слота: int, начать_до: str | None = None) -> list:
+    """Подписи адреса со слотом в [от_слота, до_слота], от новых к старым, постранично (с подписи начать_до, если дана)."""
+    сп, до = [], начать_до
     while True:
         стр = уз.подписи(адрес, до=до, limit=1000)
         if not стр:
@@ -50,6 +50,9 @@ def main() -> int:
     р.add_argument("--teni", action="store_true")
     р.add_argument("--dbc", action="store_true")
     р.add_argument("--okno", action="store_true")
+    р.add_argument("--vhod", default="dve_sdelki_vhod.json", help="--okno: файл сделок в data/podbivka")
+    р.add_argument("--plus", type=int, default=0, help="--okno: окно -- слоты покупки … +plus (0 -- до продажи +2)")
+    р.add_argument("--out", default="dve_sdelki_tx.json.gz", help="--okno: выход в data/podbivka")
     а = р.parse_args()
     уз = S.Узел()
     import podbivka_run as R  # noqa: PLC0415
@@ -63,7 +66,7 @@ def main() -> int:
             txs = скачать(уз, sorted({с["signature"] for с in сд}))
             out = П / "dbc_ist_tx.json.gz"
         else:
-            вход = json.loads((П / "dve_sdelki_vhod.json").read_text(encoding="utf-8"))["сделки"]
+            вход = json.loads((П / а.vhod).read_text(encoding="utf-8"))["сделки"]
             txs, окна = {}, {}
             for с in вход:
                 пара = скачать(уз, [с["buy_sig"], с["sell_sig"]])
@@ -71,17 +74,18 @@ def main() -> int:
                 s0 = (пара.get(с["buy_sig"]) or {}).get("slot")
                 s1 = (пара.get(с["sell_sig"]) or {}).get("slot")
                 if not (s0 and s1):
-                    окна[с["mint"]] = {"why_not": "покупка или продажа не прочитана"}
+                    окна[с["buy_sig"]] = окна[с["mint"]] = {"why_not": "покупка или продажа не прочитана"}
                     continue
                 подп = {}
+                верх = s0 + а.plus if а.plus else s1 + 2
                 for адрес in (с["mint"], с["pool_vault"]):
-                    for з in окно(уз, адрес, s0, s1 + 2):
+                    for з in окно(уз, адрес, s0, верх, с["sell_sig"]):
                         подп[з["signature"]] = з
-                окна[с["mint"]] = {"slot_покупки": s0, "slot_продажи": s1, "подписей": len(подп),
+                окна[с["buy_sig"]] = окна[с["mint"]] = {"slot_покупки": s0, "slot_продажи": s1, "верх_окна": верх, "подписей": len(подп),
                                    "упавших": sum(1 for з in подп.values() if з.get("err") is not None)}
                 txs.update(скачать(уз, sorted(з for з, v in подп.items() if v.get("err") is None)))
             txs = {"окна": окна, "транзакции": txs}
-            out = П / "dve_sdelki_tx.json.gz"
+            out = П / а.out
     тело = txs if isinstance(txs, dict) and "окна" in txs else {"транзакции": txs}
     тело["расход"] = уз.расход()
     out.write_bytes(gzip.compress(json.dumps(тело, ensure_ascii=False).encode()))
