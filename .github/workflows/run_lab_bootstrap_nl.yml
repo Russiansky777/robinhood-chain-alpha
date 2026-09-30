@@ -1,8 +1,13 @@
-name: "Лаборатория Miami: свой ключ, бегунок lab-miami, окружение зондов"
+name: "Лаборатория (Miami / AMS): свой ключ, бегунок lab-*, окружение зондов"
 
-# ЗАЧЕМ (вечерний пакет владельца 30.09, п.3). Miami 169.128.191.158 (ExtraVM,
-# 6 ядер) -- ЛАБОРАТОРНЫЙ сервер под архивы Code-2. На нём должно быть ровно
-# три вещи: свой ключ, бегунок с меткой lab-miami и питон как у зондов.
+# ЗАЧЕМ (пакеты владельца 30.09: вечерний п.3 и ночной п.1). ДВА
+# ЛАБОРАТОРНЫХ сервера ExtraVM, на каждом ровно три вещи: свой ключ, бегунок с
+# меткой lab-<машина> и питон как у зондов.
+#   miami  169.128.191.158  6 ядер  -- под архивы Code-2
+#   ams    216.73.157.61    2 ядра  -- под зонды
+# Машина выбирается входом `mashina`, и ОДИН прогон служит обеим: два почти
+# одинаковых файла разошлись бы правками, и гейт, добавленный в один, тихо
+# отсутствовал бы в другом.
 #
 # ЧЕГО НА НЁМ НЕ ДОЛЖНО БЫТЬ НИКОГДА (слово владельца): ключей кошельков, env
 # полосы, торговых служб. Это не пожелание, а проверка: шаг "лаборатория чиста"
@@ -13,15 +18,22 @@ name: "Лаборатория Miami: свой ключ, бегунок lab-miami
 # ОБЩИЙ ключ «Claude» -- тот же, которым открывается торговый NL-хост. Пока он
 # там, лаборатория и деньги живут на одном ключе: доступ к лаборатории есть
 # доступ к торговому хосту. Поэтому прогон работает ТОЛЬКО со своим
-# VPS_SSH_KEY_MIAMI, а общий убирает ОТДЕЛЬНЫМ входом и лишь после того, как
+# ключом машины (VPS_SSH_KEY_MIAMI / VPS_SSH_KEY_AMS), а общий убирает
+# ОТДЕЛЬНЫМ входом и лишь после того, как
 # свой ключ доказал, что работает (иначе мы закрыли бы себе дверь снаружи).
 on:
   workflow_dispatch:
     inputs:
-      labels:
-        description: "метки бегунка через запятую"
+      mashina:
+        description: "какая лаборатория: miami (6 ядер) или ams (2 ядра)"
         required: false
-        default: "lab-miami"
+        default: "miami"
+        type: choice
+        options: ["miami", "ams"]
+      labels:
+        description: "метки бегунка через запятую (пусто -- lab-<машина>)"
+        required: false
+        default: ""
       runner_user:
         description: "системный пользователь бегунка (не root)"
         required: false
@@ -31,7 +43,7 @@ on:
         required: false
         default: "yes"
       postavit_svoj_kljuch:
-        description: "'yes' -- поставить публичную половину VPS_SSH_KEY_MIAMI в authorized_keys хоста, подключившись ОБЩИМ ключом (один раз, до первой установки)"
+        description: "'yes' -- поставить публичную половину ключа машины в authorized_keys хоста, подключившись ОБЩИМ ключом (один раз, до первой установки)"
         required: false
         default: "no"
       ubrat_obshchij_kljuch:
@@ -44,18 +56,15 @@ on:
         default: "no"
 
 concurrency:
-  group: lab-miami-bootstrap
+  group: lab-${{ inputs.mashina }}-bootstrap
   cancel-in-progress: false
 
 env:
-  HOST: 169.128.191.158
   # Запасное число: заявленный GitHub минимум для регистрации на 30.09.
   # Рабочее значение шаг "Версия бегунка" берёт у самого GitHub.
   RUNNER_VERSION: "2.329.0"
-  # Ожидаемое число ядер: подтверждение, что мы на ТОМ сервере. У торгового
-  # NL-хоста их другое число, и промах адресом виден до любой правки.
-  JADER_ZHDJOM: "6"
-  OUT_FILE: data/lab_miami_bootstrap.txt
+  # HOST, JADER_ZHDJOM, METKA_OSN и OUT_FILE ставит первый шаг по входу
+  # `mashina`: держать их здесь значило бы держать два файла прогона.
 
 jobs:
   lab:
@@ -68,35 +77,62 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "Отчёт прогона: начать с чистого файла"
+      - name: "КАКАЯ МАШИНА: адрес, ядра, метка, файл отчёта"
         run: |
           set -e
-          echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT_FILE"
-          echo "host $HOST, metki ${{ inputs.labels }}" >> "$OUT_FILE"
+          # ЗАЧЕМ ЗДЕСЬ, А НЕ В env. Один прогон обслуживает обе лаборатории, и
+          # адрес с числом ядер -- не украшение, а гейт: ядра сверяются на
+          # хосте, и промах адресом виден до любой правки. Неизвестная машина --
+          # отказ, а не "возьмём Miami по умолчанию".
+          case "${{ inputs.mashina }}" in
+            miami) HOST=169.128.191.158; JADER=6 ;;
+            ams)   HOST=216.73.157.61;   JADER=2 ;;
+            *) echo "OTKAZ: mashina '${{ inputs.mashina }}' neizvestna -- tolko miami ili ams"; exit 1 ;;
+          esac
+          METKA_OSN="lab-${{ inputs.mashina }}"
+          METKI="${{ inputs.labels }}"
+          [ -n "$METKI" ] || METKI="$METKA_OSN"
+          OUT="data/lab_${{ inputs.mashina }}_bootstrap.txt"
+          {
+            echo "HOST=$HOST"
+            echo "JADER_ZHDJOM=$JADER"
+            echo "METKA_OSN=$METKA_OSN"
+            echo "METKI=$METKI"
+            echo "OUT_FILE=$OUT"
+          } >> "$GITHUB_ENV"
+          echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$OUT"
+          echo "mashina ${{ inputs.mashina }}, host $HOST, jader zhdjom $JADER, metki $METKI" >> "$OUT"
 
-      - name: "СВОЙ ключ Miami -- иначе прогон не идёт"
+      - name: "СВОЙ ключ этой машины -- иначе прогон не идёт"
         env:
-          VPS_SSH_KEY_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+          KLJUCH_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
         run: |
           set -e
-          if [ -z "$VPS_SSH_KEY_MIAMI" ]; then
-            echo "OTKAZ: sekreta VPS_SSH_KEY_MIAMI net."
+          # У КАЖДОЙ ЛАБОРАТОРИИ СВОЙ КЛЮЧ, и берётся он по выбранной машине.
+          # Оба секрета приходят сюда, но на диск ложится ровно один: ключ
+          # чужой машины не должен оказаться в файле, которым идут шаги.
+          case "${{ inputs.mashina }}" in
+            miami) KLJUCH="$KLJUCH_MIAMI"; IMJA_SEKRETA=VPS_SSH_KEY_MIAMI ;;
+            ams)   KLJUCH="$KLJUCH_AMS";   IMJA_SEKRETA=VPS_SSH_KEY_AMS ;;
+          esac
+          if [ -z "$KLJUCH" ]; then
+            echo "OTKAZ: sekreta $IMJA_SEKRETA net."
             echo "Lab-server ne stavitsja na OBSHCHEM kljuche: poka on tot zhe, chto"
             echo "u torgovogo NL-hosta, dostup k laboratorii = dostup k dengam."
             echo "Nuzhno ODNO dejstvie vladelca:"
-            echo "  1) ssh-keygen -t ed25519 -f ~/.ssh/miami_lab -C lab-miami -N ''"
-            echo "  2) soderzhimoe ~/.ssh/miami_lab (PRIVATNAJA polovina) -- v sekret"
-            echo "     repozitorija VPS_SSH_KEY_MIAMI"
+            echo "  1) ssh-keygen -t ed25519 -f ~/.ssh/lab_${{ inputs.mashina }} -C $METKA_OSN -N ''"
+            echo "  2) soderzhimoe fajla (PRIVATNAJA polovina) -- v sekret $IMJA_SEKRETA"
             echo "Publichnuju polovinu na host postavit SAM progon: zapustite ego s"
             echo "vhodom postavit_svoj_kljuch=yes -- on vychislit ejo iz privatnoj i"
             echo "dopishet v authorized_keys, podkljuchivshis obshchim kljuchom."
             exit 1
           fi
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY_MIAMI" > ~/.ssh/miami_key
-          chmod 600 ~/.ssh/miami_key
-          echo "SSH_OPTS=-i $HOME/.ssh/miami_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
-          echo "kljuch Miami prinjat: dlina $(wc -c < ~/.ssh/miami_key) bajt, sha256 $(sha256sum ~/.ssh/miami_key | cut -c1-16)…" >> "$OUT_FILE"
+          printf '%s\n' "$KLJUCH" > ~/.ssh/lab_key
+          chmod 600 ~/.ssh/lab_key
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+          echo "kljuch $IMJA_SEKRETA prinjat: dlina $(wc -c < ~/.ssh/lab_key) bajt, sha256 $(sha256sum ~/.ssh/lab_key | cut -c1-16)…" >> "$OUT_FILE"
 
       - name: "Свой ключ поставить на хост ОБЩИМ ключом (один раз)"
         if: ${{ inputs.postavit_svoj_kljuch == 'yes' }}
@@ -118,7 +154,7 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/obshchij_key
           chmod 600 ~/.ssh/obshchij_key
-          SVOJ_PUB=$(ssh-keygen -y -f ~/.ssh/miami_key)
+          SVOJ_PUB=$(ssh-keygen -y -f ~/.ssh/lab_key)
           echo "svoj publichnyj kljuch (nachalo): $(echo "$SVOJ_PUB" | cut -c1-40)…" | tee -a "$OUT_FILE"
           printf '%s\n' "$SVOJ_PUB" | ssh -i ~/.ssh/obshchij_key -o ConnectTimeout=15 \
             -o BatchMode=yes -o StrictHostKeyChecking=accept-new root@$HOST "
@@ -144,7 +180,7 @@ jobs:
           set -o pipefail
           # ЗАЧЕМ. Промах адресом на лабораторном прогоне безобиден, а на
           # торговом -- нет. Проверка ядер ловит подмену адреса до любой правки:
-          # у Miami их 6.
+          # у miami их 6, у ams 2.
           ssh -n $SSH_OPTS root@$HOST "
             echo \"hostname: \$(hostname)\"
             echo \"jader: \$(nproc)\"
@@ -152,7 +188,7 @@ jobs:
             echo \"vremja: \$(date -u +%Y-%m-%dT%H:%M:%SZ)\"" | tee -a "$OUT_FILE"
           JADER=$(ssh -n $SSH_OPTS root@$HOST "nproc")
           [ "$JADER" = "$JADER_ZHDJOM" ] || {
-            echo "OTKAZ: jader $JADER, a u Miami dolzhno byt $JADER_ZHDJOM -- adres ne tot"; exit 1; }
+            echo "OTKAZ: jader $JADER, a u ${{ inputs.mashina }} dolzhno byt $JADER_ZHDJOM -- adres ne tot"; exit 1; }
           echo "server tot: jader $JADER" | tee -a "$OUT_FILE"
 
       - name: "ЛАБОРАТОРИЯ ЧИСТА: ни ключей кошельков, ни env полосы, ни торговых служб"
@@ -297,13 +333,13 @@ jobs:
             echo "RUNNER_VERSION=$VER" >> "$GITHUB_ENV"
           fi
 
-      - name: "Бегунок lab-miami"
+      - name: "Бегунок lab-<машина>"
         if: ${{ inputs.remove != 'yes' && inputs.stavit_begunok == 'yes' }}
         run: |
           set -e
           set -o pipefail
           RUNNER_USER="${{ inputs.runner_user }}"
-          RUNNER_LABELS="${{ inputs.labels }}"
+          RUNNER_LABELS="$METKI"
           ssh -n $SSH_OPTS root@$HOST "
             set -e
             install -d -o $RUNNER_USER -g $RUNNER_USER -m 750 /home/$RUNNER_USER/actions-runner
@@ -355,7 +391,7 @@ jobs:
             fi
             sudo -u $RUNNER_USER ./config.sh --unattended --replace \
               --url https://github.com/${{ github.repository }} \
-              --token \$REG_TOKEN --name lab-miami --labels '$RUNNER_LABELS' --work _work
+              --token \$REG_TOKEN --name $METKA_OSN --labels '$RUNNER_LABELS' --work _work
             ./svc.sh install $RUNNER_USER
             ./svc.sh start
             sleep 3
@@ -398,7 +434,7 @@ jobs:
           #
           # Свой публичный ключ вычисляется ИЗ ПРИВАТНОГО на бегунке -- так
           # строка, которую надо сохранить, не берётся на слово.
-          SVOJ_PUB=$(ssh-keygen -y -f ~/.ssh/miami_key)
+          SVOJ_PUB=$(ssh-keygen -y -f ~/.ssh/lab_key)
           echo "svoj publichnyj kljuch (nachalo): $(echo "$SVOJ_PUB" | cut -c1-40)…" | tee -a "$OUT_FILE"
           printf '%s\n' "$SVOJ_PUB" | ssh $SSH_OPTS root@$HOST "
             set -e
@@ -426,7 +462,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$OUT_FILE" 2>/dev/null || true
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
-          git commit -m "Lab Miami: bootstrap, otchjot [automated]"
+          git commit -m "Lab ${{ inputs.mashina }}: bootstrap, otchjot [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
             git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
