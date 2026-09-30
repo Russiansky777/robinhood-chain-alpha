@@ -39,7 +39,7 @@ p50/p90 по всем и по регионам лидера (EU / US / Asia), д
       --report-out deshred_svod.json --report-md deshred_svod.md
   python3 podbivka_zond_deshred.py --self-test          # без сети, на записанном образце
 Ключ Triton: TRITON_DESHRED_TOKEN(_FILE), иначе TRITON_X_TOKEN(_FILE). Адрес: --url или
-TRITON_DESHRED_URL(_FILE). Ключ Helius: HELIUS_API_KEY(_FILE). Ключи в журнал, признак и печать не идут:
+TRITON_DESHRED_URL(_FILE). Ключ Helius: HELIUS_API_KEY2(_FILE), иначе HELIUS_API_KEY(_FILE). Ключи в журнал, признак и печать не идут:
 только «задан» и длина; тексты ошибок проходят вычистку ключей и api-key=.
 Нагрузка на Helius: getSlot + getLeaderSchedule раз в эпоху; подписки WS шлются не чаще --ws-temp в секунду
 (по умолчанию 8, предел владельца -- 10 rps суммарно).
@@ -71,6 +71,7 @@ from pathlib import Path
 ИМЕНА_КЛЮЧА = ("TRITON_DESHRED_TOKEN", "TRITON_X_TOKEN")
 ИМЯ_АДРЕСА = "TRITON_DESHRED_URL"
 ИМЯ_HELIUS = "HELIUS_API_KEY"
+ИМЕНА_HELIUS = ("HELIUS_API_KEY2", ИМЯ_HELIUS, "HELIUS_API")  # на хосте NL -- второй ключ (слово владельца 30.09)
 HELIUS_WS = "wss://mainnet.helius-rpc.com/?api-key={}"
 HELIUS_HTTP = "https://mainnet.helius-rpc.com/?api-key={}"
 КРУПНО = ("EU", "US", "Asia", "прочее", "неизвестно")
@@ -104,7 +105,11 @@ def токен(окружение=None) -> str | None:
 
 def ключ_helius(окружение=None) -> str | None:
     окр = os.environ if окружение is None else окружение
-    return _из_окружения(ИМЯ_HELIUS, окр) or _из_окружения("HELIUS_API", окр) or None
+    for имя in ИМЕНА_HELIUS:
+        з = _из_окружения(имя, окр)
+        if з:
+            return з
+    return None
 
 
 def адрес_triton(окружение=None) -> str | None:
@@ -1122,7 +1127,7 @@ def main() -> int:
         if с:
             _СЕКРЕТЫ.append(с)
     цель = адрес_grpc(url) if url else None
-    print(json.dumps({"triton_key": задан(кл_t, "/".join(ИМЕНА_КЛЮЧА)), "helius_key": задан(кл_h, ИМЯ_HELIUS),
+    print(json.dumps({"triton_key": задан(кл_t, "/".join(ИМЕНА_КЛЮЧА)), "helius_key": задан(кл_h, "/".join(ИМЕНА_HELIUS)),
                       "triton_host": цель[0] if цель else None, "triton_path_dropped": цель[2] if цель else None,
                       "leader_regions": str(карта_путь) if карта_путь else None,
                       "leaders_in_map": len(карта or {})}, ensure_ascii=False))
