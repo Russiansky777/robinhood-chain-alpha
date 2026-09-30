@@ -104,12 +104,15 @@ def main() -> int:
     р.add_argument("--podpisey", type=int, default=1500)
     р.add_argument("--cel", type=int, default=40)
     р.add_argument("--minut", type=float, default=80)
+    р.add_argument("--aktivnye", type=int, default=0, help="пулы -- из последних N подписей самой программы (вместо сделок источников)")
+    р.add_argument("--tolko-pokupki", action="store_true", help="оставлять снимки, где следующий своп -- покупка quote -> base")
+    р.add_argument("--metka", default="", help="суффикс файла выхода")
     а = р.parse_args()
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
     сп = json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki_code1_kandidaty.json").read_text(encoding="utf-8"))
     кошельки = sorted(set(сп["группы_code1"]) | set(сп["кандидаты"]) | set(сп.get("снайперы") or []))
     уз = S.Узел()
-    out = КОРЕНЬ / "data" / "podbivka" / "dbc_sbor.json"
+    out = КОРЕНЬ / "data" / "podbivka" / f"dbc_sbor{('_' + а.metka) if а.metka else ''}.json"
     import podbivka_run as R  # noqa: PLC0415
     итог: dict = {"окно_с": а.s, "кошельков": len(кошельки), "покрытие": {}, "сделки": [], "версия": {}, "снимки": [], "отсев": {}}
 
@@ -134,6 +137,17 @@ def main() -> int:
             итог["версия"] = {"why_not": S.чисто(str(exc))[:160]}
         пулы: dict = {}
         конфиг: dict = {}
+        if а.aktivnye:                                   # пулы, где торгуют прямо сейчас
+            кошельки = []
+            зз = [з for з in уз.подписи(ПРОГРАММА, limit=min(1000, а.aktivnye)) if з.get("err") is None]
+            for и in range(0, len(зз), 100):
+                for т in уз.пакет([з["signature"] for з in зз[и:и + 100]]).values():
+                    for _, ix in SB.инструкции(т) if т else []:
+                        x = разобрать_ix(ix)
+                        if x and x["роли"].get("pool"):
+                            пулы[x["роли"]["pool"]] = пулы.get(x["роли"]["pool"], 0) + 1
+                            конфиг[x["роли"]["pool"]] = x["роли"].get("config")
+            print("активных пулов DBC:", len(пулы), flush=True)
         for w in кошельки:
             сп_w, до = [], None
             while len(сп_w) < а.podpisey:
@@ -194,6 +208,9 @@ def main() -> int:
             if not т:
                 continue
             в_слоте = [з for з in уз.подписи(пул, limit=50) if з.get("slot") == след["slot"] and з.get("err") is None]
+            if а.tolko_pokupki and not any(e["pool"] == пул and e["trade_direction"] == 1 for e in события(т)):
+                отсев("следующий своп -- не покупка quote -> base")
+                continue
             сн.update(сделка=след["signature"], slot_сделки=т.get("slot"), транзакция=т, успешных_в_слоте_сделки=len(в_слоте))
             итог["снимки"].append(сн)
             записать()

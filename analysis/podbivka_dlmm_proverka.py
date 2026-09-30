@@ -29,6 +29,7 @@ import podbivka_dlmm_quote as Q  # noqa: E402
 import podbivka_sim as S  # noqa: E402
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
+СЫРЫЕ = False
 
 
 def инструкции(tx: dict) -> list:
@@ -68,8 +69,9 @@ def _разбор_события(b: bytes) -> dict | None:
         sfy = d[88] != 0
         fee, prot = struct.unpack_from("<QQ", d, 89)
         host = struct.unpack_from("<Q", d, 121)[0]
+        lo_, hi_ = struct.unpack_from("<QQ", d, 105)
         return {"вид": "Swap", "lb_pair": lb, "from": fr, "start": start, "end": end, "amount_in": a_in, "amount_out": a_out,
-                "swap_for_y": sfy, "fee": fee, "protocol_fee": prot, "host_fee": host}
+                "swap_for_y": sfy, "fee": fee, "protocol_fee": prot, "fee_bps": lo_ | (hi_ << 64), "host_fee": host}
     if b[:8] == DISC_SWAP2:
         d = b[8:]
         if len(d) < 147:
@@ -162,7 +164,9 @@ def прочитать(уз, пул: str) -> dict:
         if a:
             ba = Q.разобрать_массив(base64.b64decode(a["data"][0]))
             массивы[ba["index"]] = ba
-    return {"lb": lb, "ext": ext, "массивы": массивы, "slot": slot}
+    сырые = {"slot": slot, "данные": {a: (x["data"][0] if x else None) for a, x in zip([пул] + адр, v2)},
+             "расширение": {Q.адрес_расширения(пул): (val[1]["data"][0] if len(val) > 1 and val[1] else None)}}
+    return {"lb": lb, "ext": ext, "массивы": массивы, "slot": slot, "сырые": сырые}
 
 
 def дельты(tx: dict, lb: dict) -> dict:
@@ -225,7 +229,8 @@ def сверить(уз, пул: str, ст: dict, повод: str, пулы: dic
             "active_id_чтения": ст["lb"]["active_id"], "end_модель": q["active_id_после"] if q else None,
             "корзин_модель": q["корзин"] if q else None, "host_fee": e.get("host_fee"), "fee_факт": e.get("fee"),
             "fee_модель": q["fee"] if q else None, "вход_по_хранилищу": д, "подписант": e.get("from"),
-            "why_not": why, "сделки_источников_в_пуле": len(пулы.get(пул, [])), "свопов_по_пулу_в_tx": len(виды), "события": все_события}
+            "why_not": why, "сделки_источников_в_пуле": len(пулы.get(пул, [])), "свопов_по_пулу_в_tx": len(виды), "события": все_события,
+            **({"сырые": ст["сырые"], "транзакция": т} if СЫРЫЕ else {})}
 
 
 def main() -> int:
@@ -235,7 +240,10 @@ def main() -> int:
     р.add_argument("--minut", type=float, default=90)
     р.add_argument("--krupnaya", type=float, default=1.0, help="покупка источника от стольких SOL -- «наш случай»")
     р.add_argument("--metka", default="mnogo")
+    р.add_argument("--syrye", action="store_true", help="сохранять сырые счета чтения (base64) и транзакцию сделки")
     а = р.parse_args()
+    global СЫРЫЕ  # noqa: PLW0603
+    СЫРЫЕ = а.syrye
     сп = json.loads((КОРЕНЬ / "data" / "podbivka" / "istochniki_code1_kandidaty.json").read_text(encoding="utf-8"))
     кошельки = sorted(set(сп["группы_code1"]) | set(сп["кандидаты"]))
     уз = S.Узел()
