@@ -75,6 +75,18 @@ jobs:
             grep -c '^TELEGRAM_LOG_CHAT_ID=' $ENV_DIR/env || echo 'в env переменной нет'
           "
 
+      - name: "Охрана нуля позиций на хост (только если попросили перезапуск)"
+        if: ${{ inputs.mode == 'set' }}
+        run: |
+          set -e
+          # ЗАЧЕМ. Перезапуск ниже идёт внутри того же удалённого блока, что и
+          # запись строки окружения. Охрану ставим НА ХОСТ заранее и вызываем её
+          # в том блоке ВПЛОТНУЮ перед systemctl restart: так строка окружения
+          # пишется всегда, а перезапускается служба только при нуле позиций.
+          # Проверять здесь, отдельным шагом, нельзя: между шагами проходят
+          # секунды и минуты, за которые позиция открывается.
+          ssh $SSH_OPTS root@127.0.0.1 "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
+
       - name: "Записать ID в env и перезапустить детектор"
         if: ${{ inputs.mode == 'set' }}
         env:
@@ -99,6 +111,13 @@ jobs:
             chmod 600 \"\$f\"
             grep -c '^TELEGRAM_LOG_CHAT_ID=' \"\$f\"
             if [ '$RESTART' = 'yes' ]; then
+              # НУЛЬ ПОЗИЦИЙ -- ТА ЖЕ ОХРАНА, ЧТО У ОСТАЛЬНЫХ ПРОГОНОВ.
+              # Позиция в воздухе на время перезапуска остаётся без своего
+              # сторожа; у продавца это прямо пропущенное окно продажи.
+              # set -e выше означает: не прошла охрана -- перезапуска нет, а
+              # строка окружения уже записана и потеряна не будет.
+              python3 /tmp/pered_perezapuskom_sluzhby.py
+              rm -f /tmp/pered_perezapuskom_sluzhby.py
               systemctl restart bloom-detector
               sleep 6
               systemctl is-active bloom-detector
