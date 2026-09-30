@@ -74,8 +74,22 @@ jobs:
           # i upavshaja samoproverka vygljadit kak projdennaja (poymano 30.09
           # na shage shredov -- "shredy idut" pri nule shredov).
           python3 -m py_compile analysis/podbivka_zond_deshred.py
+          # SISTEMNYJ python3 BEGUNKA NE VIDIT protobuf i grpcio, a samoproverka
+          # zonda podnimaet nastojashchij grpc-server na 127.0.0.1 i razbiraet
+          # zaglushki geyser_pb2 -- bez etih paketov ona padaet ModuleNotFoundError
+          # (tak i vyshlo na pervom progone 13:25Z). Mestno ona prohodila potomu,
+          # chto v moej pesochnice pakety est: raznica sredy, a ne koda.
+          if python3 -c "import grpc, google.protobuf" 2>/dev/null; then
+            PYZ=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/zond_venv"
+            "$RUNNER_TEMP/zond_venv/bin/pip" install -q --upgrade pip
+            "$RUNNER_TEMP/zond_venv/bin/pip" install -q grpcio protobuf
+            PYZ="$RUNNER_TEMP/zond_venv/bin/python"
+          fi
+          echo "samoproverka na $PYZ"
           cd analysis
-          python3 podbivka_zond_deshred.py --self-test | tail -1
+          "$PYZ" podbivka_zond_deshred.py --self-test | tail -1
 
       - name: "Секреты заведены (значения не печатаются)"
         env:
