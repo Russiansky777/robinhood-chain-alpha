@@ -20,6 +20,14 @@ on:
         description: "до какой метки UTC (пусто -- 06:00Z сегодня)"
         required: false
         default: ""
+      predel_podpisey:
+        description: "подписей пула назад для чужих продаж (300 -- обычно; больше -- только для ретроспективы, дороже по кредитам)"
+        required: false
+        default: "300"
+      metka_fajla:
+        description: "пометка в имени файла для РАЗОВОГО прогона (пусто -- обычная суточная выгрузка)"
+        required: false
+        default: ""
 
 concurrency:
   group: vygruzka-sdelok-c2
@@ -59,7 +67,19 @@ jobs:
           S_DEF="$(date -u -d 'yesterday' +%Y-%m-%dT06:00)"
           echo "S_OKNA=${S_VHOD:-$S_DEF}" >> "$GITHUB_ENV"
           echo "DO_OKNA=${DO_VHOD:-$DO_DEF}" >> "$GITHUB_ENV"
-          echo "OUT_FILE=data/sdelki_polosy_$(date -u +%Y-%m-%d).json" >> "$GITHUB_ENV"
+          # ИМЯ ФАЙЛА: РАЗОВЫЙ ПРОГОН НЕ ТРОГАЕТ СУТОЧНУЮ ВЫГРУЗКУ. Без этого
+          # прогон по узкому окну (например два выброса за полчаса) записал бы
+          # data/sdelki_polosy_<сегодня>.json двумя сделками вместо двадцати трёх
+          # -- то есть затёр бы суточный файл, которым считают день. Ровно так
+          # 29.09 был затёрт образец транзакций для самопроверки c2_common.
+          METKA="${{ inputs.metka_fajla }}"
+          case "$METKA" in
+            "") OUT_FILE="data/sdelki_polosy_$(date -u +%Y-%m-%d).json" ;;
+            *[!A-Za-z0-9._-]*) echo "СБОЙ: в metka_fajla недопустимый знак"; exit 1 ;;
+            *) OUT_FILE="data/sdelki_polosy_$(date -u +%Y-%m-%d)_$METKA.json" ;;
+          esac
+          echo "OUT_FILE=$OUT_FILE" >> "$GITHUB_ENV"
+          echo "вывод пойдёт в $OUT_FILE"
 
       - name: "SSH key"
         env:
@@ -96,6 +116,7 @@ jobs:
             BLOOM_CODE_DIR='$CODE_DIR' python3 /tmp/vygr/sdelki_polosy_vygruzka.py \
               --state-dir '$STATE_DIR' \
               --s '$S_OKNA' --do '$DO_OKNA' --polnye \
+              --predel-podpisey '${{ inputs.predel_podpisey }}' \
               --karta-regionov /tmp/vygr/leader_regions.json \
               --out /tmp/vygr/sdelki.json" | tail -24
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/vygr/sdelki.json 2>/dev/null || true" > /tmp/vygr_sdelki.json || true
