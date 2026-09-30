@@ -863,15 +863,35 @@ def main() -> int:  # noqa: C901
     а = _разборщик().parse_args()
     if а.self_test:
         return self_test(а.kolco_file)
+    # ВЫЗОВ УЗЛА -- ИЗ solana_rpc_client, А НЕ ИЗ bloom_detector.
+    # Здесь стояло getattr(bloom_detector, "rpc_call"/"call"), и прогон кольца
+    # 30.09 15:47Z отказал словами "в bloom_detector нет вызова узла". Их там и
+    # не было никогда: вызов живёт МЕТОДОМ КЛАССА solana_rpc_client.SolanaRpc.call,
+    # а не функцией на уровне модуля. Заодно уходит импорт всего детектора --
+    # опыту нужен только узел.
+    #
+    # КЛЮЧ -- ЗОНДОВЫЙ ПЕРВЫМ. Опыт забора -- это ЗАМЕР, и тратить он должен
+    # HELIUS_API_KEY2, отдельный ключ проверок: иначе замер отнимает лимит у
+    # торгующей службы в те же минуты. Общий ключ остаётся запасным путём.
+    # SolanaRpc сам ведёт счёт кредитов, темп и понижение на публичный узел,
+    # поэтому расход опыта виден в data/helius_usage под своим именем службы.
     try:
-        import bloom_detector as D  # noqa: PLC0415
+        import solana_rpc_client as RPC  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001
         print(f"не сделано: модуль узла не загружен: {type(exc).__name__}: {exc}")
         return 2
-    зов = getattr(D, "rpc_call", None) or getattr(D, "call", None)
-    if not callable(зов):
-        print("не сделано: в bloom_detector нет вызова узла (rpc_call/call)")
+    ключ, имя_ключа = "", "нет"
+    for имя in ("HELIUS_API_KEY2", "HELIUS_API_KEY", "HELIUS_API"):
+        ключ = (os.environ.get(имя) or "").strip()
+        if ключ:
+            имя_ключа = имя
+            break
+    if not ключ:
+        print("не сделано: ключа Helius нет в окружении "
+               "(HELIUS_API_KEY2 / HELIUS_API_KEY / HELIUS_API)")
         return 2
+    print(f"узел: ключ из {имя_ключа}, служба учёта zabor_s0_opyt")
+    зов = RPC.SolanaRpc("zabor_s0_opyt", key=ключ).call
     о = {"что": "опыт забора S+0", "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                                         time.gmtime()),
          "режим": а.rezhim, "отправитель": а.otpravitel, "раундов": а.raundov,
