@@ -219,11 +219,21 @@ jobs:
             systemctl stop 'actions.runner.*' 2>/dev/null || true
             if [ -d /home/$RUNNER_USER/actions-runner ]; then
               cd /home/$RUNNER_USER/actions-runner
-              sudo -u $RUNNER_USER ./svc.sh uninstall 2>/dev/null || true
+              # 'svc.sh uninstall' ot polzovatelja begunka NE mozhet udalit
+              # junit iz /etc/systemd/system -- imenno poetomu junit ostalsja
+              # i ustanovka v progone 6 upala ('error: exists ...'). Snimaem ot
+              # root i proverjaem, chto junita bolshe net.
+              ./svc.sh uninstall >/dev/null 2>&1 || true
               # Bez etogo 'snjali' znachilo by tolko sluzhbu: nastrojka
               # ostavalas, i sledujushchaja ustanovka padala.
               sudo -u $RUNNER_USER ./config.sh remove --local >/dev/null 2>&1 || true
               rm -f .runner .credentials .credentials_rsaparams
+            fi
+            OSTALOS=\$(ls /etc/systemd/system/actions.runner.*.service 2>/dev/null | wc -l)
+            if [ \$OSTALOS != 0 ]; then
+              rm -f /etc/systemd/system/actions.runner.*.service
+              systemctl daemon-reload
+              echo junitov begunka ubrali vruchnuju: \$OSTALOS
             fi
             echo 'sluzhba i nastrojka begunka snjaty'" | tee -a "$OUT_FILE"
 
@@ -320,6 +330,17 @@ jobs:
             set -e
             REG_TOKEN=\$(cat)
             cd /home/$RUNNER_USER/actions-runner
+            # Sluzhbu snimaem PERVOJ i ot root: './svc.sh install' otkazyvaet,
+            # poka junit lezhit ('error: exists /etc/systemd/system/...'), a ot
+            # polzovatelja begunka junit ne udalit. Progon 6 upal imenno zdes.
+            systemctl stop 'actions.runner.*' 2>/dev/null || true
+            [ -f .service ] && ./svc.sh uninstall >/dev/null 2>&1 || true
+            OSTALOS=\$(ls /etc/systemd/system/actions.runner.*.service 2>/dev/null | wc -l)
+            if [ \$OSTALOS != 0 ]; then
+              rm -f /etc/systemd/system/actions.runner.*.service
+              systemctl daemon-reload
+              echo junitov begunka ubrali vruchnuju: \$OSTALOS
+            fi
             # Staryj _diag ubiraem DO nastrojki: inache proverka 'Listening for
             # Jobs' nashla by stroku proshlogo begunka i pozelenela by vpustuju.
             rm -rf _diag
