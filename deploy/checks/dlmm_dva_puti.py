@@ -62,6 +62,10 @@ def главное(а) -> int:
     import c2_dlmm_odno_chtenie as OD  # noqa: PLC0415
     import c2_dlmm_tochnaya_kotirovka as K  # noqa: PLC0415
     import c2_pool_programs as PP  # noqa: PLC0415
+    # МЕТКИ ПУЛОВ -- ОТ ТОГО ЖЕ МОДУЛЯ, ЧТО У ПОЛОСЫ. Первый заход звал
+    # PP.pool_program(tx, vault, {}) с пустыми метками, и программа выходила None
+    # у всех 14 строк ("это не DLMM, а None"): без меток модуль тип не узнаёт.
+    import c2_shadow_build as SB  # noqa: PLC0415
     import c2_swap_build as B  # noqa: PLC0415
     import priemka_stroitelya as P  # noqa: PLC0415
 
@@ -103,7 +107,8 @@ def главное(а) -> int:
         if not пул.get("ok"):
             пропуск(f"пул: {пул.get('why_not')}")
             continue
-        прог = PP.pool_program(tx, пул["pool_vault"], {}).get("pool_program")
+        прог = PP.pool_program(tx, пул["pool_vault"],
+                                SB._labels()).get("pool_program")
         стр["pool_program"] = прог
         if прог != DLMM_ПРОГРАММА:
             пропуск(f"это не DLMM, а {прог}")
