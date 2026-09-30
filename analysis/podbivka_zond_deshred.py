@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import calendar
 import gzip
 import json
 import os
@@ -550,24 +551,32 @@ def слушать_ws(журнал: Журнал, *, адреса: list, клю�
         по_номеру: dict = {}
         по_id = {i: а for i, а in enumerate(адреса, 1)}
         ws = None
+        # своя остановка у каждого соединения: при обрыве поток подписки гасится и присоединяется ДО нового
+        # соединения -- иначе он шлёт logsSubscribe в закрытый сокет (Bad file descriptor, Code-1 30.09 13:30Z)
+        конец_соединения = threading.Event()
+        нить_подписки = None
         try:
             ws = (фабрика or ПростойWS)(HELIUS_WS.format(ключ))
             if попыток:
                 журнал.событие({"kind": "reconnected", "attempts": попыток}, фид=КАНАЛ_WS, регион=имя,
                                t=time.time(), моно=time.monotonic())
-            готово = threading.Event()
 
-            def подписать():
+            def подписать(ws=ws, конец=конец_соединения):
                 for i, а in по_id.items():
-                    if стоп.is_set():
+                    if стоп.is_set() or конец.is_set():
                         return
-                    темп.ждать(стоп)
-                    ws.отправить(json.dumps({"jsonrpc": "2.0", "id": i, "method": "logsSubscribe",
-                                             "params": [{"mentions": [а]}, {"commitment": "processed"}]}))
+                    темп.ждать(конец)
+                    if стоп.is_set() or конец.is_set():
+                        return
+                    try:
+                        ws.отправить(json.dumps({"jsonrpc": "2.0", "id": i, "method": "logsSubscribe",
+                                                 "params": [{"mentions": [а]}, {"commitment": "processed"}]}))
+                    except Exception:  # noqa: BLE001 -- сокет закрыт на обрыве; обрыв пишет читающий цикл
+                        return
                     with журнал.замок:
                         журнал.подписок["requested"] += 1
-                готово.set()
-            threading.Thread(target=подписать, name=f"ws-podpiska-{имя}", daemon=True).start()
+            нить_подписки = threading.Thread(target=подписать, name=f"ws-podpiska-{имя}", daemon=True)
+            нить_подписки.start()
             while not стоп.is_set():
                 try:
                     сырое = ws.принять()
@@ -580,8 +589,11 @@ def слушать_ws(журнал: Журнал, *, адреса: list, клю�
             журнал.событие({"kind": "stream_error", "code": type(exc).__name__, "details": чисто(str(exc))},
                            фид=КАНАЛ_WS, регион=имя, t=time.time(), моно=time.monotonic())
         finally:
+            конец_соединения.set()
             if ws is not None:
                 ws.закрыть()
+            if нить_подписки is not None:
+                нить_подписки.join(timeout=10)
         попыток += 1
         стоп.wait(min(30.0, 2.0 * попыток))
 
@@ -1075,6 +1087,39 @@ def self_test() -> int:
     chk("WS-цикл: подписка, транзакция с адресом, обрыв в журнале без ключа",
         [с["kind"] for с in ст3][:3] == ["subscribed", "transaction", "stream_error"]
         and ст3[1]["address"] == "A1" and "hk-456" not in ж3.ф.getvalue(), ст3)
+    # обрыв посреди подписки: старый поток подписки не шлёт в закрытый сокет и кончается до нового соединения
+    соединения: list = []
+
+    class Обрыв:
+        def __init__(self, url):
+            self.закрыт, self.после_закрытия, self.ушло = False, 0, 0
+            self.номер = len(соединения)
+            self.живых_потоков_при_создании = sum(1 for н in threading.enumerate() if н.name.startswith("ws-podpiska-t5"))
+            соединения.append(self)
+
+        def отправить(self, т, код=0x1):
+            if self.закрыт:
+                self.после_закрытия += 1
+                raise OSError(9, "Bad file descriptor")
+            self.ушло += 1
+
+        def принять(self):
+            if self.номер == 0:
+                time.sleep(0.05)                # подписка первого соединения ещё идёт (темп 20/с, 50 адресов)
+                raise ConnectionError("обрыв")
+            стоп5.set()
+            raise ConnectionError("конец теста")
+
+        def закрыть(self):
+            self.закрыт = True
+    стоп5 = threading.Event()
+    ж5 = Журнал(поток_записи=io.StringIO())
+    слушать_ws(ж5, адреса=[f"A{i}" for i in range(50)], ключ="k", стоп=стоп5, темп=Темп(20), имя="t5", фабрика=Обрыв)
+    time.sleep(0.3)
+    chk("WS-обрыв посреди подписки: в закрытый сокет не ушло ни одной подписки, старый поток кончился до нового",
+        len(соединения) == 2 and all(с.после_закрытия == 0 for с in соединения)
+        and соединения[0].ушло < 50 and соединения[1].живых_потоков_при_создании == 0,
+        [(с.ушло, с.после_закрытия, с.живых_потоков_при_создании) for с in соединения])
     print(f"самопроверка зонда шредов: {'СБОЙ ' + str(len(ошибок)) if ошибок else 'всё сошлось'} "
           f"({len(ошибок)} ошибок)")
     return 1 if ошибок else 0
@@ -1109,6 +1154,8 @@ def main() -> int:
     р.add_argument("--report-log", nargs="*", default=None, help="только свод: журнал(ы) зонда")
     р.add_argument("--report-out", default=None)
     р.add_argument("--report-md", default=None)
+    р.add_argument("--vyrezat", action="append", default=[], help="только свод: окно UTC «YYYY-MM-DDTHH:MM:SS,YYYY-MM-DDTHH:MM:SS» -- "
+                   "строки обоих каналов с t_recv внутри выбрасываются (дыра в записи); можно несколько раз")
     р.add_argument("--metki-liderov", default=None, help="json {\"по_лидеру\": {лидер: BAM|Harmonic}} -- разбивка свода по движку лидера")
     а = р.parse_args()
     if а.self_test:
@@ -1126,7 +1173,15 @@ def main() -> int:
 
     if а.report_log is not None:
         метки = (json.loads(Path(а.metki_liderov).read_text(encoding="utf-8")).get("по_лидеру") or {}) if а.metki_liderov else None
-        св = свод(читать_журнал(а.report_log), лидеры, метки)
+        строки = читать_журнал(а.report_log)
+        вырезано = []
+        for окно in а.vyrezat:
+            н, к = (calendar.timegm(time.strptime(x.strip(), "%Y-%m-%dT%H:%M:%S")) for x in окно.split(","))
+            было = len(строки)
+            строки = [с for с in строки if not (с.get("t_recv") and н <= с["t_recv"] <= к)]
+            вырезано.append({"окно": окно, "строк": было - len(строки)})
+        св = свод(строки, лидеры, метки)
+        св["вырезано"] = вырезано
         св["карта_регионов"] = str(карта_путь) if карта_путь else None
         print(json.dumps({к: v for к, v in св.items() if к != "ряды"}, ensure_ascii=False, indent=2))
         if а.report_out:
