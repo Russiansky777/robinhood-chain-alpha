@@ -193,6 +193,45 @@ def quote_sol_for(mint: str, amount_raw: int, slippage_bps: int,
     return {"ошибка": "ни один хост Jupiter не дал котировку", "подробности": errors}
 
 
+# ЗАГОЛОВКИ ЛИМИТОВ, КОТОРЫЕ ОТДАЮТ АГРЕГАТОРЫ. Имена разные у разных слоёв
+# (сам Jupiter, Cloudflare перед ним), поэтому берём все, какие есть, и не
+# придумываем своих: пустой словарь честнее выдуманного числа.
+ЗАГОЛОВКИ_ЛИМИТОВ = (
+    "retry-after", "x-ratelimit-limit", "x-ratelimit-remaining",
+    "x-ratelimit-reset", "ratelimit-limit", "ratelimit-remaining",
+    "ratelimit-reset", "x-rate-limit-limit", "x-rate-limit-remaining",
+    "cf-ray", "server",
+)
+
+
+def диагностика_ответа(r, *, scrub: Callable[[str], str] = lambda s: s) -> dict:
+    """HTTP-код, заголовки лимитов и ПОЛНОЕ тело ответа. Только чтение.
+
+    ЗАЧЕМ ЦЕЛИКОМ, А НЕ 300 СИМВОЛОВ (слово владельца 02.10). Отказ BTN 01.10
+    обрезался ровно на ключе "ammKey" -- то есть именно там, где написано, какой
+    маршрут агрегатор не смог собрать. 1667 одинаковых отказов за 51 минуту не
+    дали ни одного годного к разбору, и причину пришлось называть догадкой.
+    Заголовки лимитов нужны по той же причине: ответ 200 с котировкой и без
+    транзакции внешне не отличить от ответа под лимитом.
+    """
+    из_ = {"http": None, "заголовки_лимитов": {}, "тело": None, "тело_байт": None}
+    try:
+        из_["http"] = int(getattr(r, "status_code", None) or 0) or None
+    except (TypeError, ValueError):
+        из_["http"] = None
+    try:
+        зг = dict(getattr(r, "headers", None) or {})
+    except Exception:  # noqa: BLE001
+        зг = {}
+    низ = {str(к).lower(): v for к, v in зг.items()}
+    из_["заголовки_лимитов"] = {к: str(низ[к]) for к in ЗАГОЛОВКИ_ЛИМИТОВ if к in низ}
+    текст = getattr(r, "text", None)
+    if isinstance(текст, str):
+        из_["тело_байт"] = len(текст)
+        из_["тело"] = scrub(текст)
+    return из_
+
+
 def ultra_order(mint: str, amount_raw: int, taker: str,
                  scrub: Callable[[str], str] = lambda s: s,
                  slippage_bps: int | None = None) -> dict:
@@ -213,14 +252,18 @@ def ultra_order(mint: str, amount_raw: int, taker: str,
         r = сессия().get(f"{JUP_ULTRA}/order", params=params, timeout=30)
     except Exception as exc:  # noqa: BLE001
         return {"ошибка": f"сеть: {type(exc).__name__}"}
+    диаг = диагностика_ответа(r, scrub=scrub)
     if r.status_code != 200:
-        return {"ошибка": f"http={r.status_code}: {scrub(r.text[:300])}"}
+        return {"ошибка": f"http={r.status_code}: {scrub(r.text[:300])}",
+                 "диагностика": диаг}
     try:
         b = r.json()
     except ValueError:
-        return {"ошибка": "не JSON"}
+        return {"ошибка": "не JSON", "диагностика": диаг}
     if not b.get("transaction") or not b.get("requestId"):
-        return {"ошибка": f"в ответе нет transaction/requestId: {scrub(json.dumps(b, default=str)[:300])}"}
+        # Текст отказа не меняем: его метку читает третий случай.
+        return {"ошибка": f"в ответе нет transaction/requestId: {scrub(json.dumps(b, default=str)[:300])}",
+                 "диагностика": диаг}
     return {"transaction": b["transaction"], "requestId": b["requestId"],
             "outAmount": b.get("outAmount"), "priceImpactPct": b.get("priceImpactPct"),
             # Поля, по которым вызывающий проверяет пол по выходу ДО подписи.
@@ -282,17 +325,23 @@ def swap_v2_order(mint: str, amount_raw: int, taker: str,
                           headers=jup_v2_headers(), timeout=30)
     except Exception as exc:  # noqa: BLE001
         return {"ошибка": f"сеть: {type(exc).__name__}"}
+    диаг = диагностика_ответа(r, scrub=scrub)
     if r.status_code != 200:
-        return {"ошибка": f"http={r.status_code}: {scrub(r.text[:300])}"}
+        return {"ошибка": f"http={r.status_code}: {scrub(r.text[:300])}",
+                 "диагностика": диаг}
     try:
         b = r.json()
     except ValueError:
-        return {"ошибка": "не JSON"}
+        return {"ошибка": "не JSON", "диагностика": диаг}
     tx = b.get("transaction") or b.get("swapTransaction")
     зид = b.get("requestId") or b.get("orderId") or b.get("id")
     if not tx or not зид:
+        # КОРОТКАЯ СТРОКА ОСТАЁТСЯ ДЛЯ ЖУРНАЛА, ПОЛНОЕ ТЕЛО -- В ДИАГНОСТИКУ.
+        # Менять текст отказа нельзя: на его метку смотрит третий случай
+        # (bloom_vtoroe_mnenie.ответ_без_транзакции).
         return {"ошибка": ("в ответе нет transaction/requestId: "
-                            f"{scrub(json.dumps(b, default=str)[:300])}")}
+                            f"{scrub(json.dumps(b, default=str)[:300])}"),
+                 "диагностика": диаг}
     порог = b.get("otherAmountThreshold")
     if порог is None:
         порог = ((b.get("quote") or {}).get("otherAmountThreshold")
