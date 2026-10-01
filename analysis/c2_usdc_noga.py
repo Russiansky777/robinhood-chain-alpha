@@ -113,6 +113,33 @@ TYPES = {
 
 # Отказы -- ПО ИМЕНИ: полоса пишет их в выгрузку, и искать их подстрокой должно
 # быть можно. Формулировки не меняются от места к месту, поэтому они здесь.
+# БОЕВОЙ КОТИРОВЩИК ПО ТИПУ -- ЦЕНА С УЧЁТОМ НАШЕГО ОБЪЁМА, А НЕ СРЕДНЯЯ ЦЕНА
+# СДЕЛКИ ИСТОЧНИКА. Решение владельца 01.10: в бою min_out второй ноги приходит от
+# котировщика типа, потому что цена события -- средняя цена ЕГО сделки, а наша
+# покупка идёт уже из состояния ПОСЛЕ неё, то есть по худшей цене. Значит цена
+# события выход ЗАВЫШАЕТ, и min_out от неё -- это чаевые и приоритет за откат.
+#   "stroitel"   -- подготовить(минт_котировки=USDC) модуля типа: живое состояние
+#                   пула, и шаблон приходит С НЫНЕШНИМИ массивами (у CLMM и
+#                   Whirlpool это обязательно -- массивы источника успели уехать).
+#   "kirpichi"   -- c2_swap_build.min_out_from_reserves: у DAMM v2 это цена по
+#                   событию свопа И резервам после сделки источника, нуль чтений.
+#   "dlmm_bez_chteniy" -- c2_dlmm_bez_chteniy.котировка: нуль чтений, цена из
+#                   события (слово владельца: «DLMM без чтений»). У неё выход
+#                   считается средней ценой сделки источника, поэтому завышение
+#                   остаётся -- его закрывает проскальзывание группы, и число
+#                   завышения мерит deploy/checks/usdc_noga_min_out.py.
+SPOSOB_STROITEL = "stroitel"
+SPOSOB_KIRPICHI = "kirpichi"
+SPOSOB_DLMM = "dlmm_bez_chteniy"
+KOTIROVSHCHIKI = {
+    PROG_CLMM: SPOSOB_STROITEL,
+    PROG_WHIRLPOOL: SPOSOB_STROITEL,
+    PROG_AMMV4: SPOSOB_STROITEL,
+    PROG_DBC: SPOSOB_STROITEL,
+    PROG_DAMM2: SPOSOB_KIRPICHI,
+    PROG_DLMM: SPOSOB_DLMM,
+}
+
 WHY_OTHER_SIDE = ("своп источника шёл в другую сторону -- цену покупки "
                   "из обратного свопа брать нельзя")
 WHY_NO_REVERSE = ("сделка источника -- продажа, а переставить стороны у этого типа "
@@ -121,6 +148,20 @@ WHY_TYPE = "тип пула не в таблице USDC-ноги"
 WHY_OFF = f"USDC-нога выключена флагом {FLAG}"
 WHY_SHADOW = "режим тени: транзакция на отправку не собирается"
 WHY_EXACT_OUT = "шаг 2 с инструкцией точного выхода -- этим путём не берём"
+WHY_NET_KOTIROVSHCHIKA = ("боевого котировщика для этого типа нет -- по цене события "
+                          "отправлять нельзя (выход завышен на наш объём)")
+WHY_CENA_SOBYTIYA_V_BOJ = ("в бою min_out по цене события не берётся: она не учитывает "
+                           "наш объём и завышает выход -- это чаевые и приоритет за откат")
+
+# ПРЕДЕЛ CU НОГИ -- ОТДЕЛЬНЫМ ВХОДОМ (слово владельца 01.10). Замер Code-1 по
+# simulateTransaction на живых образцах нашей таблицей адресов: 158 733...172 545 CU
+# (deploy/checks/usdc_noga_razmer_cu.py, раздел замера в docs/usdc_noga_kak_vstroit.md).
+# Умолчание 250 000 -- тот же потолок, что у двухшагового пути в таблице полосы, и
+# это запас 1.45x к измеренному максимуму. Меняется переменной окружения, без
+# правки кода и без деплоя.
+IMYA_FLAGA_CU = "BLOOM_USDC_NOGA_CU"
+CU_NOGI_PO_UMOLCHANIYU = 250_000
+CU_ZAMER_CODE1 = (158_733, 172_545)
 
 
 class OshibkaNogi(Exception):
@@ -419,6 +460,124 @@ def instrukciya_nogi(storona_nogi: dict, *, user: str, amount_in: int, min_out: 
                               как_у_источника=bool(kak_u_istochnika))
 
 
+def tx_s_adresami(tx: dict) -> dict:
+    """Транзакция из getTransaction(encoding="json") в вид jsonParsed: вместо
+    ИНДЕКСОВ -- адреса. Ничего не придумывается.
+
+    ЗАЧЕМ. Образцы Code-2 (data/podbivka/usdc_noga_dlya_code3.json) сняты с
+    `encoding: "json"`: в инструкциях там `programIdIndex` и номера счетов, а не
+    адреса. Строители и кирпичи ждут адреса (`programId`, `accounts` строками) --
+    на индексах они честно отказывают «инструкции пула в транзакции нет», и 22
+    образца из 22 выглядели бы как отказ пути. Та же беда 28.09 стоила полосе
+    ненайденной СВОЕЙ покупки на продаже (см. bloom_lane_sell, programIdIndex).
+
+    ОТКУДА БЕРУТСЯ АДРЕСА И ПРАВА. Адреса -- ключи самой транзакции: статические
+    (`message.accountKeys`) плюс адреса из таблиц (`meta.loadedAddresses`), в
+    каноническом порядке «статические, затем записываемые из таблиц, затем
+    читаемые» -- том же, по которому индексируются балансы (c2_common.account_keys).
+    Подписи и права -- из `message.header` по раскладке сообщения Solana:
+    первые numRequiredSignatures -- подписанты (последние numReadonlySignedAccounts
+    из них только для чтения), у остальных статических записываемы все, кроме
+    последних numReadonlyUnsignedAccounts. Адреса из таблиц подписантами не бывают.
+
+    Права здесь -- не мелочь: `writable_map` кормит метки счетов нашей
+    инструкции, и перепутанное право записи -- это отказ программы на живых
+    деньгах. Поэтому у перевода есть обратная сверка (см. self_test): настоящая
+    jsonParsed-сделка опускается в индексы и поднимается назад, и флаги с
+    адресами обязаны совпасть у всех образцов.
+
+    Уже разобранную сделку (есть programId) возвращает как есть.
+    """
+    t = (tx or {}).get("transaction") or {}
+    m = t.get("message") or {}
+    ixs = m.get("instructions") or []
+    if not ixs or "programId" in (ixs[0] or {}):
+        return tx
+    syrye = list(m.get("accountKeys") or [])
+    if syrye and isinstance(syrye[0], dict):
+        return tx
+    meta = dict((tx or {}).get("meta") or {})
+    zagr = meta.get("loadedAddresses") or {}
+    zapis = list(zagr.get("writable") or [])
+    chtenie = list(zagr.get("readonly") or [])
+    klyuchi = list(syrye) + zapis + chtenie
+    h = m.get("header") or {}
+    ns = int(h.get("numRequiredSignatures") or 0)
+    nrs = int(h.get("numReadonlySignedAccounts") or 0)
+    nru = int(h.get("numReadonlyUnsignedAccounts") or 0)
+    if not ns or ns > len(syrye):
+        raise OshibkaNogi("в сделке нет message.header -- права счетов не вывести")
+    novye = []
+    for i, a in enumerate(syrye):
+        podpisant = i < ns
+        if podpisant:
+            mozhno = i < ns - nrs
+        else:
+            mozhno = i < len(syrye) - nru
+        novye.append({"pubkey": a, "writable": bool(mozhno), "signer": podpisant,
+                      "source": "transaction"})
+    for a in zapis:
+        novye.append({"pubkey": a, "writable": True, "signer": False,
+                      "source": "lookupTable"})
+    for a in chtenie:
+        novye.append({"pubkey": a, "writable": False, "signer": False,
+                      "source": "lookupTable"})
+
+    def _ix(ix: dict) -> dict:
+        i = ix.get("programIdIndex")
+        nomera = ix.get("accounts") or []
+        if not isinstance(i, int) or i >= len(klyuchi)                 or any((not isinstance(j, int)) or j >= len(klyuchi) for j in nomera):
+            raise OshibkaNogi("номер счёта в инструкции вне списка ключей сделки")
+        novyj = {k: v for k, v in ix.items() if k not in ("programIdIndex", "accounts")}
+        novyj["programId"] = klyuchi[i]
+        novyj["accounts"] = [klyuchi[j] for j in nomera]
+        return novyj
+
+    vnutri = []
+    for g in meta.get("innerInstructions") or []:
+        vnutri.append(dict(g, instructions=[_ix(x) for x in (g.get("instructions") or [])]))
+    meta["innerInstructions"] = vnutri
+    return dict(tx, transaction=dict(t, message=dict(m, accountKeys=novye,
+                                                     instructions=[_ix(x) for x in ixs])),
+                meta=meta)
+
+
+# Теговые номера инструкций токеновых программ, которыми СОЗДАЮТ счёт: у всех трёх
+# минт стоит вторым счётом (SPL Token и Token-2022 одинаково).
+TEGI_SOZDANIYA_SCHETA = (1, 16, 18)
+
+
+def mint_scheta(tx: dict, adres: str) -> str | None:
+    """Минт токенового счёта ПО САМОЙ СДЕЛКЕ: сначала балансы, потом создание.
+
+    ЗАЧЕМ ВТОРОЙ ПУТЬ. Часть источников торгует через ВРЕМЕННЫЕ счета, созданные и
+    закрытые в этой же транзакции: в pre/postTokenBalances их нет вовсе, и по
+    балансам минт не узнать. Живой след -- сделка 5pPyhfPdictT4BvVg4Xgr... (бот
+    term9YPb9...): счета мест 3 и 4 создаются (System CreateAccount, затем
+    InitializeAccount2) и закрываются (CloseAccount) внутри сделки, а минты у них
+    ровно наши -- USDC и база. Без этого пути такая сделка выглядела бы
+    расхождением «вне наших мест», то есть ложным провалом типа.
+    """
+    _C, _PP, _SB, B = _kirpichi()
+    C, *_ = _kirpichi()
+    for r in C.token_rows(tx).values():
+        if r.get("account") == adres and r.get("mint"):
+            return r["mint"]
+    for ix in B.all_instructions(tx):
+        if ix.get("programId") not in (B.TOKEN_PROGRAM, TOKEN_2022):
+            continue
+        scheta = ix.get("accounts") or []
+        if len(scheta) < 2 or scheta[0] != adres:
+            continue
+        try:
+            dannye = B.b58decode(ix.get("data") or "")
+        except (ValueError, IndexError):
+            continue
+        if dannye and dannye[0] in TEGI_SOZDANIYA_SCHETA:
+            return scheta[1]
+    return None
+
+
 def polzovatel_istochnika(storona_nogi: dict, tx_istochnika: dict) -> str | None:
     """Кто подписал сделку ИСТОЧНИКА на его месте в этой инструкции.
 
@@ -438,6 +597,116 @@ def polzovatel_istochnika(storona_nogi: dict, tx_istochnika: dict) -> str | None
     subs = B.user_accounts(tpl, tx_istochnika, metka) or {}
     mesta = [i for i, a in subs.items() if a == metka]
     return tpl["accounts"][mesta[0]] if len(mesta) == 1 else None
+
+
+def cu_nogi() -> int:
+    """Предел CU второй ноги -- отдельным входом, число из окружения.
+
+    Замер Code-1 по simulateTransaction нашей таблицей адресов: 158 733...172 545 CU
+    на живых образцах. Умолчание 250 000 -- запас 1.45x к максимуму и то же число,
+    что у двухшагового пути в таблице полосы. Непонятное значение переменной -- это
+    умолчание, а не ноль: ноль CU означал бы отказ сети на каждой покупке.
+    """
+    syroe = (os.environ.get(IMYA_FLAGA_CU) or "").strip()
+    try:
+        chislo = int(syroe)
+    except ValueError:
+        return CU_NOGI_PO_UMOLCHANIYU
+    return chislo if 0 < chislo <= 1_400_000 else CU_NOGI_PO_UMOLCHANIYU
+
+
+def min_out_boj(storona_nogi: dict, tx_istochnika: dict, *, amount_in: int,
+                proskalzyvanie: float, rpc_call=None, pul: str | None = None,
+                hranilishche: str | None = None, mint_bazy: str | None = None,
+                gruppa: str | None = None, nalog_vyhoda=None,
+                seychas: float | None = None) -> dict:
+    """MIN_OUT ВТОРОЙ НОГИ ДЛЯ БОЯ: у котировщика типа, с учётом нашего объёма.
+
+    Возвращает {ok, why_not, min_out, expected_out, put, chtenij, tpl}. `tpl` --
+    ЗАМЕНА шаблона ноги, если котировщик её дал (у CLMM и Whirlpool подготовить()
+    отдаёт шаблон с НЫНЕШНИМИ массивами тиков: массивы сделки источника к нашей
+    покупке уже уехали, и собрать по ним значило бы заплатить за промах).
+
+    Цены события здесь нет вовсе: её место -- тень.
+    """
+    iz = {"ok": False, "why_not": None, "min_out": None, "expected_out": None,
+          "put": None, "chtenij": None, "tpl": None, "fee_share": None}
+    if not (storona_nogi or {}).get("ok"):
+        iz["why_not"] = (storona_nogi or {}).get("why_not") or "стороны ноги нет"
+        return iz
+    tpl = storona_nogi["tpl"]
+    prog = tpl.get("program") or storona_nogi.get("program")
+    if not prog:
+        prog = next((p for p, t in TYPES.items()
+                     if t["label"] == storona_nogi.get("label")), None)
+    sposob = KOTIROVSHCHIKI.get(prog or "")
+    iz["put"] = sposob
+    if sposob is None:
+        iz["why_not"] = WHY_NET_KOTIROVSHCHIKA
+        return iz
+    if not isinstance(amount_in, int) or amount_in <= 0:
+        iz["why_not"] = f"сумма второй ноги не положительное целое: {amount_in!r}"
+        return iz
+    baza = mint_bazy or storona_nogi.get("base_mint")
+    try:
+        if sposob == SPOSOB_STROITEL:
+            M = modul(prog)
+            if M is None:
+                iz["why_not"] = WHY_NET_KOTIROVSHCHIKA
+                return iz
+            d = M.подготовить(tx_istochnika, пул=pul, хранилище_пула=hranilishche,
+                              лампорты=int(amount_in),
+                              проскальзывание=float(proskalzyvanie),
+                              rpc_call=rpc_call, минт_котировки=USDC, минт_базы=baza,
+                              группа=gruppa, сейчас=seychas, налог_выхода=nalog_vyhoda)
+            d = d if isinstance(d, dict) else {}
+            iz.update(chtenij=d.get("чтений"), fee_share=d.get("fee_share"),
+                      min_out=d.get("min_out"), expected_out=d.get("expected_out"),
+                      put=f"подготовить {TYPES[prog]['module']}")
+            if not d.get("ok"):
+                iz["why_not"] = f"котировщик типа отказал: {d.get('why_not')}"
+                return iz
+            iz["tpl"] = d.get("шаблон")
+        elif sposob == SPOSOB_KIRPICHI:
+            _C, _PP, _SB, B = _kirpichi()
+            mo = B.min_out_from_reserves(tpl, tx_istochnika, int(amount_in),
+                                         float(proskalzyvanie))
+            mo = mo if isinstance(mo, dict) else {}
+            iz.update(chtenij=0, min_out=mo.get("min_out"),
+                      expected_out=mo.get("expected_out"),
+                      put="c2_swap_build.min_out_from_reserves")
+            if not mo.get("ok"):
+                iz["why_not"] = f"котировщик типа отказал: {mo.get('why_not')}"
+                return iz
+        else:
+            import c2_dlmm_bez_chteniy as DL  # noqa: PLC0415
+
+            # Пул DLMM -- счёт 0 его инструкции; адрес пула полоса знает не всегда,
+            # а шаблон ноги знает всегда.
+            pul_dlmm = pul or (tpl.get("accounts") or [None])[0]
+            k = DL.котировка(пул=pul_dlmm, минт_базы=baza, минт_котировки=USDC,
+                             лампорты=int(amount_in),
+                             проскальзывание=float(proskalzyvanie),
+                             tx_источника=tx_istochnika,
+                             программа_выхода=storona_nogi.get("base_program"),
+                             налог_выхода=nalog_vyhoda)
+            k = k if isinstance(k, dict) else {}
+            iz.update(chtenij=k.get("чтений"), min_out=k.get("min_out"),
+                      expected_out=k.get("expected_out"),
+                      put="c2_dlmm_bez_chteniy.котировка",
+                      korzin_dokazano=k.get("корзин_доказано"),
+                      korzin_nashego_razmera=k.get("корзин_нашего_размера"))
+            if not k.get("ok"):
+                iz["why_not"] = f"котировщик типа отказал: {k.get('why_not')}"
+                return iz
+    except Exception as exc:  # noqa: BLE001
+        iz["why_not"] = f"котировщик типа упал: {type(exc).__name__}: {str(exc)[:160]}"
+        return iz
+    if not isinstance(iz.get("min_out"), int) or iz["min_out"] <= 0:
+        iz["why_not"] = f"минимум выхода не положителен: {iz.get('min_out')!r}"
+        return iz
+    iz["ok"] = True
+    return iz
 
 
 # --------------------------------------------------------------------- тень
@@ -528,17 +797,25 @@ def _SB_vozrast(TS) -> float:
 
 def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str,
                lamporty: int, kesh_nog, proskalzyvanie: float = 0.35,
-               cu_units: int = 800_000, prioritet_lamporty: int = 1_000_000,
+               cu_units: int | None = None, prioritet_lamporty: int = 1_000_000,
                chaevye_lamporty: int = 1_000_000, chaevye_spiskom: list | None = None,
                chaevye_adres: str | None = None, nons: tuple | None = None,
                nalog_kotirovki_bps=None, min_out_vneshnij: int | None = None,
-               gruppa: str | None = None) -> dict:
+               gruppa: str | None = None, kotirovka: str = "sobytie",
+               rpc_call=None, nalog_vyhoda=None, seychas: float | None = None) -> dict:
     """СПИСОК ИНСТРУКЦИЙ двух ног в порядке двухшагового пути -- без компиляции.
 
     Отдельно от sobrat() по одной причине: порядок инструкций -- это и есть
     механизм, и проверять его надо списком, а не по собранной транзакции (её
     может не быть вовсе: без таблиц адресов две ноги в 1232 байта не влезают).
+
+    kotirovka="boj" -- min_out у котировщика типа (min_out_boj), и шаблон ноги
+    берётся ЕГО, если он его дал. kotirovka="sobytie" -- цена события источника:
+    это путь ТЕНИ, и на отправку такой min_out не годится.
+    cu_units=None -- предел CU из окружения (cu_nogi(), умолчание 250 000).
     """
+    if cu_units is None:
+        cu_units = cu_nogi()
     iz = {"ok": False, "why_not": None, "route": ROUTE, "steps": 2,
           "rezhim": rezhim(gruppa), "pool_program": None, "label": None, "way": None,
           "quote_mint": USDC, "leg1_pool_program": None, "leg1_template_age_s": None,
@@ -589,7 +866,29 @@ def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek:
             return iz
         if isinstance(min_out_vneshnij, int) and min_out_vneshnij > 0:
             min_out = int(min_out_vneshnij)
-            iz.update(min_out=min_out, min_out_from="строитель типа")
+            iz.update(min_out=min_out, min_out_from="передан полосой")
+        elif kotirovka == "boj":
+            # БОЕВОЙ MIN_OUT -- У КОТИРОВЩИКА ТИПА, и шаблон ноги тоже его: у CLMM
+            # и Whirlpool подготовить() отдаёт массивы тиков НЫНЕШНИЕ, а не те, что
+            # были у источника.
+            kb = min_out_boj(st, tx_istochnika, amount_in=int(s["leg2_to_pool"]),
+                             proskalzyvanie=proskalzyvanie, rpc_call=rpc_call,
+                             # АДРЕС ПУЛА ПОЛОСА НЕ ЗНАЕТ -- у неё хранилище
+                             # (C.identify_pool), и строители ищут пул по нему
+                             # сами; так же зовёт их и одношаговая сборка.
+                             pul=None, hranilishche=pul["pool_vault"],
+                             mint_bazy=st["base_mint"], gruppa=gruppa,
+                             nalog_vyhoda=nalog_vyhoda, seychas=seychas)
+            iz.update(min_out=kb.get("min_out"), expected_out=kb.get("expected_out"),
+                      min_out_from=kb.get("put"), chtenij=kb.get("chtenij"),
+                      fee_share=kb.get("fee_share"))
+            if not kb.get("ok"):
+                iz["why_not"] = kb.get("why_not")
+                return iz
+            if kb.get("tpl"):
+                st = dict(st, tpl=kb["tpl"])
+                iz["tpl_ot_kotirovshchika"] = True
+            min_out = int(kb["min_out"])
         else:
             c = cena_sobytiya(tx_istochnika, st["tpl"], base_mint=st["base_mint"])
             mo = min_out_po_sobytiyu(c, int(s["leg2_to_pool"]), proskalzyvanie)
@@ -637,12 +936,13 @@ def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek:
 
 def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str,
            lamporty: int, kesh_nog, proskalzyvanie: float = 0.35,
-           cu_units: int = 800_000, prioritet_lamporty: int = 1_000_000,
+           cu_units: int | None = None, prioritet_lamporty: int = 1_000_000,
            chaevye_lamporty: int = 1_000_000, chaevye_spiskom: list | None = None,
            chaevye_adres: str | None = None, nons: tuple | None = None,
            rpc_call=None, gruppa: str | None = None, nalog_kotirovki_bps=None,
            min_out_vneshnij: int | None = None,
-           nashi_tablicy: list | None = None) -> dict:
+           nashi_tablicy: list | None = None, nalog_vyhoda=None,
+           seychas: float | None = None) -> dict:
     """ОДНА транзакция: SOL -> USDC -> токен на строителе типа. Без подписи и отправки.
 
     Порядок инструкций, пределы и связка сумм -- двухшагового пути; вторая нога --
@@ -662,7 +962,11 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
         prioritet_lamporty=prioritet_lamporty, chaevye_lamporty=chaevye_lamporty,
         chaevye_spiskom=chaevye_spiskom, chaevye_adres=chaevye_adres, nons=nons,
         nalog_kotirovki_bps=nalog_kotirovki_bps, min_out_vneshnij=min_out_vneshnij,
-        gruppa=gruppa)
+        gruppa=gruppa,
+        # В БОЮ MIN_OUT ТОЛЬКО ОТ КОТИРОВЩИКА ТИПА. Цена события остаётся тени:
+        # она не учитывает наш объём и завышает выход (решение владельца 01.10).
+        kotirovka="boj", rpc_call=rpc_call, nalog_vyhoda=nalog_vyhoda,
+        seychas=seychas)
     iz.update(tx_base64=None, size=None, build_ms=None,
               nonce_account=(str(nons[0]) if nons else None))
     ixs = iz.pop("ixs", None)
@@ -723,7 +1027,7 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ. Молчаливый пропуск -- это провал: если файла
 # живых образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 55
+ZHDEM_PROVEROK = 73
 
 # Живые образцы: свопы с котировкой USDC по типам пулов. Числа -- ЗАМЕР, они
 # объявлены здесь и сверяются по файлам; разошлось -- провал.
@@ -741,6 +1045,27 @@ ZHDEM_SPISKOV = {"CLMM": 6, "Whirlpool": 12, "DLMM": 11, "DAMM v2": 3}
 # Размер пакета БЕЗ таблиц адресов (мин, макс) по тем же 32 сделкам. Предел сети
 # 1232 байта: без таблиц не влезает НИ ОДНА -- это гейт, а не мелочь.
 ZHDEM_RAZMER = (1326, 1703)
+# Боевой котировщик на тех же живых сделках: DLMM считает нулём чтений, CLMM без
+# узла отказывает (его котировщик -- подготовить(), а он читает состояние пула).
+ZHDEM_DLMM_BOJ = 12
+ZHDEM_CLMM_BEZ_UZLA = 6
+# Образец, где источник торгует ВРЕМЕННЫМИ счетами: их нет в балансах, минт берётся
+# из инструкции создания. Наших мест у этой сделки два -- вход и выход.
+FILE_VREMENNYH = "c3_usdc_noga/obrazec_vremennye_scheta.json"
+ZHDEM_VREMENNYH = 2
+# Сверка перевода «адреса -> номера -> адреса» на тех же живых сделках. У 40 из 43
+# флаги прав, подписи, адреса и вложенные инструкции совпадают бит в бит. У ТРЁХ
+# (DLMM RGaZbh8j..., Whirlpool 32k64Gec..., 2uJCHp4p...) узел помечает ключ
+# ПРОГРАММЫ только для чтения ПЕРЕД блоком записываемых, чего раскладка сообщения
+# Solana не допускает: по header права выходят сдвинутыми на одно место. Кто из
+# двух прав, офлайн не решить, поэтому эти три названы числом, а не спрятаны.
+# Деньги от этого не зависят: перевод нужен только образцам Code-2 (encoding=json),
+# а полоса получает jsonParsed со своего узла. Сверка байт в байт на образцах
+# сравнивает АДРЕСА и ДАННЫЕ -- права в неё не входят.
+ZHDEM_KRUG_PRIGODNO = 43
+ZHDEM_KRUG_SOVPALO = 40
+# Кошелёк самопроверки -- кошелёк опыта забора, не боевой: подписи здесь нет вовсе.
+KOSHELEK_PROVERKI = "D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph"
 
 
 def _obrazcy() -> dict:
@@ -768,6 +1093,52 @@ def _obrazcy() -> dict:
                           "минт": x.get("mint"), "сделка": ""})
     iz.update(ok=True, ryady=ryady)
     return iz
+
+
+def _v_nomera(tx: dict) -> dict | None:
+    """ОБРАТНЫЙ перевод для самопроверки: адреса -> номера, как отдаёт encoding="json".
+
+    Нужен только сверке: настоящая jsonParsed-сделка опускается в номера и
+    поднимается назад tx_s_adresami, и флаги с адресами обязаны совпасть. Без
+    такой сверки права счетов в переводе проверялись бы на слово, а перепутанное
+    право записи -- это отказ программы на живых деньгах.
+
+    None -- сделка не годится для сверки (ключи не в разобранном виде).
+    """
+    t = (tx or {}).get("transaction") or {}
+    m = t.get("message") or {}
+    syrye = list(m.get("accountKeys") or [])
+    if not syrye or not isinstance(syrye[0], dict):
+        return None
+    stat = [k for k in syrye if (k.get("source") or "transaction") == "transaction"]
+    tabl = [k for k in syrye if (k.get("source") or "transaction") != "transaction"]
+    zapis = [k["pubkey"] for k in tabl if k.get("writable")]
+    chtenie = [k["pubkey"] for k in tabl if not k.get("writable")]
+    # Порядок ключей тот же, что у узла: статические, затем записываемые из
+    # таблиц, затем читаемые. Разошёлся -- сверять нечего, честный None.
+    if [k["pubkey"] for k in syrye] != [k["pubkey"] for k in stat] + zapis + chtenie:
+        return None
+    klyuchi = [k["pubkey"] for k in syrye]
+    podpisanty = [k for k in stat if k.get("signer")]
+    h = {"numRequiredSignatures": len(podpisanty),
+         "numReadonlySignedAccounts": sum(1 for k in podpisanty if not k.get("writable")),
+         "numReadonlyUnsignedAccounts": sum(1 for k in stat
+                                            if not k.get("signer") and not k.get("writable"))}
+
+    def _ix(ix: dict) -> dict:
+        novyj = {k: v for k, v in ix.items() if k not in ("programId", "accounts")}
+        novyj["programIdIndex"] = klyuchi.index(ix["programId"])
+        novyj["accounts"] = [klyuchi.index(a) for a in (ix.get("accounts") or [])]
+        return novyj
+
+    meta = dict((tx or {}).get("meta") or {})
+    meta["innerInstructions"] = [
+        dict(g, instructions=[_ix(x) for x in (g.get("instructions") or [])])
+        for g in (meta.get("innerInstructions") or [])]
+    meta["loadedAddresses"] = {"writable": zapis, "readonly": chtenie}
+    return dict(tx, transaction=dict(t, message=dict(
+        m, header=h, accountKeys=[k["pubkey"] for k in stat],
+        instructions=[_ix(x) for x in (m.get("instructions") or [])])), meta=meta)
 
 
 def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
@@ -1011,13 +1382,14 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         and zap.get("program") == "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
         zap if isinstance(zap, str) else (isinstance(zap, dict) and zap.get("q_dec")))
     spiskov = {}
+    kesh = None
     if isinstance(zap, dict):
         # Цена -- ЦЕНА ОБРАЗЦА, и это сказано вслух: на пути покупки её читают по
         # остаткам хранилищ, здесь же проверяется арифметика, а не цена.
         zap = dict(zap, price_sol=zap["price_sol_obrazca"], checked_at=_time.time())
         kesh = SB.LegCache({}, None)
         kesh.entries[USDC] = zap
-        W = "D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph"
+        W = KOSHELEK_PROVERKI
         poryadok_ok, argumenty_ok, nons_ok, chaevye_ok = 0, 0, 0, 0
         razmery = []
         for r in ryady:
@@ -1054,11 +1426,15 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 argumenty_ok += 1
             # РАЗМЕР ПАКЕТА -- ЗАМЕР, А НЕ ПРЕДПОЛОЖЕНИЕ. Таблиц адресов без сети
             # взять негде, поэтому компиляция идёт БЕЗ них: число показывает,
-            # сколько весит та же транзакция, когда сжимать нечем.
+            # сколько весит та же транзакция, когда сжимать нечем (с НАШЕЙ
+            # таблицей Code-1 замерил 643...702 байта, см. страницу врезки).
+            # min_out передаётся готовым: от него размер не зависит, а боевой
+            # котировщик типа без узла отказал бы и замера бы не было.
             sb = sobrat(tx_istochnika=tx, istochnik=ist,
                         mint=r.get("минт") or st["base_mint"], nash_koshelek=W,
                         lamporty=10_000_000, kesh_nog=kesh, proskalzyvanie=0.35,
                         chaevye_lamporty=0, chaevye_adres=None,
+                        min_out_vneshnij=res["min_out"],
                         rpc_call=lambda _m, _p: {"value": []})
             if isinstance(sb.get("size"), int):
                 razmery.append(sb["size"])
@@ -1092,6 +1468,157 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     for tip, zhdem in sorted(ZHDEM_SPISKOV.items()):
         chk(f"{tip}: списков инструкций {zhdem}", spiskov.get(tip, 0) == zhdem,
             spiskov.get(tip, 0))
+
+    # ---------------------------------- 7. боевой режим: котировщик типа, не цена события
+    sohr_cu = os.environ.get(IMYA_FLAGA_CU)
+    os.environ.pop(IMYA_FLAGA_CU, None)
+    chk(f"предел CU ноги без {IMYA_FLAGA_CU} -- {CU_NOGI_PO_UMOLCHANIYU}, и это выше "
+        f"замера Code-1 {CU_ZAMER_CODE1[1]}",
+        cu_nogi() == CU_NOGI_PO_UMOLCHANIYU > CU_ZAMER_CODE1[1], cu_nogi())
+    os.environ[IMYA_FLAGA_CU] = "300000"
+    chk("предел CU берётся из окружения", cu_nogi() == 300_000, cu_nogi())
+    os.environ[IMYA_FLAGA_CU] = "мусор"
+    chk("непонятный предел CU -- умолчание, а не ноль",
+        cu_nogi() == CU_NOGI_PO_UMOLCHANIYU, cu_nogi())
+    os.environ[IMYA_FLAGA_CU] = "0"
+    chk("ноль CU -- умолчание: отправка с нулём CU отказала бы в сети",
+        cu_nogi() == CU_NOGI_PO_UMOLCHANIYU, cu_nogi())
+    if sohr_cu is None:
+        os.environ.pop(IMYA_FLAGA_CU, None)
+    else:
+        os.environ[IMYA_FLAGA_CU] = sohr_cu
+    chk("котировщик назван у всех шести типов и у каждого свой способ",
+        set(KOTIROVSHCHIKI) == set(TYPES)
+        and KOTIROVSHCHIKI[PROG_CLMM] == KOTIROVSHCHIKI[PROG_WHIRLPOOL]
+        == KOTIROVSHCHIKI[PROG_AMMV4] == KOTIROVSHCHIKI[PROG_DBC] == SPOSOB_STROITEL
+        and KOTIROVSHCHIKI[PROG_DAMM2] == SPOSOB_KIRPICHI
+        and KOTIROVSHCHIKI[PROG_DLMM] == SPOSOB_DLMM,
+        sorted(KOTIROVSHCHIKI.items()))
+    kb_net = min_out_boj({"ok": False, "why_not": "нет стороны"}, {}, amount_in=1,
+                         proskalzyvanie=0.35)
+    chk("боевой котировщик без стороны ноги -- отказ словами, без исключения",
+        not kb_net["ok"] and kb_net["why_not"], kb_net["why_not"])
+    kb_chuzhoj = min_out_boj({"ok": True, "tpl": {"program": "НеПрограмма"},
+                              "way": WAY_BRICKS, "label": "нет такого"}, {},
+                             amount_in=1, proskalzyvanie=0.35)
+    chk("тип без боевого котировщика -- отказ по имени, а не цена события",
+        not kb_chuzhoj["ok"] and kb_chuzhoj["why_not"] == WHY_NET_KOTIROVSHCHIKA,
+        kb_chuzhoj["why_not"])
+    # На живых образцах: DLMM считает боевой min_out нулём чтений, CLMM без узла
+    # отказывает (его котировщик -- подготовить(), а он читает состояние пула).
+    dlmm_ok, clmm_otkaz, bez_chtenij = 0, 0, 0
+    for r in ryady:
+        tx = r["транзакция"]
+        st = storona(tx, programma=r["program"], pul=r.get("пул"))
+        if not st["ok"] or not r.get("usdc_vhod"):
+            continue
+        kb = min_out_boj(st, tx, amount_in=1_000_000, proskalzyvanie=0.35,
+                         rpc_call=None, nalog_vyhoda=(0, None))
+        if r["tip"] == "DLMM" and kb.get("ok"):
+            dlmm_ok += 1
+            bez_chtenij += 1 if kb.get("chtenij") == 0 else 0
+        if r["tip"] == "CLMM" and not kb.get("ok"):
+            clmm_otkaz += 1
+    chk(f"DLMM: боевой min_out считается нулём чтений у {ZHDEM_DLMM_BOJ} сделок",
+        dlmm_ok == ZHDEM_DLMM_BOJ and bez_chtenij == ZHDEM_DLMM_BOJ,
+        (dlmm_ok, bez_chtenij))
+    chk(f"CLMM без узла: боевой котировщик отказывает у всех {ZHDEM_CLMM_BEZ_UZLA} "
+        f"-- подготовить() читает состояние пула",
+        clmm_otkaz == ZHDEM_CLMM_BEZ_UZLA, clmm_otkaz)
+    # Сборка в бою НЕ подменяет отказ котировщика ценой события.
+    flag(MODE_LIVE)
+    r_clmm = next(r for r in ryady if r["tip"] == "CLMM" and r.get("usdc_vhod"))
+    st_clmm = storona(r_clmm["транзакция"], programma=r_clmm["program"],
+                      pul=r_clmm.get("пул"))
+    ist_clmm = (sorted(C.signers(r_clmm["транзакция"]))[0]
+                if C.signers(r_clmm["транзакция"]) else "")
+    sb_boj = (sobrat(tx_istochnika=r_clmm["транзакция"], istochnik=ist_clmm,
+                     mint=st_clmm["base_mint"], nash_koshelek=KOSHELEK_PROVERKI,
+                     lamporty=10_000_000, kesh_nog=kesh, proskalzyvanie=0.35,
+                     chaevye_lamporty=0, chaevye_adres=None, rpc_call=None)
+              if kesh is not None else {"ok": None})
+    chk("в бою отказ котировщика -- это отказ сборки, а не подмена ценой события",
+        sb_boj.get("ok") is False and sb_boj.get("tx_base64") is None
+        and "цена события" not in str(sb_boj.get("min_out_from") or ""),
+        (sb_boj.get("why_not"), sb_boj.get("min_out_from")))
+    flag()
+
+    # ------------------------- 8. сделки с НОМЕРАМИ счетов (encoding="json")
+    tuda_obratno, idempotentno, prigodno, adresa_te_zhe = 0, 0, 0, 0
+    for r in ryady:
+        tx = r["транзакция"]
+        v_nomera = _v_nomera(tx)
+        if v_nomera is None:
+            continue
+        nazad = tx_s_adresami(v_nomera)
+        m0 = (tx["transaction"]["message"] or {})
+        m1 = (nazad["transaction"]["message"] or {})
+        klyuchi_te_zhe = [(k["pubkey"], bool(k.get("writable")), bool(k.get("signer")))
+                          for k in m0["accountKeys"]] == \
+                         [(k["pubkey"], bool(k.get("writable")), bool(k.get("signer")))
+                          for k in m1["accountKeys"]]
+        ix_te_zhe = [(x.get("programId"), list(x.get("accounts") or []))
+                     for x in m0["instructions"]] == \
+                    [(x.get("programId"), list(x.get("accounts") or []))
+                     for x in m1["instructions"]]
+        vnutri_te_zhe = [[(x.get("programId"), list(x.get("accounts") or []))
+                          for x in (g.get("instructions") or [])]
+                         for g in (tx.get("meta") or {}).get("innerInstructions") or []] == \
+                        [[(x.get("programId"), list(x.get("accounts") or []))
+                          for x in (g.get("instructions") or [])]
+                         for g in (nazad.get("meta") or {}).get("innerInstructions") or []]
+        prigodno += 1
+        tuda_obratno += 1 if (klyuchi_te_zhe and ix_te_zhe and vnutri_te_zhe) else 0
+        adresa_te_zhe += 1 if (ix_te_zhe and vnutri_te_zhe) else 0
+        idempotentno += 1 if tx_s_adresami(tx) is tx else 0
+    chk(f"обратный перевод вышел у всех {ZHDEM_KRUG_PRIGODNO} образцов -- сверять есть что",
+        prigodno == ZHDEM_KRUG_PRIGODNO, prigodno)
+    chk(f"адреса и вложенные инструкции в круге совпадают у всех "
+        f"{ZHDEM_KRUG_PRIGODNO}: байт в байт на образцах от прав не зависит",
+        adresa_te_zhe == ZHDEM_KRUG_PRIGODNO, adresa_te_zhe)
+    chk(f"права и подписи в круге совпадают у {ZHDEM_KRUG_SOVPALO} из "
+        f"{ZHDEM_KRUG_PRIGODNO}; у остальных узел ставит ключ программы только "
+        f"для чтения ПЕРЕД записываемыми -- раскладка сообщения такого не допускает",
+        tuda_obratno == ZHDEM_KRUG_SOVPALO, tuda_obratno)
+    chk("уже разобранную сделку перевод возвращает как есть",
+        idempotentno == len(ryady), (idempotentno, len(ryady)))
+    try:
+        tx_s_adresami({"transaction": {"message": {"accountKeys": ["A"],
+                                                   "instructions": [{"programIdIndex": 0,
+                                                                     "accounts": []}]}}})
+        bez_header = False
+    except OshibkaNogi:
+        bez_header = True
+    chk("сделка без message.header -- исключение по имени, а не выдуманные права",
+        bez_header, bez_header)
+
+    # ------------------- 9. минт счёта: по балансам и по инструкции создания
+    put_vrem = Path(C.DATA) / FILE_VREMENNYH
+    sig_vrem = None
+    if put_vrem.exists():
+        sig_vrem = (json.loads(put_vrem.read_text(encoding="utf-8")).get("сигнал")
+                    or {})
+    chk(f"образец со временными счетами на месте ({FILE_VREMENNYH})",
+        bool(sig_vrem) and bool(sig_vrem.get("tx")), put_vrem.exists())
+    if sig_vrem and sig_vrem.get("tx"):
+        tx_v = tx_s_adresami(sig_vrem["tx"])
+        st_v = storona(tx_v, programma=sig_vrem.get("программа_пула"),
+                       pul=sig_vrem.get("пул"))
+        u_v = polzovatel_istochnika(st_v, tx_v) if st_v.get("ok") else None
+        iz_balansov = [a for a in (st_v.get("tpl") or {}).get("accounts") or []
+                       if any(r["account"] == a and r.get("mint")
+                              for r in C.token_rows(tx_v).values())]
+        chk("минт счёта по балансам находится", bool(iz_balansov)
+            and mint_scheta(tx_v, iz_balansov[0]) is not None,
+            len(iz_balansov))
+        # Два наших места этой сделки -- счета, созданные и закрытые внутри неё:
+        # в балансах их нет, и минт берётся из инструкции создания.
+        vne = [a for a in (st_v.get("tpl") or {}).get("accounts") or []
+               if not any(r["account"] == a for r in C.token_rows(tx_v).values())
+               and mint_scheta(tx_v, a) in (USDC, st_v.get("base_mint"))]
+        chk("минт счёта, которого нет в балансах, берётся из инструкции создания "
+            f"({ZHDEM_VREMENNYH} счёта у этой сделки)",
+            len(vne) == ZHDEM_VREMENNYH and bool(u_v), (len(vne), u_v))
 
     for k, v in sohr.items():
         if v is None:
