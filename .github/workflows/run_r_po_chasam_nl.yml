@@ -85,6 +85,7 @@ jobs:
               $PY_HOSTA $RABOTA/r_po_chasam.py \
                 --s '${{ inputs.s }}' --perezapusk '${{ inputs.perezapusk }}' \
                 --noch-do '${{ inputs.noch_do }}' --skolko '${{ inputs.skolko }}' \
+                --resheniya \$BLOOM_STATE_DIR/decisions.jsonl \
                 --out $RABOTA/out.json >/dev/null
             cat $RABOTA/out.json
           " > /tmp/r.json
