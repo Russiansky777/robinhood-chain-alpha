@@ -218,7 +218,16 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_own_send.py bloom_lane_two_step.py bloom_lane_sell.py bloom_vtoroe_mnenie.py c3_bilet_ot_rezerva.py; do
+          #
+          # c2_itog_po_cepi, c2_swap_build, c2_shadow_build -- СТОРОЖ ИХ
+          # ИМПОРТИРУЕТ, а в списке их не было. Работало это по случайности:
+          # продавец и детектор лежат в ОДНОМ каталоге (/home/bot/bloom_executor),
+          # и файлы туда привозил деплой детектора. То есть деплой продавца в
+          # одиночку привозил сторожа НОВОГО, а правило 13 (итог по цепи) --
+          # СТАРОЕ, и расхождение было бы молчаливым: итог по цепи просто не
+          # дописался бы, а суточный стоп читал бы прежнее число. Список теперь
+          # полный, и деплой продавца самодостаточен.
+          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_own_send.py bloom_lane_two_step.py bloom_lane_sell.py bloom_vtoroe_mnenie.py c2_itog_po_cepi.py c2_swap_build.py c2_shadow_build.py c3_bilet_ot_rezerva.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
