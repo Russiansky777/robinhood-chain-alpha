@@ -220,6 +220,67 @@ def подшаги(позиции: list, *, сколько: int, ночь_до_t
                                "по подшагам нечем")}
 
 
+def из_resheniy(путь: str, *, с_ts: float, перезапуск_ts: float,
+                 сколько: int) -> dict:
+    """podshagi_ms из журнала РЕШЕНИЙ: «гейт полосы» отдельным числом.
+
+    ЗАЧЕМ ОТДЕЛЬНО ОТ ПОЗИЦИЙ. В позиции podshagi_ms не лежит -- там только
+    метки ts_decision/ts_signed, а они дают ОДИН кусок «приём→решение» целиком.
+    Внутри этого куска четыре разных дела: разбор и размер, ГЕЙТ ПОЛОСЫ, веер
+    контролей, чаевые пула и нонс. Чтобы назвать виновника, нужен именно гейт.
+
+    Журнал решений -- ЛЕНТА, строка на решение; берутся только строки, где
+    podshagi_ms непустой (то есть полоса дошла до подписи).
+    """
+    строки = []
+    with open(путь, encoding="utf-8") as ф:
+        for с in ф:
+            с = с.strip()
+            if not с:
+                continue
+            try:
+                з = json.loads(с)
+            except Exception:  # noqa: BLE001
+                continue
+            ш = з.get("podshagi_ms")
+            if not isinstance(ш, dict) or not ш:
+                continue
+            т = з.get("ts") or з.get("ts_utc") or з.get("utc")
+            if isinstance(т, str):
+                try:
+                    т = _ts(т)
+                except Exception:  # noqa: BLE001
+                    т = None
+            if not isinstance(т, (int, float)) or float(т) < с_ts:
+                continue
+            строки.append((float(т), з, ш))
+    строки.sort(key=lambda х: х[0])
+    if not строки:
+        return {"строк": 0,
+                 "почему_пусто": (f"в {путь} нет строк с непустым podshagi_ms "
+                                   "за окно -- гейт отдельным числом не достать")}
+
+    def медианы(набор):
+        имена: dict = {}
+        for _, _, ш in набор:
+            for имя, мс in ш.items():
+                if isinstance(мс, (int, float)):
+                    имена.setdefault(имя, []).append(float(мс))
+        return {и: {"медиана": round(statistics.median(з), 2), "n": len(з)}
+                for и, з in sorted(имена.items())}
+
+    до = [х for х in строки if х[0] < перезапуск_ts]
+    после = [х for х in строки if х[0] >= перезапуск_ts]
+    return {"строк": len(строки), "почему_пусто": None,
+             "медианы_до": медианы(до), "медианы_после": медианы(после),
+             "n_до": len(до), "n_после": len(после),
+             "последние": [{"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                  time.gmtime(т)),
+                             "группа": з.get("group") or з.get("lane_group"),
+                             "подшаги_мс": ш}
+                            for т, з, ш in строки[-сколько:]]}
+
+
 def самопроверка() -> int:
     из_строя = []
 
@@ -287,6 +348,32 @@ def самопроверка() -> int:
         and пм["медианы_последних"]["приём_решение_мс_n"] == 1,
         пм["медианы_последних"])
 
+    import tempfile  # noqa: PLC0415
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
+                                      encoding="utf-8") as _ф:
+        _ф.write(json.dumps({"ts": 1000.0, "group": "cand1",
+                              "podshagi_ms": {"гейт полосы": 130.0,
+                                               "сборка": 7.0, "всего": 137.0}}) + "\n")
+        _ф.write(json.dumps({"ts": 2000.0, "group": "cand1",
+                              "podshagi_ms": {"гейт полосы": 8.0,
+                                               "сборка": 7.0, "всего": 15.0}}) + "\n")
+        _ф.write(json.dumps({"ts": 2001.0, "group": "cand1",
+                              "podshagi_ms": {}}) + "\n")
+        _ф.write("не json\n")
+        _имя = _ф.name
+    _р = из_resheniy(_имя, с_ts=0.0, перезапуск_ts=1500.0, сколько=5)
+    chk("решения: пустой podshagi_ms и мусор пропущены, остались две строки",
+        _р["строк"] == 2, _р.get("строк"))
+    chk("решения: гейт до и после перезапуска разделён",
+        _р["медианы_до"]["гейт полосы"]["медиана"] == 130.0
+        and _р["медианы_после"]["гейт полосы"]["медиана"] == 8.0,
+        (_р["медианы_до"], _р["медианы_после"]))
+    _пусто = из_resheniy(_имя, с_ts=9e9, перезапуск_ts=9e9, сколько=5)
+    chk("решения: нет строк за окно -- сказано словами, а не нулевой гейт",
+        _пусто["строк"] == 0 and "не достать" in (_пусто["почему_пусто"] or ""),
+        _пусто)
+    os.unlink(_имя)
+
     # САМОЕ ГЛАВНОЕ: модуль обязан брать Р у переводчика службы, а не считать
     # сам. Если bloom_doklad.поля перестанет отдавать путь_решили, измеритель
     # должен молчать, а не выдумывать число.
@@ -307,6 +394,8 @@ def main() -> int:
                     help="что считать ночью: записи раньше этого времени")
     р.add_argument("--skolko", type=int, default=5)
     р.add_argument("--pozicii", default="", help="файл positions.jsonl (пусто -- из состояния)")
+    р.add_argument("--resheniya", default="",
+                    help="файл decisions.jsonl (пусто -- не читать)")
     р.add_argument("--out", default=None)
     р.add_argument("--self-test", action="store_true")
     а = р.parse_args()
@@ -318,6 +407,14 @@ def main() -> int:
     свод_.update(по_часам(поз, с_ts=_ts(а.s), перезапуск_ts=_ts(а.perezapusk)))
     свод_["подшаги"] = подшаги(поз, сколько=а.skolko, ночь_до_ts=_ts(а.noch_do))
     свод_["по_меткам"] = по_меткам(поз, сколько=а.skolko, ночь_до_ts=_ts(а.noch_do))
+    if а.resheniya:
+        if not os.path.exists(а.resheniya):
+            свод_["из_решений"] = {"строк": 0,
+                                    "почему_пусто": f"файла {а.resheniya} нет"}
+        else:
+            свод_["из_решений"] = из_resheniy(
+                а.resheniya, с_ts=_ts(а.s),
+                перезапуск_ts=_ts(а.perezapusk), сколько=а.skolko)
     print(json.dumps(свод_, ensure_ascii=False, indent=1))
     if а.out:
         Path(а.out).parent.mkdir(parents=True, exist_ok=True)
