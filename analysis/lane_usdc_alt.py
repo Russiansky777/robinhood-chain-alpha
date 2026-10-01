@@ -513,6 +513,18 @@ def self_test() -> int:  # noqa: C901
     chk("без кошелька -- отказ словами",
         адреса(наш="", путь_ног=путь)["ok"] is False
         or адреса(наш=None, путь_ног=путь)["ok"] in (True, False))
+    # КЛИЕНТ УЗЛА НАЗЫВАЕТСЯ ТАК, КАК МЫ ЕГО ЗОВЁМ. Первый боевой прогон упал
+    # на AttributeError: module 'bloom_api' has no attribute 'Helius' -- уже ПОСЛЕ
+    # слова SOZDAT, хотя до сети дело и не дошло. Проверка ловит это ДО траты.
+    try:
+        import solana_rpc_client as RPCп  # noqa: PLC0415
+
+        chk("класс клиента узла называется так, как мы его зовём, и у него есть call",
+            hasattr(RPCп, "SolanaRpc") and callable(
+                getattr(RPCп.SolanaRpc, "call", None)),
+            [и for и in dir(RPCп) if "Rpc" in и])
+    except Exception as exc:  # noqa: BLE001
+        chk("модуль клиента узла загружается", False, type(exc).__name__)
     print(f"самопроверка таблицы адресов USDC-ноги: {всего - сбоев}/{всего} пройдено")
     if сбоев:
         print(f"самопроверка не пройдена: {сбоев} из {всего}")
@@ -553,10 +565,12 @@ def main() -> int:
         print(f"   {а_}  -- {сп['почему'][а_]}")
     итог = {"адреса": сп, "формула": ф}
     if а.sozdat:
-        import bloom_api  # noqa: PLC0415
+        # ТОТ ЖЕ КЛИЕНТ УЗЛА, ЧТО У ОСТАЛЬНЫХ ПРОГОНОВ (solana_rpc_client.SolanaRpc,
+        # как в lane_nonce): у него общий темп, запасной путь и учёт кредитов.
+        import solana_rpc_client as RPC  # noqa: PLC0415
 
-        узел = bloom_api.Helius()
-        с = создать(узел.call, путь_ног=путь, с_чаевыми=bool(а.s_chaevymi))
+        клиент = RPC.SolanaRpc(service="lane_usdc_alt")
+        с = создать(клиент.call, путь_ног=путь, с_чаевыми=bool(а.s_chaevymi))
         итог["создание"] = с
         print("\n--- СОЗДАНИЕ ---")
         print(json.dumps({к: v for к, v in с.items() if к != "tx"},
