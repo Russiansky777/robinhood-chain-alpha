@@ -5516,6 +5516,33 @@ def провести(*, tx_источника: dict, источник: str, ми
         из_["size_why"] = разм.get("why")
         из_["first_trades"] = разм.get("first_trades")
         из_["group_landed"] = разм.get("landed")
+        # БИЛЕТ ОТ РЕЗЕРВА (точка врезки от Code-3, docs/bilet_ot_rezerva_kak_
+        # vstroit.md, п.4). Доля -- вход BLOOM_BILET_DOLYA, по умолчанию 0: без
+        # слова владельца НИ ОДИН билет не меняется, а числа всё равно считаются
+        # и ложатся в решение. Резерв берётся из самой сделки источника и БЕЗ
+        # ЕДИНОГО ЧТЕНИЯ: pool_reserve_sol появляется только ПОСЛЕ сборки, а
+        # размер нужен ДО неё, и пересобирать покупку ради него на горячем пути
+        # значило бы платить миллисекундами за число, которое уже есть в сделке.
+        #
+        # ОТКАЗ ДВЕРИ -- НЕ ОТКАЗ В ПОКУПКЕ: нет резерва, резерв виртуальный
+        # (кривая pump.fun) или доля вне (0, 0.5] -- билет остаётся потолком
+        # группы, причина словами в bilet_rezerv_why_not.
+        try:
+            import c3_bilet_ot_rezerva as BR  # noqa: PLC0415
+            бр = BR.bilet_dlya_signala(
+                potolok_sol=разм["sol"], tx_istochnika=tx_источника or {},
+                istochnik=источник or "", mint=минт or "")
+        except Exception as exc:  # noqa: BLE001
+            бр = {"bilet_sol": None, "ot_rezerva": False,
+                  "rezerv_why_not": f"модуль билета не загружен: {type(exc).__name__}"}
+        из_.update(bilet_sol=бр.get("bilet_sol"), bilet_dolya=бр.get("dolya"),
+                    bilet_ot_rezerva=бр.get("ot_rezerva"),
+                    bilet_rezerv_sol=бр.get("rezerv_sol"),
+                    bilet_rezerv_otkuda=бр.get("rezerv_otkuda"),
+                    bilet_rezerv_vid=бр.get("rezerv_vid"),
+                    bilet_rezerv_why_not=бр.get("rezerv_why_not"))
+        if бр.get("ot_rezerva") and бр.get("bilet_lamporty"):
+            лампорты = int(бр["bilet_lamporty"])
     из_["lamports"] = лампорты
     из_["size_sol"] = лампорты / ЛАМПОРТОВ_В_SOL
     # ЧЕСТНОЕ ИМЯ ПОДШАГА. Всё до этой метки -- разбор сигнала источника и
@@ -11530,6 +11557,42 @@ def self_test() -> int:
                          котировщик=_котировщик(массивы_адреса=[_М2, _М3]))
     chk("DLMM: исходный шаблон не испорчен подстановкой",
         _исх["accounts"][3:] == [_М1, _М2], _исх["accounts"])
+
+    # --- БИЛЕТ ОТ РЕЗЕРВА ВРЕЗАН И ПРИ ДОЛЕ 0 НИЧЕГО НЕ МЕНЯЕТ
+    _бр_было = os.environ.get("BLOOM_BILET_DOLYA")
+    try:
+        import c3_bilet_ot_rezerva as _BR  # noqa: PLC0415
+    except Exception as _e:  # noqa: BLE001
+        _BR = None
+    chk("модуль билета от резерва загружается", _BR is not None,
+        None if _BR is not None else "импорт не удался")
+    if _BR is not None:
+        os.environ.pop("BLOOM_BILET_DOLYA", None)
+        _б0 = _BR.bilet(0.3, 15.0, _BR.dolya())
+        chk("доля по умолчанию 0 -- билет равен потолку группы",
+            _б0.get("ok") and _б0.get("bilet_sol") == 0.3 and not _б0.get("ot_rezerva"),
+            _б0)
+        os.environ["BLOOM_BILET_DOLYA"] = "0.01"
+        _б1 = _BR.bilet(0.5, 15.0, _BR.dolya())
+        chk("доля 1 % от резерва 15 SOL -- билет 0.15, то есть от резерва",
+            _б1.get("bilet_sol") == 0.15 and _б1.get("ot_rezerva"), _б1)
+        _б2 = _BR.bilet(0.5, 100.0, _BR.dolya())
+        chk("резерв большой -- билет остаётся потолком",
+            _б2.get("bilet_sol") == 0.5 and not _б2.get("ot_rezerva"), _б2)
+        if _бр_было is None:
+            os.environ.pop("BLOOM_BILET_DOLYA", None)
+        else:
+            os.environ["BLOOM_BILET_DOLYA"] = _бр_было
+    _тело_бр = Path(__file__).read_text(encoding="utf-8").split("def self_test")[0]
+    # ВРЕЗКА СТОИТ МЕЖДУ РАЗМЕРОМ ГРУППЫ И ИТОГОВЫМИ ЛАМПОРТАМИ -- то есть
+    # билет считается ДО того, как размер ушёл дальше, и до единого
+    # потраченного лампорта. Сравнивать с местом ОПРЕДЕЛЕНИЯ гейта нельзя:
+    # определение стоит выше по файлу, а зовётся гейт позже.
+    _и1 = _тело_бр.index("разм = размер_для_группы(")
+    _и2 = _тело_бр.index("bilet_dlya_signala")
+    _и3 = _тело_бр.index('из_["lamports"] = лампорты')
+    chk("врезка билета стоит между размером группы и итоговыми лампортами",
+        _и1 < _и2 < _и3, (_и1, _и2, _и3))
 
     # --- ОДИН СНИМОК ПУЛА НА ВСЕ ВАРИАНТЫ (кэш чтений)
     _зовы_к = []
