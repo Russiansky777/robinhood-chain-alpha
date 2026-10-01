@@ -24,6 +24,10 @@ name: "Bloom: деплой сторожа продаж на NL-хост (по у
 on:
   workflow_dispatch:
     inputs:
+      zavisshie_fantomy:
+        description: "yes -- разово пропустить ЗАВИСШИЕ позиции, у которых токена на цепи уже нет (фантомы). Открытые позиции не пропускаются ничем. Ставит человек, по умолчанию пусто"
+        required: false
+        default: ""
       vtoroe_mnenie_pervyj_deploj:
         description: "'yes' -- РАЗОВО пропустить гейт «модуль второго мнения загружен» (поле пишет только сторож с этой правкой)"
         required: false
@@ -630,7 +634,7 @@ jobs:
           # ОТДЕЛЬНЫМ ШАГОМ ВПЛОТНУЮ К ПЕРЕЗАПУСКУ: между постановкой прогона в
           # очередь и перезапуском проходят минуты, за них позиция открывается.
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "VTOROE_MNENIE_PERVYJ_DEPLOJ='${{ inputs.vtoroe_mnenie_pervyj_deploj }}' python3 /tmp/pered_perezapuskom_sluzhby.py"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "VTOROE_MNENIE_PERVYJ_DEPLOJ='${{ inputs.vtoroe_mnenie_pervyj_deploj }}' ZAVISSHIE_FANTOMY='${{ inputs.zavisshie_fantomy }}' python3 /tmp/pered_perezapuskom_sluzhby.py"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pered_perezapuskom_sluzhby.py"
 
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
