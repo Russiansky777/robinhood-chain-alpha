@@ -1,0 +1,132 @@
+name: "Лаборатория Miami/AMS: есть ли там НАСТОЯЩИЙ ключ кошелька (только чтение)"
+
+# ЗАЧЕМ. Прогон lab_bootstrap для miami остановился на охране «лаборатория чиста»:
+# она нашла ИМЯ ключа кошелька в файлах /etc или /home. Имя -- не ключ: строка
+# EXEC_WALLET_KEY есть в исходниках репозитория (bloom_jupiter_sell.py и прочих),
+# и клон репозитория на лаборатории даёт то же срабатывание без всякого ключа.
+#
+# ПОЭТОМУ ЗДЕСЬ ДВА ОТВЕТА, И ОНИ РАЗНЫЕ:
+#   1. КАКИЕ ФАЙЛЫ дали срабатывание по имени -- пути, без содержимого;
+#   2. ЕСТЬ ЛИ НАСТОЯЩИЙ КЛЮЧ -- тем же аудитом, что на торговом хосте: любая
+#      строка, которая разбирается как ключ, превращается в ПУБЛИЧНЫЙ адрес, и
+#      сверяется адрес. Сам ключ никуда не печатается.
+#
+# ТОЛЬКО ЧТЕНИЕ. Ничего не удаляется и не правится. Общий ключ не снимается.
+on:
+  workflow_dispatch:
+    inputs:
+      mashina:
+        description: "miami или ams"
+        required: false
+        default: "miami"
+
+concurrency:
+  group: lab-kljuchi-audit
+  cancel-in-progress: false
+
+env:
+  OUT_FILE: data/lab_kljuchi_audit.json
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение и самопроверка аудита ДО сети"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m venv "$RUNNER_TEMP/av"
+          "$RUNNER_TEMP/av/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/av/bin/python" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/av/bin/python" deploy/checks/koshelek_utechka.py --self-test | tail -3
+
+      - name: "Адрес машины и её ключ"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+          KLJUCH_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
+        run: |
+          set -e
+          case "${{ inputs.mashina }}" in
+            miami) HOST=169.128.191.158; JADER=6; KLJUCH="$KLJUCH_MIAMI"; IMJA=VPS_SSH_KEY_MIAMI ;;
+            ams)   HOST=216.73.157.61;   JADER=2; KLJUCH="$KLJUCH_AMS";   IMJA=VPS_SSH_KEY_AMS ;;
+            *) echo "SBOY: mashina dolzhna byt miami ili ams"; exit 1 ;;
+          esac
+          [ -n "$KLJUCH" ] || { echo "SBOY: sekret $IMJA pust"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KLJUCH" > ~/.ssh/lab_key
+          chmod 600 ~/.ssh/lab_key
+          echo "HOST=$HOST" >> "$GITHUB_ENV"
+          echo "JADER_ZHDJOM=$JADER" >> "$GITHUB_ENV"
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "ТОТ ЛИ СЕРВЕР: ядра должны совпасть"
+        run: |
+          set -e
+          set -o pipefail
+          # Промах адресом на аудите ключей безобиден, но отчёт тогда про чужую
+          # машину -- а читать его будут как про эту.
+          J=$(ssh -n $SSH_OPTS root@$HOST "nproc")
+          echo "jader: $J, zhdjom: $JADER_ZHDJOM"
+          [ "$J" = "$JADER_ZHDJOM" ] || { echo "OTKAZ: adres ne tot"; exit 1; }
+          ssh -n $SSH_OPTS root@$HOST "hostname; hostname -I"
+
+      - name: "1. КАКИЕ ФАЙЛЫ дали срабатывание по ИМЕНИ (пути, без содержимого)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$HOST "
+            grep -rlE '(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)' /etc /home 2>/dev/null | head -40
+            echo '--- vsego fajlov ---'
+            grep -rlE '(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)' /etc /home 2>/dev/null | wc -l"
+
+      - name: "2. ЕСТЬ ЛИ НАСТОЯЩИЙ КЛЮЧ: аудит выводом адреса"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$HOST "cat > /tmp/koshelek_utechka.py" < deploy/checks/koshelek_utechka.py
+          # Питон на лаборатории свой; solders может не стоять -- тогда аудит
+          # честно скажет, что ключ не разобрать, а не промолчит.
+          ssh -n $SSH_OPTS root@$HOST "
+            PY=python3
+            if ! python3 -c 'import solders' 2>/dev/null; then
+              python3 -m venv /tmp/av >/dev/null 2>&1 || true
+              /tmp/av/bin/pip install -q solders requests >/dev/null 2>&1 || true
+              [ -x /tmp/av/bin/python ] && PY=/tmp/av/bin/python
+            fi
+            \$PY /tmp/koshelek_utechka.py --puti '/etc,/home,/root' --out /tmp/lab_audit.json >/dev/null 2>&1 || true
+            cat /tmp/lab_audit.json 2>/dev/null || echo '{}'
+            rm -f /tmp/koshelek_utechka.py" > /tmp/lab.json
+          if python3 -c "import json; json.load(open('/tmp/lab.json'))" 2>/dev/null; then
+            cp /tmp/lab.json "$OUT_FILE"; echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: audit ne sobralsja"; head -30 /tmp/lab.json; exit 1
+          fi
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          if [ -f "$OUT_FILE" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"; fi
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f "$OUT_FILE" ]; then git add "$OUT_FILE"; fi
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Lab ${{ inputs.mashina }}: audit kljuchej vyvodom adresa [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
