@@ -88,6 +88,25 @@ from bloom_exec_state import (  # noqa: E402
 ПРЕДЕЛ_ДОГОНА_ПОДПИСЕЙ = 3
 
 
+def программа_пула(pos: dict) -> str | None:
+    """Программа пула НАШЕЙ покупки -- из записи позиции.
+
+    ПОЛЕ В ПОЗИЦИИ НАЗЫВАЕТСЯ program, А НЕ pool_program. Запись делает
+    write_intent (program=тип_пула), а имя pool_program живёт в сборке и в
+    отчётах. Проверки своей продажи читали именно pool_program -- то есть
+    всегда получали None и всегда отказывали словами "не Pump AMM". Это тихий
+    зелёный: гейт не падал и не жаловался, он просто никогда никого не
+    пропускал, и симуляция своей продажи не запускалась ни разу. Читаются оба
+    имени: program -- настоящее, pool_program -- на случай записей, куда его
+    всё же положили.
+    """
+    for имя in ("program", "pool_program"):
+        зн = (pos or {}).get(имя)
+        if зн:
+            return str(зн)
+    return None
+
+
 def кошелёк_позиции(pos: dict) -> str:
     """С какого адреса продаётся эта позиция.
 
@@ -741,6 +760,14 @@ try:  # Своя продажа одной ногой: без модуля ст�
     import bloom_lane_sell as LS
 except Exception:  # noqa: BLE001
     LS = None
+
+# ВТОРОЕ МНЕНИЕ О ЦЕНЕ (правило 4 в редакции владельца 01.10, 11:09). Без
+# модуля сторож работает В ТОЧНОСТИ как раньше: котировка ниже 30 % от входа
+# означает UNSOLD. С модулем -- спрашивает цену того же пула своим строителем.
+try:
+    import bloom_vtoroe_mnenie as VM
+except Exception:  # noqa: BLE001
+    VM = None
 
 ФАЙЛ_СЧЁТА_СИМУЛЯЦИЙ = "own_sell_sim_count.json"
 
@@ -2018,6 +2045,19 @@ class Seller:
                 итог.update(action="продажа через Jupiter отправлена", jupiter=r)
                 return итог
             итог["jupiter"] = r
+            # ПОЛ 30 % -- ПРОВЕРКА МАРШРУТА, А НЕ ПРИГОВОР (правило 4 в редакции
+            # владельца 01.10). Jupiter отказал именно по доле от входа -- значит
+            # спрашиваем цену того же пула своим строителем и продаём тем путём,
+            # который рассудит второе мнение. UNSOLD остаётся только там, где
+            # второго мнения нет или оба пути отказали.
+            if r.get("unsold"):
+                вм = self.правило_4_второе_мнение(
+                    pos, bal=bal, now=now, количество_raw=int(bal.get("raw") or 0),
+                    jup_итог=r)
+                итог["второе_мнение"] = вм
+                if вм.get("ok"):
+                    итог.update(action=f"продажа отправлена путём {вм.get('путь')}")
+                    return итог
             # Не получилось -- идём в UNSOLD ниже, причина уже в журнале.
 
         if по_неудачам or give_up(pos, give_up_after_s=self.give_up_after_s, now=now):
@@ -2381,6 +2421,21 @@ class Seller:
                                f"{now - float(последняя):.0f} с из "
                                f"{self.retry_every_s:.0f}")
             return итог
+        # ОПРОС UNSOLD -- РАЗ В МИНУТУ С НАРАСТАНИЕМ (слово владельца 01.10).
+        # Позиция в UNSOLD круга сторожа (3 с) не стоит: котировка за три
+        # секунды не меняется настолько, чтобы спрашивать её двадцать раз в
+        # минуту, а каждый запрос -- это чужой тариф. Пауза удваивается от 60 с
+        # до потолка. Деньги это не двигает: что продавать и за сколько, решает
+        # та же дорога ниже, только реже.
+        if VM is not None and pos.get("state") == "unsold":
+            оп = VM.пауза_unsold(pos, now=now)
+            итог["опрос_unsold"] = оп
+            if not оп.get("можно"):
+                итог["action"] = оп.get("почему") or "пауза опроса UNSOLD"
+                return итог
+            self.state.update_position(
+                cid, unsold_polls=int(оп.get("опросов") or 0) + 1,
+                ts_unsold_poll=now)
         # СВОЙ СТРОИТЕЛЬ -- ПЕРВЫМ, Jupiter -- ЗАПАСНЫМ (правило 4 и п.3 плана
         # владельца 27.09: "продажа зеркально одной транзакцией токен ->
         # котировка -> SOL по таймеру hold_slots"). Путь по умолчанию выключен,
@@ -2408,7 +2463,7 @@ class Seller:
         # ответит про деньги, а не про раскладку счетов. Отказ симуляции НИЧЕГО
         # не меняет: продаёт Jupiter, как и раньше.
         if LS is not None and симуляций_осталось() > 0 \
-                and pos.get("pool_program") == LS.SB.PUMP_AMM:
+                and программа_пула(pos) == LS.SB.PUMP_AMM:
             try:
                 сим = self.симуляция_своей_продажи(pos, количество_raw=количество)
             except Exception as exc:  # noqa: BLE001
@@ -2460,6 +2515,22 @@ class Seller:
                 sell_address_kind="jupiter")
             итог["action"] = "продажа полосы отправлена"
             return итог
+        if r.get("unsold"):
+            # То же правило 4 и для полосы: её позиция размером группы тоже
+            # попадала в UNSOLD по доле от входа, а пул рядом мог давать цену.
+            вм = self.правило_4_второе_мнение(pos, bal=bal, now=now,
+                                               количество_raw=int(количество),
+                                               jup_итог=r)
+            итог["второе_мнение"] = вм
+            if вм.get("ok"):
+                сл3 = слот_сети_из_признака()
+                self.state.update_position(
+                    cid, state="selling", ts_last_sell_attempt=now,
+                    sell_sent_slot=сл3.get("slot"),
+                    sell_sent_slot_age_s=сл3.get("age_s"),
+                    sell_sent_slot_why_not=сл3.get("why_not"))
+                итог["action"] = f"продажа полосы отправлена путём {вм.get('путь')}"
+                return итог
         итог["action"] = "Jupiter полосе не продал"
         # ТРЕВОГА (слово владельца 27.09, вечер, п.4): "продажа не собралась ни
         # своим путём, ни Jupiter". Одна на позицию: круг повторяется каждые
@@ -2523,8 +2594,8 @@ class Seller:
         if LS is None:
             из_["why_not"] = "модуль своей продажи не загружен"
             return из_
-        if pos.get("pool_program") != LS.SB.PUMP_AMM:
-            из_["why_not"] = f"не Pump AMM: {pos.get('pool_program')}"
+        if программа_пула(pos) != LS.SB.PUMP_AMM:
+            из_["why_not"] = f"не Pump AMM: {программа_пула(pos)}"
             return из_
         подпись = pos.get("lane_landed_signature") or pos.get("lane_signature")
         if not подпись:
@@ -2743,8 +2814,230 @@ class Seller:
             return 0.35
         return з if 0.0 < з < 1.0 else 0.35
 
+    def второе_мнение(self, pos: dict, *, количество_raw: int, jup_lamports) -> dict:
+        """Котировка пула НАШЕЙ покупки против котировки Jupiter. Правило 4.
+
+        Ничего не продаёт и ничего не подписывает: читает резервы пула РОВНО
+        ОДИН раз и возвращает решение, каким путём идти. Шаблон со счетами
+        отдаётся наружу, чтобы своя продажа собралась БЕЗ второго чтения тех же
+        резервов: между котировкой и подписью цена не должна успеть измениться
+        из-за нашей же медлительности.
+        """
+        из_: dict = {"ok": False, "why_not": None, "пул": None, "решение": None,
+                      "шаблон": None}
+        if VM is None:
+            из_["why_not"] = "модуль второго мнения не загружен"
+            return из_
+        if LS is None:
+            из_["why_not"] = "модуль своей продажи не загружен"
+            return из_
+        if программа_пула(pos) != LS.SB.PUMP_AMM:
+            из_["why_not"] = (f"пул нашей покупки не Pump AMM ({программа_пула(pos)}) "
+                               "-- своим строителем его не котировать")
+            return из_
+        подпись = (pos.get("lane_landed_signature") or pos.get("lane_signature")
+                   or pos.get("buy_signature"))
+        if not подпись:
+            из_["why_not"] = "севшей подписи нашей покупки в записи нет -- пул брать негде"
+            return из_
+        tx = self.tx_читатель(подпись)
+        if not tx:
+            из_["why_not"] = "нашей покупки по подписи узел не отдал"
+            return из_
+
+        def остаток(счёт):
+            r = rpc_call("getTokenAccountBalance", [счёт, {"commitment": "processed"}])
+            зн = (((r.get("result") or {}).get("value") or {}).get("amount")
+                  if r.get("ok") else None)
+            try:
+                return int(зн)
+            except (TypeError, ValueError):
+                return None
+
+        пул = VM.котировка_пула(tx_покупки=tx, наш_кошелёк=кошелёк_позиции(pos),
+                                 количество_raw=int(количество_raw),
+                                 остаток_фн=остаток, модуль=LS)
+        из_["пул"] = {к: зн for к, зн in пул.items() if к != "шаблон"}
+        из_["шаблон"] = пул.get("шаблон")
+        реш = VM.решение(jup_lamports=jup_lamports,
+                          пул_lamports=(пул.get("lamports") if пул.get("ok") else None),
+                          вход_sol=pos.get("sol_in"))
+        из_["решение"] = реш
+        из_["ok"] = реш.get("путь") is not None
+        из_["why_not"] = (None if из_["ok"]
+                           else (реш.get("почему") or пул.get("why_not")))
+        return из_
+
+    def продать_своим_в_пул(self, pos: dict, *, now: float, количество_raw: int,
+                             шаблон: dict, минимум_выхода: int) -> dict:
+        """Своя продажа в пул НАШЕЙ покупки: сборка, подпись, отправка.
+
+        Запасной путь правила 4. Зовётся только после второго мнения, и резервы
+        здесь НЕ читаются заново: шаблон и минимум выхода пришли из котировки.
+
+        ОТПРАВКА -- ОБЫЧНЫМ УЗЛОМ, А НЕ Sender. Sender берёт плату чаевыми и без
+        них отказывает, а продажа идёт по таймеру и ни с кем не соревнуется:
+        платить за скорость тут нечем и незачем. Предполётная проверка
+        ВКЛЮЧЕНА намеренно: отказ пула ("liquidity > 0") лучше узнать до того,
+        как подпись потрачена, а не искать её потом в цепи.
+        """
+        cid = pos.get("client_order_id")
+        из_: dict = {"ok": False, "why_not": None, "signature": None,
+                      "route": "свой_в_пул", "минимум_выхода": int(минимум_выхода)}
+        if LS is None:
+            из_["why_not"] = "модуль своей продажи не загружен"
+            return из_
+        if OSW is None:
+            из_["why_not"] = "модуль полосы не загружен -- подписывать нечем"
+            return из_
+        if not шаблон or not шаблон.get("ok"):
+            из_["why_not"] = "шаблона продажи нет"
+            return из_
+        if int(количество_raw) <= 0:
+            из_["why_not"] = f"продавать нечего: количество {количество_raw}"
+            return из_
+        cu = env_int("BLOOM_OWN_SELL_CU", 170_000)
+        приоритет = int(round(OSW.приоритет_sol() * 1e9))
+        сб = LS.собрать_продажу(
+            шаблон=шаблон, наш_кошелёк=кошелёк_позиции(pos),
+            база_в=int(количество_raw), минимум_выхода=int(минимум_выхода),
+            минт_котировки=LS.C.WSOL, cu_units=cu,
+            cu_price_micro=OSW.цена_единицы_cu(приоритет, cu))
+        из_.update(размер_tx=сб.get("size"), инструкций=сб.get("n_instructions"),
+                    закрыт_счёт_wsol=сб.get("закрыт_счёт_wsol"),
+                    приоритет_лампорты=приоритет)
+        if not сб.get("ok"):
+            из_["why_not"] = сб.get("why_not")
+            self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                       "action": "своя продажа в пул не собралась",
+                       "why_not": из_["why_not"], "свой_в_пул": из_})
+            return из_
+        if not self.live:
+            из_.update(why_not="собрано, но живые продажи выключены (dry-run)",
+                        assembled=True)
+            self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                       "action": "своя продажа в пул собрана (dry-run)",
+                       "свой_в_пул": из_})
+            return из_
+        от = rpc_call("getLatestBlockhash", [{"commitment": "confirmed"}])
+        bh = (((от.get("result") or {}).get("value") or {}).get("blockhash")
+              if от.get("ok") else None)
+        if not bh:
+            из_["why_not"] = f"blockhash не получен: {от.get('why_not') or 'пуст'}"
+            return из_
+        под = OSW.подписать(сб["tx_base64"], blockhash=bh,
+                            ожидаемый_кошелёк=кошелёк_позиции(pos),
+                            секрет=ключ_позиции(pos))
+        if not под.get("ok"):
+            из_["why_not"] = f"подпись: {под.get('why_not')}"
+            self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                       "action": "своя продажа в пул не подписана",
+                       "why_not": из_["why_not"]})
+            return из_
+        из_["signature_local"] = под.get("signature")
+        отпр = rpc_call("sendTransaction",
+                         [под["tx_base64"], {"encoding": "base64",
+                                              "skipPreflight": False,
+                                              "maxRetries": 2}])
+        подпись = отпр.get("result") if отпр.get("ok") else None
+        из_["ok"] = bool(подпись)
+        из_["signature"] = подпись
+        if not из_["ok"]:
+            из_["why_not"] = отпр.get("why_not") or "узел не вернул подпись"
+        поля = {"own_pool_sell_min_out": int(минимум_выхода),
+                 "own_pool_sell_why_not": (None if из_["ok"]
+                                            else str(из_["why_not"])[:300]),
+                 "ts_own_pool_sell_try": now}
+        if подпись:
+            поля.update({"own_pool_sell_signature": подпись,
+                          "last_sell_signatures": [подпись],
+                          "sell_address_kind": "свой_в_пул"})
+        self.state.update_position(cid, **поля)
+        self.log({"client_order_id": cid, "mint": pos.get("mint"),
+                   "action": ("своя продажа в пул отправлена" if из_["ok"]
+                               else "своя продажа в пул не ушла"),
+                   "why_not": из_["why_not"], "свой_в_пул": из_})
+        return из_
+
+    def правило_4_второе_мнение(self, pos: dict, *, bal: dict, now: float,
+                                 количество_raw: int, jup_итог: dict) -> dict:
+        """Jupiter дал меньше 30 % от входа. Спросить пул и продать. Правило 4.
+
+        ok=True -- продажа ушла (каким путём, написано в "путь"). ok=False --
+        вызывающий идёт прежней дорогой: UNSOLD и тревога.
+
+        ПОЧЕМУ В ВЕТКЕ "ПАДЕНИЕ НАСТОЯЩЕЕ" ЕСТЬ ВТОРАЯ ПОПЫТКА, А В ВЕТКЕ
+        "МАРШРУТ ПЛОХОЙ" НЕТ. Слово владельца: "свой путь отказал -- UNSOLD и
+        тревога" сказано про плохой маршрут, где Jupiter как раз и не годится.
+        Когда падение настоящее, сказано другое: "продать немедленно по любой
+        цене тем путём, что даёт больше", -- и если тот путь отказал, остаётся
+        второй, а UNSOLD по-прежнему дороже дешёвой продажи.
+        """
+        из_: dict = {"ok": False, "why_not": None, "решение": None, "путь": None}
+        if VM is None or not VM.включено():
+            из_["why_not"] = ("второе мнение выключено"
+                               if VM is not None else "модуль второго мнения не загружен")
+            return из_
+        порог = ((jup_итог.get("floor") or {}).get("checks") or {})
+        jup_lamports = порог.get("out_amount")
+        мн = self.второе_мнение(pos, количество_raw=int(количество_raw),
+                                 jup_lamports=jup_lamports)
+        реш = мн.get("решение") or {}
+        пул = мн.get("пул") or {}
+        из_.update(решение=реш, пул=пул, путь=реш.get("путь"))
+        # В ЗАПИСЬ -- ОБЕ КОТИРОВКИ И ПУТЬ (слово владельца: "в записи:
+        # котировка Jupiter, котировка пула, путь").
+        self.state.update_position(
+            pos.get("client_order_id"),
+            vtoroe_jup_lamports=реш.get("котировка_jupiter_lamports"),
+            vtoroe_pool_lamports=реш.get("котировка_пула_lamports"),
+            vtoroe_pool_po_krivoj=пул.get("по_кривой"),
+            vtoroe_dolya_jup_pct=реш.get("доля_jup_pct"),
+            vtoroe_dolya_pool_pct=реш.get("доля_пула_pct"),
+            vtoroe_porog_pct=реш.get("порог_pct"),
+            vtoroe_put=реш.get("путь"),
+            vtoroe_lyubaya_cena=bool(реш.get("любая_цена")),
+            vtoroe_why_not=(None if реш.get("путь")
+                             else str(мн.get("why_not") or "")[:300]),
+            ts_vtoroe_mnenie=now)
+        self.log({"client_order_id": pos.get("client_order_id"),
+                   "mint": pos.get("mint"), "action": "второе мнение о цене",
+                   "почему": реш.get("почему"), "why_not": мн.get("why_not"),
+                   "второе_мнение": {"решение": реш, "пул": пул}})
+        if not мн.get("ok"):
+            из_["why_not"] = мн.get("why_not")
+            return из_
+        порядок = ([реш["путь"]] if not реш.get("любая_цена")
+                   else [реш["путь"]] + [п for п in (VM.ПУТЬ_СВОЙ, VM.ПУТЬ_JUPITER)
+                                          if п != реш["путь"]])
+        отказы = []
+        for путь in порядок:
+            if путь == VM.ПУТЬ_СВОЙ:
+                мин = ((пул.get("минимум") or {}).get("min_out"))
+                if not мин:
+                    отказы.append("свой путь: минимума выхода нет")
+                    continue
+                r = self.продать_своим_в_пул(pos, now=now,
+                                              количество_raw=int(количество_raw),
+                                              шаблон=мн.get("шаблон"),
+                                              минимум_выхода=int(мин))
+                из_["свой_в_пул"] = r
+            else:
+                r = self.продать_через_jupiter(pos, bal=bal, now=now,
+                                                количество_raw=int(количество_raw),
+                                                любая_котировка=True)
+                из_["jupiter"] = r
+            if r.get("ok"):
+                из_.update(ok=True, путь=путь, why_not=None,
+                            signature=r.get("signature"))
+                return из_
+            отказы.append(f"{путь}: {r.get('why_not')}")
+        из_["why_not"] = "; ".join(отказы) or "продажа не ушла"
+        return из_
+
     def продать_через_jupiter(self, pos: dict, *, bal: dict, now: float,
-                               количество_raw: int | None = None) -> dict:
+                               количество_raw: int | None = None,
+                               любая_котировка: bool = False) -> dict:
         """Продажа через Ultra с полом по выходу. Одна попытка на позицию.
 
         Одна -- намеренно: если Ultra отказала или котировка ниже границы, то
@@ -2766,7 +3059,12 @@ class Seller:
         # по таймеру при любой котировке. Пол 70 % от котировки (минимум выхода
         # в подписанных байтах) не отменяется НИКОМУ -- он защищает не от
         # дешёвой котировки, а от подмены минимума на цепи.
-        любая = продавать_при_любой_котировке(pos)
+        # ЛЮБАЯ КОТИРОВКА -- ДВА РАЗНЫХ ОСНОВАНИЯ, И ОБА ОТ ВЛАДЕЛЬЦА. Первое:
+        # позиции полосы размером 0.01 продаются по таймеру при любой котировке
+        # (25.09). Второе: второе мнение подтвердило, что падение настоящее, --
+        # и тогда пол по доле от входа снят для любой позиции (01.10), потому
+        # что держать в UNSOLD дороже, чем продать дешево.
+        любая = bool(любая_котировка) or продавать_при_любой_котировке(pos)
         r = JUP.продать(mint=pos.get("mint"), amount_raw=сколько,
                          taker=кошелёк_позиции(pos), вход_sol=pos.get("sol_in"),
                          живьём=self.live, секрет=ключ_позиции(pos),
@@ -2788,6 +3086,7 @@ class Seller:
             (ш or {}).get("step") == "execute" for ш in шаги_r)
         поля = {"jup_amount_raw": сколько,
                  "jup_any_quote": любая,
+                 "jup_any_quote_vtoroe": bool(любая_котировка),
                  "jup_attempts": int(pos.get("jup_attempts") or 0) + 1,
                  "jup_reached_network": дошло_до_сети,
                  "jup_floor": (r.get("floor") or {}).get("checks"),
@@ -3599,6 +3898,224 @@ def self_test() -> None:
         else:
             os.environ["BLOOM_SELL_VIA_JUPITER"] = было_вкл
 
+    # --- ПРОГРАММА ПУЛА ЧИТАЕТСЯ ИЗ ПОЛЯ program, А НЕ pool_program
+    chk("программа пула берётся из поля program записи позиции",
+        программа_пула({"program": "PAMM"}) == "PAMM", программа_пула({"program": "PAMM"}))
+    chk("и из pool_program тоже, если оно там есть",
+        программа_пула({"pool_program": "PAMM"}) == "PAMM")
+    chk("пустая запись -- None, а не выдуманная программа",
+        программа_пула({}) is None and программа_пула({"program": None}) is None)
+    _зп_пр = ExecState(base=база / "поле_программы", kill=база / "НЕТ_РУБИЛЬНИКА_ПР")
+    _зп_пр.write_intent(client_order_id="пр1", mint="МП", source_sig="S", source_slot=1,
+                         sol_in=0.01, pool=None, program="PAMM_ТИП", taxed=None,
+                         tax_bps=None, mode="dry-run", sell_after_s=28.8)
+    chk("write_intent кладёт тип пула именно в program -- и помощник его видит",
+        программа_пула(_зп_пр.positions()["пр1"]) == "PAMM_ТИП",
+        {к: зн for к, зн in _зп_пр.positions()["пр1"].items() if "program" in к})
+
+    # --- ВТОРОЕ МНЕНИЕ О ЦЕНЕ (правило 4 в редакции владельца 01.10, 11:09)
+    # Пол 30 % от входа больше не приговор: когда Jupiter даёт меньше, цену того
+    # же пула спрашивает свой строитель, и путь выбирается по двум котировкам.
+    import bloom_jupiter_sell as JV  # noqa: PLC0415
+    import bloom_vtoroe_mnenie as VM2  # noqa: PLC0415
+    было_вм = os.environ.get("BLOOM_SELL_VTOROE_MNENIE")
+    было_вj = os.environ.get("BLOOM_SELL_VIA_JUPITER")
+    старый_jv = JV.продать
+    os.environ["BLOOM_SELL_VIA_JUPITER"] = "1"
+    os.environ["BLOOM_SELL_VTOROE_MNENIE"] = "1"
+    try:
+        sv = Seller(state=st, live=False)
+        sv.tx_читатель = lambda подпись: {"это": "наша покупка"}
+        # ЧТЕНИЕ ПУЛА ПОДМЕНЯЕТСЯ ЦЕЛИКОМ, А РЕШЕНИЕ -- НАСТОЯЩЕЕ. Котировка
+        # пула -- единственное место, которому нужен bloom_lane_sell (а ему --
+        # solders): на раннере деплоя системный python3 его не имеет, и
+        # самопроверка не должна зависеть от того, чем её запустили. Решение же
+        # считает та самая чистая функция, что и в бою.
+        пул_отдаёт = {}
+
+        def мнение_подменой(pos, *, количество_raw, jup_lamports):
+            реш = VM2.решение(jup_lamports=jup_lamports,
+                               пул_lamports=(пул_отдаёт.get("lamports")
+                                              if пул_отдаёт.get("ok") else None),
+                               вход_sol=pos.get("sol_in"))
+            return {"ok": реш.get("путь") is not None,
+                     "why_not": (None if реш.get("путь") else
+                                  (реш.get("почему") or пул_отдаёт.get("why_not"))),
+                     "пул": {к: зн for к, зн in пул_отдаёт.items() if к != "шаблон"},
+                     "шаблон": пул_отдаёт.get("шаблон"), "решение": реш}
+
+        sv.второе_мнение = мнение_подменой
+        # Jupiter всегда отказывает по доле от входа: 12 % при входе 0.001 SOL.
+        JV.продать = lambda **kw: {"ok": False, "unsold": True,
+                                    "why_not": "котировка 12.0 % от входа ниже 30 %",
+                                    "floor": {"checks": {"out_amount": 120_000}},
+                                    "_kw": kw}
+
+        def позицию_вм(cid):
+            st.write_intent(client_order_id=cid, mint=f"М{cid}", source_sig="S",
+                             source_slot=1, sol_in=0.001, pool="ПУЛ",
+                             program=(LS.SB.PUMP_AMM if LS is not None else "PAMM"),
+                             taxed=None, tax_bps=None, mode="dry-run",
+                             sell_after_s=28.8)
+            st.update_position(cid, state="selling", ts_accepted=time.time() - 200,
+                                sell_attempts=2,
+                                ts_last_sell_attempt=time.time() - 100,
+                                lane_landed_signature="НАША_ПОКУПКА")
+            return st.positions()[cid]
+
+        свои = []
+
+        def свой_путь_удачно(pos, *, now, количество_raw, шаблон, минимум_выхода):
+            свои.append({"cid": pos.get("client_order_id"), "кол": количество_raw,
+                          "мин": минимум_выхода})
+            return {"ok": True, "signature": "ПОДПИСЬ_СВОЯ", "route": "свой_в_пул"}
+
+        sv.продать_своим_в_пул = свой_путь_удачно
+
+        # (а) пул даёт 45 % -- маршрут Jupiter плохой, продаём своим путём в пул
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
+            "ok": True, "lamports": 450_000, "гарантированный": 450_000,
+            "по_кривой": 600_000, "минимум": {"ok": True, "min_out": 450_000},
+            "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
+            "why_not": None})
+        п = позицию_вм("vm_маршрут")
+        r = sv.handle(п, balance_reader=читатель(5_000_000))
+        зп = st.positions()["vm_маршрут"]
+        chk("второе мнение: пул 45 % -- продаём своим путём в пул",
+            r.get("action") == "продажа отправлена путём свой_в_пул", r.get("action"))
+        chk("и UNSOLD не ставится", зп.get("state") != "unsold", зп.get("state"))
+        chk("и своему пути передан остаток по цепи и минимум из котировки",
+            свои and свои[-1]["кол"] == 5_000_000 and свои[-1]["мин"] == 450_000, свои)
+        chk("в записи обе котировки и путь",
+            зп.get("vtoroe_jup_lamports") == 120_000
+            and зп.get("vtoroe_pool_lamports") == 450_000
+            and зп.get("vtoroe_put") == "свой_в_пул", {
+                к: зп.get(к) for к in ("vtoroe_jup_lamports", "vtoroe_pool_lamports",
+                                        "vtoroe_put")})
+        chk("в записи обе доли от входа и порог",
+            зп.get("vtoroe_dolya_jup_pct") == 12.0
+            and зп.get("vtoroe_dolya_pool_pct") == 45.0
+            and зп.get("vtoroe_porog_pct") == 30.0, зп.get("vtoroe_dolya_pool_pct"))
+        chk("и цена пула по кривой записана отдельно от гарантированной",
+            зп.get("vtoroe_pool_po_krivoj") == 600_000,
+            зп.get("vtoroe_pool_po_krivoj"))
+        chk("любая цена при плохом маршруте НЕ включается",
+            зп.get("vtoroe_lyubaya_cena") is False, зп.get("vtoroe_lyubaya_cena"))
+
+        # (б) пул не прочитан -- UNSOLD и тревога, а не продажа за бесценок
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
+            "ok": False, "lamports": None, "по_кривой": None, "минимум": None,
+            "шаблон": None, "чтений_резервов": 2, "why_not": "резервы пула не прочитаны"})
+        свои.clear()
+        п = позицию_вм("vm_нет_пула")
+        r = sv.handle(п, balance_reader=читатель(5_000_000))
+        зп = st.positions()["vm_нет_пула"]
+        chk("второе мнение: пул не прочитан -- UNSOLD",
+            зп.get("state") == "unsold", (r.get("action"), зп.get("state")))
+        chk("и своим путём при незнании цены не продаём", свои == [], свои)
+        chk("и причина второго мнения записана словами",
+            "не прочитана" in str(зп.get("vtoroe_why_not")), зп.get("vtoroe_why_not"))
+
+        # (в) оба ниже порога, пул даёт больше -- любая цена, свой путь
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
+            "ok": True, "lamports": 250_000, "гарантированный": 250_000,
+            "по_кривой": 330_000, "минимум": {"ok": True, "min_out": 250_000},
+            "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
+            "why_not": None})
+        свои.clear()
+        п = позицию_вм("vm_падение")
+        r = sv.handle(п, balance_reader=читатель(5_000_000))
+        зп = st.positions()["vm_падение"]
+        chk("второе мнение: оба ниже порога -- продаём немедленно по любой цене",
+            r.get("action") == "продажа отправлена путём свой_в_пул"
+            and зп.get("vtoroe_lyubaya_cena") is True, (r.get("action"), зп.get("vtoroe_lyubaya_cena")))
+
+        # (г) оба ниже порога, больше даёт Jupiter -- идём через него с любой котировкой
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
+            "ok": True, "lamports": 90_000, "гарантированный": 90_000,
+            "по_кривой": 120_000, "минимум": {"ok": True, "min_out": 90_000},
+            "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
+            "why_not": None})
+        зовы_jv = []
+        JV.продать = lambda **kw: (зовы_jv.append(kw) or
+                                    ({"ok": True, "signature": "ПОДПИСЬ_ЛЮБАЯ",
+                                      "floor": {"checks": {"out_amount": 120_000}}}
+                                     if kw.get("мин_доля_от_входа") == 0.0 else
+                                     {"ok": False, "unsold": True,
+                                      "why_not": "котировка 12.0 % от входа ниже 30 %",
+                                      "floor": {"checks": {"out_amount": 120_000}}}))
+        свои.clear()
+        п = позицию_вм("vm_jup_больше")
+        r = sv.handle(п, balance_reader=читатель(5_000_000))
+        зп = st.positions()["vm_jup_больше"]
+        chk("второе мнение: больше даёт Jupiter -- продаём им, пол по входу снят",
+            r.get("action") == "продажа отправлена путём jupiter", r.get("action"))
+        chk("и вторым зовом Jupiter пол по доле от входа передан нулём",
+            len(зовы_jv) == 2 and зовы_jv[1].get("мин_доля_от_входа") == 0.0, зовы_jv)
+        chk("и в записи отмечено, что любая котировка -- от второго мнения",
+            зп.get("jup_any_quote_vtoroe") is True, зп.get("jup_any_quote_vtoroe"))
+        chk("и своим путём при этом не ходили", свои == [], свои)
+
+        # (д) плохой маршрут, свой путь отказал -- UNSOLD и тревога, без Jupiter
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
+            "ok": True, "lamports": 450_000, "гарантированный": 450_000,
+            "по_кривой": 600_000, "минимум": {"ok": True, "min_out": 450_000},
+            "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
+            "why_not": None})
+        зовы_jv.clear()
+        JV.продать = lambda **kw: (зовы_jv.append(kw) or
+                                    {"ok": False, "unsold": True,
+                                     "why_not": "котировка 12.0 % от входа ниже 30 %",
+                                     "floor": {"checks": {"out_amount": 120_000}}})
+        sv.продать_своим_в_пул = lambda pos, **kw: {
+            "ok": False, "why_not": "симуляция пула отказала: liquidity > 0"}
+        п = позицию_вм("vm_свой_отказ")
+        r = sv.handle(п, balance_reader=читатель(5_000_000))
+        зп = st.positions()["vm_свой_отказ"]
+        chk("второе мнение: свой путь отказал при плохом маршруте -- UNSOLD",
+            зп.get("state") == "unsold", (r.get("action"), зп.get("state")))
+        chk("и второго зова Jupiter при плохом маршруте нет",
+            len(зовы_jv) == 1, зовы_jv)
+
+        # (ж) НАСТОЯЩИЙ второе_мнение, без подмены: когда котировать нечем --
+        # отказ словами, а не тихий ноль. Проверяется и там, где модуль своей
+        # продажи не загружен (раннер деплоя), и там, где тип пула не тот.
+        sv_нп = Seller(state=st, live=False)
+        мн_нп = sv_нп.второе_мнение({"program": "ЧУЖАЯ_ПРОГРАММА", "sol_in": 0.001},
+                                     количество_raw=1000, jup_lamports=120_000)
+        chk("второе мнение без годного пула -- отказ словами и без решения",
+            мн_нп["ok"] is False and мн_нп["решение"] is None
+            and мн_нп["why_not"], мн_нп)
+        мн_бп = sv_нп.второе_мнение({"program": (LS.SB.PUMP_AMM if LS is not None
+                                                  else "ЧУЖАЯ"), "sol_in": 0.001},
+                                     количество_raw=1000, jup_lamports=120_000)
+        chk("и без севшей подписи покупки пул не котируется",
+            мн_бп["ok"] is False and мн_бп["пул"] is None, мн_бп)
+
+        # (е) второе мнение выключено -- поведение в точности как было
+        os.environ["BLOOM_SELL_VTOROE_MNENIE"] = "0"
+        зовы_кот = []
+        sv.второе_мнение = lambda pos, **kw: (зовы_кот.append(kw) or
+                                               {"ok": False, "why_not": "не должно зваться"})
+        п = позицию_вм("vm_выкл")
+        r = sv.handle(п, balance_reader=читатель(5_000_000))
+        зп = st.positions()["vm_выкл"]
+        chk("второе мнение выключено -- UNSOLD как прежде и пул не читается",
+            зп.get("state") == "unsold" and зовы_кот == [], (r.get("action"), зовы_кот))
+    finally:
+        JV.продать = старый_jv
+        for имя, знач in (("BLOOM_SELL_VTOROE_MNENIE", было_вм),
+                           ("BLOOM_SELL_VIA_JUPITER", было_вj)):
+            if знач is None:
+                os.environ.pop(имя, None)
+            else:
+                os.environ[имя] = знач
+
     # --- сдача и доклад
     st.update_position("p3", ts_first_sell_attempt=time.time() - 601,
                         ts_last_sell_attempt=time.time() - 601)
@@ -4095,6 +4612,25 @@ def self_test() -> None:
             "Ultra отказала" in
             (st_л.positions()["l_отказ"].get("jup_why_not") or ""),
             st_л.positions()["l_отказ"].get("jup_why_not"))
+
+        # 7а. ОПРОС UNSOLD -- РАЗ В МИНУТУ С НАРАСТАНИЕМ (слово владельца 01.10).
+        # Позиция полосы в UNSOLD остаётся в работе, но круг сторожа (3 с) ей не
+        # нужен: котировку спрашиваем реже, а деньги это не двигает.
+        зовы.clear()
+        в_unsold = полосу_в_состояние(
+            "l_unsold_опрос", "MINT_L8А", куплено=1_000_000,
+            поля={"state": "unsold", "unsold_polls": 1,
+                  "ts_unsold_poll": time.time() - 5})
+        r_оп = sl.handle(в_unsold, balance_reader=читатель(50_000_000))
+        chk("UNSOLD: через 5 с котировку не спрашиваем",
+            зовы == [] and "опрос UNSOLD" in str(r_оп.get("action")), r_оп.get("action"))
+        st_л.update_position("l_unsold_опрос", ts_unsold_poll=time.time() - 120)
+        r_оп2 = sl.handle(st_л.positions()["l_unsold_опрос"],
+                           balance_reader=читатель(50_000_000))
+        chk("UNSOLD: через 120 с спрашиваем", len(зовы) == 1, (зовы, r_оп2.get("action")))
+        chk("и счётчик опросов вырос -- следующая пауза длиннее",
+            int(st_л.positions()["l_unsold_опрос"].get("unsold_polls") or 0) == 2,
+            st_л.positions()["l_unsold_опрос"].get("unsold_polls"))
 
         # 7б. ОТКАЗ ДО ОТПРАВКИ НЕ СТАВИТ ПАУЗУ 45 с. Цена ошибки измерена
         # 28.09: подпись упала (SignerError, в сеть не ушло ничего), и сторож
