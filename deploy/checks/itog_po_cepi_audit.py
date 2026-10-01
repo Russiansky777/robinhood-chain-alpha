@@ -63,6 +63,16 @@ def разбор_времени(текст: str):
     return None
 
 
+def _модуль():
+    """Модуль канонической формулы. Его нет -- считаем своей копией и ГОВОРИМ."""
+    try:
+        import c2_itog_po_cepi as C13  # noqa: PLC0415
+
+        return C13
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def дельты_сделки(tx: dict, кошелёк: str) -> dict:
     """Изменения НАШИХ счетов в одной транзакции, разложенные по смыслу.
 
@@ -359,6 +369,79 @@ def self_test() -> int:
     return 1 if сбоев else 0
 
 
+def дозаполнить(*, state_dir: str, кошелёк: str, с_ts: float,
+                 по_ts: float | None = None, предел: int = 400) -> dict:
+    """ПРАВИЛО 13, п.8: дописать итог по цепи в СТАРЫЕ закрытые записи.
+
+    Пишутся ТОЛЬКО поля итога по цепи и подписи; ни одно денежное поле записи не
+    трогается, состояние позиции не меняется. Журнал позиций append-only, поэтому
+    дозапись -- это новая строка с теми же cid, а не правка прошлой.
+    """
+    из_ = {"посмотрено": 0, "дописано": 0, "уже_было": 0, "не_смогли": 0,
+            "причины": {}, "кошелёк": кошелёк}
+    C13 = _модуль()
+    if C13 is None:
+        из_["почему_нет"] = "модуль c2_itog_po_cepi не загружен"
+        return из_
+    try:
+        import bloom_exec_state as ST  # noqa: PLC0415
+
+        сч = ST.ExecState(base=Path(state_dir))
+        закрыто = ST.STATE_CLOSED
+    except Exception as exc:  # noqa: BLE001
+        из_["почему_нет"] = f"состояние не открылось: {type(exc).__name__}"
+        return из_
+    поз = P11.позиции_полосы(state_dir, с_ts, по_ts)
+    for cid in sorted(поз, key=lambda к: float(поз[к].get("ts_intent") or 0)):
+        п = поз[cid]
+        if п.get("state") != закрыто:
+            continue
+        if из_["посмотрено"] >= int(предел):
+            из_["почему_оборвано"] = f"предел {предел}"
+            break
+        из_["посмотрено"] += 1
+        if isinstance(п.get(C13.ПОЛЕ), (int, float)):
+            из_["уже_было"] += 1
+            continue
+        с_ = строка_аудита(cid, п, кошелёк)
+        if с_.get("итог_по_цепи") is None:
+            из_["не_смогли"] += 1
+            пр = (с_.get("почему_нет") or "неизвестно")[:80]
+            из_["причины"][пр] = из_["причины"].get(пр, 0) + 1
+            try:
+                сч.update_position(cid, **{C13.ПОЛЕ_ПОЧЕМУ: пр})
+            except Exception:  # noqa: BLE001
+                pass
+            continue
+        части = {
+            "покупка": {"все_sol": с_.get("покупка_все_sol"),
+                         "кошелёк_sol": с_.get("покупка_кошелёк_sol"),
+                         "завёрнутое_sol": с_.get("покупка_завёрнутое_sol")},
+            "продажа": {"все_sol": с_.get("продажа_все_sol"),
+                         "кошелёк_sol": с_.get("продажа_кошелёк_sol"),
+                         "завёрнутое_sol": с_.get("продажа_завёрнутое_sol")},
+            "итог_ликвидный_sol": с_.get("ликвидный_по_цепи"),
+            "разница_с_ликвидным_sol": round(
+                float(с_["итог_по_цепи"]) - float(с_["ликвидный_по_цепи"] or 0.0), 9),
+            "дозаполнено": True}
+        try:
+            свежая = сч.update_position(
+                cid, **{C13.ПОЛЕ: с_["итог_по_цепи"], C13.ПОЛЕ_ЧАСТИ: части,
+                         C13.ПОЛЕ_ПОДПИСЬ_ПОКУПКИ: с_.get("подпись_покупки"),
+                         C13.ПОЛЕ_ПОДПИСЬ_ПРОДАЖИ: с_.get("подпись_продажи"),
+                         C13.ПОЛЕ_ПОЧЕМУ: None})
+            св = C13.сверка(свежая or dict(п, **{C13.ПОЛЕ: с_["итог_по_цепи"]}))
+            сч.update_position(cid,
+                                lane_chain_sverka_sol=св.get("расхождение_sol"),
+                                lane_chain_sverka_ok=св.get("сверено"))
+            из_["дописано"] += 1
+        except Exception as exc:  # noqa: BLE001
+            из_["не_смогли"] += 1
+            пр = f"запись не легла: {type(exc).__name__}"
+            из_["причины"][пр] = из_["причины"].get(пр, 0) + 1
+    return из_
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--state-dir", default="")
@@ -367,6 +450,8 @@ def main() -> int:
     ap.add_argument("--po", default="")
     ap.add_argument("--predel", type=int, default=400)
     ap.add_argument("--out", default="")
+    ap.add_argument("--zapisat", action="store_true",
+                     help="дозаполнить итог по цепи в старые закрытые записи")
     ap.add_argument("--self-test", action="store_true")
     а = ap.parse_args()
     if а.self_test:
@@ -384,6 +469,15 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"OTKAZ: адрес полосы не спрошен ({type(exc).__name__})")
             return 2
+    if а.zapisat:
+        д = дозаполнить(state_dir=(а.state_dir or "."), кошелёк=кошелёк,
+                         с_ts=с_ts, по_ts=разбор_времени(а.po), предел=а.predel)
+        print("# Правило 13, дозаполнение итога по цепи")
+        print(json.dumps(д, ensure_ascii=False, indent=1))
+        if а.out:
+            Path(а.out).write_text(json.dumps(д, ensure_ascii=False, indent=2),
+                                    encoding="utf-8")
+        return 0
     о = аудит(state_dir=(а.state_dir or "."), кошелёк=кошелёк, с_ts=с_ts,
                по_ts=разбор_времени(а.po), предел=а.predel)
     печать(о)

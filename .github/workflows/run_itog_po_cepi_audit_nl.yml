@@ -33,6 +33,10 @@ on:
         description: "предел строк таблицы (защита от многочасового прогона)"
         required: false
         default: "400"
+      zapisat:
+        description: "'yes' -- ДОЗАПОЛНИТЬ итог по цепи в старые закрытые записи (п.8); пишутся только поля итога и подписи"
+        required: false
+        default: "no"
 
 concurrency:
   group: itog-po-cepi-audit
@@ -93,7 +97,16 @@ jobs:
           [ -n "${{ inputs.koshelek }}" ] && KOSH="--koshelek ${{ inputs.koshelek }}"
           # Кошелёк полосы скрипт спрашивает у bloom_own_send (env OWN_SEND_WALLET);
           # не ответил -- ОТКАЗ словами, а не счёт по чужому адресу.
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/itog_po_cepi_audit.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $KOSH --predel '${{ inputs.predel }}' --out $RABOTA/out.json" | tail -200
+          ZAP=""
+          if [ "${{ inputs.zapisat }}" = yes ]; then ZAP="--zapisat"; fi
+          # ЗАПИСЬ -- ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ. Журнал позиций принадлежит bot, и
+          # дозапись от root сделала бы строки, которых служба потом не сможет
+          # переписать. Чтение идёт тем же путём, разницы нет.
+          if [ -n "$ZAP" ]; then
+            ssh -n $SSH_OPTS root@$TARGET_HOST "chmod 644 $RABOTA/*.py; set -a; . $ENV_DIR/env; set +a; cd $KOD_HOSTA && sudo -u bot -E env PYTHONPATH=$KOD_HOSTA:$RABOTA BLOOM_CODE_DIR=$KOD_HOSTA $PY_HOSTA $RABOTA/itog_po_cepi_audit.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $KOSH --predel '${{ inputs.predel }}' $ZAP --out $RABOTA/out.json" | tail -200
+          else
+            ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/itog_po_cepi_audit.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $KOSH --predel '${{ inputs.predel }}' --out $RABOTA/out.json" | tail -200
+          fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/itog_po_cepi.json || true
           if python3 -c "import json; json.load(open('/tmp/itog_po_cepi.json'))" 2>/dev/null; then
             cp /tmp/itog_po_cepi.json "$OUT_FILE"
