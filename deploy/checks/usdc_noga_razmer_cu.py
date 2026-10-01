@@ -71,6 +71,43 @@ def наша_таблица(каталог: str | None) -> dict:
     return из_
 
 
+def модуль_рядом(имя: str) -> dict:
+    """Загрузить модуль ИЗ ФАЙЛА РЯДОМ СО СКРИПТОМ, если он там лежит.
+
+    ЗАЧЕМ ТАК, А НЕ import. На хосте рядом со скриптом лежит ДОСТАВЛЕННЫЙ модуль,
+    а в PYTHONPATH стоит ещё и код службы. Три прогона подряд (06:47, 06:49, 06:52Z)
+    брали копию службы, хотя каталог прогона стоял в путях первым -- и замер шёл по
+    коду БЕЗ входа для нашей таблицы адресов. Чем именно её обходило -- не важно:
+    загрузка по ЯВНОМУ пути не зависит от порядка путей вовсе.
+    """
+    из_ = {"ok": False, "модуль": None, "путь": None, "откуда": None,
+            "why_not": None}
+    рядом = Path(__file__).resolve().parent / f"{имя}.py"
+    if рядом.exists():
+        try:
+            import importlib.util  # noqa: PLC0415
+
+            спец = importlib.util.spec_from_file_location(имя, рядом)
+            м = importlib.util.module_from_spec(спец)
+            sys.modules[имя] = м
+            спец.loader.exec_module(м)
+            из_.update(ok=True, модуль=м, путь=str(рядом), откуда="рядом со скриптом")
+            return из_
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = (f"модуль рядом не загрузился: "
+                               f"{type(exc).__name__}: {str(exc)[:140]}")
+            return из_
+    try:
+        import importlib  # noqa: PLC0415
+
+        м = importlib.import_module(имя)
+        из_.update(ok=True, модуль=м, путь=getattr(м, "__file__", None),
+                    откуда="по путям (рядом со скриптом файла нет)")
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"модуль не нашёлся: {type(exc).__name__}"
+    return из_
+
+
 def образцы(путь: str | None, *, UN) -> dict:
     """Живые образцы: из НАЗВАННОГО файла плюс DAMM v2 из образцов пулов службы.
 
@@ -369,6 +406,12 @@ def self_test() -> int:
         об_н = образцы(str(КОРЕНЬ / "нет-такого.json"), UN=UN)
         chk("названного файла нет -- отказ словами, а не тихий ноль рядов",
             об_н["ok"] is False and "нет" in (об_н["why_not"] or ""), об_н)
+        м_р = модуль_рядом("c2_usdc_noga")
+        chk(f"модуль USDC-ноги загружен ({м_р.get('откуда')}), и вход таблицы у него есть",
+            м_р["ok"] and "nashi_tablicy" in м_р["модуль"].sobrat.__code__.co_varnames,
+            (м_р.get("why_not"), м_р.get("путь")))
+        chk("несуществующего модуля рядом -- отказ словами, а не тихая подмена",
+            модуль_рядом("нет_такого_модуля_совсем")["ok"] is False)
         chk("у сборки USDC-ноги есть вход для НАШЕЙ таблицы адресов",
             "nashi_tablicy" in UN.sobrat.__code__.co_varnames,
             UN.sobrat.__code__.co_varnames)
@@ -405,8 +448,14 @@ def main() -> int:
     # упал на AttributeError уже на хосте (06:42Z). Имена, которыми пользуется
     # main(), теперь проверяются самопроверкой.
     import c2_shadow_build as SH  # noqa: PLC0415
-    import c2_usdc_noga as UN  # noqa: PLC0415
     import solana_rpc_client as RPC  # noqa: PLC0415
+
+    # МОДУЛЬ USDC-НОГИ -- ИЗ ФАЙЛА РЯДОМ СО СКРИПТОМ, если он доставлен.
+    _м = модуль_рядом("c2_usdc_noga")
+    if not _м.get("ok"):
+        print(f"ОТКАЗ: модуль USDC-ноги не загрузился: {_м.get('why_not')}")
+        return 2
+    UN = _м["модуль"]
 
     наш = а.koshelek or OS.кошелёк_полосы()
     предел_cu = а.predel_cu or OS.предел_cu("two_step")
@@ -416,7 +465,9 @@ def main() -> int:
     # ОТКУДА ВЗЯЛСЯ МОДУЛЬ -- В ОТЧЁТ. Прогон 06:47Z упал на том, что sobrat() не
     # знал входа nashi_tablicy: взялась копия с хоста, а не доставленная. Молча
     # измерить не тем модулем -- значит измерить не то, что поедет в бой.
-    ответ["модуль_usdc_nogi"] = getattr(UN, "__file__", None)
+    ответ["модуль_usdc_nogi"] = _м.get("путь")
+    ответ["модуль_откуда"] = _м.get("откуда")
+    ответ["пути_поиска"] = sys.path[:5]
     ответ["вход_nashi_tablicy_есть"] = (
         "nashi_tablicy" in UN.sobrat.__code__.co_varnames)
     if not ответ["вход_nashi_tablicy_есть"]:
