@@ -1,202 +1,209 @@
 {
  "ok": true,
- "метка": "2026-09-27T20:23:10Z",
- "живёт_с": "2026-09-27T20:21:48Z",
- "hash": "2caba2a7c834",
- "mtime_utc": "2026-09-27T20:19:14Z",
+ "метка": "2026-10-01T18:22:22Z",
+ "живёт_с": "2026-10-01T17:15:18Z",
+ "hash": "1a018ec4849c",
+ "mtime_utc": "2026-10-01T10:06:16Z",
  "тревога": null,
  "why_not": null,
  "в_файле": {
   "leader": 1,
-  "batch5": 8,
+  "batch5": 12,
   "lane_s0": 10,
   "off": 9,
-  "log_only": 557
+  "log_only": 574,
+  "sniper_src": 2,
+  "kandidaty": 6,
+  "cand1": 9
  },
  "подписано": {
-  "batch5": 8,
-  "off": 13,
+  "batch5": 12,
   "leader": 1,
   "lane_s0": 10,
-  "log_only": 557
+  "sniper_src": 2,
+  "kandidaty": 6,
+  "cand1": 9,
+  "off": 2
  },
- "источников": 589,
- "сигналов": 434,
+ "источников": 625,
+ "сигналов": 176034,
  "к_покупке": 0,
- "обрывов_подписки": 0,
+ "обрывов_подписки": 2,
  "способ_подписки": "transactionSubscribe",
- "кредитов_за_сеанс": 3094,
+ "кредитов_за_сеанс": 104248,
  "по_кодам": {
-  "NOT_A_BUY": 332,
-  "TARGET_AMOUNT_OUT_OF_RANGE": 68,
-  "TOKEN_RECEIVED_NOT_BOUGHT": 19,
-  "INSUFFICIENT_BALANCE": 8,
-  "STALE": 3,
-  "THRESHOLD_EDGE": 1,
-  "SKIP_TARGET_INCREASE_POSITION": 3
+  "NOT_A_BUY": 173716,
+  "TOKEN_RECEIVED_NOT_BOUGHT": 150,
+  "TARGET_AMOUNT_OUT_OF_RANGE": 76,
+  "INSUFFICIENT_BALANCE": 21,
+  "STALE": 2045,
+  "SKIP_TARGET_INCREASE_POSITION": 25,
+  "THRESHOLD_EDGE": 1
  },
  "площадка_не_звана_по_группе": 0,
  "полоса": {
   "enabled": true,
   "live": true,
-  "sent": 0,
+  "sent": 10,
   "by_stage": {
-   "gate": 8
+   "sent": 10,
+   "gate": 3,
+   "two_step_build": 5,
+   "build": 3
   },
   "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
-  "balance_sol": 6.07907666,
+  "balance_sol": 2.997643212,
   "limits": {
    "open": 1,
    "per_day": 50,
    "open_by_group": {
     "batch5": 3,
+    "cand1": 3,
+    "kandidaty": 1,
     "lane_s0": 3,
     "leader": 3,
     "log_only": 1,
-    "off": 1
+    "off": 1,
+    "sniper_src": 3
    },
    "size_sol": 0.05,
+   "ceiling_sol": 0.5,
    "stop_failed_in_row": 5,
    "stop_loss_sol": 0.3
   },
   "last": {
-   "stage": "gate",
+   "stage": "two_step_build",
    "ok": false,
-   "why_not": "предел полосы: по группе log_only полоса не торгует (lane_trades выключен)",
+   "why_not": "котировка пула не SOL -- полоса только одношаговая",
    "signature": null,
-   "pool_program": null,
-   "ts_utc": "2026-09-27T20:23:10Z"
+   "pool_program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+   "ts_utc": "2026-10-01T18:20:16Z"
   },
   "balance_day_threshold": {
    "ok": true,
    "kill": false,
-   "why": "просадка от 00:00 -0.035366 SOL при пороге 2.0",
+   "why": "просадка от 00:00 -0.887979 SOL при пороге 2.0",
    "threshold_sol": 2.0,
-   "day": "20260927",
-   "open_sol": 6.043711064,
-   "balance_sol": 6.07907666,
-   "drop_sol": -0.035365596
+   "day": "20261001",
+   "open_sol": 2.10966446,
+   "balance_sol": 2.997643212,
+   "drop_sol": -0.887978752,
+   "withdrawals_sol": 0.0,
+   "withdrawals_n": 0
   },
   "lane_daily_stop": {
    "threshold_sol": 1.5,
-   "pnl_all_groups_sol": -0.089780738,
+   "pnl_all_groups_sol": 0.892946671,
    "stopped": false,
    "why_not": null
   }
  },
  "рубильник": false,
  "рубильник_почему": "путь рубильника доступен на чтение",
- "баланс_исполнителя_sol": 0.000810942,
+ "баланс_исполнителя_sol": 0.0,
  "рубильник_площадки": false,
  "кэш_ног": {
   "enabled": true,
-  "pools": 57,
+  "pools": 17,
   "templates": {
-   "7ga6rtE9qSb3wdEiDCpTu2kHqoGVfT52jD8ign1rYTvx": {
-    "age_s": 1.6,
-    "flipped": false,
-    "sig": "2Xqe55LSdJ7RXsfWdoHgbNFQ83vf16x4dz6fWvBT3zUW21fvzuQTjD93LiiSur5Dp5nvGPBabtNAKydP6Ywdb5bo"
-   },
-   "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN": {
-    "age_s": 0.2,
-    "flipped": false,
-    "sig": "2dmeR3LAU2QcbKPKWaKRtr7Ny5g2ZBp3LWSXUCArb5awxrLd9hCAYTV5UZmbpZXrVXbtEd4yq7CPG6TBozEN6b4N"
-   },
-   "6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx": {
-    "age_s": 0.2,
-    "flipped": false,
-    "sig": "2KB8EzMs49un2rH38MLw71URk7jj4jjMi7ftb6PpgkhDNyZrbW1yB3gLbcu4Mz7jNAea5SWtgip1PJL1qqHagAxn"
-   },
-   "HTmQz7My6MehV7bjhJ6jde8nDND1yvsz68d24LP7YgUQ": {
-    "age_s": 20.3,
-    "flipped": true,
-    "sig": "2YMaNvpRECkzxQzE5mjC8FioD5pCqFTS5g5qq8dMHmnk1zsn2k8ouDQbmNXmCumJuMeudkscnbJVc2UaXXei4kUu"
-   },
-   "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
-    "age_s": 43.2,
-    "flipped": false,
-    "sig": "5ZHipG9irGmnQh1D1aQhUTxuUH6eTiHBGaYkUj9SzLK8Cs7afjYfntFhUprxwtAW5CuKE5Y54P2mLDhdcmnCby3U"
-   },
-   "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
-    "age_s": 7.5,
-    "flipped": false,
-    "sig": "2fYnz1HFooB5x2cvJ9UUQhivTTvTQjd1BedetmhnntLLYLcA9ypNez7WEyex1chSif1MgDhi2256XxBZPyygwWYB"
-   },
-   "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw": {
-    "age_s": 70.7,
-    "flipped": true,
-    "sig": "64erRAHoBXuRLGsu7PpNTAkHkaJb8JJVp2L6w58E76knyJokRp82E5JDkgNW9echfimUMhb7A7WaZdRdhTXd4utn"
-   },
-   "4rkGWJNSUPBcMicXMRAzohEyeJLFG8gUjwiWaz7Pddr3": {
-    "age_s": 15.3,
-    "flipped": true,
-    "sig": "Uqjm1osCob4J7qc6mW9m5BHJPxvW4BrzfvxDaQ7wXEJcdj65evLEgufSbyLgbs8UjsZvJfnSMzvfqmTxELAMw5u"
-   },
-   "DJTu7vi8norVzdVAffgvb39VP7wjKeTsgaMBJrzfxvoF": {
-    "age_s": 25.9,
-    "flipped": false,
-    "sig": "4w6NSF5U4FZLcqikh6v5gZxCfXUwskq7dX8VKnrzTtNo7tUMPnKTRJTVmzC2VuNZTcFXWvLs56DaUdphwSomwyNq"
-   },
-   "RBLXDGRD64AtRamHMFVcjqne3Ar7NLWtFtYNtsrf1cE": {
-    "age_s": 1.5,
-    "flipped": false,
-    "sig": "5BxFgEryVkKV6124XPrRpnDd86jNe9C9zKx6tEqXzisdJSRexEs63vPBsjCwXZEd9dxv4yuLr8yqHGq4vhaGvp5m"
-   },
-   "WXMRyRZhsa19ety5erZhHg4N3xj3EVN92u94422teJp": {
-    "age_s": 16.2,
-    "flipped": true,
-    "sig": "3aXQvCtARh9JNUDEtG9WssMENFt98vXv3vJQ25cJgmNzXe8oUvYcHydjqeY8z78aJcL9jToVWL8eMANKPfQCoW1r"
-   },
-   "METvsvVRapdj9cFLzq4Tr43xK4tAjQfwX76z3n6mWQL": {
-    "age_s": 0.7,
-    "flipped": true,
-    "sig": "3YsJeBLG98cSdqjL3bjxpGvvATx8xzUJSfLxo9fqFVv1xNVXSYNmWyvX8mANVKDzwnfTfB4b8J4ZkvVsvKGJuEHC"
-   },
-   "HcRLc9VDgjLeK154xDawfb1dmVJ98DoSqcwTHGqiDeJR": {
-    "age_s": 15.4,
-    "flipped": true,
-    "sig": "oKqveFYmvaC9ZiF4ZdhxDj8SNqYxmYFxCGyg9MwdxkC3zVdwunR1AnsDPMLAoNRd26rVRtwzja9wTtSSSTAkTr2"
-   },
    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-    "age_s": 0.3,
+    "age_s": 2.4,
     "flipped": false,
-    "sig": "4AYxVzkZ92DXbbUQeH8yKJ5LKeRA2NfU3ZasofNLdgjNdAhJm64WXyMxMwiEEyxt7fkFUc1m1gzvSiAr398vnBDs"
+    "sig": "AtW7W2vP7hBeXQqKmG3NQKhjK4SdbQPJYSitiN9GVrS3HqKjF4YAh66MfsBNa8h6kAoc594Pn6aUAuEzYh2hafq"
+   },
+   "Cm6fNnMk7NfzStP9CZpsQA2v3jjzbcYGAxdJySmHpump": {
+    "age_s": 4.4,
+    "flipped": false,
+    "sig": "E4AmJYTqBcbcLDMNMYZZnwkLsXjQct39xGWWbfEow63TA2bgJo7uns5kVSB1Q7BNH4BVwNNneMfvZzRgyVGaNqc"
    },
    "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2": {
-    "age_s": 1.7,
+    "age_s": 46.9,
     "flipped": false,
-    "sig": "58YY8xR5H5PtAkGpPuRYXa2nLKQh6YyapTKCVWSaQ9ARBABRtNYgh53S5oCNiQ5sdmygSExRsZjUdd4efEdVYE4u"
+    "sig": "5gwdAb4bSW7LxkANckFKkz5QodiKjSmAAFUnAHZMsEMx5oRcSG9wi5mB4qmFXo9vQtQ49mk7Y7vcoHPoGMVhxFks"
    },
-   "HgcxVs6kJhPAaGqnPNGaa7zYgNT49hJrLufiqcNMuYZT": {
-    "age_s": 0.2,
-    "flipped": true,
-    "sig": "4eMy8nvKSho8s8aTPghy6hCTzkskXp2jQFrAtjdtJSWznNHgdeVA4BjGtkJucNpPc48NTDMARRbC1uCMvYapTqZi"
+   "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump": {
+    "age_s": 24.4,
+    "flipped": false,
+    "sig": "nghWo2tPNafJssSMuZtXKkudjLvSskteUVWVcbP7tNaHS5qmadho2VYJMiJYNF5Ur8trQEuWeE1CCNtcTxQ1hCK"
+   },
+   "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
+    "age_s": 0.3,
+    "flipped": false,
+    "sig": "36GZybAxg6qaYAqis9s3pGRftTuhTDpMjdYuTLRgyPBSMMsojW2gA9W1PTwwied8Uh3KfZunMFCZ2Z5CUe2MUwGs"
+   },
+   "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": {
+    "age_s": 863.6,
+    "flipped": false,
+    "sig": "3apd6xtnaXG7DsdViPpzuQPtKntSW63rKFDtJKPm3z4WTucHS7byMsSRqnU3NeMmKajEscbSdSYNSW1GzvChyzU1"
+   },
+   "AywAYdNJnSLSXwKWYxDciPjqGRnwp4iZdQptuuQTpump": {
+    "age_s": 19.1,
+    "flipped": false,
+    "sig": "2Jo5NsayZxZzwi2Qm89aYVMzwK9ixJMgLpGneKxVmXAaV26D4SpPABgo5aWTbaQGc4aLZEXfy72oWNqprECQGsMA"
+   },
+   "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump": {
+    "age_s": 46.9,
+    "flipped": false,
+    "sig": "4Ghravo87Frc3vz3364quAXaGUD8UX8Lx6p6CoDCB3Vm1dNrjZijeowZDHA7U32sJkb1wnUv4y3W98EHzp5AEWCU"
+   },
+   "8J69rbLTzWWgUJziFY8jeu5tDwEPBwUz4pKBMr5rpump": {
+    "age_s": 24.4,
+    "flipped": false,
+    "sig": "3GPxttdWmAx5yHJktmaNxV9iQWvSG9kqbE5X5k9Borzg8VKvGKbH9ZsJ3qhdZb9zfvwvFHPYr7xQwgSKYS4dcBUq"
+   },
+   "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
+    "age_s": 14.1,
+    "flipped": false,
+    "sig": "5TcpKeoWE7EFsmNUSGPjbuDgyw4Cm5qA1fH8SRw9spN77bZMBPJNmnFc4cAaF3S6BNh6HA9FC23s5GjSmwgU4w2m"
+   },
+   "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump": {
+    "age_s": 71.0,
+    "flipped": false,
+    "sig": "3GqDyczTEgWWEJzTfs4b7qZEv1b9CNYt7orGE6dpJbk7QS5Wa4N8ihZx7acpmf4GseJQm97W46cS8VfSHNBMs68k"
+   },
+   "DitHyRMQiSDhn5cnKMJV2CDDt6sVct96YrECiM49pump": {
+    "age_s": 452.1,
+    "flipped": false,
+    "sig": "dR7jTosX84yE6nXKFPYqU1FfatLbTUfQ2HagSqTBEkD2xn3C4cH9zaHDPzxn5kcPcG1r9xUqmGRZPzEBHbEA5v5"
+   },
+   "4N4DnNo3qpPks9aQCkcWkzoir8tnvT6diS4TnnZibonk": {
+    "age_s": 2.2,
+    "flipped": false,
+    "sig": "uk58hCpiJpz3mKDATcaJaBBUmxgDkpmGxLmaVxZwYK4zVgT6vdsYvqKFsnkpv27ZFgDNgkDw4ypQxYQLrpL9JA7"
+   },
+   "7n8kRipxAQBfpGQtcGA2AbkM2HASSVCzqZ5F3QEopump": {
+    "age_s": 1566.6,
+    "flipped": false,
+    "sig": "aEfd2CAmZNuGDZn4XRbTRDki2DUhuen3jatJDsGvLHsdQ4b9twD1axvpwo4gyitLuUQRnWqX23bCkbZxv3QKxTk"
+   },
+   "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": {
+    "age_s": 1422.3,
+    "flipped": false,
+    "sig": "3mFLdGM54LsKYWKsFHzbQvzxAwvgg7myReDaMdrnfNKre9B8bd71m37m1k1Ba1cNA6UvyqRVLDeBNe895qn7ByTn"
    }
   },
-  "fed": 1061,
+  "fed": 13036,
   "no_tx": 0,
   "failed": 0,
-  "luts": 138,
-  "luts_pending": 24,
-  "luts_warmed": 32,
+  "luts": 675,
+  "luts_pending": 0,
+  "luts_warmed": 18,
   "warm_why_not": "",
-  "luts_topped_up": 106,
+  "luts_topped_up": 657,
   "top_up_why_not": "",
-  "bytes": 27128880,
-  "credits": 518,
-  "credits_day": 55318,
-  "credits_before_start": 54800,
+  "bytes": 383646946,
+  "credits": 7318,
+  "credits_day": 146718,
+  "credits_before_start": 139400,
   "credits_write_why_not": "",
   "credit_budget": 0,
   "credit_cap": "нет потолка",
   "dropped": false,
   "dropped_why": "",
   "ingest_stats": {
-   "шаблона нет": 81,
-   "новый шаблон": 44,
-   "новый шаблон (из продажи, перевёрнут)": 27,
-   "не своп / счета не зависят от цены -- шаблон подтверждён": 988,
-   "своп без шаблона -- шаблон не подтверждён": 1
+   "новый шаблон": 2493,
+   "шаблона нет": 167,
+   "не своп / счета не зависят от цены -- шаблон подтверждён": 10825
   }
  },
  "двухшаговый": {
@@ -210,7 +217,7 @@
   "enabled": true,
   "format2": false,
   "format3": true,
-  "sent": 0,
+  "sent": 12,
   "failed": 0,
   "last_error": ""
  }
