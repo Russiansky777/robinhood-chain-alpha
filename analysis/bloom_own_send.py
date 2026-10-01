@@ -640,6 +640,15 @@ def потолок_группы(группа: str | None) -> dict:
             из_["stop_loss_sol"] = float(п["stop_loss_sol"])
         if п.get("day_cap_sol") is not None:
             из_["day_cap_sol"] = float(п["day_cap_sol"])
+        # ПОЛЕ ГРУППЫ СИЛЬНЕЕ ВХОДА. is not None, а не "or": ноль -- осмысленный
+        # запрет (группа не торгует вовсе), и подменять его умолчанием нельзя.
+        # Мусор в поле не превращается в запрет: число не разобралось -- остаётся
+        # общий предел, и причина видна в самом файле групп.
+        if п.get("per_day") is not None:
+            try:
+                из_["per_day"] = int(п["per_day"])
+            except (TypeError, ValueError):
+                из_["per_day_spor"] = п.get("per_day")
         return из_
     потолок, стоп = ПОТОЛОК_СУТОК_СКОРОСТИ_SOL, СТОП_УБЫТОК_СКОРОСТИ_SOL
     try:
@@ -4077,7 +4086,11 @@ def позиция_зависла(p: dict, *, сейчас: float) -> bool:
         return (float(сейчас) - float(основа)) > float(СРОК_ЗАВИСАНИЯ_S)
     except (TypeError, ValueError):
         return False
-ЛИМИТ_В_СУТКИ = 50
+# СКОЛЬКО СДЕЛОК В СУТКИ РАЗРЕШЕНО ПОЛОСЕ. Было жёсткое 50 в коде: 01.10 в
+# 05:16:42Z cand1 упёрся в него и молчал до сброса суток по Мадриду, то есть
+# шестнадцать часов. Теперь это ВХОД, и его можно поднять без деплоя; поле
+# группы per_day сильнее входа (слово владельца 01.10, 11:24: "cand1 = 150").
+ЛИМИТ_В_СУТКИ = ST.env_int("BLOOM_LANE_DAY_LIMIT", 50)
 СТОП_ПОДРЯД_УПАВШИХ = 5
 СТОП_УБЫТОК_SOL = 0.3
 
@@ -10139,6 +10152,53 @@ def self_test() -> int:
                                DLMM_П) == 0)
 
         д0 = размер_первой_двухшаговой({}, ПОЛНЫЙ)
+        # --- СУТОЧНЫЙ ПРЕДЕЛ: ВХОД И ПОЛЕ ГРУППЫ (слово владельца 01.10, 11:24)
+        _пр_было = os.environ.pop("BLOOM_LANE_DAY_LIMIT", None)
+        try:
+            chk("предел суток берётся входом, и умолчание прежнее 50",
+                ST.env_int("BLOOM_LANE_DAY_LIMIT", 50) == 50
+                and ЛИМИТ_В_СУТКИ == ST.env_int("BLOOM_LANE_DAY_LIMIT", 50),
+                (ЛИМИТ_В_СУТКИ, ST.env_int("BLOOM_LANE_DAY_LIMIT", 50)))
+            os.environ["BLOOM_LANE_DAY_LIMIT"] = "150"
+            chk("вход 150 читается входом, а не из кода",
+                ST.env_int("BLOOM_LANE_DAY_LIMIT", 50) == 150)
+        finally:
+            os.environ.pop("BLOOM_LANE_DAY_LIMIT", None)
+            if _пр_было is not None:
+                os.environ["BLOOM_LANE_DAY_LIMIT"] = _пр_было
+        # ПОЛЕ ГРУППЫ per_day СИЛЬНЕЕ ВХОДА -- на ЗАПИСАННОМ файле групп, а не на
+        # заглушке: читается тот же загрузчик, которым живёт служба.
+        import json as _js  # noqa: PLC0415
+        import tempfile as _tf  # noqa: PLC0415
+
+        import bloom_source_groups as _SG  # noqa: PLC0415
+
+        with _tf.TemporaryDirectory() as _д:
+            _ф = str(Path(_д) / "groups.json")
+            Path(_ф).write_text(_js.dumps({"groups": {
+                "cand1": {"lane_size": 0.1, "lane_trades": True, "per_day": 150,
+                           "addresses": ["АдресОдин"]},
+                "batch5": {"lane_size": 0.3, "lane_trades": True,
+                            "addresses": ["АдресДва"]},
+                "кривой": {"lane_size": 0.1, "lane_trades": True,
+                            "per_day": "сто пятьдесят", "addresses": ["АдресТри"]},
+            }}, ensure_ascii=False), encoding="utf-8")
+            _было_путь = os.environ.get("BLOOM_SOURCE_GROUPS_FILE")
+            os.environ["BLOOM_SOURCE_GROUPS_FILE"] = _ф
+            try:
+                _SG.загрузить(_ф, заново=True) if "заново" in \
+                    _SG.загрузить.__code__.co_varnames else _SG.загрузить(_ф)
+                chk("per_day из файла групп доходит до политики",
+                    _SG.политика("cand1", _ф).get("per_day") == 150,
+                    _SG.политика("cand1", _ф))
+                chk("у группы без поля per_day остаётся None (действует вход)",
+                    _SG.политика("batch5", _ф).get("per_day") is None)
+                chk("мусор в per_day не становится запретом: число не разобралось",
+                    _SG.политика("кривой", _ф).get("per_day") == "сто пятьдесят")
+            finally:
+                os.environ.pop("BLOOM_SOURCE_GROUPS_FILE", None)
+                if _было_путь is not None:
+                    os.environ["BLOOM_SOURCE_GROUPS_FILE"] = _было_путь
         chk("двухшаговых не было -- первая по 0.01, и причина названа",
             д0["lamports"] == 10_000_000 and д0["first"] is True and д0["why"],
             д0)
