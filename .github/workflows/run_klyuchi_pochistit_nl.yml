@@ -1,0 +1,134 @@
+name: "Ключи: стереть копии env, права 600, убрать EXEC_WALLET_KEY"
+
+# ЗАЧЕМ (слово владельца 01.10 вечером, п.2). Ключ кошелька Bloom 4s87RRC2 утёк,
+# Bloom выключен с 27.09, и его ключу в окружении делать нечего. Ключ полосы
+# ротации не требует -- слово владельца 18:31: LIVE никуда не импортировался.
+#
+# ПОРЯДОК ЖЁСТКИЙ, И ПО УМОЛЧАНИЮ ПРОГОН ТОЛЬКО ЧИТАЕТ:
+#   1. копии env.bak.*: сколько, какие, какие ИМЕНА переменных в каждой;
+#   2. ПРОБА: копия живого env БЕЗ строки ключа, и по ней -- собственная проверка
+#      старта КАЖДОЙ из пяти служб. Живой env и сами службы не трогаются;
+#   3. только по слову steret=STERET -- стереть копии и поставить 600;
+#      только по слову ubrat_kljuch=UBRAT -- убрать строку ключа, и ТОЛЬКО если
+#      ни одна служба в пробе её не потребовала и проба вышла у всех.
+#
+# ЗНАЧЕНИЙ КЛЮЧЕЙ НЕТ НИГДЕ: ни в журнале прогона, ни в отчёте -- только имена,
+# пути, числа и права. Отдельная проверка отчёта стоит в конце.
+#
+# ИМЕНА ПЕРЕМЕННЫХ ИЗ КОПИЙ ПИШУТСЯ В ОТЧЁТ ДО СТИРАНИЯ. Копии -- единственное
+# место, откуда можно узнать, что в окружении когда-то было; стереть их, не
+# записав имён, значит потерять этот список навсегда.
+on:
+  workflow_dispatch:
+    inputs:
+      steret:
+        description: "ровно STERET -- стереть копии env.bak.* и поставить 600"
+        required: false
+        default: "net"
+      ubrat_kljuch:
+        description: "ровно UBRAT -- убрать строку EXEC_WALLET_KEY из живого env"
+        required: false
+        default: "net"
+
+concurrency:
+  group: klyuchi-pochistit
+  cancel-in-progress: false
+
+env:
+  ENV_FILE: /etc/bloom-executor/env
+  TARGET_HOST: 127.0.0.1
+  RABOTA: /tmp/klyuchi_pochistit
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/klyuchi_pochistit.json
+
+jobs:
+  klyuchi:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО всего"
+        run: |
+          set -e
+          set -o pipefail
+          python3 deploy/checks/klyuchi_pochistit.py --self-test | tail -3
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Команды проверки служб -- ИЗ systemd, а не из моей памяти"
+        run: |
+          set -e
+          set -o pipefail
+          # ExecStart читается у самой службы: угадывать путь к её файлу нельзя,
+          # а список флагов проверки берётся по имени файла -- у каждой службы он
+          # свой (grpc_feed_probe умеет только --self-test).
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            for U in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
+              E=\$(systemctl show -p ExecStart --value \$U 2>/dev/null | sed -n 's/.*argv\[\]=\([^;]*\);.*/\1/p')
+              [ -z \"\$E\" ] && E=\$(systemctl show -p ExecStart --value \$U 2>/dev/null)
+              echo \"\$U|\$E\"
+            done" > /tmp/execstart.txt
+          cat /tmp/execstart.txt
+          python3 deploy/checks/sluzhby_iz_systemd.py /tmp/execstart.txt > /tmp/sluzhby.txt
+          echo "SLUZHBY=$(cat /tmp/sluzhby.txt)" >> "$GITHUB_ENV"
+          echo "собрано проб: $(tr ';' '\n' < /tmp/sluzhby.txt | grep -c '=' || true)"
+
+      - name: "Чтение, проба без ключа и -- только по слову -- правки"
+        run: |
+          set -e
+          set -o pipefail
+          FLAGI=""
+          if [ "${{ inputs.steret }}" = "STERET" ]; then FLAGI="$FLAGI --steret-kopii --prava-600"; fi
+          if [ "${{ inputs.ubrat_kljuch }}" = "UBRAT" ]; then FLAGI="$FLAGI --ubrat-kljuch"; fi
+          echo "flagi dejstvij: ${FLAGI:-net, tolko chtenie}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 700 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/klyuchi_pochistit.py" < deploy/checks/klyuchi_pochistit.py
+          # СВОДКА СТРОКАМИ -- В ЖУРНАЛ ПРОГОНА, JSON -- ОТДЕЛЬНЫМ ВЫЗОВОМ.
+          # Смешивать их в один поток нельзя: тогда файл отчёта перестаёт быть
+          # разбираемым JSON, и проверка "ключей в отчёте нет" его не прочтёт.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            $PY_HOSTA $RABOTA/klyuchi_pochistit.py --env $ENV_FILE \
+              --sluzhby '$SLUZHBY' $FLAGI --out $RABOTA/out.json --kratko"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json" > /tmp/kl.json
+          if python3 -c "import json; json.load(open('/tmp/kl.json'))" 2>/dev/null; then
+            cp /tmp/kl.json "$OUT_FILE"; echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: svodka ne sobralas"; head -40 /tmp/kl.json; exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          if [ -f "$OUT_FILE" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"; fi
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f "$OUT_FILE" ]; then git add "$OUT_FILE"; fi
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Kljuchi: kopii env, prava, EXEC_WALLET_KEY [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
