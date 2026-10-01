@@ -116,7 +116,7 @@ on:
         required: false
         default: "1"
       nochnye:
-        description: "пары ключ=значение через запятую: close_on_sell, tg_format, region_send, lane_max_pool_fee, copiers_file (у workflow_dispatch предел 25 входов, поэтому одной строкой)"
+        description: "пары ключ=значение через запятую: close_on_sell, tg_format, region_send, lane_max_pool_fee, copiers_file, vtoroe_mnenie_pervyj_deploj (у workflow_dispatch предел 25 входов, поэтому одной строкой)"
         required: false
         default: "close_on_sell=0,tg_format=,region_send=0,lane_max_pool_fee=0.05,copiers_file=/home/bot/bloom_executor_live_data/kopirovshchiki.json"
 
@@ -1027,7 +1027,15 @@ jobs:
           # ним: между постановкой прогона в очередь и перезапуском проходят
           # минуты, и за них позиция успевает открыться.
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
+          # РАЗОВОЕ РАЗРЕШЕНИЕ ГЕЙТА -- ИЗ ОДНОСТРОЧНОГО ВХОДА nochnye: у
+          # workflow_dispatch предел 25 входов, и он уже выбран. Разбираем ровно
+          # ту же строку, что и ночные флаги, и ничего не добавляем в список.
+          VMP="no"
+          case ",${{ inputs.nochnye }}," in
+            *,vtoroe_mnenie_pervyj_deploj=yes,*) VMP="yes" ;;
+          esac
+          echo "razovoe razreshenie gejta vtorogo mnenija: $VMP"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "VTOROE_MNENIE_PERVYJ_DEPLOJ='$VMP' python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pered_perezapuskom_sluzhby.py"
 
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
