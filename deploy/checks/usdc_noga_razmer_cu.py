@@ -32,7 +32,10 @@ import sys
 from pathlib import Path
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(КОРЕНЬ / "analysis"))
+# СВОЙ КАТАЛОГ -- ПЕРВЫМ. На хосте рядом со скриптом лежат доставленные модули, и
+# они обязаны перебить копии службы: иначе замер пойдёт по старому коду.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(1, str(КОРЕНЬ / "analysis"))
 
 ПРЕДЕЛ_ПАКЕТА = 1232
 ФАЙЛ_ALT = "usdc_noga_alt.json"
@@ -405,6 +408,20 @@ def main() -> int:
     import c2_usdc_noga as UN  # noqa: PLC0415
     import solana_rpc_client as RPC  # noqa: PLC0415
 
+    # ОТКУДА ВЗЯЛСЯ МОДУЛЬ -- В ОТЧЁТ. Прогон 06:47Z упал на том, что sobrat()
+    # не знал входа nashi_tablicy: взялась копия с хоста, а не доставленная.
+    # Молча измерить не тем модулем -- значит измерить не то, что поедет в бой.
+    ответ["модуль_usdc_nogi"] = getattr(UN, "__file__", None)
+    ответ["вход_nashi_tablicy_есть"] = (
+        "nashi_tablicy" in UN.sobrat.__code__.co_varnames)
+    if not ответ["вход_nashi_tablicy_есть"]:
+        print(f"ОТКАЗ: модуль USDC-ноги взят из {ответ['модуль_usdc_nogi']} -- у его "
+              "sobrat() нет входа nashi_tablicy, то есть НАША таблица в сборку не "
+              "попадёт, и замер сказал бы «не влезает» по своей же причине")
+        if а.out:
+            Path(а.out).write_text(json.dumps(ответ, ensure_ascii=False, indent=1),
+                                    encoding="utf-8")
+        return 2
     наш = а.koshelek or OS.кошелёк_полосы()
     предел_cu = а.predel_cu or OS.предел_cu("two_step")
     клиент = RPC.SolanaRpc(service="usdc_noga_razmer_cu")
