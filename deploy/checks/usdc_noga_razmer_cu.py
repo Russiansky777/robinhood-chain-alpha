@@ -68,6 +68,56 @@ def наша_таблица(каталог: str | None) -> dict:
     return из_
 
 
+def образцы(путь: str | None, *, UN) -> dict:
+    """Живые образцы: из НАЗВАННОГО файла плюс DAMM v2 из образцов пулов службы.
+
+    ПУТЬ НУЖЕН ЯВНО. `c2_usdc_noga._obrazcy` ищет файл в data РЯДОМ С КОДОМ
+    СЛУЖБЫ (c2_common.DATA = ../data от модуля), а на хосте это /home/bot/data --
+    то есть каталог службы, а не прогона. Из-за этого первый прогон разобрал НОЛЬ
+    сделок и честно сказал «не знаю»: файла там просто не было. Писать образцы в
+    каталог службы ради замера нельзя, поэтому путь передаётся входом.
+
+    DAMM v2 всё равно берётся через модуль: его ряды лежат в образцах пулов самой
+    службы (data/c2_pool_samples), и дублировать их в прогон незачем.
+    """
+    из_ = {"ok": False, "why_not": None, "ряды": [], "из_файла": 0,
+            "damm2_из_службы": 0, "почему_службы": None}
+    ряды = []
+    if путь:
+        п = Path(путь)
+        if not п.exists():
+            из_["why_not"] = f"файла образцов нет: {п}"
+            return из_
+        try:
+            д = json.loads(п.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"файл образцов не разобран: {type(exc).__name__}"
+            return из_
+        ряды = [dict(р) for р in (д.get("ряды") or [])]
+        из_["из_файла"] = len(ряды)
+    сл = {}
+    try:
+        сл = UN._obrazcy()
+    except Exception as exc:  # noqa: BLE001
+        из_["почему_службы"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+    if isinstance(сл, dict):
+        из_["почему_службы"] = из_["почему_службы"] or сл.get("why_not")
+        свои = {(р.get("сделка") or "") + "|" + (р.get("пул") or "") for р in ряды}
+        for р in (сл.get("ryady") or []):
+            ключ = (р.get("сделка") or "") + "|" + (р.get("пул") or "")
+            if ключ in свои:
+                continue
+            ряды.append(dict(р))
+            if р.get("tip") == "DAMM v2":
+                из_["damm2_из_службы"] += 1
+    if not ряды:
+        из_["why_not"] = (из_["why_not"] or из_["почему_службы"]
+                           or "живых образцов не нашлось ни в файле, ни у службы")
+        return из_
+    из_.update(ok=True, ряды=ряды)
+    return из_
+
+
 def cu_по_цепи(rpc_call, tx_base64: str) -> dict:
     """CU у ЦЕПИ: simulateTransaction. Нет ответа -- так и говорим."""
     из_ = {"ok": False, "cu": None, "why_not": None, "ошибка_симуляции": None}
@@ -309,6 +359,13 @@ def self_test() -> int:
             and all(len(str(р.get('сделка') or '')) > 40 for р in со_сделкой)
             and all(р.get("пул") for р in из_пула),
             (о.get("why_not"), len(ряды), len(со_сделкой), len(из_пула)))
+        об_ф = образцы(str(КОРЕНЬ / "data" / "c3_usdc_noga"
+                            / "obrazcy_usdc_noga.json"), UN=UN)
+        chk(f"образцы читаются из НАЗВАННОГО файла: {об_ф.get('из_файла')} рядов",
+            об_ф["ok"] and об_ф["из_файла"] >= 30, об_ф)
+        об_н = образцы(str(КОРЕНЬ / "нет-такого.json"), UN=UN)
+        chk("названного файла нет -- отказ словами, а не тихий ноль рядов",
+            об_н["ok"] is False and "нет" in (об_н["why_not"] or ""), об_н)
         chk("у сборки USDC-ноги есть вход для НАШЕЙ таблицы адресов",
             "nashi_tablicy" in UN.sobrat.__code__.co_varnames,
             UN.sobrat.__code__.co_varnames)
@@ -328,6 +385,9 @@ def main() -> int:
                     help="предел CU (0 -- взять из BLOOM_LANE_CU_TWO_STEP полосы)")
     р.add_argument("--tipov", default="", help="только эти типы, через запятую")
     р.add_argument("--predel", type=int, default=0, help="не больше N сделок")
+    р.add_argument("--obrazcy", default="",
+                    help="путь к obrazcy_usdc_noga.json (иначе только то, что "
+                          "найдёт сама служба в своём каталоге data)")
     р.add_argument("--out", default="")
     а = р.parse_args()
     if а.self_test:
@@ -374,8 +434,17 @@ def main() -> int:
     # load_luts, и подделка дала бы "влезает" там, где в бою таблиц не нашлось.
     кэш = SH.LegCache({}, клиент.call, allow_polling=True)
     ответ["влито_записей_ноги"] = статичные.влить(кэш)
-    о = UN._obrazcy()
-    ряды = о.get("ryady") or []
+    об = образцы(а.obrazcy or None, UN=UN)
+    ответ["образцы"] = {к: об.get(к) for к in
+                         ("ok", "why_not", "из_файла", "damm2_из_службы",
+                          "почему_службы")}
+    ряды = об.get("ряды") or []
+    if not ряды:
+        print(f"ОТКАЗ: живых образцов нет -- {об.get('why_not')}")
+        if а.out:
+            Path(а.out).write_text(json.dumps(ответ, ensure_ascii=False, indent=1),
+                                    encoding="utf-8")
+        return 2
     только = {т.strip() for т in (а.tipov or "").split(",") if т.strip()}
     if только:
         ряды = [р for р in ряды if р.get("tip") in только]

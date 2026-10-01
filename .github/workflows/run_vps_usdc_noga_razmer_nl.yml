@@ -97,7 +97,7 @@ jobs:
           [ "${{ inputs.predel_cu }}" != "0" ] && [ -n "${{ inputs.predel_cu }}" ] && ARG="$ARG --predel-cu ${{ inputs.predel_cu }}"
           # PYTHONPATH: сначала каталог прогона (наш свежий модуль и образцы),
           # потом код службы. Порядок важен -- иначе возьмётся модуль хоста.
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $RABOTA && PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA $RABOTA/usdc_noga_razmer_cu.py --state-dir $STATE_DIR $ARG --out $RABOTA/out.json" 2>&1 | tail -70
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $RABOTA && PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA $RABOTA/usdc_noga_razmer_cu.py --state-dir $STATE_DIR --obrazcy $RABOTA/data/c3_usdc_noga/obrazcy_usdc_noga.json $ARG --out $RABOTA/out.json" 2>&1 | tail -70
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/usdc_noga_razmer_cu.json || true
           if python3 -c "import json; json.load(open('/tmp/usdc_noga_razmer_cu.json'))" 2>/dev/null; then
             cp /tmp/usdc_noga_razmer_cu.json "$OUT_FILE"
