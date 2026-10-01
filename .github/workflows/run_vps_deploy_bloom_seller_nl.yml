@@ -214,7 +214,7 @@ jobs:
           # solana_rpc_client -- ради УЖЕ согласованной модели кредитов Helius.
           # Без него службы работают, но расход не попадает в учёт, и
           # почасовая проверка кредитов смотрит на четверть картины.
-          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_own_send.py bloom_lane_two_step.py bloom_lane_sell.py bloom_vtoroe_mnenie.py; do
+          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_own_send.py bloom_lane_two_step.py bloom_lane_sell.py bloom_vtoroe_mnenie.py c3_bilet_ot_rezerva.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
@@ -244,12 +244,24 @@ jobs:
           # Включить путь и не положить ключ -- значит получить сторожа,
           # который каждый раз отказывается продавать по причине "нет ключа".
           # Лучше остановить деплой здесь и сказать это прямо.
-          [ -n "$EXEC_WALLET_KEY" ] || {
-            echo "СБОЙ: via_jupiter=1, но секрет EXEC_WALLET_KEY пуст."
-            echo "Владелец кладёт приватный ключ кошелька исполнителя в секрет"
-            echo "репозитория EXEC_WALLET_KEY (base58 или массив байтов)."
-            exit 1; }
-          echo "ключ кошелька в секрете есть (значение не печатается)"
+          #
+          # НО КЛЮЧ МОЖЕТ ЖИТЬ НА ХОСТЕ, А НЕ В СЕКРЕТЕ (слово владельца 01.10):
+          # после замены на свежий ключ пустого кошелька секрет репозитория
+          # удаляется, и единственная копия остаётся в /etc/bloom-executor/env.
+          # Поэтому отказ только когда ключа нет НИ ТАМ, НИ ТАМ -- иначе прогон
+          # падал бы при полностью рабочем стенде.
+          if [ -z "$EXEC_WALLET_KEY" ]; then
+            NA_HOSTE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sed -n 's/^EXEC_WALLET_KEY=//p' $ENV_DIR/env | tail -1 | wc -c" || echo 0)
+            echo "секрета нет; длина строки ключа на хосте: $NA_HOSTE"
+            [ "$NA_HOSTE" -gt 1 ] || {
+              echo "СБОЙ: via_jupiter=1, а ключа нет ни в секрете, ни на хосте."
+              echo "Ключ кладётся либо в секрет EXEC_WALLET_KEY, либо прогоном"
+              echo "run_klyuchi_pochistit_nl.yml со словом svezhij_kljuch=SVEZHIJ."
+              exit 1; }
+            echo "ключ берётся С ХОСТА (значение не печатается)"
+          else
+            echo "ключ кошелька в секрете есть (значение не печатается)"
+          fi
           # В систему ставить нельзя: на своём раннере python3 помечен
           # externally-managed (PEP 668), и pip отказывается -- ровно на этом
           # упал прогон 36042078292. Ставим во временное окружение прогона.
@@ -314,6 +326,16 @@ jobs:
           echo "LIVE_BUY_PREV=$LB" >> $GITHUB_ENV
           echo "BUY_SOL_PREV=$BS" >> $GITHUB_ENV
           echo "LOG_CHAT_PREV=$LG" >> $GITHUB_ENV
+          # КЛЮЧ КОШЕЛЬКА: ПРЕЖНЮЮ СТРОКУ С ХОСТА СОХРАНЯЕМ (слово владельца
+          # 01.10, вечер). Причина: 01.10 EXEC_WALLET_KEY заменён свежим ключом
+          # НОВОГО кошелька, который никогда не пополняется, а секрет
+          # репозитория владелец удаляет -- значит хост остаётся ЕДИНСТВЕННЫМ
+          # местом, где этот ключ есть. Перезапись env без переноса стёрла бы
+          # его молча, как уже стирала ключ Jupiter V2. Длина, не значение.
+          EK=$(echo "$PREV" | sed -n 's/^EXEC_WALLET_KEY=//p' | tail -1)
+          echo "прежний EXEC_WALLET_KEY: длина ${#EK}"
+          echo "::add-mask::$EK"
+          echo "EXEC_KEY_PREV=$EK" >> $GITHUB_ENV
 
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
@@ -329,7 +351,7 @@ jobs:
           MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '2' }}
           TELEGRAM_LIVE_TEST: ${{ github.event.inputs.telegram_live_test || '1' }}
           VIA_JUPITER: ${{ github.event.inputs.via_jupiter || '0' }}
-          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY || env.EXEC_KEY_PREV }}
         run: |
           set -e
           ssh -n $SSH_OPTS root@$TARGET_HOST "
@@ -360,7 +382,14 @@ jobs:
             # ТОЛЬКО когда путь включён: лишнего ключа на хосте быть не
             # должно. В логи он не попадает -- пишется через переменную.
             echo "BLOOM_SELL_VIA_JUPITER=$VIA_JUPITER"
-            if [ "$VIA_JUPITER" = "1" ]; then echo "EXEC_WALLET_KEY=$EXEC_WALLET_KEY"; fi
+            # ПУСТЫМ НЕ ПИШЕМ НИКОГДА: пустая строка означала бы "ключ есть,
+            # но пустой" -- это хуже отсутствия, путь продажи считал бы себя
+            # готовым. И не смотрим на via_jupiter: ключ принадлежит пустому
+            # кошельку, который никогда не пополняется, а потерять единственную
+            # его копию нельзя -- секрета репозитория может уже не быть.
+            if [ -n "$EXEC_WALLET_KEY" ]; then
+              echo "EXEC_WALLET_KEY=$EXEC_WALLET_KEY"
+            fi
             # Ключ Swap V2. Есть ключ -> путь swap-v2, Ultra запасной; нет
             # ключа -> Ultra. Пустым его писать нельзя: пустая строка в env
             # означала бы "ключ есть", а он пустой.

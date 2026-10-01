@@ -213,6 +213,21 @@ def из_решений(state_dir: str, cids: set, *, с_ts: float = 0.0) -> dic
                 в["nalog_marshruta_bps"] = нал["route_transfer_fee_bps"]
             if з.get("pool_fee_share") is not None:
                 в["komissiya_pula_pct"] = round(float(з["pool_fee_share"]) * 100, 4)
+            # РЕЗЕРВ ПУЛА И БИЛЕТ -- В ВЫГРУЗКУ (та самая строка, которую назвал
+            # Code-3 в docs/bilet_ot_rezerva_kak_vstroit.md, п.3: без неё замер
+            # билета по НАШИМ сделкам считать нечем -- резерва в выгрузке не было
+            # ни у одного ряда из 79, и это свойство выгрузки, а не пулов).
+            if з.get("pool_reserve_sol") is not None:
+                в["pool_reserve_sol"] = з["pool_reserve_sol"]
+                в["pool_reserve_kind"] = з.get("pool_reserve_kind")
+            if з.get("pool_reserve_sol_eq") is not None and в.get("pool_reserve_sol") is None:
+                в["pool_reserve_sol"] = з["pool_reserve_sol_eq"]
+                в["pool_reserve_kind"] = з.get("pool_reserve_kind") or "двухшаговый"
+            for поле_б in ("bilet_sol", "bilet_dolya", "bilet_ot_rezerva",
+                            "bilet_rezerv_sol", "bilet_rezerv_otkuda",
+                            "bilet_rezerv_vid", "bilet_rezerv_why_not"):
+                if з.get(поле_б) is not None:
+                    в[поле_б] = з[поле_б]
             # СТРОИТЕЛЬ -- ВТОРЫМ ИСТОЧНИКОМ (слово владельца 29.09, п.5: в
             # sdelki_polosy строитель должен быть заполнен везде). В записи
             # позиции он лежит в program, но у сделок до правки брони поля там
@@ -610,6 +625,22 @@ def main() -> int:
             "nalog_tokena_bps": п.get("tax_bps"),
             "nalog_marshruta_bps": None,
             "komissiya_pula_pct": None,
+            # РЕЗЕРВ ПУЛА НА ВХОДЕ И БИЛЕТ ОТ РЕЗЕРВА: в записи позиции их нет,
+            # они живут в журнале решений и дозаполняются ниже.
+            "pool_reserve_sol": None,
+            "pool_reserve_kind": None,
+            "bilet_sol": None,
+            "bilet_dolya": None,
+            "bilet_ot_rezerva": None,
+            "bilet_rezerv_sol": None,
+            "bilet_rezerv_otkuda": None,
+            "bilet_rezerv_vid": None,
+            "bilet_rezerv_why_not": None,
+            # ИТОГ ПО ЦЕПИ БЕЗ РАСПАКОВКИ WSOL и прежнее нативное число рядом:
+            # по ним видно, какие сделки сменили итог после правки учёта 01.10.
+            "itog_po_cepi_sol": п.get("closed_sol_net"),
+            "itog_po_cepi_nativ_sol": п.get("closed_sol_net_native"),
+            "wsol_delta_sol": п.get("closed_wsol_delta"),
             "freeze_authority": None,
             "freeze_authority_otozvan": None,
             "state": п.get("state"),
@@ -647,7 +678,11 @@ def main() -> int:
         д = решения.get(ряд["cid"]) or {}
         for поле in ("nalog_tokena_bps", "nalog_marshruta_bps",
                       "komissiya_pula_pct", "freeze_authority",
-                      "freeze_authority_otozvan", "stroitel", "stroitel_otkuda"):
+                      "freeze_authority_otozvan", "stroitel", "stroitel_otkuda",
+                      "pool_reserve_sol", "pool_reserve_kind",
+                      "bilet_sol", "bilet_dolya", "bilet_ot_rezerva",
+                      "bilet_rezerv_sol", "bilet_rezerv_otkuda",
+                      "bilet_rezerv_vid", "bilet_rezerv_why_not"):
             if ряд.get(поле) is None and д.get(поле) is not None:
                 ряд[поле] = д[поле]
                 добрано_чисел += 1
@@ -954,7 +989,7 @@ def main() -> int:
     по_цепи = sum(1 for р_ in ряды if р_.get("итог_откуда") == "цепь")
     не_сверено = sum(1 for р_ in ряды if р_.get("sverka_ok") is False)
     свод = {"снято_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-             "версия": "pravilo13",
+             "версия": "pravilo13b",
              "итог_канонический": "итог_po_cepi_sol (сумма изменений ВСЕХ наших "
                                    "счетов по двум подписям); итог_po_polyam_sol "
                                    "-- прежний счёт по полям",
@@ -1092,6 +1127,21 @@ def самопроверка() -> int:
             not нет_в_модуле, нет_в_модуле)
     else:
         chk("модуль отправки найден для сверки имён полей региона", False, путь_модуля)
+    # --- РЕЗЕРВ, БИЛЕТ И ИТОГ БЕЗ РАСПАКОВКИ: поля есть в ряду И переносятся
+    # из журнала решений (та самая строка из дока Code-3, п.3).
+    свой = open(os.path.abspath(__file__), encoding="utf-8").read()
+    рабочая_в = свой.split("def self_test")[0]
+    нужные_поля = ("pool_reserve_sol", "pool_reserve_kind", "bilet_sol",
+                    "bilet_ot_rezerva", "itog_po_cepi_sol",
+                    "itog_po_cepi_nativ_sol", "wsol_delta_sol")
+    нет_поля = [и for и in нужные_поля if f'"{и}"' not in рабочая_в]
+    chk("резерв, билет и итог без распаковки -- поля ряда выгрузки", not нет_поля, нет_поля)
+    chk("резерв переносится из журнала решений, а не выдумывается",
+        'з.get("pool_reserve_sol")' in рабочая_в
+        and 'з.get("pool_reserve_sol_eq")' in рабочая_в, None)
+    chk("версия выгрузки pravilo13b -- по ней Code-2 отличит пересчитанный файл",
+        '"версия": "pravilo13b"' in рабочая_в, None)
+
     print(f"самопроверка выгрузки сделок полосы: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 

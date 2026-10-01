@@ -29,6 +29,14 @@ on:
         description: "ровно UBRAT -- убрать строку EXEC_WALLET_KEY из живого env"
         required: false
         default: "net"
+      svezhij_kljuch:
+        description: "ровно SVEZHIJ -- заменить EXEC_WALLET_KEY свежим ключом НОВОГО кошелька (его не пополнять)"
+        required: false
+        default: "net"
+      perezapusk:
+        description: "'yes' -- перезапустить службы после замены ключа (только при нуле позиций)"
+        required: false
+        default: "no"
 
 concurrency:
   group: klyuchi-pochistit
@@ -110,6 +118,46 @@ jobs:
             echo "SBOY: svodka ne sobralas"; head -40 /tmp/kl.json; exit 1
           fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "СВЕЖИЙ EXEC_WALLET_KEY (новый кошелёк, не пополнять) -- только по слову"
+        if: ${{ inputs.svezhij_kljuch == 'SVEZHIJ' }}
+        # ЗАЧЕМ ИМЕННО ЗАМЕНА. Слово владельца 01.10, вечер: "EXEC_WALLET_KEY не
+        # удалять, а заменить свежим ключом (новый кошелёк, никогда не
+        # пополнять)". Прежний ключ -- ключ кошелька 4s87RRC2..., с которого
+        # 06:52:54Z ушли 0.024620982 SOL не владельцем.
+        #
+        # ПИТОНА В YAML ЗДЕСЬ НЕТ (правило 12): вся работа -- в репозиторном
+        # модуле deploy/checks/svezhij_exec_kljuch.py, который и генерирует пару,
+        # и пишет env атомарно, и перечитывает файл для сверки адреса. Приватный
+        # ключ не печатается ни в поток, ни в отчёт: только адрес.
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 700 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/svezhij_exec_kljuch.py" < deploy/checks/svezhij_exec_kljuch.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_FILE; set +a
+            BLOOM_CODE_DIR=/home/bot/bloom_executor \
+            PYTHONPATH=/home/bot/bloom_executor \
+            $PY_HOSTA $RABOTA/svezhij_exec_kljuch.py --env $ENV_FILE \
+              --podtverzhdenie SVEZHIJ --trebovat-nol-pozicij \
+              --out $RABOTA/svezhij.json" | tee /tmp/svezhij.json
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f $RABOTA/svezhij_exec_kljuch.py"
+
+      - name: "Перезапуск служб после замены ключа (по слову, при нуле позиций)"
+        if: ${{ inputs.svezhij_kljuch == 'SVEZHIJ' && inputs.perezapusk == 'yes' }}
+        # Гейт нуля позиций стоит В МОДУЛЕ выше: без нуля он отказывает и этот
+        # шаг не выполняется вовсе (шаг выше падает, job останавливается).
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            systemctl restart bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe
+            sleep 5
+            for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
+              printf '%s: ' \$S
+              systemctl is-active \$S || { echo 'SBOY: ne podnyalas'; exit 1; }
+            done
+          "
 
       - name: "Ключей в отчёте быть не должно"
         if: always()

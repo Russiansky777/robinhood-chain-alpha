@@ -1,0 +1,82 @@
+name: "Сверка по подписям: что транзакция сделала с кошельком (только чтение)"
+
+# ЗАЧЕМ. Владелец 01.10 (вечер): по сделке DBT 16:29:23Z в записи стоит итог
+# +0.091217606 SOL, а по Solscan продажа дала 0.00324471 WSOL -- около -0.007.
+# Две цифры об одних деньгах надо не обсуждать, а разобрать по полям meta: что
+# стало с нативным балансом кошелька, что -- с его счётом WSOL, что -- с токеном.
+#
+# ПОЧЕМУ С ОБЛАЧНОГО БЕГУНКА. Проверка только читает цепь и ничего не делает с
+# хостом; свой бегунок занимают деплои и замеры, и становиться за ними в очередь
+# сверке незачем.
+#
+# НИ ОДНОЙ ЗАПИСИ И НИ ОДНОЙ ПОДПИСИ: один getTransaction на подпись.
+on:
+  workflow_dispatch:
+    inputs:
+      podpisi:
+        description: "подписи через запятую (две -- посчитается итог по сделке)"
+        required: false
+        default: ""
+      ostatki:
+        description: "'yes' -- показать токеновые остатки кошелька сейчас (в т.ч. запаркованный WSOL)"
+        required: false
+        default: "no"
+      koshelek:
+        description: "чей кошелёк разбираем"
+        required: false
+        default: "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+
+concurrency:
+  group: sverka-podpisej
+  cancel-in-progress: false
+
+env:
+  OUT_FILE: data/sverka_podpisej.json
+
+jobs:
+  sverka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка разбора (без сети)"
+        run: python3 deploy/checks/sverka_podpisej.py --self-test
+
+      - name: "Разбор подписей"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          OST=""
+          if [ "${{ inputs.ostatki }}" = "yes" ]; then OST="--ostatki"; fi
+          python3 deploy/checks/sverka_podpisej.py \
+            --podpisi '${{ inputs.podpisi }}' \
+            --koshelek '${{ inputs.koshelek }}' $OST \
+            --out "$OUT_FILE"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          if [ -f "$OUT_FILE" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"; fi
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f "$OUT_FILE" ]; then git add "$OUT_FILE"; fi
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Sverka po podpisjam [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

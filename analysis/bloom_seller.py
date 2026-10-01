@@ -87,6 +87,9 @@ from bloom_exec_state import (  # noqa: E402
 # не превращается в перебор на каждой закрываемой позиции.
 ПРЕДЕЛ_ДОГОНА_ПОДПИСЕЙ = 3
 
+# Минт обёрнутого SOL. Нужен учёту: распаковка WSOL -- это не выручка сделки.
+WSOL_МИНТ = "So11111111111111111111111111111111111111112"
+
 
 def программа_пула(pos: dict) -> str | None:
     """Программа пула НАШЕЙ покупки -- из записи позиции.
@@ -1033,12 +1036,28 @@ def итог_продажи(tx: dict, wallet: str, mint: str) -> dict:
             код = str(ошибка)[:80]
     sol = None
     минт_дельта = None
+    wsol_дельта = None
     try:
         import bloom_detector as BD  # noqa: PLC0415
         б = BD.балансы_кошелька(tx, wallet)
         sol = б.get("native_delta_sol")
         з = (б.get("by_mint") or {}).get(mint) or {}
         минт_дельта = з.get("delta_ui")
+        # РАСПАКОВКА WSOL -- НЕ ВЫРУЧКА СДЕЛКИ. Закрытие счёта WSOL отдаёт в
+        # нативный баланс всё, что на нём лежало, и нативная дельта становится
+        # больше выручки свопа ровно на эту сумму. Измерено 01.10: продажа DBT
+        # d1hXygBzo (16:29Z) дала нативных +0.104711046 при дельте WSOL -0.1 --
+        # те 0.1 обёрнула и не распаковала ЧУЖАЯ покупка tvwftKB3 (15:58:39Z), и
+        # записаны они были как выручка продажи. Поэтому выручка считается
+        # нативной дельтой ПЛЮС дельта WSOL (она отрицательная при распаковке).
+        #
+        # ОТСУТСТВИЕ СЧЁТА WSOL В СДЕЛКЕ -- ЭТО НОЛЬ, А НЕ НЕИЗВЕСТНОСТЬ: по
+        # pre/postTokenBalances видно все тронутые счета владельца, и если WSOL
+        # среди них нет, значит он не двигался вовсе.
+        _w = (б.get("by_mint") or {}).get(WSOL_МИНТ) or {}
+        wsol_дельта = _w.get("delta_ui") if _w else 0.0
+        if not isinstance(wsol_дельта, (int, float)):
+            wsol_дельта = None
     except Exception as exc:  # noqa: BLE001
         return {"known": True, "ok": ошибка is None, "error_code": код,
                  "slot": tx.get("slot"),
@@ -1048,10 +1067,25 @@ def итог_продажи(tx: dict, wallet: str, mint: str) -> dict:
     # sol_delta_net -- то, что реально осело на балансе. Оба числа нужны:
     # первое сравнимо с ценой, второе -- с балансом.
     комиссия = (мета.get("fee") or 0) / 1e9
+    # ВЫРУЧКА СВОПА: нативная дельта плюс дельта WSOL. Дельта WSOL неизвестна --
+    # выручку не выдумываем, остаётся None, и тот, кто считает итог, увидит
+    # отсутствие числа, а не завышенное число.
+    своп = (round(sol + wsol_дельта, 9)
+            if isinstance(sol, (int, float)) and isinstance(wsol_дельта, (int, float))
+            else None)
     return {"known": True, "ok": ошибка is None, "error_code": код,
              "slot": tx.get("slot"), "sol_delta": sol,
              "sol_delta_net": (round(sol - комиссия, 9) if isinstance(sol, (int, float))
                                 else None),
+             # ДВА НОВЫХ ЧИСЛА. wsol_delta_sol -- сколько SOL пришло или ушло
+             # через обёртку; sol_delta_swap -- выручка САМОЙ сделки, без
+             # распаковки чужих остатков. Прежние два поля оставлены как были:
+             # их читают уже написанные разборы, и менять их смысл задним числом
+             # значит незаметно переписать историю.
+             "wsol_delta_sol": wsol_дельта,
+             "sol_delta_swap": своп,
+             "sol_delta_net_swap": (round(своп - комиссия, 9)
+                                     if isinstance(своп, (int, float)) else None),
              "fee_sol": комиссия, "mint_delta_ui": минт_дельта}
 
 
@@ -1377,6 +1411,24 @@ class Seller:
         # Последнее -- не придирка: sol_delta считается ВМЕСТЕ с комиссией, и
         # у сделки, вернувшей ровно ноль, он равен самой комиссии. Проверка
         # "sol_delta > 0" такую сделку назвала бы удачной продажей.
+        # ПОЧЕМУ closed_sol_net ОСТАЁТСЯ НАТИВНЫМ ЧИСЛОМ. Соблазн записать сюда
+        # выручку свопа (без распаковки WSOL) я проверил и отверг: на этом поле
+        # стоит ТОЖДЕСТВО, проверенное на 67 закрытых сделках 30.09-01.10
+        # (c2_itog_po_cepi.объяснённое):
+        #
+        #     итог_полей - итог_по_цепи + рента_заперта + завёрнутое_осталось = 0
+        #
+        # итог_полей считается ИЗ closed_sol_net, а перешедшее через границу
+        # завёрнутое -- НАЗВАННАЯ величина этого тождества. Вычти распаковку из
+        # closed_sol_net -- и остаток тождества станет равен ей же, то есть
+        # сверка начнёт звать владельца на объяснённое: 54 закрытые сделки дали
+        # бы по тревоге. Поэтому выручка свопа ложится ОТДЕЛЬНЫМ полем, а
+        # честный итог сделки считается как итог_полей минус завёрнутое.
+        #
+        # Настоящая починка -- не в учёте, а в сборке: покупка теперь
+        # распаковывает WSOL в той же транзакции (c2_swap_build.build_buy), и у
+        # новых сделок через границу не переходит ничего, то есть оба счёта
+        # совпадают сами.
         чисто = исход.get("sol_delta_net")
         минт_дельта = исход.get("mint_delta_ui")
         почему_нет = ""
@@ -1403,8 +1455,13 @@ class Seller:
                                     closed_sol_delta=sol,
                                     closed_confirmed=подтверждена,
                                     closed_why_not=почему_нет,
-                                    closed_sol_net=(найдено.get("outcome") or {}).get(
-                                        "sol_delta_net"))
+                                    closed_sol_net=чисто,
+                                    closed_wsol_delta=(найдено.get("outcome") or {}).get(
+                                        "wsol_delta_sol"),
+                                    # ВЫРУЧКА СВОПА -- ОТДЕЛЬНЫМ ПОЛЕМ, рядом, и
+                                    # ни одно прежнее число от этого не меняется.
+                                    closed_sol_net_swap=(найдено.get("outcome") or {}).get(
+                                        "sol_delta_net_swap"))
         if self.оповещатель is not None and NT is not None:
             # Уже доложенную нашу продажу второй строкой не повторяем.
             уже = (если_наша and pos.get("last_sell_reported") == подпись)
@@ -3431,6 +3488,63 @@ def self_test() -> None:
         "узел молчит" in str(st.positions()["p3"].get("balance_read_why_not")))
 
     # --- закрытие таймерным ордером Bloom: строка ОБЯЗАТЕЛЬНА
+    # --- РАСПАКОВКА WSOL НЕ СЧИТАЕТСЯ ВЫРУЧКОЙ СДЕЛКИ (измерено 01.10)
+    def _tx_с_wsol(*, натив, wsol_до, wsol_после, минт="МИНТW", токен_до=1_000_000):
+        def бал(м, raw, idx, dec=6):
+            return {"accountIndex": idx, "mint": м, "owner": EXECUTOR_WALLET,
+                     "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                     "uiTokenAmount": {"amount": str(raw), "decimals": dec,
+                                        "uiAmount": raw / (10 ** dec)}}
+        до = [бал(минт, токен_до, 1)]
+        после = [бал(минт, 0, 1)]
+        if wsol_до is not None:
+            до.append(бал(WSOL_МИНТ, int(wsol_до * 1e9), 2, 9))
+        if wsol_после is not None:
+            после.append(бал(WSOL_МИНТ, int(wsol_после * 1e9), 2, 9))
+        return {"slot": 11, "meta": {
+                    "err": None, "fee": 5000,
+                    "preBalances": [10 ** 9],
+                    "postBalances": [10 ** 9 + int(натив * 1e9)],
+                    "preTokenBalances": до, "postTokenBalances": после,
+                    "innerInstructions": []},
+                "transaction": {"message": {
+                    "accountKeys": [{"pubkey": EXECUTOR_WALLET}],
+                    "instructions": []}}}
+
+    # Ровно случай DBT: своп дал 0.004711046, но закрылся WSOL с 0.1 чужих денег,
+    # и нативная дельта вышла +0.104711046.
+    _и = итог_продажи(_tx_с_wsol(натив=0.104716046, wsol_до=0.1, wsol_после=0.0),
+                       EXECUTOR_WALLET, "МИНТW")
+    # ЧИСЛА С ПОПРАВКОЙ НА КОМИССИЮ: нативная дельта у плательщика считается
+    # ОЧИЩЕННОЙ от комиссии (balансы_кошелька добавляет её обратно), поэтому
+    # 0.104716046 на балансе -- это дельта 0.104721046 при комиссии 5e-06.
+    chk("нативная дельта осталась прежним полем (очищенная от комиссии)",
+        _и["sol_delta"] == 0.104721046, _и["sol_delta"])
+    chk("дельта WSOL записана отдельным числом со знаком",
+        _и["wsol_delta_sol"] == -0.1, _и["wsol_delta_sol"])
+    chk("выручка свопа = натив плюс дельта WSOL",
+        _и["sol_delta_swap"] == 0.004721046, _и["sol_delta_swap"])
+    chk("и чистая выручка свопа меньше неё на комиссию",
+        _и["sol_delta_net_swap"] == 0.004716046, _и["sol_delta_net_swap"])
+    chk("прежнее поле sol_delta_net осталось с распаковкой -- история не меняется",
+        _и["sol_delta_net"] == 0.104716046, _и["sol_delta_net"])
+    chk("closed_sol_net пишется НАТИВНЫМ числом: на нём стоит тождество сверки",
+        'чисто = исход.get("sol_delta_net")' in
+        Path(__file__).read_text(encoding="utf-8"), None)
+    chk("а выручка свопа идёт отдельным полем closed_sol_net_swap",
+        "closed_sol_net_swap=" in Path(__file__).read_text(encoding="utf-8"), None)
+    _и2 = итог_продажи(_tx_с_wsol(натив=0.00081, wsol_до=None, wsol_после=None),
+                        EXECUTOR_WALLET, "МИНТW")
+    chk("счёта WSOL в сделке нет -- это НОЛЬ, и выручка равна нативной дельте",
+        _и2["wsol_delta_sol"] == 0.0
+        and _и2["sol_delta_swap"] == _и2["sol_delta"], _и2)
+    _и3 = итог_продажи(_tx_с_wsol(натив=-0.1, wsol_до=0.0, wsol_после=0.1),
+                        EXECUTOR_WALLET, "МИНТW")
+    chk("обёртка в сделке (WSOL вырос) поправляет выручку в другую сторону",
+        _и3["wsol_delta_sol"] == 0.1
+        and _и3["sol_delta_swap"] == round(_и3["sol_delta"] + 0.1, 9)
+        and _и3["sol_delta_swap"] > _и3["sol_delta"], _и3)
+
     def tx_продажа_минта(минт, sol=0.00081):
         def читатель(подпись):
             бал = lambda raw, idx: {  # noqa: E731

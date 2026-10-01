@@ -1,0 +1,466 @@
+#!/usr/bin/env python3
+"""Строки владельцу, которые пишет САМ ХОСТ: получасовая и часовая.
+
+ЗАЧЕМ (слово владельца 01.10, вечер, п.3). Получасовую строку балансов и
+часовую самопроверку до сих пор писала сессия Code-1 по расписанию снаружи.
+Сессия может простоять (11:15Z-16:11Z так и вышло), и тогда строк нет вовсе,
+хотя стенд жив и числа у него есть. Поэтому обе строки переносятся на таймеры
+ХОСТА: кто считает, тот и отправляет. Сессия после этого только читает и
+разбирает.
+
+ДЕНЕЖНОГО ПУТИ НЕТ -- И ЭТО ПРОВЕРЯЕТСЯ САМОПРОВЕРКОЙ. Модуль читает файлы
+состояния и журнал службы и отправляет текст в Telegram. Ни покупки, ни
+продажи, ни подписи, ни записи в позиции здесь нет; самопроверка ищет в
+рабочей части этого файла имена денежных вызовов и падает, если они появятся.
+
+ЧЕГО ХОСТ НЕ МОЖЕТ И О ЧЁМ ЧЕСТНО ГОВОРИТ В СТРОКЕ. Свежесть учёта
+(data/ledger_status.json) и незавершённые прогоны Actions живут в GitHub, а не
+на хосте: эти два пункта часовой самопроверки хост не проверяет и не делает
+вид, что проверил -- он называет их словами "не с хоста". Рубильник по
+страховке (X + Y <= 0.60 SOL) хост тоже НЕ ставит: файл /etc/bloom-executor/KILL
+пишется от root, а таймеру отчётов root не нужен. Строка в этом случае уходит
+с пометкой "НУЖЕН ОБЩИЙ KILL", и рубильник ставит прогон.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess  # noqa: S404  -- только journalctl, только чтение
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+ПОРОГ_СТРАХОВКИ_SOL = 0.60
+ПОРОГ_ПРИЗНАКА_S = 600.0
+СЛУЖБЫ = ("bloom-detector", "bloom-seller", "dbot-sold-guard",
+           "dbot-detect-probe", "grpc-feed-probe")
+ПРИЗНАКИ = ("detector_status.json", "seller_heartbeat.json")
+
+
+def _число(значение):
+    if значение is None or isinstance(значение, bool):
+        return None
+    try:
+        ч = float(значение)
+    except (TypeError, ValueError):
+        return None
+    return None if ч != ч else ч
+
+
+def время_метки(ts: float | None = None) -> str:
+    return time.strftime("%H:%MZ", time.gmtime(ts if ts is not None else time.time()))
+
+
+def прочитать_json(путь) -> dict:
+    """Файл состояния. Нечитаемый файл -- это не ноль, это отсутствие числа."""
+    п = Path(путь)
+    из_ = {"ok": False, "why_not": None, "данные": None, "возраст_с": None}
+    if not п.exists():
+        из_["why_not"] = f"нет файла {п.name}"
+        return из_
+    try:
+        из_["данные"] = json.loads(п.read_text(encoding="utf-8"))
+        из_["возраст_с"] = round(max(0.0, time.time() - п.stat().st_mtime), 1)
+        из_["ok"] = True
+    except (OSError, ValueError) as exc:
+        из_["why_not"] = f"{п.name}: {type(exc).__name__}"
+    return из_
+
+
+def числа_из_признака(d: dict) -> dict:
+    """X, Y, стоп и метка -- из признака жизни детектора. Ничего не считаем сами."""
+    d = d or {}
+    полоса = d.get("own_send") or {}
+    стоп = d.get("kill_active")
+    return {"метка": d.get("updated_utc"),
+             "стоп": (None if стоп is None else bool(стоп)),
+             "X": _число(d.get("balance_sol")),
+             "Y": _число(полоса.get("balance_sol")),
+             "кошелёк_полосы": полоса.get("wallet")}
+
+
+def _сол(значение) -> str:
+    ч = _число(значение)
+    return "НЕ ЗНАЮ" if ч is None else f"{ч:.9f}".rstrip("0").rstrip(".")
+
+
+def строка_балансов(числа: dict, позиций) -> str:
+    """Ровно тот формат, который велел владелец 26.09, и ни знака больше.
+
+    «стоп стоит/снят, балансы X / Y, позиций N». Неизвестное число пишется
+    словами НЕ ЗНАЮ: прочерк и ноль на деньгах значат разное.
+    """
+    стоп = числа.get("стоп")
+    слово = "стоп стоит" if стоп else ("стоп снят" if стоп is False
+                                        else "стоп НЕ ЗНАЮ")
+    n = _число(позиций)
+    return (f"{слово}, балансы {_сол(числа.get('X'))} / {_сол(числа.get('Y'))}, "
+             f"позиций {'НЕ ЗНАЮ' if n is None else int(n)}")
+
+
+def страховка(числа: dict, *, порог: float = ПОРОГ_СТРАХОВКИ_SOL) -> dict:
+    """X + Y <= порог -- нужен ОБЩИЙ KILL. Неизвестное число решения не даёт.
+
+    Порог считается ТОЛЬКО когда известны оба числа: сумма с НЕ ЗНАЮ -- это не
+    "мало денег", это непрочитанное состояние, и глушить по нему нельзя.
+    """
+    X, Y = _число(числа.get("X")), _число(числа.get("Y"))
+    если = {"нужен_общий_kill": False, "сумма": None, "порог": float(порог),
+             "почему": None}
+    if X is None or Y is None:
+        если["почему"] = ("страховку не считать: один из балансов не прочитан "
+                           f"(X {_сол(X)}, Y {_сол(Y)})")
+        return если
+    если["сумма"] = round(X + Y, 9)
+    если["нужен_общий_kill"] = если["сумма"] <= float(порог)
+    если["почему"] = (f"сумма {если['сумма']} <= {порог}" if если["нужен_общий_kill"]
+                       else f"сумма {если['сумма']} выше {порог}")
+    return если
+
+
+def открытых_позиций(state_dir: str | None = None) -> dict:
+    """Сколько открытых позиций. ТОЛЬКО чтение состояния."""
+    из_ = {"n": None, "why_not": None}
+    try:
+        import bloom_exec_state as ST  # noqa: PLC0415
+        с = ST.ExecState() if state_dir is None else ST.ExecState(base=Path(state_dir))
+        из_["n"] = len(с.open_positions())
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"позиции не прочитаны: {type(exc).__name__}"
+    return из_
+
+
+def _из_journalctl(единица: str, минут: int, *, бегун=None) -> dict:
+    """Строки журнала службы за окно. Чтение, и только оно."""
+    из_ = {"ok": False, "строк": 0, "текст": "", "why_not": None}
+    зов = ["journalctl", "-u", единица, "--since", f"-{int(минут)}min",
+           "--no-pager", "-o", "cat"]
+    try:
+        б = бегун or (lambda к: subprocess.run(  # noqa: S603
+            к, capture_output=True, text=True, timeout=30, check=False))
+        р = б(зов)
+        текст = (getattr(р, "stdout", "") or "")
+        код = getattr(р, "returncode", 0)
+        # КОД ВОЗВРАТА -- ЭТО ПРО ТИХИЙ ЗЕЛЁНЫЙ. Без него journalctl без прав
+        # (пользователь не в systemd-journal) отдаёт пустой stdout и код 1, а
+        # счёт по словам даёт "сбоев 0" -- проверка становится зелёной, ничего
+        # не прочитав. Такой ответ -- отказ, а не норма.
+        if код not in (0, None):
+            из_["why_not"] = (f"journalctl вернул код {код} -- журнал не прочитан "
+                               "(прав на чужой юнит может не быть)")
+            return из_
+        из_.update(ok=True, текст=текст, строк=текст.count("\n"))
+        # ПУСТО ЗА ЧАС У ЖИВОЙ СЛУЖБЫ НЕ БЫВАЕТ: сторож пишет каждый круг.
+        # Пустое окно -- это тоже не "сбоев нет", это нечитаемый журнал.
+        if из_["строк"] == 0:
+            из_["пусто"] = True
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"journalctl: {type(exc).__name__}"
+    return из_
+
+
+def сбои_за_окно(текст: str) -> dict:
+    """Сколько в окне падений обработчика и непроданных. Только счёт по словам."""
+    т = текст or ""
+    return {"HANDLER_CRASHED": т.count("HANDLER_CRASHED"),
+             "traceback": т.count("Traceback (most recent call last)"),
+             "UNSOLD": т.count("UNSOLD"),
+             "автопауза": т.count("автопауза")}
+
+
+def служба_жива(единица: str, *, бегун=None) -> dict:
+    из_ = {"единица": единица, "active": None, "enabled": None, "why_not": None}
+    try:
+        б = бегун or (lambda к: subprocess.run(  # noqa: S603
+            к, capture_output=True, text=True, timeout=15, check=False))
+        a = б(["systemctl", "is-active", единица])
+        e = б(["systemctl", "is-enabled", единица])
+        из_["active"] = (getattr(a, "stdout", "") or "").strip() == "active"
+        из_["enabled"] = (getattr(e, "stdout", "") or "").strip() == "enabled"
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"systemctl: {type(exc).__name__}"
+    return из_
+
+
+def строка_самопроверки(итог: dict) -> str:
+    """«самопроверка HH:MMZ: норма» или перечень того, что не так.
+
+    Два пункта владельца (свежесть учёта и прогоны Actions) живут в GitHub и с
+    хоста не видны -- они названы словами, а не посчитаны зелёными.
+    """
+    плохо = итог.get("плохо") or []
+    голова = f"самопроверка {итог.get('время')}: " + ("норма" if not плохо
+                                                       else "; ".join(плохо))
+    хвост = ("проверено на хосте: службы, признаки жизни, сбои за час, UNSOLD "
+              "за час, кредиты Helius, рубильники. Не с хоста (смотрит сессия): "
+              "свежесть учёта и прогоны Actions.")
+    return f"{голова}\n{хвост}"
+
+
+def часовая(*, state_dir: str | None = None, минут: int = 60,
+             бегун=None) -> dict:
+    """Часовая самопроверка по тому, что видно НА ХОСТЕ."""
+    пр = прочитать_json(Path(state_dir or состояние_каталог()) / "detector_status.json")
+    итог: dict = {"время": время_метки(), "плохо": [], "службы": [],
+                   "признаки": [], "сбои": None, "кредиты": None,
+                   "рубильники": None}
+    for ед in СЛУЖБЫ:
+        с = служба_жива(ед, бегун=бегун)
+        итог["службы"].append(с)
+        if с["active"] is not True:
+            итог["плохо"].append(f"служба {ед} не active"
+                                  if с["why_not"] is None else
+                                  f"служба {ед}: {с['why_not']}")
+    for имя in ПРИЗНАКИ:
+        ф = прочитать_json(Path(state_dir or состояние_каталог()) / имя)
+        итог["признаки"].append({"файл": имя, "возраст_с": ф["возраст_с"],
+                                  "why_not": ф["why_not"]})
+        if not ф["ok"]:
+            итог["плохо"].append(f"признак {имя}: {ф['why_not']}")
+        elif (ф["возраст_с"] or 0) > ПОРОГ_ПРИЗНАКА_S:
+            итог["плохо"].append(f"признак {имя} старше "
+                                  f"{ПОРОГ_ПРИЗНАКА_S:.0f} с ({ф['возраст_с']} с)")
+    ж = _из_journalctl("bloom-seller", минут, бегун=бегун)
+    итог["сбои"] = ({**сбои_за_окно(ж["текст"]), "строк": ж["строк"]} if ж["ok"]
+                     else {"why_not": ж["why_not"]})
+    if ж["ok"]:
+        for имя in ("HANDLER_CRASHED", "traceback"):
+            if итог["сбои"].get(имя):
+                итог["плохо"].append(f"{имя} за час: {итог['сбои'][имя]}")
+        if ж.get("пусто"):
+            итог["сбои"]["пусто"] = True
+            итог["плохо"].append("журнал службы за час пуст -- у живой службы "
+                                  "так не бывает, значит он не прочитан")
+    else:
+        итог["плохо"].append(f"журнал службы не прочитан: {ж['why_not']}")
+    д = (пр.get("данные") or {}) if пр.get("ok") else {}
+    итог["кредиты"] = д.get("session_credits")
+    итог["рубильники"] = {"общий": д.get("kill_active"),
+                           "площадка": d_kill(д, "kill_bloom_active"),
+                           "полоса": (д.get("own_send") or {}).get("lane_kill")}
+    if not пр.get("ok"):
+        итог["плохо"].append(f"признак детектора не прочитан: {пр.get('why_not')}")
+    итог["строка"] = строка_самопроверки(итог)
+    return итог
+
+
+def d_kill(д: dict, имя: str):
+    return (д or {}).get(имя)
+
+
+def состояние_каталог() -> str:
+    """Каталог состояния: из окружения службы, без выдумывания пути."""
+    з = (os.environ.get("BLOOM_STATE_DIR") or "").strip()
+    if з:
+        return з
+    try:
+        import bloom_exec_state as ST  # noqa: PLC0415
+        return str(ST.state_dir())
+    except Exception:  # noqa: BLE001
+        return "."
+
+
+def получасовая(*, state_dir: str | None = None) -> dict:
+    """Получасовая строка балансов и вердикт страховки. Только чтение."""
+    кат = state_dir or состояние_каталог()
+    пр = прочитать_json(Path(кат) / "detector_status.json")
+    числа = числа_из_признака(пр.get("данные") or {})
+    поз = открытых_позиций(кат if state_dir else None)
+    стр = страховка(числа)
+    строка = строка_балансов(числа, поз.get("n"))
+    if стр.get("нужен_общий_kill"):
+        строка += (f" | СТРАХОВКА: {стр['почему']} -- НУЖЕН ОБЩИЙ KILL "
+                    "(хост его не ставит, ставит прогон)")
+    return {"время": время_метки(), "строка": строка, "числа": числа,
+             "позиций": поз, "страховка": стр,
+             "возраст_признака_с": пр.get("возраст_с"),
+             "why_not": пр.get("why_not") or поз.get("why_not")}
+
+
+def послать(текст: str) -> dict:
+    """Отправка владельцу в основной чат. Без исключений наружу."""
+    try:
+        import bloom_notify as NT  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"bloom_notify не загружен: {type(exc).__name__}"}
+    готов, почему = NT.настроен(NT.КУДА_ОСНОВНОЙ)
+    if not готов:
+        return {"ok": False, "why_not": почему}
+    try:
+        о = NT.Оповещатель(в_фоне=False)
+        return о.отправить(текст, куда=NT.КУДА_ОСНОВНОЙ)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "why_not": f"{type(exc).__name__}"}
+
+
+def main() -> int:
+    р = argparse.ArgumentParser()
+    р.add_argument("--rezhim", choices=("polchasa", "chas"), required=True)
+    р.add_argument("--state-dir", default=None)
+    р.add_argument("--minut", type=int, default=60)
+    р.add_argument("--poslat", action="store_true",
+                    help="отправить строку в Telegram (без него только печать)")
+    р.add_argument("--out", default=None)
+    а = р.parse_args()
+    итог = (получасовая(state_dir=а.state_dir) if а.rezhim == "polchasa"
+             else часовая(state_dir=а.state_dir, минут=а.minut))
+    if а.poslat:
+        итог["телеграм"] = послать(итог["строка"])
+    текст = json.dumps(итог, ensure_ascii=False, indent=1)
+    print(текст)
+    if а.out:
+        Path(а.out).write_text(текст + "\n", encoding="utf-8")
+    # ОТКАЗ НЕ ПРЯЧЕМ: строка без чисел -- это сбой таймера, а не норма.
+    плохо = (итог.get("why_not") if а.rezhim == "polchasa" else итог.get("плохо"))
+    return 1 if плохо else 0
+
+
+def self_test() -> int:
+    плохо = []
+
+    def chk(имя, усл, факт=""):
+        if not усл:
+            плохо.append(f"{имя}: {факт}")
+        print(("ok   " if усл else "ПЛОХО") + f" {имя}")
+
+    пр = {"updated_utc": "2026-10-01T18:22:22Z", "kill_active": False,
+           "balance_sol": 0.0,
+           "own_send": {"balance_sol": 2.997643212, "wallet": "4dPZMbRe"}}
+    ч = числа_из_признака(пр)
+    chk("числа: X, Y и стоп взяты из признака",
+        ч["X"] == 0.0 and ч["Y"] == 2.997643212 and ч["стоп"] is False, ч)
+    chk("строка ровно того формата, что велел владелец",
+        строка_балансов(ч, 0) == "стоп снят, балансы 0 / 2.997643212, позиций 0",
+        строка_балансов(ч, 0))
+    chk("стоп стоит пишется словами",
+        строка_балансов({**ч, "стоп": True}, 3)
+        == "стоп стоит, балансы 0 / 2.997643212, позиций 3")
+    chk("непрочитанный баланс -- НЕ ЗНАЮ, а не ноль",
+        "НЕ ЗНАЮ" in строка_балансов({**ч, "Y": None}, 0),
+        строка_балансов({**ч, "Y": None}, 0))
+    chk("непрочитанный стоп -- НЕ ЗНАЮ, а не 'снят'",
+        строка_балансов({**ч, "стоп": None}, 0).startswith("стоп НЕ ЗНАЮ"))
+    chk("непрочитанное число позиций -- НЕ ЗНАЮ",
+        "позиций НЕ ЗНАЮ" in строка_балансов(ч, None))
+
+    с = страховка({"X": 0.3, "Y": 0.25})
+    chk("страховка: сумма 0.55 <= 0.60 -- нужен общий KILL",
+        с["нужен_общий_kill"] and с["сумма"] == 0.55, с)
+    с = страховка({"X": 0.0, "Y": 2.997643212})
+    chk("страховка: сумма выше порога -- рубильник не нужен",
+        not с["нужен_общий_kill"], с)
+    с = страховка({"X": 0.6, "Y": 0.0})
+    chk("страховка: ровно порог -- рубильник нужен (<=, как сказано)",
+        с["нужен_общий_kill"], с)
+    с = страховка({"X": None, "Y": 0.1})
+    chk("страховка: баланс не прочитан -- решения нет вовсе",
+        not с["нужен_общий_kill"] and "не прочитан" in с["почему"], с)
+
+    chk("сбои считаются по словам журнала",
+        сбои_за_окно("a HANDLER_CRASHED b\nUNSOLD\nTraceback (most recent call last):")
+        == {"HANDLER_CRASHED": 1, "traceback": 1, "UNSOLD": 1, "автопауза": 0},
+        сбои_за_окно("a HANDLER_CRASHED b\nUNSOLD\nTraceback (most recent call last):"))
+
+    chk("строка самопроверки при норме -- одна строка владельца",
+        строка_самопроверки({"время": "18:10Z", "плохо": []}).startswith(
+            "самопроверка 18:10Z: норма"),
+        строка_самопроверки({"время": "18:10Z", "плохо": []}))
+    chk("и в ней честно сказано, чего хост не проверяет",
+        "Не с хоста" in строка_самопроверки({"время": "18:10Z", "плохо": []}))
+    chk("при беде строка называет беду, а не 'норма'",
+        "норма" not in строка_самопроверки(
+            {"время": "18:10Z", "плохо": ["служба bloom-seller не active"]}),
+        строка_самопроверки({"время": "18:10Z", "плохо": ["служба bloom-seller не active"]}))
+
+    # --- чтение файлов
+    import tempfile  # noqa: PLC0415
+    with tempfile.TemporaryDirectory() as д:
+        п = Path(д) / "detector_status.json"
+        п.write_text(json.dumps(пр), encoding="utf-8")
+        ф = прочитать_json(п)
+        chk("файл состояния прочитан и возраст посчитан",
+            ф["ok"] and ф["возраст_с"] is not None, ф)
+        (Path(д) / "битый.json").write_text("{не json", encoding="utf-8")
+        ф2 = прочитать_json(Path(д) / "битый.json")
+        chk("битый файл -- отказ словами, а не пустые данные",
+            not ф2["ok"] and ф2["данные"] is None and ф2["why_not"], ф2)
+        ф3 = прочитать_json(Path(д) / "нету.json")
+        chk("нет файла -- отказ словами", not ф3["ok"] and "нет файла" in ф3["why_not"])
+
+        # часовая с подменённым бегуном: ни systemctl, ни journalctl по-настоящему
+        class _Р:
+            def __init__(с_, out, код=0):
+                с_.stdout = out
+                с_.returncode = код
+
+        def бегун(к):
+            if к[0] == "systemctl":
+                return _Р("active\n" if к[1] == "is-active" else "enabled\n")
+            return _Р("всё тихо\n")
+
+        (Path(д) / "seller_heartbeat.json").write_text("{}", encoding="utf-8")
+        ч2 = часовая(state_dir=д, минут=60, бегун=бегун)
+        chk("часовая при живых службах и свежих признаках -- норма",
+            ч2["плохо"] == [] and "норма" in ч2["строка"], ч2["плохо"])
+
+        def бегун_мёртвый(к):
+            if к[0] == "systemctl":
+                return _Р("inactive\n" if к[1] == "is-active" else "enabled\n")
+            return _Р("HANDLER_CRASHED\n")
+
+        def бегун_без_прав(к):
+            if к[0] == "systemctl":
+                return _Р("active\n" if к[1] == "is-active" else "enabled\n")
+            р = _Р("")
+            р.returncode = 1
+            return р
+
+        ч_бп = часовая(state_dir=д, минут=60, бегун=бегун_без_прав)
+        chk("journalctl без прав -- отказ, а не 'сбоев нет'",
+            any("журнал" in с for с in ч_бп["плохо"])
+            and "норма" not in ч_бп["строка"], ч_бп["плохо"])
+
+        def бегун_пусто(к):
+            if к[0] == "systemctl":
+                return _Р("active\n" if к[1] == "is-active" else "enabled\n")
+            return _Р("")
+
+        ч_п = часовая(state_dir=д, минут=60, бегун=бегун_пусто)
+        chk("пустой журнал за час -- тоже не норма",
+            any("пуст" in с for с in ч_п["плохо"]), ч_п["плохо"])
+
+        ч3 = часовая(state_dir=д, минут=60, бегун=бегун_мёртвый)
+        chk("мёртвая служба и падение обработчика попадают в строку",
+            any("не active" in с for с in ч3["плохо"])
+            and any("HANDLER_CRASHED" in с for с in ч3["плохо"]), ч3["плохо"])
+
+        пол = получасовая(state_dir=д)
+        chk("получасовая отдаёт строку по файлу состояния",
+            пол["строка"].startswith("стоп снят, балансы 0 / 2.997643212"), пол)
+        chk("и позиции прочитаны числом, а не отказом",
+            пол["позиций"]["n"] == 0 and пол["why_not"] is None, пол["позиций"])
+
+    # --- ДЕНЕЖНОГО ПУТИ НЕТ: ищем денежные вызовы в рабочей части файла
+    тело = Path(__file__).read_text(encoding="utf-8").split("def self_test")[0]
+    денежные = ("sendTransaction", "update_position", "write_intent",
+                 "подписать(", "отправить_в_сеть", "JUP.продать", "продать(",
+                 "собрать_продажу", "simulateTransaction")
+    найдено = [с for с in денежные if с in тело]
+    chk("в рабочей части нет ни одного денежного вызова", найдено == [], найдено)
+    chk("и нет импорта модулей, которые умеют продавать",
+        "bloom_jupiter_sell" not in тело and "bloom_lane_sell" not in тело
+        and "bloom_own_send" not in тело, тело.count("bloom_"))
+
+    print(f"\nитог: {'ВСЁ ОК' if not плохо else 'ОТКАЗ'}; проверок плохих {len(плохо)}")
+    for с in плохо:
+        print("  -", с)
+    return 1 if плохо else 0
+
+
+if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        raise SystemExit(self_test())
+    raise SystemExit(main())
