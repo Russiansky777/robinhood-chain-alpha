@@ -559,6 +559,17 @@ def main() -> int:
             "lane_dlmm_reads_ms": п.get("lane_dlmm_reads_ms"),
             "lane_dlmm_odno_godilos": п.get("lane_dlmm_odno_godilos"),
             "lane_dlmm_odno_why_not": п.get("lane_dlmm_odno_why_not"),
+            # ТЕНЬ НУЛЯ ЧТЕНИЙ (утренний пакет 01.10, п.1). ОБЕ цены и ОБА
+            # минимума идут в выгрузку рядом с годилось: по проценту одному
+            # Code-2 не сможет пересчитать расхождение сам, а по двум парам
+            # чисел -- сможет, и именно это и есть проверка.
+            "lane_dlmm_nol_godilos": п.get("lane_dlmm_nol_godilos"),
+            "lane_dlmm_nol_why_not": п.get("lane_dlmm_nol_why_not"),
+            "lane_dlmm_nol_cena_polosy": п.get("lane_dlmm_nol_cena_polosy"),
+            "lane_dlmm_nol_cena_teni": п.get("lane_dlmm_nol_cena_teni"),
+            "lane_dlmm_nol_min_out_polosy": п.get("lane_dlmm_nol_min_out_polosy"),
+            "lane_dlmm_nol_min_out_teni": п.get("lane_dlmm_nol_min_out_teni"),
+            "lane_dlmm_nol_otklonenie_pct": п.get("lane_dlmm_nol_otklonenie_pct"),
             # S+0 И РЕГИОНАЛЬНАЯ ОТПРАВКА -- ДЛЯ МЕТРИКИ "ДО/ПОСЛЕ ПО НЕ-EU
             # ЛИДЕРАМ" (слово владельца 29.09 ночью, п.2). s_plus заполняется
             # ниже, после дозаполнения слота посадки по цепи: до него landed_slot
