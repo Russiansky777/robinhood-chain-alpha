@@ -135,7 +135,9 @@ def итог_сделки(покупка: dict, продажа: dict) -> dict:
 
 def main() -> int:
     р = argparse.ArgumentParser()
-    р.add_argument("--podpisi", required=True, help="подписи через запятую")
+    р.add_argument("--podpisi", default="", help="подписи через запятую")
+    р.add_argument("--ostatki", action="store_true",
+                    help="показать ТОКЕНОВЫЕ остатки кошелька сейчас (в т.ч. WSOL)")
     р.add_argument("--koshelek", required=True)
     р.add_argument("--url", default=None, help="адрес узла (по умолчанию из HELIUS_API_KEY)")
     р.add_argument("--out", default=None)
@@ -149,6 +151,34 @@ def main() -> int:
                else "https://api.mainnet-beta.solana.com")
     зов = _зов_через_узел(урл)
     итог = {"кошелёк": а.koshelek, "подписи": {}, "why_not": None}
+    if а.ostatki:
+        # ЗАПАРКОВАННЫЕ ДЕНЬГИ. Остаток на счёте WSOL -- это SOL, которых нет ни
+        # в балансе кошелька, ни в суточном счёте: они обёрнуты и ждут. Такой
+        # остаток надо видеть числом, а не узнавать из закрытия счёта потом.
+        о = зов("getTokenAccountsByOwner",
+                 [а.koshelek, {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+                  {"encoding": "jsonParsed", "commitment": "confirmed"}])
+        ряд = (((о.get("result") or {}).get("value")) or []) if not о.get("error") else []
+        остатки = []
+        for б in ряд:
+            инфо = ((((б.get("account") or {}).get("data") or {}).get("parsed") or {})
+                    .get("info") or {})
+            сумма = (инфо.get("tokenAmount") or {}).get("amount")
+            try:
+                с_ = int(сумма)
+            except (TypeError, ValueError):
+                с_ = None
+            остатки.append({"счёт": б.get("pubkey"), "минт": инфо.get("mint"),
+                             "сырых": с_,
+                             "sol_если_wsol": (round(с_ / ЛАМПОРТОВ, 9)
+                                                if с_ is not None
+                                                and инфо.get("mint") == WSOL else None)})
+        итог["остатки"] = {"всего_счетов": len(остатки),
+                            "непустых": [о_ for о_ in остатки if (о_["сырых"] or 0) > 0],
+                            "why_not": (str(о.get("error"))[:200] if о.get("error")
+                                         else None)}
+        итог["запарковано_wsol_sol"] = round(sum(
+            (о_["сырых"] or 0) for о_ in остатки if о_["минт"] == WSOL) / ЛАМПОРТОВ, 9)
     подписи = [п.strip() for п in а.podpisi.split(",") if п.strip()]
     for п in подписи:
         try:

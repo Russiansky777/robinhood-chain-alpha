@@ -15,7 +15,12 @@ on:
     inputs:
       podpisi:
         description: "подписи через запятую (две -- посчитается итог по сделке)"
-        required: true
+        required: false
+        default: ""
+      ostatki:
+        description: "'yes' -- показать токеновые остатки кошелька сейчас (в т.ч. запаркованный WSOL)"
+        required: false
+        default: "no"
       koshelek:
         description: "чей кошелёк разбираем"
         required: false
@@ -47,9 +52,11 @@ jobs:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
           set -e
+          OST=""
+          if [ "${{ inputs.ostatki }}" = "yes" ]; then OST="--ostatki"; fi
           python3 deploy/checks/sverka_podpisej.py \
             --podpisi '${{ inputs.podpisi }}' \
-            --koshelek '${{ inputs.koshelek }}' \
+            --koshelek '${{ inputs.koshelek }}' $OST \
             --out "$OUT_FILE"
 
       - name: "Ключей в отчёте быть не должно"
