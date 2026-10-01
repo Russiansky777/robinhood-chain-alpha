@@ -189,8 +189,16 @@ def шаблон_продажи(tx_покупки: dict, *, программа: 
             if not ш.get("ok"):
                 из_["why_not"] = ш.get("why_not")
                 return из_
+            # МИНТ БАЗЫ -- ИЗ РАСКЛАДКИ, А НЕ ПУСТОЙ. Без него котировка продажи
+            # и закрытие токенового счёта остались бы без минта: место 3 -- это
+            # base_mint у обеих раскладок Pump AMM (SPECS и SPECS_ПРОДАЖИ).
+            спец = (B.SPECS_ПРОДАЖИ.get(программа) or B.SPECS.get(программа) or {})
+            м_б = спец.get("base_mint")
+            база_pa = (ш["accounts"][м_б] if isinstance(м_б, int)
+                       and len(ш["accounts"]) > м_б else None)
             из_.update(ok=True, accounts=list(ш["accounts"]), writable=ш["writable"],
-                       tpl=ш, имя_инструкции="sell")
+                       tpl=ш, имя_инструкции="sell",
+                       минт_базы=(минт_базы or база_pa))
             return из_
         if т["способ"] == SPOSOB_PARY:
             import bloom_lane_two_step as TS  # noqa: PLC0415
