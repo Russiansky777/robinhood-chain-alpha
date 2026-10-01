@@ -12,6 +12,7 @@ maxSupportedTransactionVersion 0. Выход -- data/samples/prodazhi/<тип>.j
 """
 from __future__ import annotations
 
+import argparse
 import gzip
 import json
 import sys
@@ -25,6 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 WSOL = "So11111111111111111111111111111111111111112"
 АРХИВ = "den_2026-09-30T06"
 НУЖНО = 6
+ПРЕДЕЛ_КАНД = 200       # читаем кандидатов с запасом: транзакции версии 1 при maxSupportedTransactionVersion 0
+                        # не отдаются узлом, а их много (у LaunchLab из 18 первых кандидатов годных было 3)
 ТИПЫ = {"pump": ("krivaya_pump_fun", "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"),
         "raydium-launchpad": ("launchlab", "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"),
         "meteora-damm-v1": ("damm_v1", "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB"),
@@ -44,20 +47,24 @@ def отобрать(события: list, тип: str) -> list:
         кош.add(e.get("trader"))
         минты.add(e.get("mint"))
         из_.append(e)
-        if len(из_) >= НУЖНО * 3:
+        if len(из_) >= ПРЕДЕЛ_КАНД:
             break
-    if len(из_) < НУЖНО:                      # мало разных кошельков -- добираем любыми, но разными подписями
+    if len(из_) < ПРЕДЕЛ_КАНД:                # мало разных кошельков -- добираем любыми, но разными подписями
         видел = {e["signature"] for e in из_}
         for e in сс:
             if e["signature"] not in видел:
                 из_.append(e)
                 видел.add(e["signature"])
-            if len(из_) >= НУЖНО * 3:
+            if len(из_) >= ПРЕДЕЛ_КАНД:
                 break
     return из_
 
 
 def main() -> int:
+    р = argparse.ArgumentParser()
+    р.add_argument("--tipy", default="", help="через запятую: только эти выходные имена (krivaya_pump_fun, launchlab, damm_v1, damm_v2, cpmm)")
+    а = р.parse_args()
+    только = {x for x in а.tipy.split(",") if x}
     import podbivka_run as R  # noqa: PLC0415
     import podbivka_sim as S  # noqa: PLC0415
     д = json.loads(gzip.decompress((П / "arhiv_den" / f"{АРХИВ}.json.gz").read_bytes()))
@@ -67,6 +74,8 @@ def main() -> int:
     итоги = {}
     with уз.на("helius"):
         for тип, (имя, программа) in ТИПЫ.items():
+            if только and имя not in только:
+                continue
             канд = отобрать(события, тип)
             готово, не_вышло = [], []
             for e in канд:
