@@ -1,0 +1,126 @@
+name: "Правило 13: итог позиции по цепи против записей (только чтение)"
+
+# ЗАЧЕМ (правило 13, слово владельца 01.10 04:14). SELL Jevolution 02:00:36Z
+# напечатан "0.102005 -> 0.010314 (-89.9 %)", а по цепи продажа отдала токен и
+# получила 0.113526721 WSOL -- около +0.009 чистыми. Разница 0.103213 -- это
+# завёрнутое: closed_sol_net службы считается по нативной дельте КОШЕЛЬКА и не
+# видит его токеновых счетов, поэтому выручка, оставшаяся завёрнутой на
+# WSOL-счёте, в запись не попадает вовсе. Если такое лежит в записях, то по ним
+# неверно считается всё: суд кандидатов, таблицы источников, выгрузки Code-2.
+#
+# Прогон читает КАЖДУЮ закрытую сделку полосы за окно, берёт из записи ДВЕ
+# подписи и считает итог по цепи как сумму изменений ВСЕХ наших счетов (кошелёк
+# плюс его токеновые счета, включая WSOL) за покупку и продажу. Рядом -- итог из
+# записи и разница; строки с |разницей| > 0.00001 SOL перечисляются отдельно.
+# Сводка с расхождениями подписывается "не сверено".
+#
+# ТОЛЬКО ЧТЕНИЕ: getTransaction по подписям плюс positions.jsonl.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "начало окна UTC (начало счёта по цепи -- 2026-09-29T14:00:00Z)"
+        required: true
+      po:
+        description: "конец окна UTC (пусто -- до сейчас)"
+        required: false
+        default: ""
+      koshelek:
+        description: "кошелёк (пусто -- кошелёк полосы из env хоста)"
+        required: false
+        default: ""
+      predel:
+        description: "предел строк таблицы (защита от многочасового прогона)"
+        required: false
+        default: "400"
+
+concurrency:
+  group: itog-po-cepi-audit
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/itog_po_cepi
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/itog_po_cepi_audit.json
+
+jobs:
+  sdelki:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 50
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО любой сети"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/itog_po_cepi_audit.py \
+            deploy/checks/pravilo11_po_cepi.py
+          python3 deploy/checks/itog_po_cepi_audit.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Аудит итогов по цепи на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          # ДВА ФАЙЛА: сам счёт и модуль правила 11, у которого он берёт вызовы
+          # узла и чтение позиций. Забытая доставка второго дала бы ImportError
+          # уже на хосте.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/itog_po_cepi_audit.py" < deploy/checks/itog_po_cepi_audit.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/pravilo11_po_cepi.py" < deploy/checks/pravilo11_po_cepi.py
+          PO=""
+          [ -n "${{ inputs.po }}" ] && PO="--po ${{ inputs.po }}"
+          KOSH=""
+          [ -n "${{ inputs.koshelek }}" ] && KOSH="--koshelek ${{ inputs.koshelek }}"
+          # Кошелёк полосы скрипт спрашивает у bloom_own_send (env OWN_SEND_WALLET);
+          # не ответил -- ОТКАЗ словами, а не счёт по чужому адресу.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/itog_po_cepi_audit.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $KOSH --predel '${{ inputs.predel }}' --out $RABOTA/out.json" | tail -200
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/itog_po_cepi.json || true
+          if python3 -c "import json; json.load(open('/tmp/itog_po_cepi.json'))" 2>/dev/null; then
+            cp /tmp/itog_po_cepi.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: svodka ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Pravilo 13: audit itogov po cepi protiv zapisej [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
