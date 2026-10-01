@@ -196,6 +196,32 @@ def self_test() -> int:
               + (f" -> {факт!r}" if факт is not None and not ок else ""))
 
     chk("предел пакета -- 1232, как в сети", ПРЕДЕЛ_ПАКЕТА == 1232)
+    # ИМЕНА, КОТОРЫМИ ПОЛЬЗУЕТСЯ main(), -- ПРОВЕРЯЮТСЯ ЗДЕСЬ. Два прогона уже
+    # упали на хосте именно на именах (bloom_api.Helius, c2_swap_build.LegCache):
+    # проверка без сети ловит это до любого прогона.
+    try:
+        import bloom_nogi_shablony as NSп  # noqa: PLC0415
+        import bloom_own_send as OSп  # noqa: PLC0415
+        import c2_shadow_build as SHп  # noqa: PLC0415
+        import solana_rpc_client as RPCп  # noqa: PLC0415
+
+        chk("кэш ног -- c2_shadow_build.LegCache, и у него есть get, luts, load_luts",
+            hasattr(SHп, "LegCache")
+            and all(hasattr(SHп.LegCache, и) for и in ("get", "load_luts")),
+            [и for и in dir(SHп) if "Cache" in и])
+        ст_п, _п = NSп.загрузить(путь=str(КОРЕНЬ / "data" / "nogi_shablony.json"))
+        chk("статичные записи ноги умеют вливаться в кэш (метод влить)",
+            callable(getattr(ст_п, "влить", None))
+            and callable(getattr(ст_п, "обновить", None)))
+        chk("клиент узла -- solana_rpc_client.SolanaRpc с методом call",
+            hasattr(RPCп, "SolanaRpc") and callable(
+                getattr(RPCп.SolanaRpc, "call", None)))
+        chk("предел CU и кошелёк полосы спрашиваются у bloom_own_send",
+            callable(getattr(OSп, "предел_cu", None))
+            and callable(getattr(OSп, "кошелёк_полосы", None)))
+    except Exception as exc:  # noqa: BLE001
+        chk("модули, которыми пользуется замер, загружаются", False,
+            f"{type(exc).__name__}: {str(exc)[:140]}")
     # ВЕРДИКТ: НЕЗНАНИЕ НЕ ПРЕВРАЩАЕТСЯ В "ДА" -- это и есть защита от тихой зелени.
     с1 = свод([{"тип": "CLMM", "ok": True, "размер": 1100, "влез": True,
                  "cu": 120_000, "cu_хватило": True}], предел_cu=250_000)
@@ -283,7 +309,10 @@ def main() -> int:
     os.environ.pop("BLOOM_USDC_NOGA_GROUPS", None)
     import bloom_nogi_shablony as NS  # noqa: PLC0415
     import bloom_own_send as OS  # noqa: PLC0415
-    import c2_swap_build as SB  # noqa: PLC0415
+    # КЭШ НОГ ЖИВЁТ В c2_shadow_build, а не в c2_swap_build: перепутал -- и прогон
+    # упал на AttributeError уже на хосте (06:42Z). Имена, которыми пользуется
+    # main(), теперь проверяются самопроверкой.
+    import c2_shadow_build as SH  # noqa: PLC0415
     import c2_usdc_noga as UN  # noqa: PLC0415
     import solana_rpc_client as RPC  # noqa: PLC0415
 
@@ -311,9 +340,11 @@ def main() -> int:
         ответ["кэш_ног_обновление"] = обн if isinstance(обн, dict) else str(обн)
     except Exception as exc:  # noqa: BLE001
         ответ["кэш_ног_обновление"] = f"{type(exc).__name__}: {str(exc)[:160]}"
-    кэш = SB.LegCache({}, клиент.call, allow_polling=True)
-    for q, зап in (getattr(статичные, "записи", None) or {}).items():
-        кэш.cache[q] = зап
+    # КЭШ ТОТ ЖЕ, ЧТО У СЛУЖБЫ: LegCache плюс влив статичных записей ноги. Своим
+    # словарём тут не обойтись -- сборка спрашивает у кэша get(q), luts и
+    # load_luts, и подделка дала бы "влезает" там, где в бою таблиц не нашлось.
+    кэш = SH.LegCache({}, клиент.call, allow_polling=True)
+    ответ["влито_записей_ноги"] = статичные.влить(кэш)
     о = UN._obrazcy()
     ряды = о.get("ryady") or []
     только = {т.strip() for т in (а.tipov or "").split(",") if т.strip()}
