@@ -1,0 +1,125 @@
+name: "Были ли сделки за окно -- ПО ЦЕПИ (только чтение)"
+
+# ЗАЧЕМ (слово владельца 01.10 ночью, п.2). Круг 0.01 сделал ДВЕ сделки, а моя
+# проверка сказала "сделок нет": она читала мгновенный счётчик открытых позиций
+# (удержание 12 слотов -- к замеру уже закрыто) и сводку кодов журнала, в
+# которой кода BUY у покупок полосы не бывает вовсе. "Сделок не было" означало
+# "в выборке журнала нет кода BUY".
+#
+# ЗДЕСЬ ВЕРДИКТ ОДИН: "сделок не было" значит "ЦЕПЬ ОТВЕТИЛА, и за окно с
+# кошелька не ушло ни одной покупки". Цепь молчит, страниц не хватило, хоть одна
+# транзакция не прочитана -- ответ "не знаю" с причиной, а не ноль. Записи
+# службы читаются рядом вторым мнением, и расхождение называется числом.
+#
+# ТОЛЬКО ЧТЕНИЕ: getSignaturesForAddress, getTransaction и positions.jsonl.
+# Ключ Helius берётся из env хоста внутри удалённой оболочки и в журнал прогона
+# не попадает.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "начало окна UTC, например 2026-09-30T23:30:00Z"
+        required: true
+      po:
+        description: "конец окна UTC (пусто -- до сейчас)"
+        required: false
+        default: ""
+      koshelek:
+        description: "кошелёк (пусто -- кошелёк полосы из env хоста)"
+        required: false
+        default: ""
+      stranic:
+        description: "сколько страниц подписей читать назад (1000 на страницу)"
+        required: false
+        default: "5"
+
+concurrency:
+  group: sdelki-po-cepi-za-okno
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/sdelki_po_cepi
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/sdelki_po_cepi_za_okno.json
+
+jobs:
+  sdelki:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО любой сети"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/sdelki_po_cepi_za_okno.py \
+            deploy/checks/pravilo11_po_cepi.py
+          python3 deploy/checks/sdelki_po_cepi_za_okno.py --self-test | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Счёт по цепи на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          # ДВА ФАЙЛА: сам счёт и модуль правила 11, у которого он берёт вызовы
+          # узла и чтение позиций. Забытая доставка второго дала бы ImportError
+          # уже на хосте.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/sdelki_po_cepi_za_okno.py" < deploy/checks/sdelki_po_cepi_za_okno.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/pravilo11_po_cepi.py" < deploy/checks/pravilo11_po_cepi.py
+          PO=""
+          [ -n "${{ inputs.po }}" ] && PO="--po ${{ inputs.po }}"
+          KOSH=""
+          [ -n "${{ inputs.koshelek }}" ] && KOSH="--koshelek ${{ inputs.koshelek }}"
+          # Кошелёк полосы скрипт спрашивает у bloom_own_send (env OWN_SEND_WALLET);
+          # не ответил -- ОТКАЗ словами, а не счёт по чужому адресу.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/sdelki_po_cepi_za_okno.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $KOSH --stranic '${{ inputs.stranic }}' --out $RABOTA/out.json" | tail -60
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/sdelki_po_cepi.json || true
+          if python3 -c "import json; json.load(open('/tmp/sdelki_po_cepi.json'))" 2>/dev/null; then
+            cp /tmp/sdelki_po_cepi.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: svodka ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Sdelki po cepi za okno: verdikt po cepi [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
