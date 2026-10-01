@@ -19,6 +19,10 @@ on:
         description: "СОЗДАТЬ таблицу на цепи -- ровно слово SOZDAT (иначе только показать)"
         required: false
         default: "net"
+      prinjat:
+        description: "ПРИНЯТЬ уже созданную таблицу по адресу (перечитать по цепи и отдать службе; денег не тратит)"
+        required: false
+        default: ""
       s_chaevymi:
         description: "'yes' -- положить в таблицу и белый список чаевых (рента вдвое: 0.0158 против 0.0089 SOL)"
         required: false
@@ -92,6 +96,10 @@ jobs:
             echo "VNIMANIE: sozdanie tablicy -- eto renta s koshel'ka polosy"
           else
             echo "rezhim pokaza: nichego ne tratim (sozdat: slovo SOZDAT v pole sozdat)"
+          fi
+          if [ -n "${{ inputs.prinjat }}" ]; then
+            FLAGI="--prinjat ${{ inputs.prinjat }} --katalog $STATE_DIR"
+            echo "rezhim prinjatija uzhe sozdannoj tablicy: deneg ne tratim"
           fi
           [ "${{ inputs.s_chaevymi }}" = "yes" ] && FLAGI="$FLAGI --s-chaevymi"
           ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $KOD_HOSTA && PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/lane_usdc_alt.py --pokazat $FLAGI --out $RABOTA/out.json" | tail -90
