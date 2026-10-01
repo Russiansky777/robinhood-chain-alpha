@@ -1,0 +1,124 @@
+name: "Кошелёк: движение по цепи и где лежит его ключ (только чтение)"
+
+# ЗАЧЕМ (слово владельца 01.10, п.2). С кошелька Bloom 4s87RRC2… между 06:36Z и
+# 07:17Z ушли 0.024620982 SOL, и владелец этого перевода не делал. Нужны подпись
+# с получателем по цепи и ответ, есть ли приватный ключ этого кошелька на хосте.
+#
+# КЛЮЧ ИЩЕТСЯ ВЫВОДОМ АДРЕСА, А НЕ ПО ИМЕНИ ПЕРЕМЕННОЙ: любая строка, которая
+# разбирается как ключ, превращается в публичный адрес, и сверяется адрес.
+# САМ КЛЮЧ НИКУДА НЕ ПЕЧАТАЕТСЯ -- ни в журнал прогона, ни в отчёт: только имя
+# переменной, путь файла и выведенный публичный адрес.
+#
+# ТОЛЬКО ЧТЕНИЕ. Ничего не удаляется: удаление -- отдельным словом владельца.
+on:
+  workflow_dispatch:
+    inputs:
+      koshelek:
+        description: "кошелёк для разбора движения"
+        required: false
+        default: "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+      s:
+        description: "начало окна UTC, например 2026-10-01T06:30:00Z"
+        required: false
+        default: "2026-10-01T06:30:00Z"
+      po:
+        description: "конец окна UTC (пусто -- до сейчас)"
+        required: false
+        default: "2026-10-01T07:20:00Z"
+      stranic:
+        description: "страниц подписей назад"
+        required: false
+        default: "3"
+
+concurrency:
+  group: koshelek-utechka
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/koshelek_utechka
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/koshelek_utechka.json
+
+jobs:
+  audit:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО любой сети"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/koshelek_utechka.py
+          if python3 -c "import requests, solders" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/ut_venv"
+            "$RUNNER_TEMP/ut_venv/bin/pip" install -q requests solders
+            PY="$RUNNER_TEMP/ut_venv/bin/python"
+          fi
+          "$PY" deploy/checks/koshelek_utechka.py --self-test | tail -3
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Аудит на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/koshelek_utechka.py" < deploy/checks/koshelek_utechka.py
+          # ПУТИ АУДИТА: каталог env службы, её рабочий каталог, каталог состояния,
+          # домашние каталоги bot и root, клон репозитория на хосте, systemd.
+          PUTI="/etc/bloom-executor,/home/bot,/root,/etc/systemd/system,$KOD_HOSTA,$STATE_DIR"
+          PO=""
+          [ -n "${{ inputs.po }}" ] && PO="--po ${{ inputs.po }}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $KOD_HOSTA && PYTHONPATH=$KOD_HOSTA $PY_HOSTA $RABOTA/koshelek_utechka.py --koshelek '${{ inputs.koshelek }}' --s '${{ inputs.s }}' $PO --stranic '${{ inputs.stranic }}' --puti \"$PUTI\" --out $RABOTA/out.json" 2>&1 | tail -80
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/koshelek_utechka.json || true
+          if python3 -c "import json; json.load(open('/tmp/koshelek_utechka.json'))" 2>/dev/null; then
+            cp /tmp/koshelek_utechka.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: svodka ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Koshelek: dvizhenie po cepi i audit kljuchej [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
