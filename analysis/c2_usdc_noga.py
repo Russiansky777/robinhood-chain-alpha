@@ -641,7 +641,8 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
            chaevye_lamporty: int = 1_000_000, chaevye_spiskom: list | None = None,
            chaevye_adres: str | None = None, nons: tuple | None = None,
            rpc_call=None, gruppa: str | None = None, nalog_kotirovki_bps=None,
-           min_out_vneshnij: int | None = None) -> dict:
+           min_out_vneshnij: int | None = None,
+           nashi_tablicy: list | None = None) -> dict:
     """ОДНА транзакция: SOL -> USDC -> токен на строителе типа. Без подписи и отправки.
 
     Порядок инструкций, пределы и связка сумм -- двухшагового пути; вторая нога --
@@ -680,15 +681,23 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
 
         _C, _PP, SB, _B = _kirpichi()
         TS = _dvuhshagovyj()
-        nuzhny = [k for k in SB._lut_keys(e["tx"]) + SB._lut_keys(tx_istochnika)
-                  if k not in kesh_nog.luts]
+        # НАША ТАБЛИЦА АДРЕСОВ -- ПЕРВОЙ (правка Code-1 01.10). Без неё две ноги не
+        # влезают в 1232 байта ни на одном типе пула: замер 1326...1703 байта на 32
+        # живых сделках. Таблицы источника и ноги нашего пакета не покрывают: у
+        # девяти источников из 32 своей таблицы нет вовсе, а статичные счета ноги
+        # SOL -> USDC не лежат ни в одной чужой таблице.
+        свои = [к for к in (nashi_tablicy or []) if к]
+        nuzhny = [k for k in свои + SB._lut_keys(e["tx"])
+                  + SB._lut_keys(tx_istochnika) if k not in kesh_nog.luts]
         if nuzhny:
             kesh_nog.load_luts(nuzhny, rpc=rpc_call)
             iz["hot_lut_calls"] = 1
-        klyuchi = list(dict.fromkeys(SB._lut_keys(e["tx"])
+        klyuchi = list(dict.fromkeys(свои + SB._lut_keys(e["tx"])
                                      + SB._lut_keys(tx_istochnika)))
         tablicy = [kesh_nog.luts[k] for k in klyuchi if k in kesh_nog.luts]
         iz["lut_tables"] = len(tablicy)
+        iz["nashi_tablicy_vzjaty"] = [к for к in свои if к in kesh_nog.luts]
+        iz["nashi_tablicy_ne_vzjaty"] = [к for к in свои if к not in kesh_nog.luts]
         msg = MessageV0.try_compile(Pubkey.from_string(nash_koshelek), ixs, tablicy,
                                     Hash.default())
         syroe = bytes(VersionedTransaction.populate(

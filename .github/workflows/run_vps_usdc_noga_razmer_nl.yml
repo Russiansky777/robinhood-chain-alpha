@@ -1,0 +1,130 @@
+name: "USDC-нога: размер пакета против 1232 и CU против 250 000 (без отправки)"
+
+# ЗАЧЕМ (утренний пакет владельца 01.10, п.2б): "в тени -- размер транзакции
+# против 1232 и CU по simulateTransaction против 250 000, таблицей по
+# CLMM / DLMM / Whirlpool / DAMM v2. Влезает и CU хватает -- 0.01 на первом
+# USDC-сигнале; не влезает -- число и стоп, не чинить втихую."
+#
+# НИ ОДНОЙ ПОДПИСИ В СЕТЬ. Прогон собирает транзакцию и спрашивает у цепи
+# simulateTransaction -- и только. BLOOM_USDC_NOGA=boj он ставит ТОЛЬКО СЕБЕ, в
+# своём процессе: env службы не трогается, служба остаётся в тени.
+#
+# Сделки -- ЖИВЫЕ снимки свопов с котировкой USDC по типам пулов из образцов
+# Code-3 (data/c3_usdc_noga/obrazcy_usdc_noga.json), с подписями.
+on:
+  workflow_dispatch:
+    inputs:
+      tipov:
+        description: "только эти типы через запятую (пусто -- все): CLMM,DLMM,Whirlpool,DAMM v2"
+        required: false
+        default: ""
+      predel:
+        description: "не больше N сделок (пусто/0 -- все)"
+        required: false
+        default: "0"
+      predel_cu:
+        description: "предел CU (пусто/0 -- взять BLOOM_LANE_CU_TWO_STEP полосы)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: usdc-noga-razmer
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/usdc_noga_razmer
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/usdc_noga_razmer_cu.json
+
+jobs:
+  razmer:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО любой сети"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/usdc_noga_razmer_cu.py
+          # Системный python3 раннера без requests и solders -- ставим окружение
+          # прогона, как это делает деплой. Молча пропустить проверку нельзя.
+          if python3 -c "import requests, solders" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/razmer_venv"
+            "$RUNNER_TEMP/razmer_venv/bin/pip" install -q requests solders
+            PY="$RUNNER_TEMP/razmer_venv/bin/python"
+          fi
+          "$PY" deploy/checks/usdc_noga_razmer_cu.py --self-test | tail -3
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Замер на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          # Доставляются ДВА файла: сам замер и модуль USDC-ноги с входом для
+          # нашей таблицы адресов. Без второго замер пошёл бы по версии на хосте,
+          # у которой этого входа ещё нет, и сказал бы "не влезает" по причине,
+          # которую мы сами и создали.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/usdc_noga_razmer_cu.py" < deploy/checks/usdc_noga_razmer_cu.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/c2_usdc_noga.py" < analysis/c2_usdc_noga.py
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 777 $RABOTA/data/c3_usdc_noga"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/data/c3_usdc_noga/obrazcy_usdc_noga.json" < data/c3_usdc_noga/obrazcy_usdc_noga.json
+          ARG=""
+          [ -n "${{ inputs.tipov }}" ] && ARG="$ARG --tipov '${{ inputs.tipov }}'"
+          [ "${{ inputs.predel }}" != "0" ] && [ -n "${{ inputs.predel }}" ] && ARG="$ARG --predel ${{ inputs.predel }}"
+          [ "${{ inputs.predel_cu }}" != "0" ] && [ -n "${{ inputs.predel_cu }}" ] && ARG="$ARG --predel-cu ${{ inputs.predel_cu }}"
+          # PYTHONPATH: сначала каталог прогона (наш свежий модуль и образцы),
+          # потом код службы. Порядок важен -- иначе возьмётся модуль хоста.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $RABOTA && PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA $RABOTA/usdc_noga_razmer_cu.py --state-dir $STATE_DIR $ARG --out $RABOTA/out.json" 2>&1 | tail -70
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/usdc_noga_razmer_cu.json || true
+          if python3 -c "import json; json.load(open('/tmp/usdc_noga_razmer_cu.json'))" 2>/dev/null; then
+            cp /tmp/usdc_noga_razmer_cu.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: svodka ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "USDC-noga: razmer paketa i CU po tipam pulov [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
