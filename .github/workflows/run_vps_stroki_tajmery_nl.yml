@@ -1,0 +1,221 @@
+name: "NL-хост: получасовая строка и часовая самопроверка таймерами ХОСТА"
+
+# ЗАЧЕМ (слово владельца 01.10, вечер, п.3). Обе строки писала сессия Code-1 по
+# расписанию снаружи. Сессия может простоять -- 01.10 она простояла с 11:15Z до
+# 16:11Z, и строк за это время не было вовсе, хотя стенд жил и числа у него
+# были. Теперь считает и отправляет САМ ХОСТ, а сессия только читает и
+# разбирает.
+#
+# ДЕНЕЖНОГО ПУТИ НЕТ. Юниты зовут один модуль (bloom_host_stroki.py), который
+# читает файлы состояния, спрашивает systemctl и journalctl и посылает текст в
+# Telegram. Ни покупки, ни продажи, ни подписи в нём нет -- это проверяет его
+# же самопроверка, и она же падает, если денежный вызов появится. ReadWritePaths
+# юнитам не дан вовсе: писать им некуда.
+#
+# ЧЕГО ЭТИ ЮНИТЫ НЕ ДЕЛАЮТ. Рубильник по страховке (X + Y <= 0.60 SOL) они НЕ
+# ставят: файл /etc/bloom-executor/KILL пишется от root, а таймеру отчётов root
+# не нужен. В строке в этом случае стоит "НУЖЕН ОБЩИЙ KILL", и рубильник ставит
+# прогон run_vps_bloom_kill_nl.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      vkljuchit:
+        description: "'yes' -- включить и запустить таймеры (иначе только доставка и пробный прогон)"
+        required: false
+        default: "no"
+      poslat_probu:
+        description: "'yes' -- один пробный прогон С ОТПРАВКОЙ в Telegram (чтобы владелец увидел строки)"
+        required: false
+        default: "no"
+      minuty_balansov:
+        description: "минуты часа для строки балансов"
+        required: false
+        default: "14,44"
+      minuta_samoproverki:
+        description: "минута часа для часовой самопроверки"
+        required: false
+        default: "10"
+
+concurrency:
+  group: stroki-tajmery-nl
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  ENV_DIR: /etc/bloom-executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  OUT_FILE: data/stroki_tajmery_nl.txt
+
+jobs:
+  tajmery:
+    runs-on: ["self-hosted", "nl-host"]
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка модуля ДО доставки (без хоста и без сети)"
+        run: python3 analysis/bloom_host_stroki.py --self-test
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставка модуля + сверка sha256"
+        run: |
+          set -e
+          set -o pipefail
+          F=bloom_host_stroki.py
+          [ -s "analysis/$F" ] || { echo "SBOY: lokalnyj analysis/$F pust"; exit 1; }
+          LOC=$(sha256sum "analysis/$F" | cut -d' ' -f1)
+          REM=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/$F 2>/dev/null | cut -d' ' -f1" || true)
+          if [ "$LOC" = "$REM" ]; then
+            echo "sovpalo, ne perepisyvaem: $F"
+          else
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/$F" < "analysis/$F"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "chown bot:bot $CODE_DIR/$F && chmod 644 $CODE_DIR/$F"
+            NEW=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $CODE_DIR/$F | cut -d' ' -f1")
+            [ "$LOC" = "$NEW" ] || { echo "SBOY: sha256 rashoditsja ($LOC vs $NEW)"; exit 1; }
+            echo "dostavlen $F sha256 $NEW"
+          fi
+
+      - name: "Самопроверка модуля НА ХОСТЕ (тем питоном, которым пойдёт таймер)"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR \
+              $VENV/python $CODE_DIR/bloom_host_stroki.py --self-test | tail -5
+          "
+
+      - name: "Юниты и таймеры (oneshot, без права писать)"
+        run: |
+          set -e
+          MB='${{ inputs.minuty_balansov }}'
+          MS='${{ inputs.minuta_samoproverki }}'
+          for PARA in "bloom-stroka-balansov polchasa" "bloom-samoproverka-chas chas"; do
+            IMJA=$(echo "$PARA" | cut -d' ' -f1)
+            REZHIM=$(echo "$PARA" | cut -d' ' -f2)
+            {
+              echo '[Unit]'
+              echo "Description=Stroka vladelcu s hosta ($REZHIM)"
+              echo 'After=network-online.target'
+              echo ''
+              echo '[Service]'
+              echo 'Type=oneshot'
+              echo 'User=bot'
+              echo 'Group=bot'
+              # ЖУРНАЛ ЧУЖОГО ЮНИТА: без этой группы journalctl отдаёт пустоту и
+              # код 1, а модуль честно говорит "журнал не прочитан". Право на
+              # чтение логов -- всё, что здесь добавлено.
+              echo 'SupplementaryGroups=systemd-journal'
+              echo "WorkingDirectory=$CODE_DIR"
+              echo "EnvironmentFile=$ENV_DIR/env"
+              echo "Environment=PYTHONPATH=$CODE_DIR"
+              echo "ExecStart=$VENV/python -u $CODE_DIR/bloom_host_stroki.py --rezhim $REZHIM --poslat"
+              echo 'StandardOutput=journal'
+              echo 'StandardError=journal'
+              echo 'NoNewPrivileges=true'
+              echo 'PrivateTmp=true'
+              echo 'ProtectSystem=strict'
+              echo 'ProtectHome=read-only'
+              echo 'ProtectKernelTunables=true'
+              echo 'ProtectControlGroups=true'
+              echo 'RestrictSUIDSGID=true'
+              echo 'LockPersonality=true'
+              echo 'MemoryMax=256M'
+              echo 'TasksMax=32'
+            } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/systemd/system/$IMJA.service"
+            if [ "$REZHIM" = "polchasa" ]; then KOGDA="*:$MB"; else KOGDA="*:$MS"; fi
+            {
+              echo '[Unit]'
+              echo "Description=Tajmer stroki vladelcu ($REZHIM)"
+              echo ''
+              echo '[Timer]'
+              echo "OnCalendar=$KOGDA"
+              echo 'AccuracySec=10s'
+              # БЕЗ ДОГОНА: опоздавшая строка о балансах хуже отсутствующей --
+              # числа в ней будут не те, что в её время.
+              echo 'Persistent=false'
+              echo "Unit=$IMJA.service"
+              echo ''
+              echo '[Install]'
+              echo 'WantedBy=timers.target'
+            } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/systemd/system/$IMJA.timer"
+          done
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl daemon-reload && echo 'junity i tajmery zapisany'"
+
+      - name: "Пробный прогон БЕЗ отправки: видно обе строки"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            for R in polchasa chas; do
+              echo \"--- \$R ---\"
+              sudo -u bot -E env PYTHONPATH=$CODE_DIR \
+                $VENV/python $CODE_DIR/bloom_host_stroki.py --rezhim \$R | head -40 || true
+            done
+          " | tee /tmp/stroki_proba.txt
+
+      - name: "Пробная ОТПРАВКА в Telegram (по запросу)"
+        if: ${{ inputs.poslat_probu == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            systemctl start bloom-stroka-balansov.service
+            systemctl start bloom-samoproverka-chas.service
+            sleep 3
+            systemctl status bloom-stroka-balansov.service --no-pager -l | tail -12
+            systemctl status bloom-samoproverka-chas.service --no-pager -l | tail -12
+          "
+
+      - name: "Включить таймеры (только по слову)"
+        if: ${{ inputs.vkljuchit == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            systemctl enable --now bloom-stroka-balansov.timer bloom-samoproverka-chas.timer
+            systemctl is-enabled bloom-stroka-balansov.timer
+            systemctl is-enabled bloom-samoproverka-chas.timer
+            systemctl list-timers 'bloom-*' --no-pager
+          " | tee -a /tmp/stroki_proba.txt
+
+      - name: "Отчёт в репозиторий"
+        run: |
+          set -e
+          {
+            echo "прогон таймеров строк: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "включение таймеров: ${{ inputs.vkljuchit }}"
+            echo "пробная отправка: ${{ inputs.poslat_probu }}"
+            echo "минуты балансов: ${{ inputs.minuty_balansov }}; минута самопроверки: ${{ inputs.minuta_samoproverki }}"
+            echo "--- пробный прогон ---"
+            cat /tmp/stroki_proba.txt 2>/dev/null || echo "пробного прогона нет"
+          } > "$OUT_FILE"
+          python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"
+
+      - name: "Коммит"
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f "$OUT_FILE" ]; then git add "$OUT_FILE"; fi
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Stroki tajmerami hosta: otchjot [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
