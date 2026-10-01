@@ -408,9 +408,14 @@ def main() -> int:
     import c2_usdc_noga as UN  # noqa: PLC0415
     import solana_rpc_client as RPC  # noqa: PLC0415
 
-    # ОТКУДА ВЗЯЛСЯ МОДУЛЬ -- В ОТЧЁТ. Прогон 06:47Z упал на том, что sobrat()
-    # не знал входа nashi_tablicy: взялась копия с хоста, а не доставленная.
-    # Молча измерить не тем модулем -- значит измерить не то, что поедет в бой.
+    наш = а.koshelek or OS.кошелёк_полосы()
+    предел_cu = а.predel_cu or OS.предел_cu("two_step")
+    клиент = RPC.SolanaRpc(service="usdc_noga_razmer_cu")
+    ответ: dict = {"кошелёк": наш, "предел_cu": предел_cu,
+                    "предел_пакета": ПРЕДЕЛ_ПАКЕТА}
+    # ОТКУДА ВЗЯЛСЯ МОДУЛЬ -- В ОТЧЁТ. Прогон 06:47Z упал на том, что sobrat() не
+    # знал входа nashi_tablicy: взялась копия с хоста, а не доставленная. Молча
+    # измерить не тем модулем -- значит измерить не то, что поедет в бой.
     ответ["модуль_usdc_nogi"] = getattr(UN, "__file__", None)
     ответ["вход_nashi_tablicy_есть"] = (
         "nashi_tablicy" in UN.sobrat.__code__.co_varnames)
@@ -422,11 +427,6 @@ def main() -> int:
             Path(а.out).write_text(json.dumps(ответ, ensure_ascii=False, indent=1),
                                     encoding="utf-8")
         return 2
-    наш = а.koshelek or OS.кошелёк_полосы()
-    предел_cu = а.predel_cu or OS.предел_cu("two_step")
-    клиент = RPC.SolanaRpc(service="usdc_noga_razmer_cu")
-    ответ: dict = {"кошелёк": наш, "предел_cu": предел_cu,
-                    "предел_пакета": ПРЕДЕЛ_ПАКЕТА}
     чт = наша_таблица(а.state_dir)
     ответ["наша_таблица"] = чт
     if not чт.get("ok"):
