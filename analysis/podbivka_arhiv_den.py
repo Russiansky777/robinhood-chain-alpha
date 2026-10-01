@@ -62,6 +62,9 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 БИЛЕТЫ = (0.3, 0.5)
 ОКНО_ВСЕМ = False       # --okno-vsem: правило окна докупки для всех наших адресов
 БЕЗ_АДРЕСОВ = False     # --bez-adresov: только цели (--celi) и их ряды -- без событий и сигналов наших адресов
+БЕЗ_СОБЫТИЙ = False     # --bez-sobytij: не писать "наши_события" (правилу кандидатов нужны только сигналы)
+ПОДПИСАНТ = ""          # --podpisant: адрес первого подписанта (сервер бота). Покупки, где txSigner -- он, считаются
+                        # сигналами для КОШЕЛЬКОВ из breakdown (их события в "наши_события" не пишутся -- только сигналы)
 ИЗДЕРЖКИ = 0.002
 КЛЮЧИ = ("signature", "action", "pool", "poolId", "mint", "quoteMint", "txSigner", "tokenAmount", "quoteAmount",
          "tokensInPool", "quoteInPool", "vTokensInBondingCurve", "vQuoteInBondingCurve", "poolFeeRate",
@@ -433,6 +436,11 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                         if sn:
                             трейдеры.add(sn.group(1))
                         наши = [t for t in трейдеры if t in адр]
+                        только_сигнал: set = set()
+                        if ПОДПИСАНТ and sn and sn.group(1) == ПОДПИСАНТ:
+                            доп_п = [t for t in трейдеры if t != ПОДПИСАНТ and t not in адр]
+                            только_сигнал = set(доп_п or ([ПОДПИСАНТ] if not наши else []))
+                            наши = наши + sorted(только_сигнал)
                         сг = р_sig.search(стр)
                         цель = bool(сг and сг.group(1) in celi)
                         мм = р_mint.search(стр) if минты else None
@@ -490,14 +498,15 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                 sol = кв * курс_q
                             else:
                                 sol = None
-                            наши_события.append({"trader": t, "signature": e["signature"], "action": e["action"],
-                                                 "pool": e.get("pool"), "poolId": pid, "mint": e.get("mint"),
-                                                 "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
-                                                 "первая": первая, "block": e.get("block"), "timestamp": e.get("timestamp"),
-                                                 "priorityFee": e.get("priorityFee"),
-                                                 "рост_до_750": цена_до[0] if цена_до else None,
-                                                 "рост_до_150": цена_до[1] if цена_до else None,
-                                                 "курс_q": курс_q, **резерв(e, курс_q)})
+                            if t not in только_сигнал and not БЕЗ_СОБЫТИЙ:
+                                наши_события.append({"trader": t, "signature": e["signature"], "action": e["action"],
+                                                     "pool": e.get("pool"), "poolId": pid, "mint": e.get("mint"),
+                                                     "quoteMint": q, "quote": кв, "tokens": ток, "sol_экв": sol,
+                                                     "первая": первая, "block": e.get("block"),
+                                                     "timestamp": e.get("timestamp"), "priorityFee": e.get("priorityFee"),
+                                                     "рост_до_750": цена_до[0] if цена_до else None,
+                                                     "рост_до_150": цена_до[1] if цена_до else None,
+                                                     "курс_q": курс_q, **резерв(e, курс_q)})
                             if t in ист and e["action"] == "buy" and q == WSOL and pid:
                                 покупки_ист.append({"trader": t, "signature": e["signature"], "poolId": pid, "pool": e.get("pool"),
                                                     "mint": e.get("mint"), "block": e.get("block"), "timestamp": e.get("timestamp"),
@@ -516,10 +525,15 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                 пред = последняя_пок.get(кл)
                                 по_окну = пред is None or (e.get("block") or 0) - пред > окно_докупки
                                 последняя_пок[кл] = e.get("block") or 0
+                                if len(последняя_пок) > 4_000_000:      # память: дальше окна правило не смотрит
+                                    порог_сл = (e.get("block") or 0) - окно_докупки
+                                    for кл_ in [k for k, v in последняя_пок.items() if v < порог_сл]:
+                                        del последняя_пок[кл_]
                             новый = по_окну if по_окну is not None else первая
                             if (e["action"] == "buy" and новый and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
                                     and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
                                 сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
+                                                "подписант": ПОДПИСАНТ if t in только_сигнал else None,
                                                 "первая": первая, "по_окну": по_окну,
                                                 "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
                                                 "sol": sol, "timestamp": e.get("timestamp"),
@@ -604,13 +618,17 @@ def main() -> int:
     р.add_argument("--okno-vsem", action="store_true",
                    help="правило Code-1 (--okno-dokupki) для ВСЕХ наших адресов, порог -- --porog (не только --istochniki)")
     р.add_argument("--bez-adresov", action="store_true", help="только цели (--celi) и ряды их пулов, без наших адресов")
+    р.add_argument("--bez-sobytij", action="store_true", help="не писать наши_события (нужны только сигналы с моделью)")
+    р.add_argument("--podpisant", default="", help="адрес первого подписанта (сервер бота): покупки с этим txSigner -- сигналы для кошельков breakdown")
     р.add_argument("--okno-dokupki", type=int, default=None,
                    help="для --istochniki сигнал по правилу Code-1: нет покупки того же минта в предыдущие N слотов (1800)")
     а = р.parse_args()
-    global БИЛЕТЫ, ОКНО_ВСЕМ, БЕЗ_АДРЕСОВ  # noqa: PLW0603
+    global БИЛЕТЫ, ОКНО_ВСЕМ, БЕЗ_АДРЕСОВ, ПОДПИСАНТ, БЕЗ_СОБЫТИЙ  # noqa: PLW0603
     БИЛЕТЫ = tuple(float(x) for x in а.bilety.split(",") if x.strip())
     ОКНО_ВСЕМ = а.okno_vsem
     БЕЗ_АДРЕСОВ = а.bez_adresov
+    ПОДПИСАНТ = а.podpisant
+    БЕЗ_СОБЫТИЙ = а.bez_sobytij
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
