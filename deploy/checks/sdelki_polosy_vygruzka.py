@@ -559,6 +559,17 @@ def main() -> int:
             "lane_dlmm_reads_ms": п.get("lane_dlmm_reads_ms"),
             "lane_dlmm_odno_godilos": п.get("lane_dlmm_odno_godilos"),
             "lane_dlmm_odno_why_not": п.get("lane_dlmm_odno_why_not"),
+            # ТЕНЬ НУЛЯ ЧТЕНИЙ (утренний пакет 01.10, п.1). ОБЕ цены и ОБА
+            # минимума идут в выгрузку рядом с годилось: по проценту одному
+            # Code-2 не сможет пересчитать расхождение сам, а по двум парам
+            # чисел -- сможет, и именно это и есть проверка.
+            "lane_dlmm_nol_godilos": п.get("lane_dlmm_nol_godilos"),
+            "lane_dlmm_nol_why_not": п.get("lane_dlmm_nol_why_not"),
+            "lane_dlmm_nol_cena_polosy": п.get("lane_dlmm_nol_cena_polosy"),
+            "lane_dlmm_nol_cena_teni": п.get("lane_dlmm_nol_cena_teni"),
+            "lane_dlmm_nol_min_out_polosy": п.get("lane_dlmm_nol_min_out_polosy"),
+            "lane_dlmm_nol_min_out_teni": п.get("lane_dlmm_nol_min_out_teni"),
+            "lane_dlmm_nol_otklonenie_pct": п.get("lane_dlmm_nol_otklonenie_pct"),
             # S+0 И РЕГИОНАЛЬНАЯ ОТПРАВКА -- ДЛЯ МЕТРИКИ "ДО/ПОСЛЕ ПО НЕ-EU
             # ЛИДЕРАМ" (слово владельца 29.09 ночью, п.2). s_plus заполняется
             # ниже, после дозаполнения слота посадки по цепи: до него landed_slot
@@ -576,6 +587,14 @@ def main() -> int:
             "region_lidera": None,
             "region_lidera_why_not": None,
             "region_otpravki": п.get("lane_region"),
+            # РЕГИОН ЛИДЕРА ПО ЗАПИСИ (слово владельца 01.10, п.5): его пишет
+            # посадка покупки рядом с lane_region. region_lidera выше считается
+            # ЗДЕСЬ по расписанию эпохи, и два числа рядом нужны именно затем,
+            # чтобы расхождение между счётом выгрузки и записью было видно, а не
+            # пряталось за одним полем.
+            "lane_region_leader": п.get("lane_region_leader"),
+            "lane_region_leader_why_not": п.get("lane_region_leader_why_not"),
+            "lane_region_leader_slot": п.get("lane_region_leader_slot"),
             "region_point": п.get("lane_region_point"),
             "region_senders": п.get("lane_region_senders"),
             "region_otpravki_why_not": (
@@ -863,6 +882,42 @@ def main() -> int:
                 continue
             ряд["итог_sol"] = (round(итог, 9) if итог is not None else None)
             ряд["расход_sol"] = round(расход, 9)
+            # ПРАВИЛО 13 (слово владельца 01.10): КАНОНИЧЕСКОЕ число -- итог по
+            # цепи, и в каждой строке лежат ОБЕ ПОДПИСИ, чтобы Code-2 пересчитал
+            # независимо. Прежний итог остаётся рядом под своим именем
+            # (итог_po_polyam_sol): по нему видно, где поля расходятся с цепью.
+            try:
+                import c2_itog_po_cepi as C13  # noqa: PLC0415
+
+                ц = C13.из_записи(поз)
+                с_ = C13.сверка(поз)
+                ряд["итог_po_polyam_sol"] = ряд["итог_sol"]
+                ряд["итог_po_cepi_sol"] = ц.get("итог_sol")
+                ряд["итог_po_cepi_pochemu_net"] = ц.get("почему_нет")
+                ряд["итог_po_cepi_chasti"] = ц.get("части") or None
+                ряд["sverka_sol"] = с_.get("расхождение_sol")
+                # РАЗНОСТЬ, ДВЕ НАЗВАННЫЕ ВЕЛИЧИНЫ И ОСТАТОК. По одной разности
+                # Code-2 не отличит объяснённую ренту от настоящей дыры, а по
+                # четырём числам отличит -- и пересчитает сам.
+                ряд["renta_zaperta_sol"] = с_.get("рента_заперта_sol")
+                ряд["zavernutoe_ostalos_sol"] = с_.get("завёрнутое_осталось_sol")
+                ряд["sverka_ostatok_sol"] = с_.get("остаток_sol")
+                ряд["sverka_ok"] = с_.get("сверено")
+                ряд["buy_sig"] = (ряд.get("buy_sig")
+                                   or поз.get(C13.ПОЛЕ_ПОДПИСЬ_ПОКУПКИ)
+                                   or поз.get("lane_landed_signature"))
+                ряд["sell_sig"] = (ряд.get("sell_sig")
+                                    or поз.get(C13.ПОЛЕ_ПОДПИСЬ_ПРОДАЖИ)
+                                    or поз.get("last_sell_reported"))
+                if ц.get("есть"):
+                    ряд["итог_sol"] = ц.get("итог_sol")
+                    ряд["итог_откуда"] = "цепь"
+                else:
+                    ряд["итог_откуда"] = "поля"
+            except Exception as exc:  # noqa: BLE001
+                ряд["итог_po_cepi_pochemu_net"] = (
+                    f"модуль итога по цепи не загружен: {type(exc).__name__}")
+                ряд["итог_откуда"] = "поля"
         # СЛАГАЕМЫЕ ПО ИМЕНАМ -- ТЕМ ЖЕ МОДУЛЕМ СЛУЖБЫ (слово владельца 29.09
         # ночью, п.3: "назвать каждое слагаемое по имени -- билет, чаевые,
         # приоритет, комиссия, рента, завёрнутое, возврат -- в самой службе").
@@ -894,7 +949,19 @@ def main() -> int:
                     "модуль учёта старше правки: разложение_позиции в нём нет")
             print("слагаемые по именам: модуль учёта их не знает")
 
+    # ВЕРСИЯ ВЫГРУЗКИ (слово владельца 01.10, п.8): по ней Code-2 отличает
+    # строки с каноническим итогом по цепи от прежних.
+    по_цепи = sum(1 for р_ in ряды if р_.get("итог_откуда") == "цепь")
+    не_сверено = sum(1 for р_ in ряды if р_.get("sverka_ok") is False)
     свод = {"снято_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             "версия": "pravilo13",
+             "итог_канонический": "итог_po_cepi_sol (сумма изменений ВСЕХ наших "
+                                   "счетов по двум подписям); итог_po_polyam_sol "
+                                   "-- прежний счёт по полям",
+             "строк_с_итогом_по_цепи": по_цепи,
+             "строк_не_сверено": не_сверено,
+             "подпись_сводки": ("не сверено" if (не_сверено or по_цепи < len(ряды))
+                                 else "сверено"),
              "с": а.s, "до": а.do or None, "полные_поля": bool(а.polnye),
              "строк_просмотрено": просмотрено, "сделок": len(ряды),
              "с_севшей_подписью": sum(1 for р_ in ряды if р_.get("landed_sig")),

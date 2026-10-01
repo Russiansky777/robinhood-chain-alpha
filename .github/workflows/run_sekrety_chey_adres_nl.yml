@@ -1,0 +1,92 @@
+name: "Секреты GitHub: чей кошелёк в каждом (только вывод адреса)"
+
+# ЗАЧЕМ (слово владельца 01.10, п.2). Нужно подтвердить, есть ли приватный ключ
+# кошелька Bloom 4s87RRC2 в GitHub secrets, и что ключ полосы (LIVE) читается
+# ТОЛЬКО из секрета LIVE.
+#
+# ИЗМЕРЕНИЕ, А НЕ ИМЯ ПЕРЕМЕННОЙ. Каждый секрет из списка разбирается общим
+# разборщиком репозитория, из него выводится ПУБЛИЧНЫЙ адрес, и сверяется адрес.
+# Секрет, названный как угодно, попадётся по адресу; секрет, который ключом не
+# является, честно помечается "не ключ" без текста исключения.
+#
+# САМ СЕКРЕТ НИКУДА НЕ ПЕЧАТАЕТСЯ: ни в журнал прогона, ни в отчёт -- только имя
+# секрета, вид записи, длина и выведенный адрес. Отдельная проверка отчёта стоит
+# в конце.
+#
+# НИ ОДНОЙ ПОДПИСИ И НИ ОДНОЙ ОТПРАВКИ. Ключ читается только чтобы получить адрес.
+on:
+  workflow_dispatch:
+    inputs:
+      celi:
+        description: "адреса-цели через запятую (адрес=чей)"
+        required: false
+        default: "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N=Bloom (исполнитель),4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x=полоса (LIVE),21DqHDDPEfMhK1dHRkV9E8v8KTTSKQGApJAr1irC9j7w=старый кошелёк полосы"
+
+concurrency:
+  group: sekrety-chey-adres
+  cancel-in-progress: false
+
+env:
+  OUT: data/sekrety_chey_adres.json
+
+jobs:
+  adresa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Окружение"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/sk_venv"
+          "$RUNNER_TEMP/sk_venv/bin/pip" install -q requests solders base58
+          echo "PY=$RUNNER_TEMP/sk_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Самопроверка ДО секретов"
+        run: $PY deploy/checks/sekrety_chey_adres.py --self-test | tail -3
+
+      - name: "Чей адрес в каждом секрете"
+        env:
+          # СПИСОК НАМЕРЕННО ШИРЕ, ЧЕМ "ключи кошельков": секрет под именем вида
+          # BLOOM_KEY или PRIVATE_KEY_NOX тоже может оказаться ключом кошелька,
+          # и узнать это можно только выводом адреса.
+          EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY }}
+          LIVE_PRIVATE: ${{ secrets.LIVE_PRIVATE }}
+          RESCUE_WALLET_KEY: ${{ secrets.RESCUE_WALLET_KEY }}
+          BLOOM_KEY: ${{ secrets.BLOOM_KEY }}
+          PRIVATE_KEY_NOX: ${{ secrets.PRIVATE_KEY_NOX }}
+          BLOOM_API_KEY_PRIVATE: ${{ secrets.BLOOM_API_KEY_PRIVATE }}
+          LIGHTER_API_KEY_PRIVATE: ${{ secrets.LIGHTER_API_KEY_PRIVATE }}
+        run: |
+          set -e
+          set -o pipefail
+          $PY deploy/checks/sekrety_chey_adres.py \
+            --imena EXEC_WALLET_KEY,LIVE_PRIVATE,RESCUE_WALLET_KEY,BLOOM_KEY,PRIVATE_KEY_NOX,BLOOM_API_KEY_PRIVATE,LIGHTER_API_KEY_PRIVATE \
+            --celi "${{ inputs.celi }}" --out "$OUT" --trebovat-zamer | tail -40
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Sekrety GitHub: chey adres v kazhdom [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

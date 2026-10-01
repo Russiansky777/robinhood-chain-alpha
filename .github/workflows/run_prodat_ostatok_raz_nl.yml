@@ -1,0 +1,197 @@
+name: "Остаток названного минта: продать по любой котировке и закрыть счёт"
+
+# ЗАЧЕМ (слово владельца 01.10, п.3): "SUPER POOP -- продать остаток по любой
+# котировке, счёт закрыть, итог по цепи строкой".
+#
+# ПОЧЕМУ ОТДЕЛЬНЫЙ ПРОГОН, А НЕ ПРАВКА ПОЛА В СЛУЖБЕ. Сторож отказался продавать
+# ПРАВИЛЬНО: у полосы правило "по любой котировке" действует для позиций не
+# больше 0.05 SOL (решение владельца 25.09), а эта вошла на 0.3 SOL -- для неё
+# правило 30 % от входа осталось, и 2.59 % его не прошли. Снижать порог в службе
+# означало бы менять правило для ВСЕХ будущих позиций из-за одной. Владелец
+# разрешил продать ОДНУ названную -- её и продаёт один названный прогон.
+#
+# ПОЛ 70 % ОТ КОТИРОВКИ НЕ ОТМЕНЯЕТСЯ НИКОМУ: он про подмену минимума на цепи,
+# а не про дешёвую котировку.
+#
+# ДВА ЖИВЫХ ШАГА, И КАЖДЫЙ ПО СВОЕМУ СЛОВУ: продажа -- live=yes, закрытие счёта
+# -- zakryt=yes. По умолчанию прогон только читает котировку и останавливается
+# перед подписью.
+on:
+  workflow_dispatch:
+    inputs:
+      mint:
+        description: "минт, остаток которого продаём"
+        required: false
+        default: "7GNz3cnErX4fmT73HxJLeqFqjoJwLpRoS8cQqiywpump"
+      vhod_sol:
+        description: "вход позиции в SOL (только для доклада доли)"
+        required: false
+        default: "0.3"
+      live:
+        description: "'yes' -- подписать и отправить продажу"
+        required: false
+        default: "no"
+      zakryt:
+        description: "'yes' -- после продажи закрыть опустевший счёт"
+        required: false
+        default: "no"
+      zhdat:
+        description: "сколько секунд ждать подтверждения подписи"
+        required: false
+        default: "90"
+
+concurrency:
+  group: prodat-ostatok-raz
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  RABOTA: /tmp/prodat_ostatok_raz
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/prodat_ostatok_raz.json
+
+jobs:
+  prodat:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      # У системного python3 бегунка нет solders -- здесь только разбор файла.
+      # Настоящая самопроверка идёт на ХОСТЕ тем же питоном, что и прогон.
+      - name: "Модуль разбирается"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/prodat_ostatok_raz.py
+          echo "razbor ok"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить модуль и самопроверка на хосте ДО любой сети"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/prodat_ostatok_raz.py" < deploy/checks/prodat_ostatok_raz.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $CODE_DIR && PYTHONPATH=$CODE_DIR $PY_HOSTA $RABOTA/prodat_ostatok_raz.py --self-test | tail -3"
+
+      - name: "Продажа остатка (живой режим -- только по слову live=yes)"
+        run: |
+          set -e
+          set -o pipefail
+          ZHIVYOM=""
+          if [ "${{ inputs.live }}" = "yes" ]; then ZHIVYOM="PRODAT_OSTATOK_LIVE=1"; fi
+          # Кошелёк НЕ задаётся входом: продаём с кошелька полосы из окружения
+          # службы. Чужой адрес сюда вписать нельзя, а ключ всё равно обязан
+          # принадлежать этому же кошельку -- проверка внутри модуля.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            env HELIUS_API_KEY=\$HELIUS_API_KEY \
+              OWN_SEND_WALLET=\$OWN_SEND_WALLET \
+              OWN_SEND_WALLET_KEY=\$OWN_SEND_WALLET_KEY \
+              JUPITER_API_KEY=\$JUPITER_API_KEY \
+              BLOOM_STATE_DIR=\$BLOOM_STATE_DIR \
+              $ZHIVYOM PYTHONPATH=$CODE_DIR \
+              $PY_HOSTA $RABOTA/prodat_ostatok_raz.py \
+                --mint '${{ inputs.mint }}' --koshelek \$OWN_SEND_WALLET \
+                --vhod-sol '${{ inputs.vhod_sol }}' --zhdat '${{ inputs.zhdat }}' \
+                --out $RABOTA/out.json
+          " 2>&1 | tail -60 || echo "PRODAZHA_NE_OK=1" >> "$GITHUB_ENV"
+          # Отчёт забираем ВСЕГДА (в нём причина), а краснеем ниже -- по самому
+          # отчёту, а не по коду ssh: причина важнее кода.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/prodat.json || true
+          if python3 -c "import json; json.load(open('/tmp/prodat.json'))" 2>/dev/null; then
+            cp /tmp/prodat.json "$OUT_FILE"
+            python3 -c "import json;print('STROKA:', json.load(open('$OUT_FILE'))['строка'])"
+            if [ "${{ inputs.live }}" = "yes" ]; then
+              OK=$(python3 -c "import json;d=json.load(open('$OUT_FILE'));c=d.get('цепь') or {};print(1 if (c.get('подтверждена') and not c.get('ошибка_цепи')) else 0)")
+              if [ "$OK" != "1" ]; then echo "SBOY: zhivoj progon ne dovel prodazhu do podtverzhdennoj podpisi"; exit 1; fi
+            fi
+          else
+            echo "SBOY: svodka ne sobralas"
+            exit 1
+          fi
+
+      - name: "Закрыть опустевший счёт (только по слову zakryt=yes)"
+        if: ${{ inputs.zakryt == 'yes' && inputs.live == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАКРЫВАЕМ РОВНО ТОТ СЧЁТ, который опустел, и только если он пуст:
+          # охрана "остаток ноль -- иначе токен потеряется" стоит в самом
+          # закрывателе, второй копии её здесь нет.
+          PUST=$(python3 -c "import json;d=json.load(open('$OUT_FILE'));print(1 if (d.get('цепь') or {}).get('счёт_пуст') else 0)")
+          SCHET=$(python3 -c "import json;d=json.load(open('$OUT_FILE'));print((d.get('цепь') or {}).get('счёт') or '')")
+          if [ "$PUST" != "1" ] || [ -z "$SCHET" ]; then
+            echo "SBOY: schet ne pust ili ne nazvan -- zakryvat nelzja"
+            exit 1
+          fi
+          echo "zakryvaem schet $SCHET"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/close_empty_token_accounts.py" < analysis/close_empty_token_accounts.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            printf '{\"wallet\": \"%s\", \"empty\": [{\"account\": \"%s\"}]}' \"\$OWN_SEND_WALLET\" '$SCHET' > $RABOTA/spisok.json
+            cd $CODE_DIR
+            env HELIUS_API_KEY=\$HELIUS_API_KEY \
+              OWN_SEND_WALLET=\$OWN_SEND_WALLET \
+              OWN_SEND_WALLET_KEY=\$OWN_SEND_WALLET_KEY \
+              BLOOM_STATE_DIR=\$BLOOM_STATE_DIR \
+              BLOOM_SOURCE_GROUPS=\$BLOOM_SOURCE_GROUPS \
+              CLOSE_ACCOUNTS_LIVE=1 CLOSE_ACCOUNTS_WHILE_TRADING=1 \
+              PYTHONPATH=$CODE_DIR \
+              $PY_HOSTA $RABOTA/close_empty_token_accounts.py \
+                --accounts $RABOTA/spisok.json --wallet \$OWN_SEND_WALLET \
+                --max-accounts 1 --batch 1 --max-batches 1 \
+                --out $RABOTA/plan.json --result $RABOTA/zakrytie.json
+          " 2>&1 | tail -40
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/zakrytie.json 2>/dev/null || echo '{}'" > data/prodat_ostatok_zakrytie.json
+          wc -c data/prodat_ostatok_zakrytie.json
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          # if, а НЕ "[ -f ] && ...": под set -e неудачная проверка последнего
+          # файла валит шаг, и прогон краснеет из-за отсутствующего файла.
+          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json; do
+            if [ -f "$F" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$F"; fi
+          done
+
+      - name: "Убрать рабочий каталог"
+        if: always()
+        run: ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json; do
+            if [ -f "$F" ]; then git add "$F"; fi
+          done
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Ostatok nazvannogo minta: prodazha i zakrytie scheta [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

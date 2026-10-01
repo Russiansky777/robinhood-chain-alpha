@@ -1,0 +1,135 @@
+name: "USDC-нога: НАША таблица адресов (показать; создать только по слову)"
+
+# ЗАЧЕМ (утренний пакет владельца 01.10, п.2а): "перед тенью создать свою ALT со
+# статичными счетами первой ноги SOL<->USDC и программами, один раз, рента
+# строкой". Замер Code-3 назвал гейт числом: две ноги БЕЗ таблиц адресов не
+# влезают в 1232 байта ни на одном типе пула (1326...1703 байта на 32 живых
+# сделках), и у девяти источников из 32 своей таблицы нет вовсе.
+#
+# УМОЛЧАНИЕ НИЧЕГО НЕ ТРАТИТ: прогон только печатает, что ляжет в таблицу, и
+# ренту по формуле. Создание -- ровно по слову SOZDAT в поле sozdat, и тогда
+# рента берётся У УЗЛА и ПРОВЕРЯЕТСЯ по цепи фактической дельтой кошелька.
+#
+# Ключ кошелька полосы читается из env хоста внутри удалённой оболочки и в
+# журнал прогона не попадает.
+on:
+  workflow_dispatch:
+    inputs:
+      sozdat:
+        description: "СОЗДАТЬ таблицу на цепи -- ровно слово SOZDAT (иначе только показать)"
+        required: false
+        default: "net"
+      prinjat:
+        description: "ПРИНЯТЬ уже созданную таблицу по адресу (перечитать по цепи и отдать службе; денег не тратит)"
+        required: false
+        default: ""
+      s_chaevymi:
+        description: "'yes' -- положить в таблицу и белый список чаевых (рента вдвое: 0.0158 против 0.0089 SOL)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: usdc-noga-alt
+  cancel-in-progress: false
+
+env:
+  ENV_DIR: /etc/bloom-executor
+  TARGET_HOST: 127.0.0.1
+  KOD_HOSTA: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  RABOTA: /tmp/usdc_noga_alt
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT_FILE: data/usdc_noga_alt.json
+
+jobs:
+  alt:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка ДО любой сети"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile analysis/lane_usdc_alt.py
+          # Системный python3 раннера БЕЗ solders, а замер наших мест без него не
+          # идёт вовсе: ставим временное окружение прогона, как это делает деплой.
+          # Молча пропустить самопроверку тут нельзя -- она и есть доказательство,
+          # что в таблицу ляжет то, что нужно, и кошелька полосы в ней нет.
+          if python3 -c "import requests, solders" 2>/dev/null; then
+            PY=python3
+          else
+            python3 -m venv "$RUNNER_TEMP/alt_venv"
+            "$RUNNER_TEMP/alt_venv/bin/pip" install -q requests solders
+            PY="$RUNNER_TEMP/alt_venv/bin/python"
+          fi
+          "$PY" analysis/lane_usdc_alt.py --self-test | tail -3
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Таблица адресов на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          # Доставляется ОДИН файл: остальное модуль берёт из кода службы на
+          # хосте (bloom_nogi_shablony, c2_swap_build, bloom_senders,
+          # bloom_own_send) -- то есть ровно из того, чем полоса и собирает.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/lane_usdc_alt.py" < analysis/lane_usdc_alt.py
+          FLAGI=""
+          if [ "${{ inputs.sozdat }}" = "SOZDAT" ]; then
+            FLAGI="--sozdat --katalog $STATE_DIR"
+            echo "VNIMANIE: sozdanie tablicy -- eto renta s koshel'ka polosy"
+          else
+            echo "rezhim pokaza: nichego ne tratim (sozdat: slovo SOZDAT v pole sozdat)"
+          fi
+          if [ -n "${{ inputs.prinjat }}" ]; then
+            FLAGI="--prinjat ${{ inputs.prinjat }} --katalog $STATE_DIR"
+            echo "rezhim prinjatija uzhe sozdannoj tablicy: deneg ne tratim"
+          fi
+          [ "${{ inputs.s_chaevymi }}" = "yes" ] && FLAGI="$FLAGI --s-chaevymi"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $KOD_HOSTA && PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/lane_usdc_alt.py --pokazat $FLAGI --out $RABOTA/out.json" | tail -90
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/usdc_noga_alt.json || true
+          if python3 -c "import json; json.load(open('/tmp/usdc_noga_alt.json'))" 2>/dev/null; then
+            cp /tmp/usdc_noga_alt.json "$OUT_FILE"
+            echo "obnovlen $OUT_FILE"
+          else
+            echo "SBOY: svodka ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "USDC-noga: tablica adresov -- chto v nej i renta [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
