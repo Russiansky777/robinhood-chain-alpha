@@ -114,10 +114,16 @@ jobs:
                 --vhod-sol '${{ inputs.vhod_sol }}' --zhdat '${{ inputs.zhdat }}' \
                 --out $RABOTA/out.json
           " 2>&1 | tail -60 || echo "PRODAZHA_NE_OK=1" >> "$GITHUB_ENV"
+          # Отчёт забираем ВСЕГДА (в нём причина), а краснеем ниже -- по самому
+          # отчёту, а не по коду ssh: причина важнее кода.
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/prodat.json || true
           if python3 -c "import json; json.load(open('/tmp/prodat.json'))" 2>/dev/null; then
             cp /tmp/prodat.json "$OUT_FILE"
             python3 -c "import json;print('STROKA:', json.load(open('$OUT_FILE'))['строка'])"
+            if [ "${{ inputs.live }}" = "yes" ]; then
+              OK=$(python3 -c "import json;d=json.load(open('$OUT_FILE'));c=d.get('цепь') or {};print(1 if (c.get('подтверждена') and not c.get('ошибка_цепи')) else 0)")
+              if [ "$OK" != "1" ]; then echo "SBOY: zhivoj progon ne dovel prodazhu do podtverzhdennoj podpisi"; exit 1; fi
+            fi
           else
             echo "SBOY: svodka ne sobralas"
             exit 1
@@ -162,8 +168,10 @@ jobs:
         if: always()
         run: |
           set -e
+          # if, а НЕ "[ -f ] && ...": под set -e неудачная проверка последнего
+          # файла валит шаг, и прогон краснеет из-за отсутствующего файла.
           for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json; do
-            [ -f "$F" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$F"
+            if [ -f "$F" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$F"; fi
           done
 
       - name: "Убрать рабочий каталог"
@@ -177,7 +185,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json; do
-            [ -f "$F" ] && git add "$F"
+            if [ -f "$F" ]; then git add "$F"; fi
           done
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
           git commit -m "Ostatok nazvannogo minta: prodazha i zakrytie scheta [automated]"
