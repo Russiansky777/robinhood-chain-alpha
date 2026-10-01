@@ -60,13 +60,35 @@ API = "https://api.apify.com/v2"
 СРОК_ЗАПУСКА_С = 300.0
 ЦЕПЬ = "sol"
 
-# КОМБИНАЦИИ ПЕРВОГО ПРОХОДА (12 запусков, ~4.5 $) -- список владельца.
-# Каждое значение сверяется со схемой актора перед первым запуском.
+# КОМБИНАЦИИ ПЕРВОГО ПРОХОДА (12 запусков, ~4.5 $).
+#
+# ЗНАЧЕНИЯ -- ИЗ СХЕМЫ АКТОРА, А НЕ ИЗ СПИСКА НА СЛОВАХ. Пробный прогон 01.10
+# (сборка XrFNAu5yp4sOfbZ7G) прочитал перечисления, и половина названий из задания
+# в схеме НЕ СУЩЕСТВУЕТ. Схема принимает:
+#   traderType: all, smart_degen, pump_smart, launchpad_smart, kol, fresh_wallet,
+#               sniper, top_tracked, top_renamed, top_dev, live
+#   sortBy:     profit_1d/7d/30d, pnl_1d/7d/30d, winrate_1d/7d/30d, txs_1d/7d/30d,
+#               volume_1d/7d/30d, net_inflow_1d/7d/30d, last_active, balance,
+#               tracked, renamed
+# Перевод списка задания в имена схемы (замена -- строкой, не молча):
+#   pnl -> pnl_7d, win_rate -> winrate_7d, transactions -> txs_7d,
+#   volume -> volume_7d, tracked и profit_7d совпали;
+#   pump_smart_money -> pump_smart, launchpad_smart_money -> launchpad_smart,
+#   kol_vc -> kol, sniper и smart_degen совпали;
+#   smart_money -> all: равного имени в схеме НЕТ, и "all" -- самый широкий
+#   список без фильтра типа, то есть замена, которая не может вернуть чужую
+#   выборку. Это ЗАМЕНА, и она названа здесь и в странице выгрузки.
+# Не задействованы (дешёвая ширина на следующий проход): fresh_wallet,
+# top_renamed, top_dev, live, окна 1d и 30d, net_inflow_*, last_active, balance.
 ТИП_ПО_УМОЛЧАНИЮ = "top_tracked"
 СОРТИРОВКА_ПО_УМОЛЧАНИЮ = "tracked"
-СОРТИРОВКИ = ("tracked", "profit_7d", "pnl", "win_rate", "transactions", "volume")
-ТИПЫ = ("smart_money", "pump_smart_money", "launchpad_smart_money", "sniper",
-         "kol_vc", "smart_degen")
+СОРТИРОВКИ = ("tracked", "profit_7d", "pnl_7d", "winrate_7d", "txs_7d", "volume_7d")
+ТИПЫ = ("all", "pump_smart", "launchpad_smart", "sniper", "kol", "smart_degen")
+# Чем заменено имя из задания -- в страницу выгрузки, чтобы это не терялось.
+ЗАМЕНЫ_ИМЁН = {"pnl": "pnl_7d", "win_rate": "winrate_7d",
+                "transactions": "txs_7d", "volume": "volume_7d",
+                "smart_money": "all", "pump_smart_money": "pump_smart",
+                "launchpad_smart_money": "launchpad_smart", "kol_vc": "kol"}
 
 
 def комбинации_прохода() -> list:
@@ -385,7 +407,14 @@ def записать_страницу(свод: dict, путь: Path, *, csv_п�
             "| столбец | строк заполнено |", "|---|---|"]
     for столбец, н in столбцы.items():
         стр.append(f"| `{столбец}` | {н} из {свод['уникальных']} |")
-    стр += ["", "Ничего не отбиралось и не оценивалось: сито -- на архиве у Code-2.",
+    стр += ["", "## Имена из задания, которых в схеме актора нет", "",
+            "| в задании | в схеме |", "|---|---|"]
+    for было, стало in sorted(ЗАМЕНЫ_ИМЁН.items()):
+        стр.append(f"| `{было}` | `{стало}` |")
+    стр += ["", "Остальные имена задания совпали со схемой. Не задействованы: "
+                "`fresh_wallet`, `top_renamed`, `top_dev`, `live`, окна `1d` и "
+                "`30d`, `net_inflow_*`, `last_active`, `balance`.",
+            "", "Ничего не отбиралось и не оценивалось: сито -- на архиве у Code-2.",
             ""]
     путь.write_text("\n".join(стр), encoding="utf-8")
     return путь
