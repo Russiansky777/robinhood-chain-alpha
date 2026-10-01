@@ -653,10 +653,31 @@ def sync_native(account: str) -> Instruction:
                        [AccountMeta(Pubkey.from_string(account), False, True)])
 
 
+def close_account(account: str, destination: str, authority: str) -> Instruction:
+    """SPL Token CloseAccount (9): остаток и рента счёта уходят в destination.
+
+    ЗАЧЕМ В ПОКУПКЕ. Обёртка SOL создаёт счёт WSOL и кладёт на него ровно
+    amount_in. Если своп эти лампорты НЕ забрал (а у пула с нативной котировкой
+    он их и не трогает), они остаются лежать на счёте WSOL: в балансе кошелька
+    их уже нет, а в сделке они не участвовали. Измерено 01.10 на покупке полосы
+    tvwftKB3 (15:58:39Z, кривая pump.fun, сделка 0.1): нативная дельта
+    -0.20500728 при дельте WSOL +0.1 -- ровно размер сделки встал в обёртке и
+    простоял 31 минуту, пока его не вернуло закрытие счёта ВНУТРИ ЧУЖОЙ продажи
+    (DBT 16:29:23Z), где эти 0.1 и были записаны как выручка той сделки.
+
+    Поэтому закрытие стоит в той же транзакции, что обёртка: не забрал своп --
+    деньги вернулись тем же действием, которым ушли.
+    """
+    return Instruction(Pubkey.from_string(TOKEN_PROGRAM), bytes([9]), [
+        AccountMeta(Pubkey.from_string(account), False, True),
+        AccountMeta(Pubkey.from_string(destination), False, True),
+        AccountMeta(Pubkey.from_string(authority), True, False)])
+
+
 def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min_out: int,
               cu_units: int = 200_000, cu_price_micro: int = 0, tip: tuple | None = None,
               wrap_sol: bool = True, nonce: tuple | None = None,
-              tip_first: bool = False) -> dict:
+              tip_first: bool = False, close_wsol: bool = True) -> dict:
     """Инструкции покупки: compute budget, ATA (идемпотентно), обёртка SOL
     (если котировка WSOL и wrap_sol), своп, tip отдельным параметром
     (адрес, лампорты) -- адрес tip не зашит.
@@ -679,9 +700,11 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
     ixs.append(ata_idempotent(payer, user, mv["base_mint"], mv["base_program"]))
     if mv["quote_program"]:   # нативная котировка (кривая pump.fun): счёта нет
         ixs.append(ata_idempotent(payer, user, mv["quote_mint"], mv["quote_program"]))
+    обёрнут_wsol = None
     if mv["quote_mint"] == C.WSOL and wrap_sol and amount_in:
         wsol_ata = ata(user, C.WSOL, mv["quote_program"])
         ixs += [sol_transfer(user, wsol_ata, amount_in), sync_native(wsol_ata)]
+        обёрнут_wsol = wsol_ata
     # ЧАЕВЫЕ ПЕРЕД СВОПОМ -- по требованию отправителя. 0slot в письме 25.09:
     # "инструкцию чаевых ставить в начало транзакции" (он ищет её там). Ставим
     # сразу после бюджета вычислений и nonce: раньше нельзя -- nonce обязан быть
@@ -715,12 +738,23 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
                 and tip and isinstance(tip[0], (list, tuple)) else [tip])
         for адрес_ч, лам_ч in пары:
             ixs.append(sol_transfer(payer, адрес_ч, int(лам_ч)))
+    # РАСПАКОВКА В ТОЙ ЖЕ ТРАНЗАКЦИИ (слово владельца 01.10, вечер). Закрытие
+    # идёт ПОСЛЕ свопа: своп берёт из счёта WSOL столько, сколько ему нужно, а
+    # всё, что осталось, вместе с рентой счёта возвращается в кошелёк тем же
+    # действием. Не обёртывали -- закрывать нечего, и инструкции нет вовсе.
+    if обёрнут_wsol and close_wsol:
+        ixs.append(close_account(обёрнут_wsol, user, user))
     msg = MessageV0.try_compile(Pubkey.from_string(payer), ixs, [], Hash.default())
     n_sig = msg.header.num_required_signatures
     vtx = VersionedTransaction.populate(msg, [Signature.default()] * n_sig)
     raw = bytes(vtx)
     return {"tx_base64": base64.b64encode(raw).decode(), "size": len(raw),
-            "n_instructions": len(ixs), "quote_mint": mv["quote_mint"], "base_mint": mv["base_mint"]}
+            "n_instructions": len(ixs), "quote_mint": mv["quote_mint"],
+            "base_mint": mv["base_mint"],
+            # ОБЁРТКА И ЕЁ ЗАКРЫТИЕ -- В ОТЧЁТ СБОРКИ, чтобы по записи позиции
+            # было видно: обёртывали ли и вернули ли то, что своп не забрал.
+            "wrapped_wsol": обёрнут_wsol,
+            "closed_wsol": bool(обёрнут_wsol and close_wsol)}
 
 
 # ------------------------------------------------------------ минимум по резервам
@@ -2018,6 +2052,41 @@ def self_test() -> int:
                          and 0 < mo["min_out"] < mo["expected_out"]
                          and mo["sol_to_curve"] < 10_000_000
                          and len(ix.accounts) == сп["n_accounts"]))
+    # --- РАСПАКОВКА WSOL В ТОЙ ЖЕ ТРАНЗАКЦИИ (слово владельца 01.10, вечер).
+    # Измерено на живой покупке полосы tvwftKB3 (15:58:39Z, программа кривой
+    # 6EF8, сделка 0.1): обёртка была, а своп взял SOL НАТИВНО -- и 0.1 остались
+    # лежать на счёте WSOL. Поэтому закрытие обязано стоять в той же сборке.
+    закр_проб = []
+    for s in load_samples(BONDING):
+        tpl = extract_template(s["tx"], BONDING, s["pool_vault"])
+        if not tpl.get("ok"):
+            continue
+        me_ = tpl["accounts"][spec_of(tpl)["user"][0]]
+        mo_ = min_out_from_reserves(tpl, s["tx"], 10_000_000, 0.35)
+        if not mo_.get("ok"):
+            continue
+        ас_ = spec_of(tpl).get("assoc_uva")
+        if ас_:
+            assoc_uva_запомнить(me_, tpl["accounts"][ас_[1]],
+                                 tpl["accounts"][ас_[0]], путь=_проб_файл)
+        б_ = build_buy(tpl, s["tx"], user=me_, payer=me_, amount_in=10_000_000,
+                        min_out=mo_["min_out"], tip=None)
+        б_нет = build_buy(tpl, s["tx"], user=me_, payer=me_, amount_in=10_000_000,
+                           min_out=mo_["min_out"], tip=None, close_wsol=False)
+        обёрнут = bool(б_.get("wrapped_wsol"))
+        # ЗАКРЫТИЕ ЕСТЬ ТОГДА И ТОЛЬКО ТОГДА, КОГДА БЫЛА ОБЁРТКА, и оно ровно
+        # одно: лишнее закрытие чужого счёта -- это чужие деньги.
+        закр_проб.append((
+            б_["closed_wsol"] == обёрнут
+            and б_нет["closed_wsol"] is False
+            and (б_["n_instructions"] == б_нет["n_instructions"] + (1 if обёрнут else 0))
+            and (б_["wrapped_wsol"] == ata(me_, C.WSOL, spec_of(tpl).get("quote_program")
+                                            or TOKEN_PROGRAM)
+                  if обёрнут else б_["wrapped_wsol"] is None)))
+    checks.append((f"распаковка WSOL: закрытие ровно там, где была обёртка "
+                    f"({sum(1 for o in закр_проб if o)} из {len(закр_проб)})",
+                    len(закр_проб) >= 2 and all(закр_проб)))
+
     checks.append((f"покупка на кривой: подставлены только наши счета по разновидности, "
                    f"аргументы по разновидности, обёртка SOL там, где котировка минтом "
                    f"({sum(1 for _, o in pf_build if o)} из {len(pf_build)})",
