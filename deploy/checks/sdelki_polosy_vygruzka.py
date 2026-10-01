@@ -587,6 +587,14 @@ def main() -> int:
             "region_lidera": None,
             "region_lidera_why_not": None,
             "region_otpravki": п.get("lane_region"),
+            # РЕГИОН ЛИДЕРА ПО ЗАПИСИ (слово владельца 01.10, п.5): его пишет
+            # посадка покупки рядом с lane_region. region_lidera выше считается
+            # ЗДЕСЬ по расписанию эпохи, и два числа рядом нужны именно затем,
+            # чтобы расхождение между счётом выгрузки и записью было видно, а не
+            # пряталось за одним полем.
+            "lane_region_leader": п.get("lane_region_leader"),
+            "lane_region_leader_why_not": п.get("lane_region_leader_why_not"),
+            "lane_region_leader_slot": п.get("lane_region_leader_slot"),
             "region_point": п.get("lane_region_point"),
             "region_senders": п.get("lane_region_senders"),
             "region_otpravki_why_not": (
