@@ -3920,12 +3920,31 @@ def self_test() -> None:
     import bloom_vtoroe_mnenie as VM2  # noqa: PLC0415
     было_вм = os.environ.get("BLOOM_SELL_VTOROE_MNENIE")
     было_вj = os.environ.get("BLOOM_SELL_VIA_JUPITER")
-    старый_jv, старая_кот = JV.продать, VM2.котировка_пула
+    старый_jv = JV.продать
     os.environ["BLOOM_SELL_VIA_JUPITER"] = "1"
     os.environ["BLOOM_SELL_VTOROE_MNENIE"] = "1"
     try:
         sv = Seller(state=st, live=False)
         sv.tx_читатель = lambda подпись: {"это": "наша покупка"}
+        # ЧТЕНИЕ ПУЛА ПОДМЕНЯЕТСЯ ЦЕЛИКОМ, А РЕШЕНИЕ -- НАСТОЯЩЕЕ. Котировка
+        # пула -- единственное место, которому нужен bloom_lane_sell (а ему --
+        # solders): на раннере деплоя системный python3 его не имеет, и
+        # самопроверка не должна зависеть от того, чем её запустили. Решение же
+        # считает та самая чистая функция, что и в бою.
+        пул_отдаёт = {}
+
+        def мнение_подменой(pos, *, количество_raw, jup_lamports):
+            реш = VM2.решение(jup_lamports=jup_lamports,
+                               пул_lamports=(пул_отдаёт.get("lamports")
+                                              if пул_отдаёт.get("ok") else None),
+                               вход_sol=pos.get("sol_in"))
+            return {"ok": реш.get("путь") is not None,
+                     "why_not": (None if реш.get("путь") else
+                                  (реш.get("почему") or пул_отдаёт.get("why_not"))),
+                     "пул": {к: зн for к, зн in пул_отдаёт.items() if к != "шаблон"},
+                     "шаблон": пул_отдаёт.get("шаблон"), "решение": реш}
+
+        sv.второе_мнение = мнение_подменой
         # Jupiter всегда отказывает по доле от входа: 12 % при входе 0.001 SOL.
         JV.продать = lambda **kw: {"ok": False, "unsold": True,
                                     "why_not": "котировка 12.0 % от входа ниже 30 %",
@@ -3954,11 +3973,12 @@ def self_test() -> None:
         sv.продать_своим_в_пул = свой_путь_удачно
 
         # (а) пул даёт 45 % -- маршрут Jupiter плохой, продаём своим путём в пул
-        VM2.котировка_пула = lambda **kw: {
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
             "ok": True, "lamports": 450_000, "гарантированный": 450_000,
             "по_кривой": 600_000, "минимум": {"ok": True, "min_out": 450_000},
             "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
-            "why_not": None}
+            "why_not": None})
         п = позицию_вм("vm_маршрут")
         r = sv.handle(п, balance_reader=читатель(5_000_000))
         зп = st.positions()["vm_маршрут"]
@@ -3984,9 +4004,10 @@ def self_test() -> None:
             зп.get("vtoroe_lyubaya_cena") is False, зп.get("vtoroe_lyubaya_cena"))
 
         # (б) пул не прочитан -- UNSOLD и тревога, а не продажа за бесценок
-        VM2.котировка_пула = lambda **kw: {
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
             "ok": False, "lamports": None, "по_кривой": None, "минимум": None,
-            "шаблон": None, "чтений_резервов": 2, "why_not": "резервы пула не прочитаны"}
+            "шаблон": None, "чтений_резервов": 2, "why_not": "резервы пула не прочитаны"})
         свои.clear()
         п = позицию_вм("vm_нет_пула")
         r = sv.handle(п, balance_reader=читатель(5_000_000))
@@ -3998,11 +4019,12 @@ def self_test() -> None:
             "не прочитана" in str(зп.get("vtoroe_why_not")), зп.get("vtoroe_why_not"))
 
         # (в) оба ниже порога, пул даёт больше -- любая цена, свой путь
-        VM2.котировка_пула = lambda **kw: {
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
             "ok": True, "lamports": 250_000, "гарантированный": 250_000,
             "по_кривой": 330_000, "минимум": {"ok": True, "min_out": 250_000},
             "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
-            "why_not": None}
+            "why_not": None})
         свои.clear()
         п = позицию_вм("vm_падение")
         r = sv.handle(п, balance_reader=читатель(5_000_000))
@@ -4012,11 +4034,12 @@ def self_test() -> None:
             and зп.get("vtoroe_lyubaya_cena") is True, (r.get("action"), зп.get("vtoroe_lyubaya_cena")))
 
         # (г) оба ниже порога, больше даёт Jupiter -- идём через него с любой котировкой
-        VM2.котировка_пула = lambda **kw: {
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
             "ok": True, "lamports": 90_000, "гарантированный": 90_000,
             "по_кривой": 120_000, "минимум": {"ok": True, "min_out": 90_000},
             "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
-            "why_not": None}
+            "why_not": None})
         зовы_jv = []
         JV.продать = lambda **kw: (зовы_jv.append(kw) or
                                     ({"ok": True, "signature": "ПОДПИСЬ_ЛЮБАЯ",
@@ -4038,11 +4061,12 @@ def self_test() -> None:
         chk("и своим путём при этом не ходили", свои == [], свои)
 
         # (д) плохой маршрут, свой путь отказал -- UNSOLD и тревога, без Jupiter
-        VM2.котировка_пула = lambda **kw: {
+        пул_отдаёт.clear()
+        пул_отдаёт.update({
             "ok": True, "lamports": 450_000, "гарантированный": 450_000,
             "по_кривой": 600_000, "минимум": {"ok": True, "min_out": 450_000},
             "шаблон": {"ok": True, "accounts": ["ПУЛ"]}, "чтений_резервов": 2,
-            "why_not": None}
+            "why_not": None})
         зовы_jv.clear()
         JV.продать = lambda **kw: (зовы_jv.append(kw) or
                                     {"ok": False, "unsold": True,
@@ -4058,18 +4082,33 @@ def self_test() -> None:
         chk("и второго зова Jupiter при плохом маршруте нет",
             len(зовы_jv) == 1, зовы_jv)
 
+        # (ж) НАСТОЯЩИЙ второе_мнение, без подмены: когда котировать нечем --
+        # отказ словами, а не тихий ноль. Проверяется и там, где модуль своей
+        # продажи не загружен (раннер деплоя), и там, где тип пула не тот.
+        sv_нп = Seller(state=st, live=False)
+        мн_нп = sv_нп.второе_мнение({"program": "ЧУЖАЯ_ПРОГРАММА", "sol_in": 0.001},
+                                     количество_raw=1000, jup_lamports=120_000)
+        chk("второе мнение без годного пула -- отказ словами и без решения",
+            мн_нп["ok"] is False and мн_нп["решение"] is None
+            and мн_нп["why_not"], мн_нп)
+        мн_бп = sv_нп.второе_мнение({"program": (LS.SB.PUMP_AMM if LS is not None
+                                                  else "ЧУЖАЯ"), "sol_in": 0.001},
+                                     количество_raw=1000, jup_lamports=120_000)
+        chk("и без севшей подписи покупки пул не котируется",
+            мн_бп["ok"] is False and мн_бп["пул"] is None, мн_бп)
+
         # (е) второе мнение выключено -- поведение в точности как было
         os.environ["BLOOM_SELL_VTOROE_MNENIE"] = "0"
         зовы_кот = []
-        VM2.котировка_пула = lambda **kw: (зовы_кот.append(kw) or
-                                            {"ok": False, "why_not": "не должно зваться"})
+        sv.второе_мнение = lambda pos, **kw: (зовы_кот.append(kw) or
+                                               {"ok": False, "why_not": "не должно зваться"})
         п = позицию_вм("vm_выкл")
         r = sv.handle(п, balance_reader=читатель(5_000_000))
         зп = st.positions()["vm_выкл"]
         chk("второе мнение выключено -- UNSOLD как прежде и пул не читается",
             зп.get("state") == "unsold" and зовы_кот == [], (r.get("action"), зовы_кот))
     finally:
-        JV.продать, VM2.котировка_пула = старый_jv, старая_кот
+        JV.продать = старый_jv
         for имя, знач in (("BLOOM_SELL_VTOROE_MNENIE", было_вм),
                            ("BLOOM_SELL_VIA_JUPITER", было_вj)):
             if знач is None:
