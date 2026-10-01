@@ -1801,6 +1801,89 @@ class Seller:
             return из_
         return из_
 
+    def дописать_итог_по_цепи(self, pos: dict, *, читатель_tx=None,
+                               подпись_продажи: str | None = None) -> dict:
+        """ПРАВИЛО 13: итог позиции ПО ЦЕПИ -- в запись, при закрытии.
+
+        Считается по ДВУМ подписям как сумма изменений ВСЕХ наших счетов
+        (кошелёк плюс его токеновые счета, включая WSOL). `closed_sol_net` видит
+        только кошелёк, поэтому выручка, оставшаяся завёрнутой, в него не
+        попадает: живой случай Jevolution 01.10 02:00:06Z -- запись −0.09169105,
+        цепь +0.01131123, разница 0.10300228.
+
+        НЕ ТРОГАЕТ НИ ОДНОГО РЕШЕНИЯ. Зовётся ПОСЛЕ подтверждённой продажи,
+        только пишет поля; стопы и KILL считаются по балансу кошелька, как и
+        были. Узел не ответил -- в запись ложится ПРИЧИНА, а не ноль.
+        """
+        из_ = {"ok": False, "why_not": None, "итог_sol": None, "тревога": False}
+        cid = pos.get("client_order_id")
+        if not cid:
+            из_["why_not"] = "у позиции нет client_order_id"
+            return из_
+        try:
+            import c2_itog_po_cepi as C13  # noqa: PLC0415
+        except Exception as exc:  # noqa: BLE001
+            из_["why_not"] = f"модуль итога по цепи не загружен: {type(exc).__name__}"
+            return из_
+        if читатель_tx is None:
+            из_["why_not"] = "читателя транзакций нет"
+            self.state.update_position(cid, **{C13.ПОЛЕ_ПОЧЕМУ: из_["why_not"]})
+            return из_
+        п_прод = (подпись_продажи or pos.get("last_sell_reported")
+                  or pos.get("jup_signature"))
+        if not п_прод:
+            сп = pos.get("last_sell_signatures")
+            п_прод = сп[-1] if isinstance(сп, list) and сп else None
+        п_пок = (pos.get("lane_landed_signature") or pos.get("lane_signature")
+                 or pos.get("lane_signature_accepted_first"))
+        if not п_пок or not п_прод:
+            из_["why_not"] = "в записи нет обеих подписей"
+            self.state.update_position(cid, **{C13.ПОЛЕ_ПОЧЕМУ: из_["why_not"]})
+            return из_
+        tx_пок = tx_прод = None
+        for роль, подпись in (("покупка", п_пок), ("продажа", п_прод)):
+            try:
+                tx = читатель_tx(подпись)
+            except Exception as exc:  # noqa: BLE001
+                из_["why_not"] = f"{роль}: {type(exc).__name__}"
+                tx = None
+            if not tx:
+                из_["why_not"] = из_["why_not"] or f"{роль}: узел не отдал транзакцию"
+                self.state.update_position(cid, **{C13.ПОЛЕ_ПОЧЕМУ: из_["why_not"]})
+                return из_
+            if роль == "покупка":
+                tx_пок = tx
+            else:
+                tx_прод = tx
+        кошелёк = кошелёк_позиции(pos)
+        о = C13.итог_по_двум(tx_пок, tx_прод, кошелёк)
+        if not о["ok"]:
+            из_["why_not"] = о["why_not"]
+            self.state.update_position(cid, **{C13.ПОЛЕ_ПОЧЕМУ: о["why_not"]})
+            return из_
+        поля = {C13.ПОЛЕ: о["итог_sol"], C13.ПОЛЕ_ЧАСТИ: о["части"],
+                 C13.ПОЛЕ_ПОДПИСЬ_ПОКУПКИ: п_пок,
+                 C13.ПОЛЕ_ПОДПИСЬ_ПРОДАЖИ: п_прод,
+                 C13.ПОЛЕ_ПОЧЕМУ: None}
+        свежая = self.state.update_position(cid, **поля) or dict(pos, **поля)
+        из_.update(ok=True, итог_sol=о["итог_sol"])
+        # СВЕРКА ПО КАЖДОЙ ПОЗИЦИИ, А НЕ СУММОЙ (слово владельца 01.10, п.7).
+        # Суммой расхождения гаснут: 59 сделок 29.09-01.10 дали по записям
+        # +0.3087 против +0.3889 по цепи, а суточная сверка показывала 0.0,
+        # потому что сравнивала ликвидную дельту с ней же.
+        try:
+            с = C13.сверка(свежая)
+            self.state.update_position(
+                cid, lane_chain_sverka_sol=с.get("расхождение_sol"),
+                lane_chain_sverka_ok=с.get("сверено"))
+            if с.get("тревога") and self.оповещатель is not None:
+                self.оповещатель.послать(C13.строка_тревоги(свежая, с))
+                из_["тревога"] = True
+        except Exception as exc:  # noqa: BLE001
+            self.log({"stage": "sverka_po_cepi", "cid": cid,
+                       "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"})
+        return из_
+
     def handle(self, pos: dict, *, now: float | None = None,
                 balance_reader=token_balance_raw, читатель_tx=None) -> dict:
         """Одна позиция за один круг. Возвращает, что сделано и почему."""
@@ -2102,6 +2185,16 @@ class Seller:
             # лампорта. Один вызов узла здесь дешевле спрятанного убытка.
             self.догнать_натив_покупки(pos, читатель_tx=читатель_tx)
             pos = (self.state.positions().get(cid) or pos) if cid else pos
+            # ПРАВИЛО 13: итог по цепи -- ДО закрытия, чтобы закрытая запись
+            # сразу имела каноническое число и его прочли все потребители.
+            try:
+                self.дописать_итог_по_цепи(
+                    pos, читатель_tx=читатель_tx,
+                    подпись_продажи=исход.get("signature"))
+                pos = (self.state.positions().get(cid) or pos) if cid else pos
+            except Exception as exc:  # noqa: BLE001
+                self.log({"stage": "itog_po_cepi_ne_zapisan", "cid": cid,
+                           "why_not": f"{type(exc).__name__}: {str(exc)[:120]}"})
             self.state.update_position(
                 cid, state=STATE_CLOSED, ts_closed=now,
                 closed_reason="продажа полосы подтверждена по цепи",
