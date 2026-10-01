@@ -90,6 +90,8 @@ def main() -> int:
     р.add_argument("--koshelek-polosy", default="")
     р.add_argument("--url", default=None)
     р.add_argument("--pisat", default="", help="ровно PERESCHITAT -- дописать в журнал")
+    р.add_argument("--vernut", default="",
+                    help="ровно VERNUT -- вернуть closed_sol_net из closed_sol_net_native")
     р.add_argument("--predel", type=int, default=0, help="сколько позиций максимум (0 -- все)")
     р.add_argument("--out", default=None)
     а = р.parse_args()
@@ -164,6 +166,31 @@ def main() -> int:
             if len(итог["примеры"]) < 12:
                 итог["примеры"].append(р_)
             правки.append((cid, р_))
+    # ВОЗВРАТ ПРЕЖНЕГО ЧИСЛА. Понадобился сразу: на closed_sol_net стоит
+    # тождество сверки (c2_itog_po_cepi.объяснённое), и выручка свопа в этом поле
+    # делает остаток тождества равным перешедшему завёрнутому -- то есть сверка
+    # начинает звать владельца на объяснённое. Числа не теряются: прежнее лежит в
+    # closed_sol_net_native, выручка свопа -- в closed_sol_net_swap.
+    if а.vernut == "VERNUT":
+        возвращено = 0
+        for cid, п in позиции.items():
+            родное = п.get("closed_sol_net_native")
+            if родное is None or п.get("closed_itog_peresvet") is None:
+                continue
+            try:
+                сост.update_position(cid, closed_sol_net=родное,
+                                     closed_sol_net_swap=п.get("closed_sol_net"),
+                                     closed_itog_peresvet=None)
+                возвращено += 1
+            except Exception as exc:  # noqa: BLE001
+                итог["не_пересчитано"].append({"cid": cid,
+                                                "why_not": f"возврат: {type(exc).__name__}"})
+        итог["возвращено"] = возвращено
+        текст_в = json.dumps(итог, ensure_ascii=False, indent=1)
+        print(текст_в)
+        if а.out:
+            Path(а.out).write_text(текст_в + "\n", encoding="utf-8")
+        return 0
     if а.pisat == "PERESCHITAT" and правки:
         for cid, р_ in правки:
             try:

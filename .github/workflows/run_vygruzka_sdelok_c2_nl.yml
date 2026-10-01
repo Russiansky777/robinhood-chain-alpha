@@ -108,6 +108,7 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vygr/peresvet_itogov.py" < deploy/checks/peresvet_itogov.py
           PIS=""
           if [ "${{ inputs.pereschitat }}" = "PERESCHITAT" ]; then PIS="--pisat PERESCHITAT"; fi
+          if [ "${{ inputs.pereschitat }}" = "VERNUT" ]; then PIS="--vernut VERNUT"; fi
           echo "rezhim pereschjota: ${PIS:-tolko pokaz}"
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
