@@ -1,4 +1,4 @@
-name: "Записать вывод владельца с кошелька полосы (по подписи, сумма с цепи)"
+name: "Записать движение владельца на кошельке полосы (вывод или ввод, сумма с цепи)"
 
 # ЗАЧЕМ (слово владельца 28.09 ночью, п.4): "Вывод средств владельца ... записать
 # как вывод, не как убыток; подпись владелец пришлёт". Порог "просадка от 00:00"
@@ -14,12 +14,29 @@ on:
   workflow_dispatch:
     inputs:
       podpis:
-        description: "подпись транзакции вывода"
-        required: true
+        description: "подпись транзакции движения (пусто при najti=yes)"
+        required: false
+        default: ""
+      vid:
+        description: "'vvod' -- пополнение владельцем; иначе вывод"
+        required: false
+        default: "vyvod"
+      najti:
+        description: "'yes' -- НАЙТИ подписи взносов по цепи и ничего не писать"
+        required: false
+        default: "no"
+      s_ts:
+        description: "окно поиска: с (unix, пусто -- без границы)"
+        required: false
+        default: ""
+      do_ts:
+        description: "окно поиска: до (unix, пусто -- без границы)"
+        required: false
+        default: ""
       primechanie:
         description: "примечание к записи"
         required: false
-        default: "вывод владельца"
+        default: "движение владельца"
       zapisat:
         description: "'yes' -- записать; иначе только показать"
         required: false
@@ -49,8 +66,11 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "Сборка модуля"
-        run: python3 -m py_compile deploy/checks/zapisat_vyvod_vladelca.py
+      - name: "Сборка модуля и его самопроверка"
+        run: |
+          set -e
+          python3 -m py_compile deploy/checks/zapisat_vyvod_vladelca.py
+          python3 deploy/checks/zapisat_vyvod_vladelca.py --self-test
 
       - name: "SSH key"
         env:
@@ -69,9 +89,17 @@ jobs:
           set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zapisat_vyvod_vladelca.py" < deploy/checks/zapisat_vyvod_vladelca.py
-          ZAP=""
-          [ "${{ inputs.zapisat }}" = "yes" ] && ZAP="--zapisat"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/zapisat_vyvod_vladelca.py --podpis '${{ inputs.podpis }}' --primechanie '${{ inputs.primechanie }}' $ZAP" | tee /tmp/vyvod.txt
+          # КЛЮЧИ СОБИРАЮТСЯ ЗДЕСЬ, А НЕ ВНУТРИ КАВЫЧЕК ssh: подстановка внутрь
+          # уже одинарно закрытой строки однажды превратила пустое значение в
+          # лишний аргумент. Пустые входы не превращаются в ключи вовсе.
+          ARGS=""
+          [ "${{ inputs.zapisat }}" = "yes" ] && ARGS="$ARGS --zapisat"
+          [ "${{ inputs.vid }}" = "vvod" ] && ARGS="$ARGS --vvod"
+          [ "${{ inputs.najti }}" = "yes" ] && ARGS="$ARGS --najti"
+          [ -n "${{ inputs.podpis }}" ] && ARGS="$ARGS --podpis '${{ inputs.podpis }}'"
+          [ -n "${{ inputs.s_ts }}" ] && ARGS="$ARGS --s-ts '${{ inputs.s_ts }}'"
+          [ -n "${{ inputs.do_ts }}" ] && ARGS="$ARGS --do-ts '${{ inputs.do_ts }}'"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $CODE_DIR && sudo -u bot -E env PYTHONPATH=$CODE_DIR BLOOM_CODE_DIR=$CODE_DIR $VENV/python $RABOTA/zapisat_vyvod_vladelca.py --primechanie '${{ inputs.primechanie }}' $ARGS" | tee /tmp/vyvod.txt
           cp /tmp/vyvod.txt "$OUT_FILE"
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
 
@@ -83,7 +111,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
-          git commit -m "Vyvod vladelca s koshelka polosy: zapis [automated]"
+          git commit -m "Dvizhenie vladelca na koshelke polosy: zapis [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
             git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
