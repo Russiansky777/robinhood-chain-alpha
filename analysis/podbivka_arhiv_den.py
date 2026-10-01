@@ -351,6 +351,17 @@ def открыть_час(requests, url: str, ч: str):
     return _ЛокальныйЧас(путь)
 
 
+def посчитать(с: dict, ряд: list, окно: int) -> dict:
+    """Все поля сигнала, которым нужен ряд пула: модель, рисунок, удержание, события окна, свопы s0+1 / s0+2."""
+    с["модель"] = модель(с, ряд)
+    с["рисунок"] = рисунок(с, ряд)
+    с["удержание"] = удержание(с, ряд)
+    с["событий_пула_в_окне"] = sum(1 for e in ряд if с["block"] <= (e.get("block") or 0) <= с["block"] + окно)
+    с["свопов"] = {f"s{k}": sum(1 for e in ряд if e.get("block") == с["block"] + k and e.get("action") in ("buy", "sell"))
+                   for k in (1, 2)}
+    return с
+
+
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
            минты: set | None = None, не_sol: bool = False, окно_докупки: int | None = None) -> Path:
@@ -365,6 +376,21 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     наши_события, сигналы, цели_события, покупки_ист = [], [], [], []
     активные: dict = {}          # poolId -> до_слота
     ряды: dict = {}              # poolId -> [события]
+    сиг_пула: dict = {}          # poolId -> [сигналы этого пула, ещё не посчитанные]
+    держать: set = set()         # poolId, чьи ряды нужны до конца прогона (цели, --istochniki)
+
+    def закрыть_пул(pid_: str) -> None:
+        """Окно пула кончилось: посчитать модель его сигналов и отпустить ряд. Иначе ряды всех сигналов
+        суток живут до конца прогона -- на 997 адресах это десятки гигабайт (прогон 01.10 убит ядром, код -9)."""
+        сп = сиг_пула.pop(pid_, None)
+        ряд_ = ряды.get(pid_) or []
+        if сп:
+            for с_ in сп:
+                посчитать(с_, ряд_, окно)
+        if pid_ not in держать:
+            # оставляем ОДНО последнее событие: ряд пула и прежде прерывался между окнами, и у следующего сигнала
+            # предыдущим событием было ровно это (pump-amm берёт из него f источника) -- счёт не меняется
+            ряды[pid_] = [ряд_[-1]] if ряд_ else ряды.pop(pid_, None) or []
     счёт = {"строк": 0, "файлов": 0, "ошибки": []}
     история_цены: dict = {}      # poolId -> deque[(слот, цена)] за НАЗАД слотов
     ноги: dict = {}              # (подпись, трейдер, минт) -> токенов куплено в транзакции (все ноги)
@@ -460,13 +486,16 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                  "рост_до_750": цена_до[0] if цена_до else None})
                         if цель:
                             цели_события.append({**e, "breakdown": e_full.get("breakdown")})
-                            if pid and pid not in активные:          # ряд пула цели -- тоже в окне
-                                ряды.setdefault(pid, []).append(e)
-                                активные[pid] = (e.get("block") or 0) + окно
-                                в_активе = False
+                            if pid:
+                                держать.add(pid)
+                                if pid not in активные:          # ряд пула цели -- тоже в окне
+                                    ряды.setdefault(pid, []).append(e)
+                                    активные[pid] = (e.get("block") or 0) + окно
+                                    в_активе = False
                         if в_активе:
                             if (e.get("block") or 0) > активные[pid]:
                                 активные.pop(pid, None)
+                                закрыть_пул(pid)
                             else:
                                 ряды[pid].append(e)
                         if not наши or e.get("action") not in ("buy", "sell"):
@@ -513,6 +542,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                                     "sol": sol, "первая": первая,
                                                     "рост_до_750": цена_до[0] if цена_до else None,
                                                     "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, 1.0)})
+                                держать.add(pid)
                                 if pid not in активные:
                                     ряды.setdefault(pid, [])
                                     if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
@@ -525,21 +555,23 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                                 пред = последняя_пок.get(кл)
                                 по_окну = пред is None or (e.get("block") or 0) - пред > окно_докупки
                                 последняя_пок[кл] = e.get("block") or 0
-                                if len(последняя_пок) > 4_000_000:      # память: дальше окна правило не смотрит
+                                if len(последняя_пок) > 800_000:      # память: дальше окна правило не смотрит
                                     порог_сл = (e.get("block") or 0) - окно_докупки
                                     for кл_ in [k for k, v in последняя_пок.items() if v < порог_сл]:
                                         del последняя_пок[кл_]
                             новый = по_окну if по_окну is not None else первая
                             if (e["action"] == "buy" and новый and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
                                     and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
-                                сигналы.append({"trader": t, "signature": e["signature"], "pool": e.get("pool"),
+                                с_нов = {"trader": t, "signature": e["signature"], "pool": e.get("pool"),
                                                 "подписант": ПОДПИСАНТ if t in только_сигнал else None,
                                                 "первая": первая, "по_окну": по_окну,
                                                 "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
                                                 "sol": sol, "timestamp": e.get("timestamp"),
                                                 "quoteMint": q, "курс_q": курс_q,
                                                 "рост_до_750": цена_до[0] if цена_до else None,
-                                                "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, курс_q)})
+                                                "рост_до_150": цена_до[1] if цена_до else None, **резерв(e, курс_q)}
+                                сигналы.append(с_нов)
+                                сиг_пула.setdefault(pid, []).append(с_нов)
                                 if pid not in активные:
                                     ряды.setdefault(pid, [])
                                     if not ряды[pid] or ряды[pid][-1]["signature"] != e["signature"]:
@@ -556,12 +588,8 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                     time.sleep(5 * (попытка + 1))
         print(f"{ч}: строк всего {счёт['строк']}, наших событий {len(наши_события)}, сигналов {len(сигналы)}, "
               f"активных пулов {len(активные)}", flush=True)
-    for с in сигналы:
-        с["модель"] = модель(с, ряды.get(с["poolId"]) or [])
-        с["рисунок"] = рисунок(с, ряды.get(с["poolId"]) or [])
-        с["удержание"] = удержание(с, ряды.get(с["poolId"]) or [])
-        ряд = ряды.get(с["poolId"]) or []
-        с["событий_пула_в_окне"] = sum(1 for e in ряд if с["block"] <= (e.get("block") or 0) <= с["block"] + окно)
+    for pid_ in list(сиг_пула):
+        закрыть_пул(pid_)
     # покупки --istochniki: кто купил следом (≥ 0.5 SOL, другие кошельки) в +15 с, в его слоте и в +3 слота
     for п in покупки_ист:
         ряд = ряды.get(п["poolId"]) or []
@@ -584,11 +612,6 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                    and e.get("трейдер") != п["trader"]]
         п["продаж_в_слоте"] = len(прод_сл)
         п["продажи_в_слоте_sol"] = round(sum(float(e.get("quoteAmount") or 0) for e in прод_сл), 4)
-    # слоты s0+1 / s0+2: число свопов (для сверки с историей пула)
-    for с in сигналы:
-        ряд = ряды.get(с["poolId"]) or []
-        с["свопов"] = {f"s{k}": sum(1 for e in ряд if e.get("block") == с["block"] + k and e.get("action") in ("buy", "sell"))
-                       for k in (1, 2)}
     ряды_целей = {e["poolId"]: ряды.get(e["poolId"]) for e in цели_события if e.get("poolId")}
     import gzip  # noqa: PLC0415
     out = КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{метка}.json.gz"   # > 100 МБ несжатым -- предел GitHub
