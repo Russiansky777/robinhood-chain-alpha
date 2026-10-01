@@ -11,7 +11,14 @@ name: "Solana ledger -- единый конвейер учёта сделок (�
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # ДВА ЗАПУСКА В ЧАС И НЕ В НОЛЬ (слово владельца 01.10, вечер, п.3).
+    # ПОЧЕМУ. Минута 0 -- самая забитая у GitHub, и расписание с неё молча
+    # теряется: по журналу этого самого учёта фактические срабатывания 30.09 --
+    # 21:14, 22:14, 01:54, 08:34, 16:10, то есть пропуск до 7.6 часа подряд при
+    # заявленном "каждый час". Два запуска со смещением дают два независимых
+    # шанса в час: пропуск одного больше не оставляет учёт без прогона.
+    - cron: "17 * * * *"
+    - cron: "47 * * * *"
   workflow_dispatch: {}
 
 concurrency:
@@ -38,6 +45,8 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install requests
+      - name: "Самопроверка учёта (без сети)"
+        run: python -u analysis/solana_ledger_run.py --self-test
       - name: "Единый конвейер учёта (A-E)"
         env:
           HELIUS_API: ${{ secrets.HELIUS_API }}
@@ -46,6 +55,7 @@ jobs:
       - name: Commit results
         if: always()
         run: |
+          git add -A data/helius_usage 2>/dev/null || true
           for f in data/dbot_follow_orders_raw.json data/dbot_follow_trades_raw.json \
                    data/chain_tx_cache.json data/solana_trades_all.json \
                    data/solana_source_stats.json data/solana_task_stats.json data/ledger_status.json; do
