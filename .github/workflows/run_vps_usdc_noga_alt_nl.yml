@@ -57,11 +57,11 @@ jobs:
           # идёт вовсе: ставим временное окружение прогона, как это делает деплой.
           # Молча пропустить самопроверку тут нельзя -- она и есть доказательство,
           # что в таблицу ляжет то, что нужно, и кошелька полосы в ней нет.
-          if python3 -c "import solders" 2>/dev/null; then
+          if python3 -c "import requests, solders" 2>/dev/null; then
             PY=python3
           else
             python3 -m venv "$RUNNER_TEMP/alt_venv"
-            "$RUNNER_TEMP/alt_venv/bin/pip" install -q solders
+            "$RUNNER_TEMP/alt_venv/bin/pip" install -q requests solders
             PY="$RUNNER_TEMP/alt_venv/bin/python"
           fi
           "$PY" analysis/lane_usdc_alt.py --self-test | tail -3
