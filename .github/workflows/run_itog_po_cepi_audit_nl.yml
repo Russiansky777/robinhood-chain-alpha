@@ -103,6 +103,11 @@ jobs:
           # дозапись от root сделала бы строки, которых служба потом не сможет
           # переписать. Чтение идёт тем же путём, разницы нет.
           if [ -n "$ZAP" ]; then
+            # КАТАЛОГ РАБОТЫ -- ПИСАБЕЛЬНЫЙ ДЛЯ bot. Прогон 2 (01.10 03:24Z)
+            # дописал поля 72 позициям и упал на записи out.json: каталог
+            # создавал root с 755, а скрипт работает от bot. Падение было ПОСЛЕ
+            # полезной работы, то есть сводка потерялась, а поля легли.
+            ssh -n $SSH_OPTS root@$TARGET_HOST "chmod 777 $RABOTA"
             ssh -n $SSH_OPTS root@$TARGET_HOST "chmod 644 $RABOTA/*.py; set -a; . $ENV_DIR/env; set +a; cd $KOD_HOSTA && sudo -u bot -E env PYTHONPATH=$KOD_HOSTA:$RABOTA BLOOM_CODE_DIR=$KOD_HOSTA $PY_HOSTA $RABOTA/itog_po_cepi_audit.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $KOSH --predel '${{ inputs.predel }}' $ZAP --out $RABOTA/out.json" | tail -200
           else
             ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/itog_po_cepi_audit.py --state-dir $STATE_DIR --s '${{ inputs.s }}' $PO $KOSH --predel '${{ inputs.predel }}' --out $RABOTA/out.json" | tail -200
