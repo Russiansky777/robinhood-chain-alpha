@@ -24,6 +24,10 @@ on:
         description: "подписей пула назад для чужих продаж (300 -- обычно; больше -- только для ретроспективы, дороже по кредитам)"
         required: false
         default: "300"
+      pereschitat:
+        description: "'PERESCHITAT' -- сначала пересчитать итог_по_цепи у закрытых (распаковка WSOL из выручки); 'pokazat' -- только посчитать и показать"
+        required: false
+        default: ""
       metka_fajla:
         description: "пометка в имени файла для РАЗОВОГО прогона (пусто -- обычная суточная выгрузка)"
         required: false
@@ -92,6 +96,31 @@ jobs:
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
+      - name: "ПЕРЕСЧЁТ итога по цепи: распаковка WSOL не выручка (по слову)"
+        if: ${{ inputs.pereschitat != '' }}
+        # ЗАЧЕМ ЗДЕСЬ, А НЕ ОТДЕЛЬНЫМ ПРОГОНОМ: пересчёт обязан идти ДО выгрузки,
+        # иначе Code-2 получит файл с прежними итогами. Запись в журнал позиций --
+        # только по слову PERESCHITAT; 'pokazat' считает и ничего не меняет.
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@$TARGET_HOST "install -d -m 755 /tmp/vygr"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/vygr/peresvet_itogov.py" < deploy/checks/peresvet_itogov.py
+          PIS=""
+          if [ "${{ inputs.pereschitat }}" = "PERESCHITAT" ]; then PIS="--pisat PERESCHITAT"; fi
+          echo "rezhim pereschjota: ${PIS:-tolko pokaz}"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            set -a; . /etc/bloom-executor/env; set +a
+            BLOOM_CODE_DIR='$CODE_DIR' python3 /tmp/vygr/peresvet_itogov.py               --s '$S_OKNA' $PIS --out /tmp/vygr/peresvet.json" | tail -40
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/vygr/peresvet.json 2>/dev/null || true" > /tmp/peresvet.json || true
+          if python3 -c "import json; json.load(open('/tmp/peresvet.json'))" 2>/dev/null; then
+            cp /tmp/peresvet.json data/peresvet_itogov.json
+            echo "obnovlen data/peresvet_itogov.json"
+          else
+            echo "SBOY: pereschjot ne otdal json"; exit 1
+          fi
+
       - name: "Доставить прогон и собрать выгрузку"
         run: |
           set -e
@@ -139,6 +168,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          if [ -f data/peresvet_itogov.json ]; then git add data/peresvet_itogov.json; fi
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
           git commit -m "Vygruzka sdelok polosy za sutki dlya Code-2 [automated]"
           for i in 1 2 3 4 5; do
