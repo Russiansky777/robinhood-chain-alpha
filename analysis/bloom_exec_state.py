@@ -3078,11 +3078,42 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--report", action="store_true")
+    # АВАРИИ ГРУПП -- ЧТЕНИЕ И СНЯТИЕ (Правило 16). Снятие делает ЧЕЛОВЕК:
+    # служба этих ключей не зовёт никогда, их зовёт прогон по слову владельца.
+    ap.add_argument("--avarii", action="store_true",
+                    help="напечатать стоящие аварии групп (только чтение)")
+    ap.add_argument("--avarija-snjat", default="",
+                    help="снять аварию названной группы (или ВСЕ) -- ТОЛЬКО "
+                          "по слову владельца")
+    ap.add_argument("--kem", default="владелец",
+                    help="кто снимает -- пишется в запись")
     a = ap.parse_args()
     if a.self_test:
         self_test()
     elif a.report:
         print(json.dumps(ExecState().report(), ensure_ascii=False, indent=2))
+    elif a.avarii:
+        ст = ExecState()
+        print(json.dumps({"файл": str(ст.avarii_grupp_path),
+                           "стоят": ст.аварии_групп()},
+                          ensure_ascii=False, indent=2))
+    elif a.avarija_snjat:
+        ст = ExecState()
+        стоят = sorted(ст.аварии_групп())
+        цели = стоят if a.avarija_snjat.strip() in ("ВСЕ", "VSE") else [
+            г.strip() for г in a.avarija_snjat.split(",") if г.strip()]
+        print(json.dumps({"стояли": стоят, "снимаем": цели},
+                          ensure_ascii=False))
+        плохо = 0
+        for г in цели:
+            из_ = ст.авария_группы_снять(г, кем=a.kem)
+            print(f"{г}: {'снята' if из_.get('ok') else 'НЕ снята'} "
+                   f"({из_.get('why_not') or 'ок'})")
+            плохо += (not из_.get("ok"))
+        осталось = sorted(ст.аварии_групп())
+        print(json.dumps({"осталось_стоять": осталось}, ensure_ascii=False))
+        if плохо:
+            sys.exit(1)
     else:
         ap.print_help()
         sys.exit(1)

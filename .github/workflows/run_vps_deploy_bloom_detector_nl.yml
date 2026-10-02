@@ -95,6 +95,10 @@ on:
         description: "'1' -- вариант пула на долговечном nonce: по транзакции на сервис, только его чаевые (нужен созданный аккаунт nonce)"
         required: false
         default: "0"
+      avarii_snjat:
+        description: "снять аварии групп (список через запятую или ВСЕ) -- ТОЛЬКО по слову владельца; пусто -- только напечатать стоящие"
+        required: false
+        default: ""
       protokol_env:
         description: "'yes' -- напечатать значения флагов BLOOM_* и имена всех ключей env (только чтение, секреты не печатаются)"
         required: false
@@ -799,6 +803,34 @@ jobs:
             echo '--- исполнитель ---'
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_executor.py --check-only
           " 2>&1 | tail -60 | tee -a data/bloom_detector_deploy.txt
+
+      # АВАРИИ ГРУПП (Правило 16): ЧТЕНИЕ ВСЕГДА, СНЯТИЕ -- ТОЛЬКО ПО ВХОДУ.
+      # Авария ставится службой по признакам ошибки и снимается ТОЛЬКО словом
+      # владельца -- значит у этого слова должно быть место в прогоне, иначе
+      # снимать пришлось бы руками на хосте. Чтение идёт от ПОЛЬЗОВАТЕЛЯ
+      # СЛУЖБЫ: от root файл состояния читается другой, и ответ был бы не про
+      # ту же папку, с которой работает детектор.
+      - name: "АВАРИИ ГРУПП: что стоит, и снятие по слову владельца"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            su -s /bin/sh bot -c 'set -a; . $ENV_DIR/env; set +a; \
+              /home/bot/robinhood-chain-alpha/venv/bin/python \
+              $CODE_DIR/bloom_exec_state.py --avarii'
+          " 2>&1 | tail -40 | tee -a data/bloom_detector_deploy.txt
+          if [ -n "${{ inputs.avarii_snjat }}" ]; then
+            ssh -n $SSH_OPTS root@$TARGET_HOST "
+              set -a; . $ENV_DIR/env; set +a
+              su -s /bin/sh bot -c 'set -a; . $ENV_DIR/env; set +a; \
+                /home/bot/robinhood-chain-alpha/venv/bin/python \
+                $CODE_DIR/bloom_exec_state.py \
+                --avarija-snjat "${{ inputs.avarii_snjat }}" --kem "владелец"'
+            " 2>&1 | tail -40 | tee -a data/bloom_detector_deploy.txt
+          else
+            echo "снятие аварий НЕ запрашивалось -- только чтение" \
+              | tee -a data/bloom_detector_deploy.txt
+          fi
 
       - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
         run: |
