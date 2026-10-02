@@ -23,6 +23,10 @@ name: "Apify: выгрузка GMGN и сбор коллов KOL"
 # Solana из них. Два шага: kolly_vybor (выбор актора в Store и чтение его схемы,
 # 0 $) и kolly_sbor (сам сбор, потолок входом, по умолчанию 5 $). Пробный запуск
 # GMGN в этих режимах НЕ ИДЁТ -- он стоил бы денег ни за что.
+#
+# ПЕРЕД ПОЛНЫМ СБОРОМ -- ПРОБНЫЙ: один аккаунт и 25 постов (около 0.004 $). Он
+# проверяет то, чего из схемы не видно: что актор ПРИНИМАЕТ наш вид даты и отдаёт
+# посты В НАШЕМ ОКНЕ. Проба вернула ноль постов в окне -- полный проход не идёт.
 on:
   workflow_dispatch:
     inputs:
@@ -119,6 +123,14 @@ jobs:
             exit 1
           fi
           python3 analysis/c3_kolly_apify.py --vybor
+
+      - name: "Коллы KOL: пробный сбор -- один аккаунт, 25 постов (копейки)"
+        if: ${{ inputs.rezhim == 'kolly_sbor' }}
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          set -e
+          python3 analysis/c3_kolly_apify.py --proba
 
       - name: "Коллы KOL: сбор постов и адресов (потолок входом)"
         if: ${{ inputs.rezhim == 'kolly_sbor' }}
