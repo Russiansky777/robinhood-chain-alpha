@@ -76,11 +76,22 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             cp -a $ENV_DIR/env $ENV_DIR/env.bak-curve-\$(date -u +%Y%m%dT%H%M%SZ)
             sed -i '/^LANE_BONDING_CURVE=/d; /^LANE_BONDING_CURVE_GROUPS=/d' $ENV_DIR/env
-            echo 'LANE_BONDING_CURVE_GROUPS=${{ inputs.groups }}' >> $ENV_DIR/env
+            # ПУСТО -- ЭТО УДАЛИТЬ СТРОКУ, А НЕ ПОЛОЖИТЬ ПУСТУЮ. Здесь стояло
+            # echo без проверки, и вход groups='' писал LANE_BONDING_CURVE_GROUPS=
+            # обратно в файл: ключ оставался, его читал бы каждый следующий
+            # глазами и кодом, а своё же описание шага обещает 'пусто = кривой
+            # нет'. Слово владельца 02.10: убрать, чтобы не читался никем.
+            if [ -n '${{ inputs.groups }}' ]; then
+              echo 'LANE_BONDING_CURVE_GROUPS=${{ inputs.groups }}' >> $ENV_DIR/env
+            else
+              echo 'groups pusto: oba klyucha krivoj udaleny iz env, stroki net'
+            fi
             chmod 600 $ENV_DIR/env
             grep -E '^LANE_BONDING_CURVE' $ENV_DIR/env
             echo '--- ключей в env всего ---'
-            grep -c '=' $ENV_DIR/env"
+            grep -c '=' $ENV_DIR/env
+            echo '--- строки кривой после правки (пусто -- их нет) ---'
+            grep -E '^LANE_BONDING_CURVE' $ENV_DIR/env || echo 'strok krivoj v env net'"
 
       - name: "Перезапуск детектора (по флагу)"
         if: ${{ inputs.restart_detector == 'yes' }}
