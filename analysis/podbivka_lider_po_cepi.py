@@ -67,7 +67,39 @@ def программы(т: dict) -> set:
     return {x for x in из_ if x}
 
 
-def цепь_адреса(уз, адрес: str, с_ts: int, до_ts, страниц_макс: int) -> dict:
+def разбор_упоминания(т: dict, адрес: str) -> dict:
+    """Чем транзакция привязана к адресу: подписант / владелец токен-счёта / только упомянут.
+
+    Архив PumpApi привязывает событие к кошельку только по txSigner или breakdown[].trader, поэтому
+    транзакции, где адрес лишь упомянут (доля создателя минта, получатель чаевых, счёт в маршруте),
+    в архиве вообще не появляются. Здесь это и считается по цепи.
+    """
+    с = (т or {}).get("transaction") or {}
+    сообщ = с.get("message") or {}
+    ключи = сообщ.get("accountKeys") or []
+    плоские = [k if isinstance(k, str) else (k or {}).get("pubkey") for k in ключи]
+    подписант = any(isinstance(k, dict) and k.get("signer") and k.get("pubkey") == адрес for k in ключи)
+    м = (т or {}).get("meta") or {}
+    пре = {(b.get("accountIndex"), b.get("mint")): b for b in (м.get("preTokenBalances") or [])}
+    пост = {(b.get("accountIndex"), b.get("mint")): b for b in (м.get("postTokenBalances") or [])}
+    владелец = получил = False
+    for кл in set(пре) | set(пост):
+        a, b = пре.get(кл), пост.get(кл)
+        if ((b or a or {}).get("owner")) != адрес:
+            continue
+        владелец = True
+        до = float(((a or {}).get("uiTokenAmount") or {}).get("uiAmountString") or 0)
+        после = float(((b or {}).get("uiTokenAmount") or {}).get("uiAmountString") or 0)
+        получил = получил or после > до
+    лам, пре_л, пост_л = 0, м.get("preBalances") or [], м.get("postBalances") or []
+    for и, p in enumerate(плоские):
+        if p == адрес and и < len(пре_л) and и < len(пост_л):
+            лам += пост_л[и] - пре_л[и]
+    return {"в_ключах": адрес in плоские, "подписант": подписант, "владелец_токенсчёта": владелец,
+            "получил_токен": получил, "sol": round(лам / 1e9, 9)}
+
+
+def цепь_адреса(уз, адрес: str, с_ts: int, до_ts, страниц_макс: int, разбор: bool = False) -> dict:
     """Подписи адреса в окне и программы по ним (пакетное чтение транзакций)."""
     подписи, до, страниц = [], None, 0
     while страниц < страниц_макс:
@@ -84,17 +116,50 @@ def цепь_адреса(уз, адрес: str, с_ts: int, до_ts, стран
     txs = уз.пакет([з["signature"] for з in удачных],
                    {з["signature"]: з.get("blockTime") for з in удачных}) if удачных else {}
     пул = collections.Counter()
-    с_пулом = 0
+    с_пулом, не_прочитано = 0, 0
+    р = {"подписант": 0, "упомянут": 0, "упомянут_владелец_получившего": 0, "упомянут_владелец_без_прихода": 0,
+         "только_упомянут": 0, "только_упомянут_с_sol": 0, "только_упомянут_sol": 0.0,
+         "подписант_без_пула": 0, "только_упомянут_без_пула": 0, "примеры": []}
     for з in удачных:
-        пр = программы(txs.get(з["signature"]) or {}) & ПУЛОВЫЕ
+        т = txs.get(з["signature"]) or {}
+        if not т:
+            не_прочитано += 1
+            continue
+        пр = программы(т) & ПУЛОВЫЕ
         if пр:
             с_пулом += 1
             for x in пр:
                 пул[x] += 1
+        if not разбор:
+            continue
+        к = разбор_упоминания(т, адрес)
+        если_пул = bool(пр)
+        if к["подписант"]:
+            р["подписант" if если_пул else "подписант_без_пула"] += 1
+            continue
+        if not если_пул:
+            р["только_упомянут_без_пула"] += 1 if not к["владелец_токенсчёта"] else 0
+            continue
+        р["упомянут"] += 1
+        if к["получил_токен"]:
+            р["упомянут_владелец_получившего"] += 1
+        elif к["владелец_токенсчёта"]:
+            р["упомянут_владелец_без_прихода"] += 1
+        else:
+            р["только_упомянут"] += 1
+            р["только_упомянут_sol"] = round(р["только_упомянут_sol"] + к["sol"], 9)
+            if к["sol"] > 0:
+                р["только_упомянут_с_sol"] += 1
+            if len(р["примеры"]) < 3:
+                р["примеры"].append({"signature": з["signature"], "sol": к["sol"],
+                                     "программы": sorted(ИМЕНА.get(x) or x[:8] for x in пр)})
     врем = [з.get("blockTime") or 0 for з in подписи if з.get("blockTime")]
-    return {"подписей": len(подписи), "упавших": len(подписи) - len(удачных), "с_пулом": с_пулом,
-            "пулы": {(ИМЕНА.get(k) or k[:8]): n for k, n in пул.most_common()},
-            "последняя_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(max(врем))) if врем else None}
+    из_ = {"подписей": len(подписи), "упавших": len(подписи) - len(удачных), "не_прочитано": не_прочитано,
+           "с_пулом": с_пулом, "пулы": {(ИМЕНА.get(k) or k[:8]): n for k, n in пул.most_common()},
+           "последняя_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(max(врем))) if врем else None}
+    if разбор:
+        из_["разбор"] = р
+    return из_
 
 
 def по_группам(а, с_ts: int, до_ts) -> int:
@@ -116,13 +181,19 @@ def по_группам(а, с_ts: int, до_ts) -> int:
     строки = []
     with уз.на("helius"):
         for a in цель:
-            r = цепь_адреса(уз, a, с_ts, до_ts, а.stranic)
+            r = цепь_адреса(уз, a, с_ts, до_ts, а.stranic, разбор=bool(а.razbor))
             r.update(адрес=a, группы=[x for x in ((реестр.get(a) or {}).get("группы") or []) if x != "log_only"],
                      архив_покупок=арх.get(a, 0))
             строки.append(r)
+            хвост = ""
+            if r.get("разбор"):
+                p = r["разбор"]
+                хвост = (f"; подписант {p['подписант']}, упомянут {p['упомянут']} (владелец получившего "
+                         f"{p['упомянут_владелец_получившего']}, только упомянут {p['только_упомянут']}, "
+                         f"из них с приходом SOL {p['только_упомянут_с_sol']} на {p['только_упомянут_sol']:+.6f})")
             print(f"{a[:8]} {','.join(r['группы'])}: цепь подписей {r['подписей']} (с пулом {r['с_пулом']}), "
-                  f"архив покупок {r['архив_покупок']}, пулы {r['пулы']}", flush=True)
-    out = П / f"cep_vs_arhiv_{а.s[:10]}.json"
+                  f"архив покупок {r['архив_покупок']}, пулы {r['пулы']}{хвост}", flush=True)
+    out = П / (f"cep_razbor_{а.s[:10]}.json" if а.razbor else f"cep_vs_arhiv_{а.s[:10]}.json")
     out.write_text(json.dumps({"с_utc": а.s, "до_utc": а.do or "сейчас", "архив": а.arhiv,
                                "группы": sorted(гр), "адресов": len(цель), "строки": строки,
                                "расход": уз.расход()}, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -142,6 +213,8 @@ def main() -> int:
     р.add_argument("--do", default="", help="до какого UTC (по умолчанию -- до сейчас)")
     р.add_argument("--arhiv", default="", help="метка суточного файла архива для сравнения (den_2026-10-01T06)")
     р.add_argument("--stranic", type=int, default=40, help="предел страниц по 1000 подписей")
+    р.add_argument("--razbor", action="store_true",
+                   help="с --gruppy: по каждой пуловой транзакции -- подписант / владелец токен-счёта / только упомянут")
     а = р.parse_args()
     с_ts = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
     до_ts = calendar.timegm(time.strptime(а.do, "%Y-%m-%dT%H:%M:%SZ")) if а.do else None
