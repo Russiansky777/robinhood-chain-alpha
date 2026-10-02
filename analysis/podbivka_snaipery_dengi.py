@@ -193,9 +193,9 @@ def сито() -> int:
     return 0
 
 
-def фаза2(д: str) -> int:
+def фаза2(д: str, сито_файл: str = "dengi_sito.json", метка: str = "") -> int:
     import podbivka_run as R  # noqa: PLC0415
-    цель = set(json.loads((П / "dengi_sito.json").read_text(encoding="utf-8"))["кошельки"])
+    цель = set(json.loads((П / сито_файл).read_text(encoding="utf-8"))["кошельки"])
     по: dict = {}                 # (кошелёк, минт) -> запись
     ведущие: dict = {}            # кошелёк -> Counter(ведущий)
     за_ведущим: dict = {}         # кошелёк -> [покупок с кем-то впереди, всего покупок]
@@ -245,7 +245,7 @@ def фаза2(д: str) -> int:
             з["prio"] += e["prio"] or 0.0
             з["s_продажи"] = блок if з["s_продажи"] is None else min(з["s_продажи"], блок)
     счёт = поток(д, 1, дело)
-    out = П / f"dengi_f2_{д}.json.gz"
+    out = П / (f"dengi_f2_{метка}_{д}.json.gz" if метка else f"dengi_f2_{д}.json.gz")
     out.write_bytes(gzip.compress(json.dumps({
         "день": д, "счёт": счёт, "кошельков_сита": len(цель), "пар": len(по),
         "пары": {к: {kk: (round(vv, 6) if isinstance(vv, float) else vv) for kk, vv in v.items()} for к, v in по.items()},
@@ -264,6 +264,13 @@ def свод() -> int:
     if not файлы:
         print("нет файлов dengi_f2_* -- фаза 2 не закончена", flush=True)
         return 1
+    пары, ведущие, покупки, дни = собрать_f2(файлы)
+    ряды = ряды_по_парам(пары, ведущие, покупки, сито_д)
+    return страница(ряды, дни, сито_д)
+
+
+def собрать_f2(файлы: list) -> tuple:
+    """Свести файлы фазы 2: пары (кошелёк, минт), ведущие и покупки по кошелькам, счёт по дням."""
     пары: dict = {}
     ведущие: dict = {}
     покупки: dict = {}
@@ -287,7 +294,11 @@ def свод() -> int:
         for w, сп in (д.get("покупки") or {}).items():
             покупки.setdefault(w, []).extend(сп)
         del д
-    # «ведущий» -- кошелёк, который был впереди (<= 3 слота) не меньше ВЕДУЩИЙ_РАЗ раз за неделю
+    return пары, ведущие, покупки, дни
+
+
+def ряды_по_парам(пары: dict, ведущие: dict, покупки: dict, сито_д: dict) -> dict:
+    """По кошелькам: оборот, итог по закрытым минтам, удержание, части, ведущие (≥ ВЕДУЩИЙ_РАЗ раз за окно)."""
     по_кошельку: dict = {}          # один проход вместо перебора пар на каждый кошелёк
     for к, v in пары.items():
         по_кошельку.setdefault(к.split("|", 1)[0], []).append(v)
@@ -320,6 +331,11 @@ def свод() -> int:
                    "покупок_в_разборе": len(сп), "за_ведущим": round(за_вед / len(сп), 3) if сп else None,
                    "ведущих": len(вед),
                    "ведущие": dict(sorted(вед.items(), key=lambda kv: -kv[1])[:8])}
+    return ряды
+
+
+def страница(ряды: dict, дни: list, сито_д: dict) -> int:
+    import podbivka_run as R  # noqa: PLC0415
     верх = sorted(ряды, key=lambda w: -(ряды[w]["итог_после_prio_sol"]))[:ВЕРХ]
     адр = json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
     наши_вед = {в for w in верх for в in ряды[w]["ведущие"]}
@@ -402,6 +418,8 @@ def main() -> int:
     р.add_argument("--faza2", action="store_true")
     р.add_argument("--sito", action="store_true")
     р.add_argument("--svod", action="store_true")
+    р.add_argument("--sito-fayl", default="dengi_sito.json", help="файл сита для фазы 2")
+    р.add_argument("--metka", default="", help="метка выхода фазы 2 (отдельное окно)")
     р.add_argument("--den", default="")
     а = р.parse_args()
     if а.sito:
@@ -410,7 +428,7 @@ def main() -> int:
         return свод()
     if not а.den:
         р.error("нужен --den YYYY-MM-DD")
-    return фаза1(а.den) if а.faza1 else фаза2(а.den) if а.faza2 else р.error("нужна фаза")
+    return фаза1(а.den) if а.faza1 else фаза2(а.den, а.sito_fayl, а.metka) if а.faza2 else р.error("нужна фаза")
 
 
 if __name__ == "__main__":
