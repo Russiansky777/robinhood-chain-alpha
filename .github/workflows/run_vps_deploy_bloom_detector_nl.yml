@@ -1164,16 +1164,24 @@ jobs:
           TAJM_DIR=/home/bot/host_tajmery
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -e
-            install -d -o bot -g bot -m 755 $TAJM_DIR $TAJM_DIR/uchet $TAJM_DIR/uchet/analysis $TAJM_DIR/uchet/data $TAJM_DIR/vygruzki $TAJM_DIR/zhivuchest
+            install -d -o bot -g bot -m 755 $TAJM_DIR $TAJM_DIR/uchet $TAJM_DIR/uchet/analysis $TAJM_DIR/uchet/data $TAJM_DIR/vygruzki $TAJM_DIR/zhivuchest $TAJM_DIR/deploy/checks $TAJM_DIR/analysis
             ls -ld $TAJM_DIR
           "
           # ДОСТАВКА СО СВЕРКОЙ sha256 И БЕЗ ЛИШНЕЙ ПЕРЕЗАПИСИ -- как у кода
           # служб: совпало по сумме, значит mtime не трогаем.
           # Каталог учёта -- КОРЕНЬ для solana_ledger_run.py: он считает свой
           # data/ как ../data от себя, поэтому модуль лежит в uchet/analysis.
+          # ВЫГРУЗКА ЛЕЖИТ ЗЕРКАЛОМ ВЕТКИ (deploy/checks + analysis рядом), И
+          # ЭТО НЕ АККУРАТНОСТЬ РАДИ АККУРАТНОСТИ: её самопроверка сверяет
+          # имена полей региона с analysis/bloom_own_send.py и ищет его как
+          # <три каталога вверх>/analysis. Положенная плоско в $TAJM_DIR, она
+          # искала бы /home/analysis, давала 20/21 и код 1 -- то есть ЭТОТ шаг
+          # падал бы на самопроверке КАЖДЫЙ раз, и строки --ustanovit ниже
+          # никогда бы не достигал. Замерено местной симуляцией раскладки.
           for PARA in "deploy/hostovye_tajmery.py $TAJM_DIR/hostovye_tajmery.py" \
                       "deploy/zhivuchest_na_hoste.py $TAJM_DIR/zhivuchest_na_hoste.py" \
-                      "deploy/checks/sdelki_polosy_vygruzka.py $TAJM_DIR/sdelki_polosy_vygruzka.py" \
+                      "deploy/checks/sdelki_polosy_vygruzka.py $TAJM_DIR/deploy/checks/sdelki_polosy_vygruzka.py" \
+                      "analysis/bloom_own_send.py $TAJM_DIR/analysis/bloom_own_send.py" \
                       "analysis/solana_ledger_run.py $TAJM_DIR/uchet/analysis/solana_ledger_run.py" \
                       "data/leader_regions.json $TAJM_DIR/leader_regions.json" \
                       "data/solana_dbot_realized_ledger.json $TAJM_DIR/uchet/data/solana_dbot_realized_ledger.json"; do
@@ -1207,7 +1215,7 @@ jobs:
             set -e
             sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/hostovye_tajmery.py --self-test
             sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/zhivuchest_na_hoste.py --self-test
-            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/sdelki_polosy_vygruzka.py --self-test
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/deploy/checks/sdelki_polosy_vygruzka.py --self-test
           " 2>&1 | tee -a data/bloom_detector_deploy.txt
           # БЕЗ tail: обрезанный хвост самопроверки прячет ИМЕННО ту строку, из-за
           # которой она упала, а pipefail у шага стоит -- падение мы увидим, но
