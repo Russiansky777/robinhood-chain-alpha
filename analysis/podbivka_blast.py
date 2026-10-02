@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 П = КОРЕНЬ / "data" / "podbivka"
 WSOL = "So11111111111111111111111111111111111111112"
 PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+ВЕРСИЯ_TX = 1          # в блоках есть транзакции версии 1: с 0 узел отвечает -32015
 
 
 def ключи(т: dict) -> list:
@@ -141,7 +142,7 @@ def по_блокам(уз, а, т0: int, т1: int) -> tuple[list, dict, dict]:
     строки, блоки, счёт = [], {}, {"блоков": 0, "вне_окна": 0, "не_отдано": 0, "транзакций": 0}
     for сл in range(а.slot_s, а.slot_do + 1):
         б = уз.вызов("getBlock", [сл, {"transactionDetails": "accounts", "rewards": False,
-                                       "maxSupportedTransactionVersion": 0}], срок=120.0)
+                                       "maxSupportedTransactionVersion": ВЕРСИЯ_TX}], срок=120.0)
         if not б:
             счёт["не_отдано"] += 1
             continue
@@ -215,7 +216,7 @@ def main() -> int:
                     ор[п] = наш[0]
                     continue
                 т = уз.вызов("getTransaction", [п, {"encoding": "jsonParsed", "commitment": "confirmed",
-                                                    "maxSupportedTransactionVersion": 0}], срок=60.0)
+                                                    "maxSupportedTransactionVersion": ВЕРСИЯ_TX}], срок=60.0)
                 ор[п] = (дополнить(разбор(т, а.mint, а.pul), вл_пула) | {"signature": п}) if т else \
                     {"signature": п, "why_not": "нет тела"}
             for пр in [x for x in а.prefiksy.split(",") if x]:
@@ -256,7 +257,7 @@ def main() -> int:
           слоты = sorted({r.get("слот") for r in строки if r.get("слот")})
           for сл in слоты:
               б = уз.вызов("getBlock", [сл, {"transactionDetails": "signatures", "rewards": False,
-                                             "maxSupportedTransactionVersion": 0}], срок=60.0)
+                                             "maxSupportedTransactionVersion": ВЕРСИЯ_TX}], срок=60.0)
               сп = (б or {}).get("signatures") or []
               блоки[сл] = {"всего": len(сп), "места": {s: и for и, s in enumerate(сп)}}
           вл_пула, доля_пула = сторона_пула(строки, а.pul)
