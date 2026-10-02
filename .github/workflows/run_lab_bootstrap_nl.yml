@@ -212,8 +212,17 @@ jobs:
             done
             # Имена ключей кошельков ищутся ПО ИМЕНИ ПЕРЕМЕННОЙ, значения не
             # печатаются никогда.
-            if grep -rlE '(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)' /etc /home 2>/dev/null | head -3 | grep -q .; then
-              echo 'NAJDENO: imja kljucha koshelka v fajlah /etc ili /home'
+            # ПУТИ НАХОДКИ ПЕЧАТАЮТСЯ, А НЕ ПРЯЧУТСЯ. Прежде страж отказывал
+            # словами 'imja kljucha koshelka v fajlah /etc ili /home' и терял
+            # пути: наружу уходил отказ без имени находки, и починить его было
+            # нечем -- ровно это и случилось на Miami в ночь 01->02.10. Печатаем
+            # ТОЛЬКО ИМЕНА ФАЙЛОВ (grep -l), содержимое не печатается никогда,
+            # поэтому значение ключа наружу попасть не может.
+            NAJDENNYE=\$(grep -rlE '(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)' /etc /home 2>/dev/null | head -20 || true)
+            if [ -n \"\$NAJDENNYE\" ]; then
+              echo 'NAJDENO: imja kljucha koshelka v fajlah /etc ili /home; puti nizhe (tolko imena fajlov):'
+              printf '  %s\n' \$NAJDENNYE
+              echo \"vsego fajlov s imenami kljuchej: \$(grep -rlE '(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)' /etc /home 2>/dev/null | wc -l)\"
               NAJDENO=1
             fi
             if [ \"\$NAJDENO\" = 1 ]; then
