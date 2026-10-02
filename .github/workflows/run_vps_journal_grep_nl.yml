@@ -30,18 +30,30 @@ on:
         description: "'yes' -- искать и в ротированных .gz (история за прошлые сутки)"
         required: false
         default: "no"
+      runner:
+        description: "'nl' -- свой бегунок на хосте (по умолчанию), 'cloud' -- запасной облачный"
+        required: false
+        default: "nl"
 
 concurrency:
   group: journal-grep-nl
   cancel-in-progress: false
 
+# СВОЙ БЕГУНОК, А НЕ ОБЛАЧНЫЙ (слово владельца 02.10, п.6). Ночью 02->03.10
+# чужая сессия заняла облачные бегунки счёта одиннадцатью параллельными
+# работами, и служебные прогоны -- учёт, живучесть, выборка из журнала -- встали
+# в очередь на час. Служебное чтение не должно зависеть от чужой очереди.
+# Облачный путь остаётся запасным: вход runner=cloud.
 env:
-  HOST: 45.59.170.76
   STATE_DIR: /home/bot/bloom_executor_live_data
 
 jobs:
   grep:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    # АДРЕС ХОСТА ЗАВИСИТ ОТ БЕГУНКА: со своего бегунка он сам себе loopback
+    # (так же, как у прогонов деплоя), из облака -- публичный адрес.
+    env:
+      HOST: ${{ inputs.runner == 'cloud' && '45.59.170.76' || '127.0.0.1' }}
     timeout-minutes: 20
     permissions:
       contents: write
