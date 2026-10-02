@@ -61,20 +61,28 @@ on:
         description: "адрес -- выключить переводом в НЕТОРГУЮЩУЮ группу из v"
         required: false
         default: ""
+      runner:
+        description: "'nl' -- свой бегунок на хосте (по умолчанию), 'cloud' -- запасной облачный"
+        required: false
+        default: "nl"
 
 concurrency:
   group: pravka-grupp
   cancel-in-progress: false
 
+# СВОЙ БЕГУНОК, А НЕ ОБЛАЧНЫЙ (слово владельца 02.10, п.6): правка файла групп
+# -- служебный прогон, и чужая очередь облачных бегунков его держать не должна.
+# Облачный путь остаётся запасным: вход runner=cloud.
 env:
-  HOST: 45.59.170.76
   FILE: /home/bot/data/sources_2026-09-25.json
   CODE_DIR: /home/bot/bloom_executor
   OUT: data/pravka_grupp.txt
 
 jobs:
   pravka:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    env:
+      HOST: ${{ inputs.runner == 'cloud' && '45.59.170.76' || '127.0.0.1' }}
     timeout-minutes: 15
     permissions:
       contents: write
