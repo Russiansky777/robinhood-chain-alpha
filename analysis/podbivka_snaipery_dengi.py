@@ -195,7 +195,7 @@ def сито() -> int:
 
 def фаза2(д: str) -> int:
     import podbivka_run as R  # noqa: PLC0415
-    цель = set(json.loads((П / "dengi_sito.json").read_text(encoding="utf-8"))["кошельков"])
+    цель = set(json.loads((П / "dengi_sito.json").read_text(encoding="utf-8"))["кошельки"])
     по: dict = {}                 # (кошелёк, минт) -> запись
     ведущие: dict = {}            # кошелёк -> Counter(ведущий)
     за_ведущим: dict = {}         # кошелёк -> [покупок с кем-то впереди, всего покупок]
