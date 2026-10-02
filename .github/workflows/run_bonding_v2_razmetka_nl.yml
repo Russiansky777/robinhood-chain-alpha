@@ -44,6 +44,10 @@ on:
         description: "подпись продажи ТОГО ЖЕ пула (внутри Jupiter тоже годится)"
         required: false
         default: ""
+      mesta_prodazhi_schet:
+        description: "счёт токена: взять подпись покупки из его истории (надёжнее журнала)"
+        required: false
+        default: ""
 
 concurrency:
   group: bonding-v2-razmetka
@@ -124,6 +128,7 @@ jobs:
             env BLOOM_STATE_DIR=\$BLOOM_STATE_DIR HELIUS_API_KEY=\$HELIUS_API_KEY \
               PYTHONPATH=$RABOTA $PY_HOSTA $RABOTA/krivaya_27_mesta.py \
                 --mint '${{ inputs.mesta_prodazhi_mint }}' \
+                --schet '${{ inputs.mesta_prodazhi_schet }}' \
                 --prodazha '${{ inputs.mesta_prodazhi_podpis }}' \
                 --out $RABOTA/mesta.json" 2>&1 | tail -80 || echo "MESTA_NE_OK=1" >> "$GITHUB_ENV"
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/mesta.json 2>/dev/null || true" > /tmp/mesta.json || true
