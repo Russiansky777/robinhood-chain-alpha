@@ -1,14 +1,12 @@
-lane_s0.lane_sol: было 0.3, стало 0.5
-lane_s0.lane_size: было 0.3, стало 0.5
-lane_s0.stop_loss_sol: было 0.45, стало 1.0
-создана группа cand1_03: {"lane_trades": 1, "bloom_trades": 0, "subscribe": 1, "fanout": 0, "lane_sol": 0.3, "lane_size": 0.3, "stop_loss_sol": 0.6, "per_day": 150, "hold_slots": 108, "lane_open_max": 1, "note": "куст DYAn4XpA: один минт в одном слоте не покупать дважды -- поэтому lane_open_max 1", "lane_pools": "pump_amm,cpmm,bonding,two_step,damm2,dbc,clmm,launchlab,dlmm"}
+создана группа cand1_05: {"lane_trades": true, "subscribe": true, "bloom_trades": false, "bloom_sol": null, "lane_sol": 0.05, "lane_size": 0.05, "stop_loss_sol": 0.15, "per_day": 100, "hold_slots": 108, "lane_open_max": 3, "min_target_sol": 2.0, "day_cap_sol": null, "lane_pools": "amm_v4,bonding,clmm,cpmm,damm2,dbc,dlmm,launchlab,pump_amm,two_step,whirlpool"}
 убран из cand1 (1 мест)
-6qudAN2k: ['cand1'] -> cand1_03
+GM7Hrz2b: ['cand1'] -> cand1_05
 убран из cand1 (1 мест)
-DYAn4XpA: ['cand1'] -> cand1_03
-убран из log_only (1 мест)
-Gf2wYM2k: ['log_only'] -> cand1_03
-поле cand1_03.per_day политика не читает -- не сверяю
-поле cand1_03.note политика не читает -- не сверяю
-самопроверка денежного пути пройдена; копия /home/bot/data/sources_2026-09-25.json.bak-20261002T000326Z
--rw-r--r-- 1 bot bot 139399 Oct  2 02:03 /home/bot/data/sources_2026-09-25.json
+HmBmSYwY: ['cand1'] -> cand1_05
+убран из cand1_03 (1 мест)
+Gf2wYM2k: ['cand1_03'] -> log_only
+cand1_03.lane_open_max: было 1, стало 3
+cand1_03.lane_pools: было 'pump_amm,cpmm,bonding,two_step,damm2,dbc,clmm,launchlab,dlmm', стало ['amm_v4', 'bonding', 'clmm', 'cpmm', 'damm2', 'dbc', 'dlmm', 'launchlab', 'pump_amm', 'two_step', 'whirlpool']
+поле cand1_05.per_day политика не читает -- не сверяю
+самопроверка денежного пути пройдена; копия /home/bot/data/sources_2026-09-25.json.bak-20261002T111313Z
+-rw-r--r-- 1 bot bot 140544 Oct  2 13:13 /home/bot/data/sources_2026-09-25.json
