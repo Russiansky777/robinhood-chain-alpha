@@ -288,9 +288,12 @@ def свод() -> int:
             покупки.setdefault(w, []).extend(сп)
         del д
     # «ведущий» -- кошелёк, который был впереди (<= 3 слота) не меньше ВЕДУЩИЙ_РАЗ раз за неделю
+    по_кошельку: dict = {}          # один проход вместо перебора пар на каждый кошелёк
+    for к, v in пары.items():
+        по_кошельку.setdefault(к.split("|", 1)[0], []).append(v)
     ряды = {}
-    for w in {к.split("|")[0] for к in пары}:
-        мои = {к: v for к, v in пары.items() if к.startswith(w + "|")}
+    for w, мои_сп in по_кошельку.items():
+        мои = {и: v for и, v in enumerate(мои_сп)}
         оборот = sum(v["sol_в"] for v in мои.values())
         закрытые = [v for v in мои.values() if v["ток_в"] > 0 and v["ток_из"] >= ЗАКРЫТ * v["ток_в"]]
         итог = sum(v["sol_из"] - v["sol_в"] for v in закрытые)
