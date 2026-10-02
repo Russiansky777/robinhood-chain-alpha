@@ -142,7 +142,26 @@ def _время_iso(ts: float | None = None) -> str:
 
 
 def _время(ts: float | None = None) -> str:
-    return time.strftime("%H:%M:%SZ", time.gmtime(ts if ts is not None else time.time()))
+    """Время строки Telegram ПО МАДРИДУ -- слово владельца 02.10 про UNSOLD.
+
+    Отсюда берут время ⚠️ UNSOLD, ⚠️ «покупка УПАЛА» и остальные строки этого
+    модуля. Зона считается ОДНИМ написанием с 📋 и с форматом 3: владелец читает
+    один чат, и две зоны в нём читались бы как разница в час-два там, где её нет.
+    Базы зон на хосте нет -- остаётся UTC С СУФФИКСОМ Z, а не Мадрид наугад.
+
+    _время_iso НЕ меняется и остаётся в Z: это метка ДЛЯ ЗАПИСИ, её читает
+    сверка, и сдвиг зоны сломал бы сшивку по времени.
+    """
+    т = ts if ts is not None else time.time()
+    try:
+        import c2_doklad_format as _CF  # noqa: PLC0415
+
+        с = _CF.чч_мм_сс(т)
+        if с:
+            return с
+    except Exception:  # noqa: BLE001
+        pass
+    return time.strftime("%H:%M:%SZ", time.gmtime(т))
 
 
 # ------------------------------------------------------------------ строки
