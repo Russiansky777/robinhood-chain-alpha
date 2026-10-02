@@ -370,6 +370,21 @@ def посчитать(с: dict, ряд: list, окно: int) -> dict:
     return с
 
 
+р_адрес = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+
+
+def адреса_файла(путь: str) -> set:
+    """Адреса из --dop-adresa: список, или словарь с ключом «адреса», или словарь адрес -> что угодно.
+    Пустой разбор -- отказ сразу: молчаливый ноль здесь стоит целого прогона (02.10: 73 млн строк впустую)."""
+    д = json.loads(Path(путь).read_text(encoding="utf-8"))
+    канд = д if isinstance(д, list) else (д.get("адреса") if isinstance(д.get("адреса"), list) else list(д))
+    из_ = {x for x in канд if isinstance(x, str) and р_адрес.match(x)}
+    if not из_:
+        raise SystemExit(f"STOP: в {путь} не нашлось ни одного адреса (ключи: {list(д)[:5] if isinstance(д, dict) else len(д)})")
+    print(f"--dop-adresa {путь}: адресов {len(из_)}", flush=True)
+    return из_
+
+
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
            минты: set | None = None, не_sol: bool = False, окно_докупки: int | None = None) -> Path:
@@ -663,7 +678,7 @@ def main() -> int:
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
-    доп = set(json.loads(Path(а.dop_adresa).read_text(encoding="utf-8"))) if а.dop_adresa else set()
+    доп = адреса_файла(а.dop_adresa) if а.dop_adresa else set()
     ист = {x for x in а.istochniki.split(",") if x}
     out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop, ист,
                  {x for x in а.minty.split(",") if x}, а.ne_sol, а.okno_dokupki)
