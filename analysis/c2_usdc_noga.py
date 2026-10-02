@@ -217,6 +217,19 @@ def _dvuhshagovyj():
     return TS
 
 
+def _sled(exc: BaseException) -> str:
+    """Строка сбоя (repr и файл:строка) -- приёмом двухшагового пути, не своим.
+
+    Обёртка нужна ровно затем, что зовут её ИЗ ОБРАБОТЧИКА: если и разбор упадёт,
+    обработчик не имеет права бросить второе исключение -- тогда полоса потеряет
+    причину целиком. Поэтому худший случай здесь -- имя класса, но СКАЗАННОЕ.
+    """
+    try:
+        return _dvuhshagovyj().след_сбоя(exc)
+    except Exception:  # noqa: BLE001
+        return f"{type(exc).__name__} (место падения не разобрано)"
+
+
 def modul(programma: str):
     """Модуль строителя типа пула или None, если нога идёт кирпичами."""
     t = TYPES.get(programma or "")
@@ -822,8 +835,8 @@ def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek:
           "leg1_min_out": None, "leg2_amount_in": None, "leg2_to_pool": None,
           "quote_fee_bps": None, "min_out": None, "expected_out": None,
           "min_out_from": None, "razvernut": None, "slippage_used": proskalzyvanie,
-          "ixs": None, "leg1_entry": None, "tip_account": None, "tips": None,
-          "tips_total_lamports": None}
+          "ixs": None, "leg1_entry": None, "nonce_para": None, "tip_account": None,
+          "tips": None, "tips_total_lamports": None}
     try:
         C, _PP, SB, B = _kirpichi()
         TS = _dvuhshagovyj()
@@ -833,6 +846,18 @@ def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek:
     if kesh_nog is None:
         iz["why_not"] = "кэша шаблонов первой ноги нет -- собирать не из чего"
         return iz
+    # ВИД NONCE ПРИВОДИТСЯ ЗДЕСЬ И ОДИН РАЗ -- тем же приёмом двухшагового пути
+    # (TS.пара_нонса), а не своим: два приёма однажды разойдутся, и разойдутся на
+    # деньгах. Полоса передаёт nonce СЛОВАРЁМ, кирпич advance_nonce ждёт пару, и
+    # 02.10 nons[0] по словарю дал KeyError: 0 -- годный сигнал потерян на этом.
+    # Приведённая пара уходит и в ответ (nonce_para): sobrat() берёт её ОТТУДА, а
+    # не трогает сырой вход второй раз.
+    np_ = TS.пара_нонса(nons)
+    if not np_["ok"]:
+        iz["why_not"] = np_["почему"]
+        return iz
+    nons = np_["пара"]
+    iz["nonce_para"] = nons
     try:
         pul = C.identify_pool(tx_istochnika, istochnik, mint)
         if not pul.get("ok"):
@@ -928,7 +953,8 @@ def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek:
             iz["tips"] = list(pary)
             iz["tips_total_lamports"] = sum(int(lamp_) for _, lamp_ in pary)
     except Exception as exc:  # noqa: BLE001
-        iz["why_not"] = f"сборка USDC-ноги: {type(exc).__name__}: {str(exc)[:160]}"
+        # repr И место падения: по одному имени класса причину не назвать (02.10).
+        iz["why_not"] = f"сборка USDC-ноги: {_sled(exc)}"
         return iz
     iz.update(ok=True, ixs=ixs, leg1_entry=e)
     return iz
@@ -967,10 +993,16 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
         # она не учитывает наш объём и завышает выход (решение владельца 01.10).
         kotirovka="boj", rpc_call=rpc_call, nalog_vyhoda=nalog_vyhoda,
         seychas=seychas)
-    iz.update(tx_base64=None, size=None, build_ms=None,
-              nonce_account=(str(nons[0]) if nons else None))
     ixs = iz.pop("ixs", None)
     e = iz.pop("leg1_entry", None)
+    # NONCE В ОТВЕТЕ -- ПРИВЕДЁННАЯ ПАРА ИЗ instrukcii(), А НЕ СЫРОЙ ВХОД. Здесь
+    # стояло str(nons[0]) ВНЕ всякого try, и словарь полосы выпускал KeyError: 0
+    # наружу из sobrat(): полоса записывала "сборка USDC-ноги не загрузилась:
+    # KeyError" и не могла назвать ни ключа, ни места. Вид приводится один раз
+    # внутри instrukcii(), и берём мы ровно тот nonce, который попал в инструкции.
+    nons = iz.pop("nonce_para", None)
+    iz.update(tx_base64=None, size=None, build_ms=None,
+              nonce_account=(nons[0] if nons else None))
     if not iz.get("ok") or not ixs:
         iz["ok"] = False
         return iz
@@ -1008,7 +1040,8 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
             msg, [Signature.default()] * msg.header.num_required_signatures))
     except Exception as exc:  # noqa: BLE001
         iz["ok"] = False
-        iz["why_not"] = f"сборка USDC-ноги: {type(exc).__name__}: {str(exc)[:160]}"
+        # То же, что и у списка инструкций: repr с ключом и файл:строка кадра.
+        iz["why_not"] = f"сборка USDC-ноги: {_sled(exc)}"
         return iz
     iz["size"] = len(syroe)
     if len(syroe) > TS.ПРЕДЕЛ_РАЗМЕРА_TX:
@@ -1027,7 +1060,7 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ. Молчаливый пропуск -- это провал: если файла
 # живых образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 73
+ZHDEM_PROVEROK = 81
 
 # Живые образцы: свопы с котировкой USDC по типам пулов. Числа -- ЗАМЕР, они
 # объявлены здесь и сверяются по файлам; разошлось -- провал.
@@ -1469,6 +1502,92 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         chk(f"{tip}: списков инструкций {zhdem}", spiskov.get(tip, 0) == zhdem,
             spiskov.get(tip, 0))
 
+    # ------- 6б. ЖИВОЙ СБОЙ 02.10: ПОЛОСА ПЕРЕДАЁТ NONCE СЛОВАРЁМ, А НЕ ПАРОЙ
+    # Сигнал Xk9onqHkpULD, группа lane_s0: пул цели Meteora DAMM v2, первая нога
+    # Pump AMM, котировка USDC. Тень сказала ГОДНА, а боевая сборка ответила
+    # "сборка USDC-ноги не загрузилась: KeyError" -- потому что bloom_own_send
+    # отдавал сюда СЛОВАРЬ нонс_для_сделки (account/authority/blockhash), а
+    # advance_nonce и ответ брали nons[0]. Единственный годный сигнал USDC-ноги за
+    # сутки потерян не по экономике, а на этом. Проверки ниже повторяют тот путь
+    # БЕЗ СЕТИ на живых образцах и падают ровно на том дефекте.
+    ND = {"ok": True, "account": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+          "authority": KOSHELEK_PROVERKI, "warm": True,
+          "blockhash": "GHtXQBsoZHVnNFa9YevAzFr17DJjgHXk3ycTKD5xD3Zi"}
+    NP = (ND["account"], ND["authority"])
+    chk("nonce не передан -- это пара None, а не отказ",
+        TS.пара_нонса(None) == {"ok": True, "пара": None, "почему": None},
+        TS.пара_нонса(None))
+    chk("пара проходит как есть", TS.пара_нонса(NP)["пара"] == NP,
+        TS.пара_нонса(NP))
+    chk("СЛОВАРЬ полосы (account/authority) приводится к паре, а не к KeyError",
+        TS.пара_нонса(ND)["ok"] and TS.пара_нонса(ND)["пара"] == NP,
+        TS.пара_нонса(ND))
+    chk("непонятный вид nonce -- отказ СЛОВАМИ, а не пустая пара и не исключение",
+        TS.пара_нонса(7)["ok"] is False and TS.пара_нонса(7)["пара"] is None
+        and "nonce" in (TS.пара_нонса(7)["почему"] or ""), TS.пара_нонса(7))
+    chk("в словаре нет распорядителя -- отказ словами: его не выдумать",
+        TS.пара_нонса({"account": ND["account"]})["ok"] is False
+        and TS.пара_нонса({"account": ND["account"]})["почему"],
+        TS.пара_нонса({"account": ND["account"]}))
+    # СТРОКА СБОЯ ОБЯЗАНА НАЗВАТЬ КЛЮЧ И МЕСТО. Ровно этого не хватило 02.10:
+    # в записи стояло одно слово "KeyError". Исключение берётся настоящее, с
+    # настоящим traceback: по выдуманной строке проверять нечего.
+    try:
+        {"а": 1}[0]
+        сл_сбоя = "исключения не было"
+    except KeyError as exc_k:
+        сл_сбоя = _sled(exc_k)
+    chk("строка сбоя называет и ключ (repr), и файл:строку падения",
+        "KeyError(0)" in сл_сбоя and "c2_usdc_noga.py:" in сл_сбоя, сл_сбоя)
+    if kesh is not None:
+        r_d2 = next((r for r in ryady if r["tip"] == "DAMM v2"
+                     and r.get("usdc_vhod")), None)
+        st_d2 = (storona(r_d2["транзакция"], programma=r_d2["program"],
+                         pul=r_d2.get("пул")) if r_d2 else {"ok": False})
+        ist_d2 = ((r_d2.get("источник")
+                   or (sorted(C.signers(r_d2["транзакция"]))[0]
+                       if C.signers(r_d2["транзакция"]) else ""))
+                  if r_d2 else "")
+
+        def _ixs_нонсом(нонс_):
+            """Список инструкций живого сигнала DAMM v2 при данном виде nonce."""
+            return instrukcii(
+                tx_istochnika=r_d2["транзакция"], istochnik=ist_d2,
+                mint=r_d2.get("минт") or st_d2["base_mint"],
+                nash_koshelek=KOSHELEK_PROVERKI, lamporty=10_000_000,
+                kesh_nog=kesh, proskalzyvanie=0.35, chaevye_lamporty=0,
+                chaevye_adres=None, nons=нонс_)
+
+        def _слепок(res_):
+            return [(str(i.program_id), bytes(i.data),
+                     [str(m.pubkey) for m in i.accounts]) for i in (res_["ixs"] or [])]
+
+        try:
+            сл_пара = _ixs_нонсом(NP)
+            сл_слов = _ixs_нонсом(ND)
+            одно = (сл_пара["ok"] and сл_слов["ok"]
+                    and _слепок(сл_пара) == _слепок(сл_слов))
+            факт = (сл_пара.get("why_not"), сл_слов.get("why_not"))
+        except Exception as exc:  # noqa: BLE001
+            одно, факт = False, repr(exc)
+        chk("DAMM v2 + нога Pump AMM: со СЛОВАРЁМ полосы собирается тот же список "
+            "инструкций, что с парой (живой путь сигнала 02.10)", одно, факт)
+        try:
+            сб_д = sobrat(tx_istochnika=r_d2["транзакция"], istochnik=ist_d2,
+                          mint=r_d2.get("минт") or st_d2["base_mint"],
+                          nash_koshelek=KOSHELEK_PROVERKI, lamporty=10_000_000,
+                          kesh_nog=kesh, proskalzyvanie=0.35, chaevye_lamporty=0,
+                          chaevye_adres=None, min_out_vneshnij=сл_пара["min_out"],
+                          nons=ND, rpc_call=lambda _m, _p: {"value": []})
+            # Отказ по РАЗМЕРУ здесь законный (таблиц адресов офлайн нет), а вот
+            # исключения наружу sobrat() не выпускает вовсе: его ответ -- словарь.
+            без_исключения = (isinstance(сб_д, dict)
+                              and сб_д.get("nonce_account") == ND["account"])
+            факт_д = (сб_д.get("why_not"), сб_д.get("nonce_account"))
+        except Exception as exc:  # noqa: BLE001
+            без_исключения, факт_д = False, repr(exc)
+        chk("sobrat() со словарём nonce НЕ бросает исключение и называет аккаунт "
+            "nonce в ответе", без_исключения, факт_д)
     # ---------------------------------- 7. боевой режим: котировщик типа, не цена события
     sohr_cu = os.environ.get(IMYA_FLAGA_CU)
     os.environ.pop(IMYA_FLAGA_CU, None)
