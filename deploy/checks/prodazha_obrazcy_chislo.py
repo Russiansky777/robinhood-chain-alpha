@@ -44,6 +44,7 @@ sys.path.insert(0, str(КОРЕНЬ / "analysis"))
 
 ОБРАЗЦЫ = КОРЕНЬ / "data" / "samples" / "prodazhi"
 PROG_KRIVAYA = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+PROG_LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
 # ПОСТОЯННЫЕ СЧЕТА КРИВОЙ -- ЗАМЕР НА ЖИВЫХ ПОКУПКАХ ОБРАЗЦОВ (все 5 из 5):
 # место 12 покупки -- global_volume_accumulator, место 10 -- event_authority,
 # 14 -- fee_config, 15 -- программа комиссий. Здесь они нужны, чтобы восстановить
@@ -162,13 +163,14 @@ def _покупка_из_продажи(продажа: dict, подписант
     return {"accounts": пок, "data": _диск("buy") + bytes(16)}
 
 
-def _транзакция_с_покупкой(tx: dict, покупка: dict) -> dict:
+def _транзакция_с_покупкой(tx: dict, покупка: dict,
+                            программа: str = PROG_KRIVAYA) -> dict:
     """Та же транзакция, но вместо инструкции продажи -- восстановленная покупка."""
     новая = {"transaction": {"message": dict(
         ((tx.get("transaction") or {}).get("message") or {}))},
         "meta": dict(tx.get("meta") or {})}
     сооб = новая["transaction"]["message"]
-    сооб["instructions"] = [{"programId": PROG_KRIVAYA,
+    сооб["instructions"] = [{"programId": программа,
                               "accounts": list(покупка["accounts"]),
                               "data": _b58(покупка["data"])}]
     новая["meta"]["innerInstructions"] = []
@@ -181,7 +183,9 @@ def _байты(инстр) -> tuple:
                   for м in инстр.accounts))
 
 
-ЖДЁМ_ПРОВЕРОК = 34
+ЖДЁМ_ПРОВЕРОК = 57
+# LaunchLab: три живые продажи, все -- sell_exact_in с 18 счетами.
+ЖДЁМ_LAUNCHLAB = {"образцов": 3, "наша разновидность": 3}
 # Замер: сколько живых продаж каждого типа есть и сколько из них -- та
 # разновидность, которую модуль собирает. Числа сверяются файлами.
 ЖДЁМ_КРИВОЙ = {"образцов": 6, "наша разновидность": 2,
@@ -346,6 +350,100 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         иная == ЖДЁМ_КРИВОЙ["иная разновидность"], (иная, sorted(почему_иная)))
     chk("каждая продажа нашей разновидности сошлась байт в байт",
         сошлось == наша, (сошлось, наша))
+
+    # =================================================== LAUNCHLAB
+    путь_л = ОБРАЗЦЫ / "launchlab.json"
+    chk("файл живых продаж LaunchLab на месте", путь_л.exists(), str(путь_л))
+    образцы_л = (json.loads(путь_л.read_text(encoding="utf-8")).get("образцы") or []
+                  if путь_л.exists() else [])
+    chk(f"живых продаж LaunchLab {ЖДЁМ_LAUNCHLAB['образцов']}",
+        len(образцы_л) == ЖДЁМ_LAUNCHLAB["образцов"], len(образцы_л))
+    наша_л, байт_л, цена_л = 0, 0, 0
+    спец_л = B.SPECS[PROG_LAUNCHLAB]
+    for о in образцы_л:
+        tx = о["tx_jsonParsed"]
+        живая = _живая_продажа(tx, PROG_LAUNCHLAB, "sell_exact_in")
+        chk(f"{о['signature'][:8]}: живая продажа -- sell_exact_in на 18 счетах",
+            живая is not None and len(живая["accounts"]) == спец_л["n_accounts"],
+            None if живая is None else len(живая["accounts"]))
+        if живая is None or len(живая["accounts"]) != спец_л["n_accounts"]:
+            continue
+        наша_л += 1
+        сч, кош = живая["accounts"], о["кошелёк"]
+        строки = {r["account"]: r for r in C.token_rows(tx).values()}
+        # РОЛИ -- ПО РАСКЛАДКЕ ПОКУПКИ ЭТОГО ЖЕ ТИПА (SPECS): если бы продажа
+        # ставила счета иначе, роли бы не сошлись и равенство байтов ничего бы не
+        # значило. Проверяется именно то, что раскладка ТА ЖЕ.
+        наш_б, наш_к = спец_л["user_ata"][0][0], спец_л["user_ata"][1][0]
+        роли = [
+            ("место подписанта -- наш кошелёк", сч[спец_л["user"][0]] == кош,
+             сч[спец_л["user"][0]]),
+            ("наш счёт базы -- наш по владельцу",
+             (строки.get(сч[наш_б]) or {}).get("owner") == кош, сч[наш_б]),
+            # СЧЁТ КОТИРОВКИ ПРОВЕРЯЕТСЯ ВЫВОДОМ ATA, А НЕ ТОЛЬКО ВЛАДЕЛЬЦЕМ:
+            # счёт WSOL бот часто создаёт и закрывает В ТОЙ ЖЕ транзакции, и в
+            # балансах его тогда нет вовсе (владелец вышел бы None).
+            ("наш счёт котировки -- ATA нашего кошелька под WSOL",
+             сч[наш_к] == B.ata(кош, C.WSOL, B.TOKEN_PROGRAM)
+             or (строки.get(сч[наш_к]) or {}).get("owner") == кош, сч[наш_к]),
+            ("минт базы на своём месте", сч[спец_л["base_mint"]] == о["mint"],
+             сч[спец_л["base_mint"]]),
+            ("минт котировки -- WSOL",
+             сч[спец_л["quote_mint"]] == C.WSOL, сч[спец_л["quote_mint"]]),
+            ("хранилище базы пула -- не наше",
+             (строки.get(сч[спец_л["base_vault"]]) or {}).get("owner") not in (None, кош),
+             сч[спец_л["base_vault"]]),
+            ("данные продажи -- 32 байта: дискриминатор и три u64",
+             len(живая["data"]) == 32, len(живая["data"])),
+        ]
+        плохо = [(что, факт) for что, ок, факт in роли if not ок]
+        chk(f"{о['signature'][:8]}: роли мест живой продажи LaunchLab сошлись",
+            not плохо, плохо)
+        # ---- байт в байт: та же раскладка, значит покупка -- те же счета
+        а0, а1 = struct.unpack("<QQ", живая["data"][8:24])
+        пок = {"accounts": list(сч),
+                "data": _диск("buy_exact_in") + bytes(16) + живая["data"][24:]}
+        синт = _транзакция_с_покупкой(tx, пок, PROG_LAUNCHLAB)
+        ш = P.шаблон_продажи(синт, программа=PROG_LAUNCHLAB,
+                             хранилище=сч[спец_л["base_vault"]])
+        chk(f"{о['signature'][:8]}: модуль собрал шаблон продажи LaunchLab",
+            ш.get("ok"), ш.get("why_not"))
+        if not ш.get("ok"):
+            continue
+        наш = P.инструкция_продажи(ш, наш_кошелёк=кош, база_в=а0, минимум_выхода=а1)
+        права = dict(B.writable_map(tx))
+        жив = Instruction(
+            Pubkey.from_string(PROG_LAUNCHLAB), bytes(живая["data"]),
+            [AccountMeta(Pubkey.from_string(а), а == кош, bool(права.get(а, False)))
+             for а in сч])
+        равно = _байты(наш) == _байты(жив)
+        chk(f"{о['signature'][:8]}: наша продажа LaunchLab БАЙТ В БАЙТ как живая",
+            равно, None if равно else (_байты(наш), _байты(жив)))
+        байт_л += bool(равно)
+        # ---- цена: кривая по виртуальным резервам ДО продажи
+        ев = B.launchlab_event(tx)
+        chk(f"{о['signature'][:8]}: событие LaunchLab разобрано", ев is not None, None)
+        if not ев:
+            continue
+        ушло = int(ев["real_quote_before"]) - int(ев["real_quote_after"])
+        ком = int(ев["protocol_fee"]) + int(ев["platform_fee"])
+        к = KP.выход_launchlab(
+            токенов=int(ев["amount_in"]),
+            резерв_базы=int(ев["virtual_base"]) - int(ев["real_base_before"]),
+            резерв_котировки=int(ев["virtual_quote"]) + int(ев["real_quote_before"]),
+            комиссия_источника=ком, вход_источника=ушло)
+        точно = (к.get("ok") and к["брутто"] == ушло and к["комиссия"] == ком
+                 and к["выход"] == int(ев["amount_out"]))
+        chk(f"{о['signature'][:8]}: котировка LaunchLab повторила живую ДО ЛАМПОРТА",
+            точно, (к.get("выход"), ев["amount_out"], к.get("why_not")))
+        цена_л += bool(точно)
+    chk(f"LaunchLab: нашей разновидности {ЖДЁМ_LAUNCHLAB['наша разновидность']} из "
+        f"{ЖДЁМ_LAUNCHLAB['образцов']}",
+        наша_л == ЖДЁМ_LAUNCHLAB["наша разновидность"], наша_л)
+    chk("LaunchLab: каждая живая продажа сошлась байт в байт", байт_л == наша_л,
+        (байт_л, наша_л))
+    chk("LaunchLab: цена сошлась до лампорта на каждой живой продаже",
+        цена_л == наша_л, (цена_л, наша_л))
 
     плохих = [п for п in проверки if not п[1]]
     for что, ок, факт in проверки:
