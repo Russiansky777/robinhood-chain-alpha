@@ -43,6 +43,26 @@ OUT_PATH = REPO_ROOT / "data" / "bloom_reconcile.json"
 
 # Владелец, 23.09: кошелёк пополнен на 0.35 SOL, порог считать 0.3.
 MIN_BALANCE_SOL = ST.env_float("BLOOM_MIN_START_BALANCE_SOL", 0.3)
+# BLOOM ВЫКЛЮЧЕН -- БАЛАНС ЕГО ИСПОЛНИТЕЛЯ БОЛЬШЕ НЕ ПРОВЕРЯЕТСЯ
+# (слово владельца 02.10, п.2). Площадка Bloom выключена с 27.09, кошелёк
+# исполнителя 4s87RRC2 скомпрометирован 01.10 и пополнять его НЕЛЬЗЯ, секрет
+# удалён 02.10. Пока это так, его нулевой баланс -- не блокер старта, а
+# ожидаемое состояние: полоса платит со СВОЕГО кошелька и исполнителя Bloom не
+# касается. Проверка остаётся в коде целиком и возвращается одним числом
+# BLOOM_EXECUTOR_LIVE=1 -- на случай, если площадку снова включат.
+#
+# ПОЧЕМУ ПОМЕТА, А НЕ УДАЛЕНИЕ. Удалённую проверку при включении Bloom пришлось
+# бы писать заново и заново доказывать; помета же говорит словами, ЧТО не
+# проверяется и почему, и это видно в каждом отчёте сверки.
+ИСПОЛНИТЕЛЬ_BLOOM_ЖИВ = ST.env_int("BLOOM_EXECUTOR_LIVE", 0)
+ПОМЕТА_BLOOM_ВЫКЛЮЧЕН = ("Bloom выключен -- баланс исполнителя не проверяется "
+                          "(слово владельца 02.10: площадка выключена с 27.09, "
+                          "кошелёк скомпрометирован 01.10 и не пополняется)")
+
+
+def _исполнитель_bloom_жив() -> bool:
+    """Проверять ли баланс исполнителя Bloom. По слову владельца 02.10 -- нет."""
+    return bool(ST.env_int("BLOOM_EXECUTOR_LIVE", ИСПОЛНИТЕЛЬ_BLOOM_ЖИВ))
 # Сколько последних подписей кошелька смотреть на чужую активность.
 FOREIGN_SCAN_LIMIT = ST.env_int("BLOOM_FOREIGN_SCAN_LIMIT", 40)
 # Предел РАЗБОРА свежих сделок. Раньше он был 10 против 40 просмотренных
@@ -547,7 +567,12 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
     if чужая.get("truncated"):
         заметки.append(f"список подписей уперся в лимит {FOREIGN_SCAN_LIMIT}: видно "
                        "не всю историю кошелька, только последние сделки")
-    if balance_sol is None:
+    if not _исполнитель_bloom_жив():
+        # ПОМЕТА, А НЕ ТИШИНА: число баланса остаётся в сводке, просто оно
+        # больше ничего не блокирует, и в отчёте сказано почему.
+        заметки.append(ПОМЕТА_BLOOM_ВЫКЛЮЧЕН
+                        + f"; на цепи сейчас {balance_sol} SOL")
+    elif balance_sol is None:
         блокеры.append("баланс кошелька неизвестен")
     elif balance_sol < min_balance_sol:
         блокеры.append(f"баланс {balance_sol:.4f} SOL ниже порога {min_balance_sol}")
@@ -570,6 +595,9 @@ def reconcile(state: ST.ExecState, *, mode: str, helius=None,
             "wallet": ST.EXECUTOR_WALLET,
             "balance_sol": balance_sol,
             "min_balance_sol": min_balance_sol,
+            "balance_checked": _исполнитель_bloom_жив(),
+            "balance_why_not_checked": (None if _исполнитель_bloom_жив()
+                                         else ПОМЕТА_BLOOM_ВЫКЛЮЧЕН),
             "dry_positions": len(dry),
             "real_open_positions": len(real),
             "real_open_mints": sorted({p.get("mint") for p in real if p.get("mint")}),
@@ -620,13 +648,38 @@ def self_test() -> int:
         chk("баланс взят с цепи", r["balance_sol"] == 0.35, r["balance_sol"])
         chk("порог по умолчанию 0.3", r["min_balance_sol"] == 0.3, r["min_balance_sol"])
 
-    # баланс ниже порога
+    # БАЛАНС НИЖЕ ПОРОГА -- ПРИ ВКЛЮЧЁННОМ BLOOM. Механизм остался целиком, и
+    # проверяется он здесь так же, как до пометы: BLOOM_EXECUTOR_LIVE=1.
+    _было_живо = os.environ.get("BLOOM_EXECUTOR_LIVE")
+    os.environ["BLOOM_EXECUTOR_LIVE"] = "1"
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            st = состояние(d)
+            r = reconcile(st, mode=ST.MODE_LIVE_TEST,
+                          helius=HeliusЗаглушка([], баланс=0.1))
+            chk("баланс 0.1 блокирует старт (Bloom включён)", not r["clean"])
+            chk("и причина названа числом",
+                any("0.1000" in b for b in r["blockers"]), r["blockers"])
+            chk("и в сводке сказано, что баланс проверялся",
+                r.get("balance_checked") is True
+                and r.get("balance_why_not_checked") is None, r.get("balance_checked"))
+    finally:
+        if _было_живо is None:
+            os.environ.pop("BLOOM_EXECUTOR_LIVE", None)
+        else:
+            os.environ["BLOOM_EXECUTOR_LIVE"] = _было_живо
+
+    # А ПО УМОЛЧАНИЮ (Bloom выключен) ТОТ ЖЕ НУЛЬ -- НЕ БЛОКЕР, А ПОМЕТА.
     with tempfile.TemporaryDirectory() as d:
         st = состояние(d)
-        r = reconcile(st, mode=ST.MODE_LIVE_TEST, helius=HeliusЗаглушка([], баланс=0.1))
-        chk("баланс 0.1 блокирует старт", not r["clean"])
-        chk("и причина названа числом",
-            any("0.1000" in b for b in r["blockers"]), r["blockers"])
+        r = reconcile(st, mode=ST.MODE_LIVE_TEST,
+                      helius=HeliusЗаглушка([], баланс=0.0))
+        chk("Bloom выключен: нулевой баланс исполнителя старт НЕ блокирует",
+            not any("ниже порога" in b for b in r["blockers"]), r["blockers"])
+        chk("и в заметках сказано словами, что именно не проверяется",
+            any("Bloom выключен" in з for з in r["notes"]), r["notes"])
+        chk("и число баланса из сводки не исчезло",
+            r["balance_sol"] == 0.0 and r.get("balance_checked") is False, r)
 
     # позиции dry-run блокируют стенд, но НЕ блокируют сам dry-run
     with tempfile.TemporaryDirectory() as d:
@@ -1149,8 +1202,12 @@ def main() -> int:
     ч = сводка["foreign_activity"]
     print("--- коротко ---")
     print(f"режим: {сводка['mode']}, вердикт: {сводка['verdict']}")
-    print(f"кошелёк {сводка['wallet']}: баланс {сводка['balance_sol']} SOL "
-          f"при пороге {сводка['min_balance_sol']}")
+    if сводка.get("balance_checked"):
+        print(f"кошелёк {сводка['wallet']}: баланс {сводка['balance_sol']} SOL "
+              f"при пороге {сводка['min_balance_sol']}")
+    else:
+        print(f"кошелёк {сводка['wallet']}: баланс {сводка['balance_sol']} SOL "
+              f"-- {сводка.get('balance_why_not_checked')}")
     print(f"чужая активность: известно={ч.get('known')}, свежих за "
           f"{ч.get('window_h')} ч {ч.get('recent_count')}, "
           f"прежних {ч.get('older_count')} (самая свежая "
