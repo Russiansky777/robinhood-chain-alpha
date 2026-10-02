@@ -67,15 +67,88 @@ def программы(т: dict) -> set:
     return {x for x in из_ if x}
 
 
+def цепь_адреса(уз, адрес: str, с_ts: int, до_ts, страниц_макс: int) -> dict:
+    """Подписи адреса в окне и программы по ним (пакетное чтение транзакций)."""
+    подписи, до, страниц = [], None, 0
+    while страниц < страниц_макс:
+        стр = уз.подписи(адрес, до=до, limit=1000)
+        страниц += 1
+        if not стр:
+            break
+        подписи += [з for з in стр if (з.get("blockTime") or 0) >= с_ts
+                    and (до_ts is None or (з.get("blockTime") or 0) < до_ts)]
+        if (стр[-1].get("blockTime") or 0) < с_ts or len(стр) < 1000:
+            break
+        до = стр[-1]["signature"]
+    удачных = [з for з in подписи if з.get("err") is None]
+    txs = уз.пакет([з["signature"] for з in удачных],
+                   {з["signature"]: з.get("blockTime") for з in удачных}) if удачных else {}
+    пул = collections.Counter()
+    с_пулом = 0
+    for з in удачных:
+        пр = программы(txs.get(з["signature"]) or {}) & ПУЛОВЫЕ
+        if пр:
+            с_пулом += 1
+            for x in пр:
+                пул[x] += 1
+    врем = [з.get("blockTime") or 0 for з in подписи if з.get("blockTime")]
+    return {"подписей": len(подписи), "упавших": len(подписи) - len(удачных), "с_пулом": с_пулом,
+            "пулы": {(ИМЕНА.get(k) or k[:8]): n for k, n in пул.most_common()},
+            "последняя_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(max(врем))) if врем else None}
+
+
+def по_группам(а, с_ts: int, до_ts) -> int:
+    """Таблица «архив N / цепь N» по адресам живых групп."""
+    import gzip  # noqa: PLC0415
+    import podbivka_run as R  # noqa: PLC0415
+    import podbivka_sim as S  # noqa: PLC0415
+    реестр = json.loads((П / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
+    гр = {x for x in а.gruppy.split(",") if x}
+    цель = sorted(a for a, v in реестр.items() if set((v or {}).get("группы") or []) & гр)
+    арх = {}
+    if а.arhiv:
+        д = json.loads(gzip.decompress((П / "arhiv_den" / f"{а.arhiv}.json.gz").read_bytes()))
+        for e in д.get("наши_события") or []:
+            if e.get("action") == "buy":
+                арх[e["trader"]] = арх.get(e["trader"], 0) + 1
+        del д
+    уз = S.Узел()
+    строки = []
+    with уз.на("helius"):
+        for a in цель:
+            r = цепь_адреса(уз, a, с_ts, до_ts, а.stranic)
+            r.update(адрес=a, группы=[x for x in ((реестр.get(a) or {}).get("группы") or []) if x != "log_only"],
+                     архив_покупок=арх.get(a, 0))
+            строки.append(r)
+            print(f"{a[:8]} {','.join(r['группы'])}: цепь подписей {r['подписей']} (с пулом {r['с_пулом']}), "
+                  f"архив покупок {r['архив_покупок']}, пулы {r['пулы']}", flush=True)
+    out = П / f"cep_vs_arhiv_{а.s[:10]}.json"
+    out.write_text(json.dumps({"с_utc": а.s, "до_utc": а.do or "сейчас", "архив": а.arhiv,
+                               "группы": sorted(гр), "адресов": len(цель), "строки": строки,
+                               "расход": уз.расход()}, ensure_ascii=False, indent=1), encoding="utf-8")
+    R.записано(out)
+    тер = [r for r in строки if r["с_пулом"] and not r["архив_покупок"]]
+    print(f"адресов {len(строки)}; теряем целиком (цепь с пулом > 0, архив 0): {len(тер)}", flush=True)
+    return 0
+
+
 def main() -> int:
     import podbivka_run as R  # noqa: PLC0415
     import podbivka_sim as S  # noqa: PLC0415
     р = argparse.ArgumentParser()
-    р.add_argument("--adres", required=True)
+    р.add_argument("--adres", default="", help="один адрес")
+    р.add_argument("--gruppy", default="", help="через запятую: группы реестра (lane_s0,batch5,cand1,cand2,leader)")
     р.add_argument("--s", required=True, help="с какого UTC: YYYY-MM-DDTHH:MM:SSZ")
+    р.add_argument("--do", default="", help="до какого UTC (по умолчанию -- до сейчас)")
+    р.add_argument("--arhiv", default="", help="метка суточного файла архива для сравнения (den_2026-10-01T06)")
     р.add_argument("--stranic", type=int, default=40, help="предел страниц по 1000 подписей")
     а = р.parse_args()
     с_ts = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
+    до_ts = calendar.timegm(time.strptime(а.do, "%Y-%m-%dT%H:%M:%SZ")) if а.do else None
+    if а.gruppy:
+        return по_группам(а, с_ts, до_ts)
+    if not а.adres:
+        raise SystemExit("нужен --adres или --gruppy")
     уз = S.Узел()
     подписи, до, страниц = [], None, 0
     with уз.на("helius"):
@@ -84,7 +157,8 @@ def main() -> int:
             страниц += 1
             if not стр:
                 break
-            подписи += [з for з in стр if (з.get("blockTime") or 0) >= с_ts]
+            подписи += [з for з in стр if (з.get("blockTime") or 0) >= с_ts
+                        and (до_ts is None or (з.get("blockTime") or 0) < до_ts)]
             if (стр[-1].get("blockTime") or 0) < с_ts or len(стр) < 1000:
                 break
             до = стр[-1]["signature"]
