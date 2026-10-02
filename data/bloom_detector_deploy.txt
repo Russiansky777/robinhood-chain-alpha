@@ -1,1 +1,1365 @@
-progon 166, 2026-10-02T13:59:11Z
+progon 167, 2026-10-02T14:21:40Z
+--- znachenija flagov, kotorye pishet PEREPISAT ---
+BLOOM_MODE=dry
+BLOOM_TASKS=BATCH-5,BATCH-3
+BLOOM_EXEC=1
+BLOOM_LIVE_TEST= NET_V_ENV
+BLOOM_LIVE_BUY=1
+BLOOM_BUY_SOL=0.2
+BLOOM_OWN_SEND=1
+BLOOM_OWN_SEND_LIVE=1
+BLOOM_OWN_SEND_SOL=0.05
+BLOOM_SENDER_REGION=ams
+BLOOM_POOL_SEND=1
+BLOOM_POOL_NONCE=1
+BLOOM_LANE_CONTROL=0
+BLOOM_SHADOW_LEGS=1
+BLOOM_SHADOW_LEGS_CREDITS=0
+BLOOM_TELEGRAM_LIVE_TEST=1
+BLOOM_TELEGRAM_REAL=1
+BLOOM_CLOSE_ON_SELL=1
+BLOOM_TG_FORMAT=3
+BLOOM_REGION_SEND=1
+BLOOM_LANE_MAX_POOL_FEE=0.05
+BLOOM_COPIERS_FILE=/home/bot/bloom_executor_live_data/kopirovshchiki.json
+BLOOM_TEST_SOURCES=DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX,8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA
+BLOOM_TEST_MIN_SOL=0.05
+BLOOM_TEST_BUY_SOL=0.001
+BLOOM_TEST_BUY_SOL_BUMP=0.005
+--- imena VSEH kljuchej env (tolko imena) ---
+ASTRALANE_API_KEY
+BLOCKRAZOR_AUTH_TOKEN
+BLOOM_AMMV4_STROITEL
+BLOOM_API_KEY
+BLOOM_BUY_SOL
+BLOOM_CLMM_STROITEL
+BLOOM_CLOSE_ON_SELL
+BLOOM_COPIERS_FILE
+BLOOM_DAILY_LOSS_SOL
+BLOOM_DLMM_BEZ_CHTENIY
+BLOOM_EXEC
+BLOOM_JUP_FLOOR_PCT
+BLOOM_JUP_MIN_QUOTE_PCT
+BLOOM_KILL_FILE
+BLOOM_KILL_SELL_FILE
+BLOOM_LANE_CONTROL
+BLOOM_LANE_MAX_POOL_FEE
+BLOOM_LANE_NONCE
+BLOOM_LIVE_BUY
+BLOOM_LIVE_SELL
+BLOOM_MAX_OPEN
+BLOOM_MODE
+BLOOM_NALOG_2022
+BLOOM_OWN_SEND
+BLOOM_OWN_SEND_LIVE
+BLOOM_OWN_SEND_SOL
+BLOOM_POOL_NONCE
+BLOOM_POOL_SEND
+BLOOM_PRIORITY_FEE
+BLOOM_PROCESSOR_TIP
+BLOOM_REGION_SEND
+BLOOM_SELLER_LOOP_S
+BLOOM_SELL_AFTER_S
+BLOOM_SELL_GIVE_UP_AFTER_S
+BLOOM_SELL_GRACE_S
+BLOOM_SELL_MAX_ATTEMPTS
+BLOOM_SELL_OWN_SIMULATE
+BLOOM_SELL_RETRY_EVERY_S
+BLOOM_SELL_SLIPPAGE_PCT
+BLOOM_SELL_VIA_JUPITER
+BLOOM_SENDER_REGION
+BLOOM_SHADOW_LEGS
+BLOOM_SHADOW_LEGS_CREDITS
+BLOOM_SHADOW_LEGS_OFF
+BLOOM_STALE_SLOTS
+BLOOM_STATE_DIR
+BLOOM_TASKS
+BLOOM_TELEGRAM_LIVE_TEST
+BLOOM_TELEGRAM_REAL
+BLOOM_TEST_BUY_SOL
+BLOOM_TEST_BUY_SOL_BUMP
+BLOOM_TEST_MIN_SOL
+BLOOM_TEST_SOURCES
+BLOOM_TG_FORMAT
+BLOOM_USDC_NOGA
+BLOOM_WHIRLPOOL_STROITEL
+CLOSE_ACCOUNTS_LIVE
+DBOT_API_KEY
+EXEC_WALLET_KEY
+HELIUS_API
+HELIUS_API_KEY
+HELIUS_API_KEY2
+JUPITER_API_KEY
+LANE_BONDING_CURVE_GROUPS
+LANE_DAILY_LOSS_SOL
+LANE_KILL_DROP_SOL
+LANE_SELL_TWO_STEP
+NOZOMI_API_KEY
+OWN_SEND_WALLET
+OWN_SEND_WALLET_KEY
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+ZEROX_API
+--- skolko strok i skolko prisvaivanij ---
+73
+73
+BLOCKRAZOR_AUTH_TOKEN: est v sekretah (dlina 96)
+ASTRALANE_API_KEY: est v sekretah (dlina 64)
+ZEROX_API: est v sekretah (dlina 32)
+NOZOMI_API_KEY: est v sekretah (dlina 36)
+BLOCKRAZOR_AUTH_TOKEN: est v env hosta
+ASTRALANE_API_KEY: est v env hosta
+ZEROX_API: est v env hosta
+NOZOMI_API_KEY: est v env hosta
+  "slippage_pct": 35.0,
+  "priority_fee": 0.001,
+  "processor_tip": 0.001,
+  "sell_after_s": 28.8,
+  "sell_slippage_pct": 40.0,
+  "sent": 0,
+  "refused": 0,
+  "last_error": "",
+  "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+  "pending_in_journal": 0,
+  "state": {
+    "schema_version": 2,
+    "state_dir": "/home/bot/bloom_executor_live_data",
+    "kill_switch": {
+      "path": "/etc/bloom-executor/KILL",
+      "active": false,
+      "why_not": "",
+      "telegram_path": "/home/bot/bloom_executor_live_data/KILL_BY_TELEGRAM",
+      "telegram_active": false,
+      "sell_stopped": false,
+      "bloom_path": "/etc/bloom-executor/KILL_BLOOM",
+      "bloom_active": false
+    },
+    "limits": {
+      "max_open": 5,
+      "daily_loss_sol": 0.2,
+      "buy_sol": 0.2,
+      "fee_reserve_sol": 0.02,
+      "api_error_streak_max": 5,
+      "unsold_streak_max": 3,
+      "rate_limited_pause_s": 300.0,
+      "mint_cooldown_s": 900.0,
+      "max_buys_per_mint": 2
+    },
+    "open_positions": 0,
+    "open_mints": [],
+    "counters": {
+      "api_error_streak": 0,
+      "unsold_streak": 0,
+      "unsold_streak_own_send": 0,
+      "api_error_last_code": "INTERNAL_ERROR",
+      "api_error_last_ts": 1790381356.4951322
+    },
+    "day_pnl": {
+      "realized_sol": 0.759374121,
+      "spent_sol": 0.00733338,
+      "buys": 0,
+      "sells": 52,
+      "tz_unavailable": false,
+      "updated_utc": "2026-10-02T13:42:38Z"
+    },
+    "bloom_request_budget": {
+      "limit_week": 10000,
+      "remaining_week": 10000,
+      "stop_at": 0.8,
+      "spent_share": 0.0,
+      "stop": false
+    }
+  }
+}
+          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        ],
+        "why_not": "подписано нашим ключом, в журнале решений и позиций не значится"
+      }
+    ],
+    "explain_failures": [],
+    "unexplained_count": 3,
+    "not_checked": [],
+    "not_checked_count": 0,
+    "explain_limit": 40
+  },
+  "stand_start": {
+    "set": true,
+    "path": "/home/bot/bloom_executor_live_data/stand_start.json",
+    "stand_start_ts": 1790766604.779387,
+    "stand_start_utc": "2026-09-30T11:10:04Z",
+    "note": "начало стенда, подтверждено владельцем"
+  },
+  "journal": {
+    "decisions": {
+      "v1": 0,
+      "v2": 167349,
+      "unreadable": 0
+    },
+    "positions": {
+      "v1": 0,
+      "v2": 2859,
+      "unreadable": 0
+    },
+    "mixed": false
+  },
+  "otlozhennye_ne_prochitany": {},
+  "notes": [
+    "1 свежих сделок: входящий перевод: нашей подписи в транзакции нет, распоряжаться кошельком она не требует -- 2FuLnRyf2YJ6",
+    "у кошелька есть прежняя история: 25 сделок старше окна, самая свежая из них 2026-10-01T06:52:54Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя",
+    "список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки"
+  ],
+  "blockers": [
+    "на кошельке 3 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни",
+    "баланс 0.0000 SOL ниже порога 0.3"
+  ],
+  "clean": false,
+  "verdict": "старт заблокирован, причин 2"
+}
+--- коротко ---
+режим: live, вердикт: старт заблокирован, причин 2
+кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.0 SOL при пороге 0.3
+чужая активность: известно=True, свежих за 24.0 ч 4, прежних 25 (самая свежая 2026-10-01T06:52:54Z)
+    свежая чужая: 5caGqUKhm4ATfdhbeXbEDoaqcfQTEqTgDRkw3YWKFpnYKWWmffDZE4HoAukPDAfvPhCaE69qjxq3tgTvCmN3PUPE 2026-10-01T19:11:08Z
+    свежая чужая: 4uZgoWZiQfz8waf71ZrdviCQQnKAcU8fN7cscFXmy9mo6ZjWoQCcw9MZyBzXaw9nf4ZATRU4BH2iLLDYjQd5GQkp 2026-10-01T19:10:49Z
+    свежая чужая: 23ULvjnBdSEZxqPuqMcQvWaAqHPK6sstXQnwj96eFgtNdhhDrCTQmM3aPnXFu1kFyFT8LA2Zp3Pz95FGsjyKhS3t 2026-10-01T19:10:44Z
+    свежая чужая: 2FuLnRyf2YJ6bX7GeejET3FjGPVACZfJadKv63w5vWw5FNPhbDYSLj3JinMvgRcsvhMCipDGmExBsJmG7c7Ukf8y 2026-10-01T19:10:21Z
+граница чужой активности: окно (2026-10-01T14:22:35Z)
+позиции: dry-run 0, настоящих открытых 0
+  БЛОКЕР: на кошельке 3 сделок за последние 24.0 ч, которых мы не делали и объяснить не смогли -- мы в кошельке не одни
+  БЛОКЕР: баланс 0.0000 SOL ниже порога 0.3
+  примечание: 1 свежих сделок: входящий перевод: нашей подписи в транзакции нет, распоряжаться кошельком она не требует -- 2FuLnRyf2YJ6
+  примечание: у кошелька есть прежняя история: 25 сделок старше окна, самая свежая из них 2026-10-01T06:52:54Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
+  примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
+признак жизни: 61 с назад; группы ['money', 'speed_only']; открытых 0, зависших 0
+второе мнение: модуль загружен
+МОЖНО: открытых 0, зависших 0, признак свежий, продажи разрешены, модуль второго мнения загружен
+bloom-detector: start 2026-10-02T14:22:39Z, moduli 2026-10-02T14:22:28Z, start_pozzhe_modulej (11 s)
+bloom-seller: start 2026-10-02T14:22:50Z, moduli 2026-10-02T14:22:28Z, start_pozzhe_modulej (22 s)
+{
+  "schema_version": 2,
+  "updated_utc": "2026-10-02T14:22:42Z",
+  "updated_ts": 1790950962.485067,
+  "alive_since_utc": "2026-10-02T14:22:39Z",
+  "mode": "live",
+  "sources": 629,
+  "source_groups": {
+    "file": "/home/bot/data/sources_2026-09-25.json",
+    "why_not": null,
+    "hash": "9b48aa9a0462",
+    "mtime_utc": "2026-10-02T12:15:29Z",
+    "alarm": null,
+    "in_file": {
+      "leader": 1,
+      "batch5": 12,
+      "lane_s0": 10,
+      "off": 9,
+      "log_only": 566,
+      "sniper_src": 2,
+      "kandidaty": 6,
+      "cand1": 5,
+      "cand1_03": 2,
+      "cand1_05": 2,
+      "cand2": 12
+    },
+    "subscribed": {
+      "batch5": 12,
+      "leader": 1,
+      "lane_s0": 10,
+      "sniper_src": 2,
+      "kandidaty": 6,
+      "cand1": 5,
+      "cand1_03": 2,
+      "cand1_05": 2,
+      "cand2": 12,
+      "off": 2
+    },
+    "policies": {
+      "leader": {
+        "lane_sol": 0.5,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.75,
+        "min_target_sol": 3,
+        "lane_open_max": 3,
+        "per_day": null,
+        "lane_pools": [
+          "pump_amm",
+          "cpmm",
+          "bonding",
+          "two_step",
+          "damm2",
+          "dbc"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": true,
+        "slippage": 0.2,
+        "slippage_thin_pool": 0.5,
+        "thin_pool_below_sol": 30,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 150.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.5
+      },
+      "batch5": {
+        "lane_sol": 0.3,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.45,
+        "min_target_sol": 2,
+        "lane_open_max": 3,
+        "per_day": null,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": true,
+        "slippage": 0.4,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.3
+      },
+      "lane_s0": {
+        "lane_sol": 0.5,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 1.0,
+        "min_target_sol": 2,
+        "lane_open_max": 3,
+        "per_day": null,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": 3,
+        "skip_flippers": true,
+        "allow_taxed_route": true,
+        "slippage": 0.4,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.5
+      },
+      "off": {
+        "lane_sol": null,
+        "bloom_trades": false,
+        "subscribe": false,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "per_day": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": null
+      },
+      "log_only": {
+        "lane_sol": null,
+        "bloom_trades": false,
+        "subscribe": false,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "per_day": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 72,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": null
+      },
+      "sniper_src": {
+        "lane_sol": 0.3,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.45,
+        "min_target_sol": 2,
+        "lane_open_max": 3,
+        "per_day": null,
+        "lane_pools": [
+          "pump_amm",
+          "cpmm",
+          "bonding",
+          "two_step",
+          "damm2",
+          "dbc",
+          "clmm",
+          "launchlab",
+          "dlmm"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": 1,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": 0.2,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 12.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.3
+      },
+      "kandidaty": {
+        "lane_sol": null,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": false,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": null,
+        "lane_open_max": null,
+        "per_day": null,
+        "lane_pools": null,
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": null
+      },
+      "cand1": {
+        "lane_sol": 0.1,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.3,
+        "min_target_sol": 2.0,
+        "lane_open_max": 3,
+        "per_day": 150,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.1
+      },
+      "cand1_03": {
+        "lane_sol": 0.3,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.6,
+        "min_target_sol": null,
+        "lane_open_max": 3,
+        "per_day": 150,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.3
+      },
+      "cand1_05": {
+        "lane_sol": 0.05,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.15,
+        "min_target_sol": 2.0,
+        "lane_open_max": 3,
+        "per_day": 100,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.05
+      },
+      "cand2": {
+        "lane_sol": 0.1,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": 0.3,
+        "min_target_sol": 2.0,
+        "lane_open_max": 3,
+        "per_day": 150,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.1
+      }
+    }
+  },
+  "sender_connections": {
+    "by_sender": {
+      "astralane": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "blockrazor": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "helius": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "jito": {
+        "age_s": 0.2,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "nozomi": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      },
+      "zeroslot": {
+        "age_s": 0.1,
+        "last_use_s": null,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
+        "pings_failed": 0,
+        "reopened": 0,
+        "last_error": ""
+      }
+    },
+    "warm_period_s": 25.0,
+    "last_warm_s": 0.2,
+    "last_warm": {
+      "ok": 6,
+      "failed": 0
+    }
+  },
+  "bloom_skipped_by_group": 0,
+  "sources_from": "DBot живьём + групп источников: 609 + тестовых источников из окружения: 2",
+  "sources_generation": 0,
+  "subscribed_addresses": 73,
+  "unsubscribed_addresses": 575,
+  "credits": {
+    "за_сеанс": 23,
+    "за_час": 6557,
+    "за_прошлый_час": 7250,
+    "за_сутки": 301548,
+    "бюджет_за_сутки": 2000000,
+    "why_not": null
+  },
+  "subscribe_method": "transactionSubscribe",
+  "subscribe_drops": 0,
+  "signals_seen": 0,
+  "to_buy": 0,
+  "by_code": {},
+  "by_code_test_source": {},
+  "test_sources": [
+    "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+    "8aTMUKspLnkm7jaHf21qfB1b5dzPzXgsmcjPPnJPaPtA"
+  ],
+  "test_source": "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
+  "test_min_sol": 0.05,
+  "max_tx_version": 1,
+  "stale_slots": 10,
+  "clmm_fee_rates": {
+    "в_кэше": 9,
+    "ждут_чтения": 0,
+    "без_ставки": 0
+  },
+  "dlmm_bin_steps": {
+    "в_кэше": 11,
+    "ждут_чтения": 0,
+    "без_шага": 0
+  },
+  "lane_cu_limit": 140000,
+  "summary_minute": 2,
+  "summary_last_hour": "2026-10-02T13:00Z",
+  "summary_write_error": null,
+  "rate_source": "geckoterminal",
+  "rate_usd_sol": 121.534196419874,
+  "rate_fresh": true,
+  "rate_stale_used": 0,
+  "rate_failures": [],
+  "kill_path": "/etc/bloom-executor/KILL",
+  "kill_readable": true,
+  "kill_active": false,
+  "kill_note": "путь рубильника доступен на чтение",
+  "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
+  "kill_bloom_active": false,
+  "kill_bloom_note": "",
+  "net_slot": 452635931,
+  "slot_notifications": 8,
+  "ws_baity_po_vidam": {
+    "источники": 117515
+  },
+  "dlina_slota": {},
+  "dlina_slota_v_rabote": {
+    "длина_слота_с": 0.25674,
+    "источник": "замер",
+    "возраст_замера_с": 198.1,
+    "константа_в_коде_с": 0.4
+  },
+  "net_slot_age_s": 0.23,
+  "balance_sol": 0.0,
+  "balance_age_s": 2.39,
+  "rpc_calls": 19,
+  "rpc_by_method": {
+    "getMultipleAccounts": 2,
+    "getBalance": 2,
+    "getSlot": 1,
+    "getLatestBlockhash": 1,
+    "getAccountInfo": 1,
+    "getTransaction": 12
+  },
+  "session_credits": 23,
+  "handler_crashes": 0,
+  "telegram": {
+    "enabled": true,
+    "configured": true,
+    "format2": false,
+    "format3": true,
+    "tracked_messages": 0,
+    "tracked_texts": 0,
+    "sent": 0,
+    "failed": 0,
+    "last_error": "",
+    "off_reason": "",
+    "log_configured": false,
+    "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
+    "by_target": {
+      "main": {
+        "sent": 0,
+        "failed": 0,
+        "last_error": ""
+      },
+      "log": {
+        "sent": 0,
+        "failed": 0,
+        "last_error": ""
+      }
+    }
+  },
+  "own_tx_seen": 0,
+  "chain_ok_backfilled": 0,
+  "block_position_backfilled": 0,
+  "block_position": {
+    "module_loaded": true,
+    "why_not": ""
+  },
+  "fallback_seconds": 0,
+  "fallback_window_s": 5.0,
+  "subscribe_main_path": true,
+  "fallback": {
+    "switches_total": 0,
+    "switches_short": 0,
+    "seconds_total": 0.0,
+    "hour_switches": 0,
+    "hour_seconds": 0.0,
+    "on_fallback_now": false,
+    "report_threshold_s": 30.0,
+    "silent_ticks": 0,
+    "tick_s": 2.0,
+    "breaks_by_reason": {}
+  },
+  "shadow": {
+    "enabled": true,
+    "built": 0,
+    "would_pass": 0,
+    "over_cap": 0,
+    "failed": 0,
+    "module_loaded": true,
+    "module_why_not": "",
+    "passed_in_row_by_pool": {},
+    "hour": {
+      "since_ts": 1790950959.6835594,
+      "since_utc": "2026-10-02T14:22:39Z",
+      "signals": 0,
+      "built": 0,
+      "sim_failed": 0,
+      "not_built": {},
+      "crashed": 0
+    },
+    "restarts": 0,
+    "last_restart_utc": "",
+    "credits_day": 420,
+    "credits_write_why_not": ""
+  },
+  "route_tax_filter": {
+    "price_curve_loaded": true,
+    "price_curve_why_not": "",
+    "module_loaded": true,
+    "module_why_not": "",
+    "code": "SKIP_TAXED_ROUTE",
+    "skipped": 0,
+    "skipped_test": 0
+  },
+  "own_send": {
+    "enabled": true,
+    "live": true,
+    "module_loaded": true,
+    "module_why_not": "",
+    "paths": 0,
+    "starts": 0,
+    "threads_alive": 0,
+    "sent": 0,
+    "by_stage": {},
+    "bought_backfilled": 0,
+    "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+    "own_wallet": true,
+    "wallet_ready": {
+      "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "own_wallet": true,
+      "ok": true,
+      "why_not": null
+    },
+    "balance_sol": 5.123731272,
+    "balance_day_threshold": {
+      "ok": true,
+      "kill": false,
+      "why": "просадка от 00:00 -0.708169 SOL при пороге 2.0",
+      "threshold_sol": 2.0,
+      "day": "20261002",
+      "open_sol": 4.415562519,
+      "balance_sol": 5.123731272,
+      "drop_sol": -0.708168753,
+      "withdrawals_sol": 0.0,
+      "deposits_sol": 0.0,
+      "net_owner_sol": 0.0,
+      "withdrawals_n": 0,
+      "deposits_n": 0
+    },
+    "lane_daily_stop": {
+      "threshold_sol": 1.5,
+      "pnl_all_groups_sol": 0.691770763,
+      "stopped": false,
+      "why_not": null
+    },
+    "lane_chain_day": {
+      "годен": true,
+      "почему_нет": null,
+      "итог_sol": 0.708168753,
+      "день": "20261002",
+      "начало_суток_ts": 1790892000.0,
+      "как_считаются_сутки": "Europe/Madrid",
+      "баланс_sol": 5.123731272,
+      "возраст_баланса_с": 0.0,
+      "предел_возраста_с": 300.0,
+      "открытие_sol": 4.415562519,
+      "выводы_sol": 0.0,
+      "выводов": 0,
+      "вводы_sol": 0.0,
+      "вводов": 0,
+      "нетто_владельца_sol": 0.0,
+      "кошелёк": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "открытых": 0,
+      "открытых_по_входу_sol": 0.0,
+      "открытых_без_числа": 0,
+      "итог_с_открытыми_sol": 0.708168753
+    },
+    "balance_age_s": 2.4,
+    "sim_shadow": {
+      "done": 0,
+      "would_fail": 0
+    },
+    "blockhash_age_s": 2.4,
+    "blockhash_updates": 1,
+    "blockhash_why_not": "",
+    "last": {},
+    "lane_kill": [
+      false,
+      ""
+    ],
+    "limits": {
+      "open": 1,
+      "per_day": 50,
+      "open_by_group": {
+        "batch5": 3,
+        "cand1": 3,
+        "cand1_03": 3,
+        "cand1_05": 3,
+        "cand2": 3,
+        "kandidaty": 1,
+        "lane_s0": 3,
+        "leader": 3,
+        "log_only": 1,
+        "off": 1,
+        "sniper_src": 3
+      },
+      "size_sol": 0.05,
+      "ceiling_sol": 0.5,
+      "stop_failed_in_row": 5,
+      "stop_loss_sol": 0.3
+    },
+    "lane_state": {
+      "open": 0,
+      "stuck": 0,
+      "day": "20261002",
+      "day_start_ts": 1790892000.0,
+      "day_how": "Europe/Madrid",
+      "pnl_all_groups_sol": 0.691770763,
+      "pnl_chain_sol": 0.765898123,
+      "pnl_chain_all_groups_sol": 0.765898123,
+      "pnl_chain_n": 52,
+      "pnl_chain_fields_n": 2,
+      "pnl_chain_open_n": 0,
+      "pnl_chain_why_not": [
+        "итог по цепи в записи не посчитан",
+        "итог по цепи в записи не посчитан"
+      ],
+      "pnl_vs_chain_sol": -0.07412736,
+      "today_all_groups": 54,
+      "today": 54,
+      "failed_in_row": 0,
+      "pnl_sol": 0.691770763,
+      "pnl_trade_sol": 0.666707501,
+      "spend_sol": -0.025063262,
+      "uncountable_today": 0,
+      "no_result_today": 0,
+      "uncountable_why": [],
+      "total": 232,
+      "group": "деньги (все группы кроме скорости)",
+      "day_turnover_sol": 13.70727,
+      "day_spend_sol": -0.025063262
+    },
+    "lane_state_by_group": {
+      "money": {
+        "open": 0,
+        "stuck": 0,
+        "day": "20261002",
+        "day_start_ts": 1790892000.0,
+        "day_how": "Europe/Madrid",
+        "pnl_all_groups_sol": 0.691770763,
+        "pnl_chain_sol": 0.765898123,
+        "pnl_chain_all_groups_sol": 0.765898123,
+        "pnl_chain_n": 52,
+        "pnl_chain_fields_n": 2,
+        "pnl_chain_open_n": 0,
+        "pnl_chain_why_not": [
+          "итог по цепи в записи не посчитан",
+          "итог по цепи в записи не посчитан"
+        ],
+        "pnl_vs_chain_sol": -0.07412736,
+        "today_all_groups": 54,
+        "today": 54,
+        "failed_in_row": 0,
+        "pnl_sol": 0.691770763,
+        "pnl_trade_sol": 0.666707501,
+        "spend_sol": -0.025063262,
+        "uncountable_today": 0,
+        "no_result_today": 0,
+        "uncountable_why": [],
+        "total": 232,
+        "group": "деньги (все группы кроме скорости)",
+        "day_turnover_sol": 13.70727,
+        "day_spend_sol": -0.025063262
+      },
+      "speed_only": {
+        "open": 0,
+        "stuck": 0,
+        "day": "20261002",
+        "day_start_ts": 1790892000.0,
+        "day_how": "Europe/Madrid",
+        "pnl_all_groups_sol": 0.691770763,
+        "pnl_chain_sol": 0.0,
+        "pnl_chain_all_groups_sol": 0.765898123,
+        "pnl_chain_n": 0,
+        "pnl_chain_fields_n": 0,
+        "pnl_chain_open_n": 0,
+        "pnl_chain_why_not": [],
+        "pnl_vs_chain_sol": 0.0,
+        "today_all_groups": 54,
+        "today": 0,
+        "failed_in_row": 0,
+        "pnl_sol": 0.0,
+        "pnl_trade_sol": 0.0,
+        "spend_sol": 0.0,
+        "uncountable_today": 0,
+        "no_result_today": 0,
+        "uncountable_why": [],
+        "total": 0,
+        "group": "speed_only",
+        "day_turnover_sol": 0,
+        "day_spend_sol": 0.0
+      }
+    },
+    "control": {
+      "enabled": false,
+      "senders_seen": 0,
+      "spent_today": {
+        "day": "20261002",
+        "n": 0,
+        "signals": 0,
+        "spent_lamports": 0,
+        "why_not": null,
+        "spent_sol": 0.0
+      },
+      "limits": {
+        "signals_per_day": 20,
+        "spend_sol_per_day": 0.1,
+        "per_sender_sol": 0.001
+      },
+      "by_sender": {}
+    },
+    "pool": {
+      "enabled": true,
+      "tip_cap_sol": 0.005,
+      "winners": {
+        "helius": 25,
+        "blockrazor": 14,
+        "astralane": 95,
+        "jito": 86,
+        "nozomi": 11,
+        "zeroslot": 1
+      }
+    },
+    "pool_nonce": {
+      "enabled": true,
+      "account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+      "wait_slots": 8,
+      "wait_s": 3.2,
+      "pending_shift": false,
+      "pending_why": null,
+      "shift_signature": null,
+      "warm": {
+        "есть": true,
+        "возраст_с": 2.34,
+        "почему": "",
+        "обновлений": 1,
+        "взят_тёплым": 0,
+        "взят_по_сети": 0,
+        "срок_с": 30.0
+      }
+    }
+  },
+  "leg_cache": {
+    "enabled": true,
+    "pools": 17,
+    "templates": {
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
+        "age_s": 0.8,
+        "flipped": false,
+        "sig": "5Z2dnoiBLyqBe63YnffNLVWWJAjAajpu4Vt7FP2gTpUCqPdUxen2aqJQeH5CDWo2gvznhCPdf6HqHFtxJCLsdgy4"
+      },
+      "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump": {
+        "age_s": 1.6,
+        "flipped": false,
+        "sig": "5YBVgYHktp1kMNcUBeHZY3y2gJPN39mquVSYMiHcogFkkhn4rpQCPGXzm9iFUt5L2ekV8tPmRmRPJCR1kyvFSVWU"
+      }
+    },
+    "fed": 4,
+    "no_tx": 0,
+    "failed": 0,
+    "luts": 18,
+    "luts_pending": 1,
+    "luts_warmed": 18,
+    "warm_why_not": "",
+    "luts_topped_up": 0,
+    "top_up_why_not": "",
+    "bytes": 114458,
+    "credits": 4,
+    "credits_day": 100004,
+    "credits_before_start": 100000,
+    "credits_write_why_not": "",
+    "credit_budget": 0,
+    "credit_cap": "нет потолка",
+    "dropped": false,
+    "dropped_why": "",
+    "ingest_stats": {
+      "не своп / счета не зависят от цены -- шаблон подтверждён": 2,
+      "новый шаблон": 1,
+      "шаблона нет": 1
+    }
+  },
+  "leg_static": {
+    "fayl": "/home/bot/data/nogi_shablony.json",
+    "obrazcov": 1,
+    "zhivyh": 1,
+    "bez_shablona": 0,
+    "obnovleniy": 1,
+    "vozrast_s": 2.5,
+    "why_not": null,
+    "kotirovki": {
+      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "USDC"
+    },
+    "otkazy": {}
+  },
+  "two_step": {
+    "module": true,
+    "why_not": null,
+    "buy": true,
+    "sell": true
+  },
+  "telegram_commands": {
+    "enabled": true,
+    "why_not": "",
+    "accepted": 0,
+    "from_strangers": 0,
+    "errors": 0,
+    "last_error": "",
+    "last_command": "",
+    "last_command_utc": "",
+    "offset": 396350741,
+    "seen_chats": {}
+  },
+  "bloom_keepalive": {
+    "enabled": true,
+    "period_s": 20.0,
+    "ok": 2,
+    "failed": 0,
+    "skipped_while_buying": 0,
+    "last_code": 200,
+    "last_utc": "2026-10-02T14:22:39Z",
+    "last_error": ""
+  },
+  "executor_attached": true,
+  "executed": 0,
+  "exec_by_code": {},
+  "executor": {
+    "schema_version": 2,
+    "mode": "live",
+    "live_buy_enabled": true,
+    "live_test_enabled": false,
+    "dry_run": false,
+    "bump_sol": 0.005,
+    "buy_sol": 0.2,
+    "slippage_pct": 35.0,
+    "priority_fee": 0.001,
+    "processor_tip": 0.001,
+    "sell_after_s": 28.8,
+    "sell_slippage_pct": 40.0,
+    "sent": 0,
+    "refused": 0,
+    "last_error": "",
+    "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+  },
+  "credits_logged": true,
+  "credits_log_error": "",
+  "decide_latency_ms": null
+}--- решений в журнале ---
+167469
+--- позиций в журнале (должно быть 0: покупать нечем) ---
+2859
+  [ok  ] работ ровно четыре: учёт, живучесть, суточная выгрузка, уборщик
+  [ok  ] имена юнитов не совпадают между собой
+  [ok  ] имена юнитов только ASCII: systemd кириллицы в имени не любит
+  [ok  ] bloom-uchet-chas: юнит oneshot, а не демон
+  [ok  ] bloom-uchet-chas: работает от bot, а не от root
+  [ok  ] bloom-uchet-chas: env службы подключён
+  [ok  ] bloom-uchet-chas: пишет в журнал -- иначе сбой таймера невидим
+  [ok  ] bloom-uchet-chas: писать можно только в каталог таймеров
+  [ok  ] bloom-uchet-chas: каталог состояния боевых служб на запись НЕ открыт
+  [ok  ] bloom-uchet-chas: ужесточение то же, что у боевых служб
+  [ok  ] bloom-uchet-chas: у прогона есть предел времени (3300 с)
+  [ok  ] bloom-uchet-chas: пропущенный из-за перезагрузки запуск догоняется
+  [ok  ] bloom-uchet-chas: расписание *:23
+  [ok  ] bloom-uchet-chas: таймер зовёт свою службу
+  [ok  ] bloom-uchet-chas: таймер можно включить enable
+  [ok  ] bloom-zhivuchest-chas: юнит oneshot, а не демон
+  [ok  ] bloom-zhivuchest-chas: работает от bot, а не от root
+  [ok  ] bloom-zhivuchest-chas: env службы подключён
+  [ok  ] bloom-zhivuchest-chas: пишет в журнал -- иначе сбой таймера невидим
+  [ok  ] bloom-zhivuchest-chas: писать можно только в каталог таймеров
+  [ok  ] bloom-zhivuchest-chas: каталог состояния боевых служб на запись НЕ открыт
+  [ok  ] bloom-zhivuchest-chas: ужесточение то же, что у боевых служб
+  [ok  ] bloom-zhivuchest-chas: у прогона есть предел времени (120 с)
+  [ok  ] bloom-zhivuchest-chas: пропущенный из-за перезагрузки запуск догоняется
+  [ok  ] bloom-zhivuchest-chas: расписание *:38
+  [ok  ] bloom-zhivuchest-chas: таймер зовёт свою службу
+  [ok  ] bloom-zhivuchest-chas: таймер можно включить enable
+  [ok  ] bloom-vygruzka-sutki: юнит oneshot, а не демон
+  [ok  ] bloom-vygruzka-sutki: работает от bot, а не от root
+  [ok  ] bloom-vygruzka-sutki: env службы подключён
+  [ok  ] bloom-vygruzka-sutki: пишет в журнал -- иначе сбой таймера невидим
+  [ok  ] bloom-vygruzka-sutki: писать можно только в каталог таймеров
+  [ok  ] bloom-vygruzka-sutki: каталог состояния боевых служб на запись НЕ открыт
+  [ok  ] bloom-vygruzka-sutki: ужесточение то же, что у боевых служб
+  [ok  ] bloom-vygruzka-sutki: у прогона есть предел времени (1800 с)
+  [ok  ] bloom-vygruzka-sutki: пропущенный из-за перезагрузки запуск догоняется
+  [ok  ] bloom-vygruzka-sutki: расписание *-*-* 06:00:00
+  [ok  ] bloom-vygruzka-sutki: таймер зовёт свою службу
+  [ok  ] bloom-vygruzka-sutki: таймер можно включить enable
+  [ok  ] bloom-uborshchik-chas: юнит oneshot, а не демон
+  [ok  ] bloom-uborshchik-chas: работает от bot, а не от root
+  [ok  ] bloom-uborshchik-chas: env службы подключён
+  [ok  ] bloom-uborshchik-chas: пишет в журнал -- иначе сбой таймера невидим
+  [ok  ] bloom-uborshchik-chas: писать можно только в каталог таймеров
+  [ok  ] bloom-uborshchik-chas: каталог состояния боевых служб на запись НЕ открыт
+  [ok  ] bloom-uborshchik-chas: ужесточение то же, что у боевых служб
+  [ok  ] bloom-uborshchik-chas: у прогона есть предел времени (600 с)
+  [ok  ] bloom-uborshchik-chas: пропущенный из-за перезагрузки запуск догоняется
+  [ok  ] bloom-uborshchik-chas: расписание *:53
+  [ok  ] bloom-uborshchik-chas: таймер зовёт свою службу
+  [ok  ] bloom-uborshchik-chas: таймер можно включить enable
+  [ok  ] часовых работ ровно три: учёт, живучесть, уборщик
+  [ok  ] часовые работы стартуют в РАЗНЫЕ минуты: иначе живучесть мерится под нагрузкой учёта, а уборщик лезет в цепь во время их работы
+  [ok  ] уборщик пустых счетов заведён ровно одной работой
+  [ok  ] уборщик: отправка разрешена, иначе рента не вернулась бы никогда
+  [ok  ] уборщик: флаг 'закрывать во время торговли' НЕ ставится -- владелец запретил его прямо
+  [ok  ] уборщик: строка юнита идёт ПОСЛЕ EnvironmentFile и потому сильнее файла
+  [ok  ] уборщик зовёт существующий модуль закрытия, пакет за прогон один
+  [ok  ] уборщик пишет план и итог в СВОЙ каталог: только он открыт на запись
+  [ok  ] уборщик: каталог состояния боевых служб на запись НЕ открыт
+  [ok  ] в файле прямо названо окно, в котором уборщик только и работает
+  [ok  ] суточная выгрузка назначена на 06:00 (часы хоста обязаны быть UTC)
+  [ok  ] часовой прогон обязан умереть до следующего тика, иначе час пропадёт
+  [ok  ] предел юнита учёта (3300 с) БОЛЬШЕ собственного бюджета конвейера (3000 с): меньший убивает прогон до того, как он допишет ledger_status.json
+  [ok  ] часы UTC -- установка разрешена
+  [ok  ] часы не UTC -- отказ СЛОВАМИ с причиной, а не выгрузка в чужой час
+  [ok  ] обёртка выгрузки падает на первой же ошибке, а не идёт дальше
+  [ok  ] имя файла выгрузки -- sdelki_polosy_<дата>, как ждёт Code-2
+  [ok  ] окно задано с двух сторон: без верхней границы в файл попадут сутки+
+  [ok  ] границы -- 06:00Z вчера .. 06:00Z сегодня, ровно как у прогона GitHub
+  [ok  ] выгрузка пишется в полуфайл и переименовывается: забор не увидит середину записи
+  [ok  ] зовётся УЖЕ СУЩЕСТВУЮЩАЯ выгрузка репозитория, своей копии счёта нет
+  [ok  ] обёртка зовёт выгрузку по зеркальному пути
+  [ok  ] выгрузка лежит на ТРИ каталога ниже корня таймеров: её самопроверка ищет модуль отправки как <три вверх>/analysis/bloom_own_send.py
+  [ok  ] модуль отправки лежит ровно там, где его ищет самопроверка выгрузки
+  [ok  ] выгрузка полная: Code-2 ждёт все поля позиции
+  [ok  ] в обёртке нет ни одного ключа: значения даёт EnvironmentFile
+  [ok  ] ни один юнит не зовёт денежный путь (нашли: [])
+  [ok  ] первая установка пишет файл
+  [ok  ] повторная установка тем же текстом НЕ пишет: иначе mtime поедет и проверка 'служба старше модулей' даст ложную тревогу
+  [ok  ] изменившийся текст перезаписывается
+  [ok  ] на диске лежит последний текст
+  [пропуск] бюджет учёта не сверен с самим модулем: analysis/solana_ledger_run.py рядом нет
+  [пропуск] проводка прогонов не проверена: файлов прогонов рядом нет (так и бывает на хосте -- модуль едет туда один)
+самопроверка хостовых таймеров: 82/82 пройдено (часть проверок пропущена, см. выше)
+  [ok  ] разбор systemctl show: поля на месте
+  [ok  ] строка без = в разбор не попадает
+  [ok  ] пустое значение остаётся пустой строкой, а не None
+  [ok  ] активная служба тревоги не даёт
+  [ok  ] установлена и не активна -- тревога
+  [ok  ] отсутствие службы -- факт, а не сбой
+  [ok  ] юнит есть, но systemd его не принял -- тревога, а не 'нет службы'
+  [ok  ] непрочитанное состояние -- тревога, а не 'наверное живёт'
+  [ok  ] отсутствующий признак жизни -- причина словами, а не ноль
+  [ok  ] свежий признак активной службы -- без тревоги
+  [ok  ] признак старше порога у активной службы -- тревога
+  [ok  ] ровно порог -- ещё не тревога (строгое >)
+  [ok  ] активная служба без признака жизни -- тревога
+  [ok  ] у неактивной службы отсутствие признака не считается второй тревогой
+  [ok  ] доклад собирается целиком и без тревог на живом стенде
+  [ok  ] в докладе столько служб, сколько в списке
+  [ok  ] границы счёта названы В САМОМ файле, а не только в коде
+  [ok  ] в докладе нет ни слова key/token -- значениям ключей взяться негде
+  [ok  ] запись создаёт каталог и разбирается как json
+  [ok  ] временного полуфайла после записи не остаётся
+  [ok  ] повторная запись поверх не ломает файл
+  [ok  ] в рабочей части нет денежных вызовов (нашли: [])
+самопроверка живучести на хосте: 22/22 пройдено
+  [ok  ] первая транзакция блока -- это место 0, а не «не знаем»
+  [ok  ] нашей подписи в блоке нет -- причина, а не ноль
+  [ok  ] пустой блок в ноль не превращается
+  [ok  ] метка UTC разбирается
+  [ok  ] удержание в слотах: 172 - 100 = 72
+  [ok  ] нет слота продажи -- None, а не ноль
+  [ok  ] удержание в секундах считается до отправки продажи
+  [ok  ] подписи варианта не двоятся
+  [ok  ] S+0: 451748367 - 451748365 = 2
+  [ok  ] нет слота источника -- причина, а не ноль
+  [ok  ] карты регионов нет -- отказ словами, а не пустая карта молча
+  [ok  ] лидер слота берётся по индексу от начала эпохи
+  [ok  ] слот вне расписания эпохи -- причина, а не чужой лидер
+  [ok  ] окно не покрыто -- отказ с причиной, а не ноль чужих продаж
+  [ok  ] окно покрыто и пусто -- ноль честный, отказа нет
+  [ok  ] подписи пула кончились -- окно считается покрытым
+  [ok  ] транзакции в окне просмотрены, и просмотрено не ноль
+  [ok  ] имена полей региона, которые читает выгрузка, ПИШЕТ отправка полосы
+  [ok  ] резерв, билет и итог без распаковки -- поля ряда выгрузки
+  [ok  ] резерв переносится из журнала решений, а не выдумывается
+  [ok  ] версия выгрузки pravilo13b -- по ней Code-2 отличит пересчитанный файл
+самопроверка выгрузки сделок полосы: 21/21 пройдено
+ОТКАЗ: часы хоста не UTC (смещение +0200): OnCalendar считается в поясе хоста, и 06:00 выстрелит не в 06:00Z. Установка отменена -- поправить пояс (timedatectl set-timezone UTC) и повторить.
