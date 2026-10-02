@@ -144,8 +144,13 @@ def имя_комбинации(к: dict) -> str:
     ("lastActiveAt", ("lastActiveAt", "last_active_at", "lastActiveTimestamp",
                        "last_active")),
     ("tags", ("tags", "tagList", "tag")),
-    ("nickname", ("nickname", "name", "nick")),
-    ("twitterUsername", ("twitterUsername", "twitter_username", "twitter")),
+    # ПРОФИЛЬ ЛЕЖИТ ВЛОЖЕННЫМ ОБЪЕКТОМ `profile` -- см. _достать. Верхний уровень
+    # оставлен первым кандидатом: если актор когда-нибудь поднимет поле наверх,
+    # разбор не сломается.
+    ("nickname", ("nickname", "profile.nickname", "profile.name", "name", "nick")),
+    ("twitterUsername", ("twitterUsername", "profile.twitterUsername",
+                          "twitter_username", "twitter")),
+    ("twitterName", ("twitterName", "profile.twitterName")),
 )
 СТОЛБЕЦ_АДРЕСА = "walletAddress"
 # Столбцы, которые пробный запуск обязан увидеть заполненными (слово владельца).
@@ -296,10 +301,30 @@ def запуск(к: dict, *, максимум: int, срок: float = СРОК_
 
 # ------------------------------------------------------- разбор и объединение
 
+def _достать(строка: dict, имя: str):
+    """Значение по имени, в том числе ВЛОЖЕННОМУ через точку ("profile.nickname").
+
+    ПОЧЕМУ ВЛОЖЕННОЕ. Актор отдаёт профиль не на верхнем уровне, а отдельным
+    объектом `profile` каждой строки набора (ключи nickname, name, avatarUrl,
+    twitterUsername, twitterName, twitterDescription, twitchChannelName -- они
+    есть у ВСЕХ 1149 сырых строк первого прохода). Прежний разбор смотрел только
+    верхний уровень, поэтому столбцы nickname и twitterUsername вышли пустыми у
+    всех 493 кошельков CSV, хотя в сырых ответах они были. Это та самая связка
+    twitter -> кошелёк, и терялась она здесь.
+    """
+    если = строка
+    for часть in str(имя).split("."):
+        if not isinstance(если, dict):
+            return None
+        если = если.get(часть)
+    return если if если not in (None, "") else None
+
+
 def _первое(строка: dict, имена: tuple):
     for и in имена:
-        if и in строка and строка[и] not in (None, ""):
-            return строка[и]
+        з = _достать(строка, и)
+        if з is not None:
+            return з
     return None
 
 
@@ -722,6 +747,42 @@ def _отказ_без_токена() -> bool:
     return False
 
 
+def пересобрать_из_сырых(папка: Path, *, путь_csv: Path) -> dict:
+    """CSV заново ИЗ СЫРЫХ ОТВЕТОВ, без сети и без денег.
+
+    Понадобилось потому, что столбцы nickname и twitterUsername вышли пустыми у
+    всех 493 кошельков: профиль актор отдаёт вложенным объектом `profile`, а
+    разбор смотрел только верхний уровень (см. _достать). Сырые ответы на диске --
+    те же самые, что пришли от актора, поэтому пересборка ничего не стоит и ничего
+    не выдумывает: это ТОТ ЖЕ разбор, только исправленный.
+    """
+    из_ = {"ok": False, "why_not": None, "запуски": [], "уникальных": 0}
+    if not папка.is_dir():
+        из_["why_not"] = f"папки сырых ответов нет: {папка}"
+        return из_
+    запуски = []
+    for файл in sorted(папка.glob("*.json")):
+        имя = файл.stem
+        try:
+            строки = json.loads(файл.read_text(encoding="utf-8"))
+        except ValueError as сбой:
+            из_["why_not"] = f"{файл.name} не разбирается: {сбой}"
+            return из_
+        if not isinstance(строки, list):
+            continue
+        запуски.append({"ok": True, "комбинация": имя, "строки": строки,
+                         "why_not": None})
+    if not запуски:
+        из_["why_not"] = f"в {папка} нет сырых выгрузок"
+        return из_
+    св = объединить(запуски)
+    записать_csv(св["строки"], путь_csv)
+    из_.update(ok=True, запуски=[з["комбинация"] for з in запуски],
+               уникальных=св["уникальных"], столбцы=пустые_столбцы(св["строки"]),
+               строк=len(св["строки"]))
+    return из_
+
+
 def main() -> int:
     п = argparse.ArgumentParser()
     п.add_argument("--proba", action="store_true",
@@ -731,10 +792,38 @@ def main() -> int:
     п.add_argument("--max-wallets", type=int, default=СТРОК_НА_ЗАПРОС)
     п.add_argument("--predel-zaprosov", type=int, default=ПРЕДЕЛ_ЗАПРОСОВ)
     п.add_argument("--predel-rashoda", type=float, default=ПРЕДЕЛ_РАСХОДА)
+    п.add_argument("--out", default=None, help="куда писать CSV при --peresobrat")
+    п.add_argument("--peresobrat", action="store_true",
+                    help="пересобрать CSV из сырых ответов, без сети и без денег")
     п.add_argument("--self-test", action="store_true")
     а = п.parse_args()
     if а.self_test:
         return self_test()
+    if а.peresobrat:
+        # ПИШЕТСЯ В ФАЙЛ ТОГО ЖЕ ПРОХОДА, А НЕ В НОВЫЙ. Данные те же самые --
+        # сырые ответы того прохода, -- и плодить вторую выгрузку той же даты
+        # значило бы оставить рядом правильную и неправильную. Файлов несколько --
+        # отказ по имени: выбирать за владельца, какой переписать, нельзя.
+        были = sorted((КОРЕНЬ / "data" / "gmgn").glob("gmgn_*.csv"))
+        if len(были) > 1:
+            печать(f"СБОЙ: выгрузок несколько ({', '.join(б.name for б in были)}) -- "
+                    f"какую переписать, решает владелец; передайте --out")
+            return 1
+        путь = (были[0] if были else
+                КОРЕНЬ / "data" / "gmgn"
+                / f"gmgn_{time.strftime('%Y-%m-%d_%HZ', time.gmtime())}.csv")
+        if а.out:
+            путь = Path(а.out)
+        о = пересобрать_из_сырых(КОРЕНЬ / "data" / "gmgn" / "raw", путь_csv=путь)
+        if not о["ok"]:
+            печать(f"СБОЙ: {о['why_not']}")
+            return 1
+        печать(f"пересобрано из {len(о['запуски'])} сырых выгрузок: строк "
+                f"{о['строк']}, уникальных {о['уникальных']}")
+        for с, н in (о.get("столбцы") or {}).items():
+            печать(f"  {с}: заполнено {н} из {о['строк']}")
+        печать(f"файл: {_под_корнем(путь)}")
+        return 0
     if not (а.proba or а.prohod):
         п.print_help()
         return 2
