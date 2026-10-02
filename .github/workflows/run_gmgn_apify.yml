@@ -1,4 +1,4 @@
-name: "GMGN через Apify: выгрузка лидербордов"
+name: "Apify: выгрузка GMGN и сбор коллов KOL"
 
 # ЗАЧЕМ. Ширина кошельков для сита Code-2: GMGN отдаёт не больше 100 строк на
 # запрос, поэтому охват берётся КОМБИНАЦИЯМИ (тип трейдера x сортировка).
@@ -17,13 +17,25 @@ name: "GMGN через Apify: выгрузка лидербордов"
 # столбцы walletAddress, followCount, buys7d, winRate7d, pnl7d и tags заполнены:
 # имена полей у актора могут поменяться со сборкой, и платить 4.5 $ за пустые
 # столбцы незачем. Пробный запуск упал -- проход не идёт.
+#
+# РЕЖИМ KOLLY (слово владельца 02.10) -- ТОТ ЖЕ ФАЙЛ, ДРУГОЙ СКРИПТ:
+# analysis/c3_kolly_apify.py, посты X пятидесяти KOL за 24.09--01.10 и адреса
+# Solana из них. Два шага: kolly_vybor (выбор актора в Store и чтение его схемы,
+# 0 $) и kolly_sbor (сам сбор, потолок входом, по умолчанию 5 $). Пробный запуск
+# GMGN в этих режимах НЕ ИДЁТ -- он стоил бы денег ни за что.
 on:
   workflow_dispatch:
     inputs:
       rezhim:
-        description: "proba (5 кошельков) или prohod (12 комбинаций по 100)"
+        description: "proba | prohod | kolly_vybor | kolly_sbor"
         required: false
         default: "prohod"
+        type: choice
+        options:
+          - proba
+          - prohod
+          - kolly_vybor
+          - kolly_sbor
       max_wallets:
         description: "строк на запрос (GMGN отдаёт не больше 100)"
         required: false
@@ -33,9 +45,17 @@ on:
         required: false
         default: "20"
       predel_rashoda:
-        description: "потолок расхода на проход, $"
+        description: "потолок расхода на проход GMGN, $"
         required: false
         default: "8"
+      kolly_predel_rashoda:
+        description: "потолок расхода на сбор коллов, $"
+        required: false
+        default: "5"
+      kolly_predel_zaprosov:
+        description: "потолок запросов на сбор коллов"
+        required: false
+        default: "60"
   schedule:
     # Раз в неделю, понедельник 06:00 UTC.
     - cron: "0 6 * * 1"
@@ -55,10 +75,14 @@ jobs:
         with:
           ref: claude/stroiteli
 
-      - name: "Самопроверка скрипта (без сети и без токена)"
-        run: python3 analysis/c3_gmgn_apify.py --self-test
+      - name: "Самопроверки скриптов (без сети и без токена)"
+        run: |
+          set -e
+          python3 analysis/c3_gmgn_apify.py --self-test
+          python3 analysis/c3_kolly_apify.py --self-test
 
-      - name: "Пробный запуск: 5 кошельков, проверка столбцов"
+      - name: "Пробный запуск GMGN: 5 кошельков, проверка столбцов"
+        if: ${{ github.event_name == 'schedule' || inputs.rezhim == 'proba' || inputs.rezhim == 'prohod' }}
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: |
@@ -80,6 +104,32 @@ jobs:
             --predel-zaprosov "${{ inputs.predel_zaprosov || '20' }}" \
             --predel-rashoda "${{ inputs.predel_rashoda || '8' }}"
 
+      - name: "Коллы KOL: пятьдесят аккаунтов (офлайн, 0 $)"
+        if: ${{ inputs.rezhim == 'kolly_vybor' || inputs.rezhim == 'kolly_sbor' }}
+        run: python3 analysis/c3_kolly_apify.py --spisok
+
+      - name: "Коллы KOL: выбор актора и его схема (0 $)"
+        if: ${{ inputs.rezhim == 'kolly_vybor' || inputs.rezhim == 'kolly_sbor' }}
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$APIFY_TOKEN" ]; then
+            echo "СБОЙ: секрет APIFY_TOKEN не задан"
+            exit 1
+          fi
+          python3 analysis/c3_kolly_apify.py --vybor
+
+      - name: "Коллы KOL: сбор постов и адресов (потолок входом)"
+        if: ${{ inputs.rezhim == 'kolly_sbor' }}
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          set -e
+          python3 analysis/c3_kolly_apify.py --sbor \
+            --predel-rashoda "${{ inputs.kolly_predel_rashoda || '5' }}" \
+            --predel-zaprosov "${{ inputs.kolly_predel_zaprosov || '60' }}"
+
       - name: "Коммит выгрузки, сырых строк и страницы"
         if: always()
         run: |
@@ -87,11 +137,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A data/gmgn docs/gmgn_*.md 2>/dev/null || true
+          git add -A data/kolly docs/kolly_sbor.md 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "менять нечего -- коммита нет"
             exit 0
           fi
-          git commit -m "GMGN через Apify: выгрузка лидербордов [automated]"
+          git commit -m "Apify (${{ inputs.rezhim || 'schedule' }}): выгрузка и/или коллы KOL [automated]"
           for N in 1 2 3 4; do
             if git push origin HEAD:claude/stroiteli; then
               exit 0
