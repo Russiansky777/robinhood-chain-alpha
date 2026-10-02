@@ -1,7 +1,27 @@
 {
-  "zachem": "Слово владельца 02.10: вернуть стоп cand1 до 22:00Z сейчас. ЗАЩЁЛКА СТОПА НАПИСАНА, НО ЕЩЁ НЕ В ПАМЯТИ СЛУЖБЫ: код уехал коммитом eb097bda, а деплоя после него не было, и файл stopy_grupp.json служба пока не читает. Единственный механизм, который действует СЕЙЧАС и без перезапуска, -- файл групп: детектор перечитывает его по mtime. Поэтому стоп ставится признаком lane_trades=false у cand1.",
-  "chto_menyaetsya": "cand1.lane_trades: true -> false. Это ОСТАНАВЛИВАЕТ полосу по группе cand1 целиком, как и стоп, но снимается НЕ часами, а обратной правкой файла -- значит в 22:00Z (полночь Мадрида) его надо вернуть в true отдельным действием. Стопы, пороги, per_day и рубильники не трогаются. ВАЖНО ПРО ЧИСЛА: сделок у cand1 с 14:37:13Z НЕ БЫЛО ни одной, последнее намерение 01.10 23:45:25Z -- её молчание весь день держал порог входа 2 SOL, а не стоп. Порог стал 0.1 в 15:27:52Z, то есть без этой правки cand1 начала бы торговать сейчас.",
+  "zachem": "Слово владельца 02.10 (дополнение, заменяет 19:24). ОТКАТ ПРАВИЛА 14 по числу Code-2 (docs/podbivka_2026-10-02_porog_razmera.md) и живым деньгам: порог размера покупки источника возвращается к 2.0 там, где он был опущен в 15:27:52Z. Плюс: снять ложный стоп cand1, завести cand3, поправить лидера. Одной пачкой, чтобы момент правки был один -- он же граница окна разбора сделок.",
+  "chto_menyaetsya": "п.1 откат порогов: lane_s0 0.5 -> 2.0, batch5 0.3 -> 2.0, cand1 0.1 -> 2.0, cand2 0.1 -> 2.0. НЕ трогаются: cand1_05 (остаётся 0.05 по слову владельца), cand1_03 (поля нет, работает общий 2), leader (3). п.3 cand1.lane_trades false -> true: стоп 23:53Z был ложным, -0.2 из -0.3456 дали BTN/Fantasy, записанные -0.1, а по цепи проданы +0.027. п.5 лидер: lane_sol 0.5 -> 0.3, stop_loss_sol 0.75 -> 0.6, min_target_sol остаётся 3. п.4 создаётся cand3 политикой cand2, но min_target_sol 2.0 (отбор считался на >=2), и в неё переносятся три адреса; 7HmkKn8P уходит в log_only. Все четыре адреса проверены: base58, ровно 32 байта.",
   "pravki": [
-    {"gruppa": "cand1", "pole": "lane_trades", "znachenie": "0"}
+    {"gruppa": "lane_s0", "pole": "min_target_sol", "znachenie": "2.0"},
+    {"gruppa": "batch5",  "pole": "min_target_sol", "znachenie": "2.0"},
+    {"gruppa": "cand1",   "pole": "min_target_sol", "znachenie": "2.0"},
+    {"gruppa": "cand2",   "pole": "min_target_sol", "znachenie": "2.0"},
+    {"gruppa": "cand1",   "pole": "lane_trades",    "znachenie": "1"},
+    {"gruppa": "leader",  "pole": "lane_sol",       "znachenie": "0.3"},
+    {"gruppa": "leader",  "pole": "stop_loss_sol",  "znachenie": "0.6"},
+    {"sozdat": "cand3",
+     "politika": {
+       "lane_trades": true, "subscribe": true, "bloom_trades": false,
+       "bloom_sol": null, "fanout": false,
+       "lane_sol": 0.1, "lane_size": 0.1,
+       "stop_loss_sol": 0.3, "per_day": 150, "hold_slots": 108,
+       "lane_open_max": 3, "min_target_sol": 2.0,
+       "lane_pools": ["amm_v4", "bonding", "clmm", "cpmm", "damm2", "dbc",
+                       "dlmm", "launchlab", "pump_amm", "two_step", "whirlpool"]
+     }},
+    {"perenesti": "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT", "v": "cand3", "pometka": "cand3 02.10"},
+    {"perenesti": "FLyBjfWGsxH4zDDfoUJHwA9774TmPVpR8kB5B46PtbaZ", "v": "cand3", "pometka": "cand3 02.10"},
+    {"perenesti": "C9s6hwgurdYfmnCNgdRou44ihPcssZmu7X45wBQ3y5t3", "v": "cand3", "pometka": "cand3 02.10"},
+    {"perenesti": "7HmkKn8P6aZSMg7jn9esjdPQ9cBqg9LQgNECzoDeJiGQ", "v": "log_only", "pometka": "log_only 02.10"}
   ]
 }
