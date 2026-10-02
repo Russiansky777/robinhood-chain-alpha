@@ -1,7 +1,7 @@
 # Свой продавец на все типы пулов: как врезать
 
-Модуль: `analysis/c3_svoj_prodavec.py` (самопроверка 42/42,
-`python3 analysis/c3_svoj_prodavec.py`).
+Модуль: `analysis/c3_prodavec_sborka.py` (самопроверка 42/42,
+`python3 analysis/c3_prodavec_sborka.py`).
 Замер по живым продажам: `deploy/checks/svoj_prodavec_chislo.py`.
 База — голова `claude/nifty-sagan-r0polg` (слито в `claude/stroiteli`, правило 8).
 Ни одного чужого файла не тронуто, ни одного чтения сети, ни одной подписи.
@@ -105,7 +105,7 @@
 
 ```python
 # bloom_vtoroe_mnenie.котировка_пула -- вместо LS.шаблон_продажи_из_покупки:
-    import c3_svoj_prodavec as SP  # noqa: PLC0415
+    import c3_prodavec_sborka as SP  # noqa: PLC0415
 
     прог = LS.программа_позиции(поз) or SB.PUMP_AMM   # программа пула позиции
     шб = SP.шаблон_продажи(tx_покупки, программа=прог)

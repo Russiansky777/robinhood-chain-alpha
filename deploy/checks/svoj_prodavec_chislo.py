@@ -58,7 +58,7 @@ def _модули(путь=None):
     sys.path.insert(0, str(Path(путь) if путь else КОРЕНЬ / "analysis"))
     import c2_common as C  # noqa: PLC0415
     import c2_swap_build as B  # noqa: PLC0415
-    import c3_svoj_prodavec as P  # noqa: PLC0415
+    import c3_prodavec_sborka as P  # noqa: PLC0415
     return C, B, P
 
 
@@ -338,7 +338,7 @@ def подставляемые(B, ш: dict, tx: dict) -> set:
     места берутся у c2_swap_build.user_accounts -- той же функции, которой их
     ставит сборка.
     """
-    import c3_svoj_prodavec as P  # noqa: PLC0415
+    import c3_prodavec_sborka as P  # noqa: PLC0415
 
     А = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"
     Б = "D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph"
