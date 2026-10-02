@@ -36,6 +36,14 @@ on:
         description: "ключ, который ждала программа"
         required: false
         default: "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2"
+      mesta_prodazhi_mint:
+        description: "минт для карты мест продажи 27-счётной (пусто -- шаг не идёт)"
+        required: false
+        default: ""
+      mesta_prodazhi_podpis:
+        description: "подпись продажи ТОГО ЖЕ пула (внутри Jupiter тоже годится)"
+        required: false
+        default: ""
 
 concurrency:
   group: bonding-v2-razmetka
@@ -48,6 +56,7 @@ env:
   # solders есть только в окружении службы -- системному python3 он не завезён.
   PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
   OUT_FILE: data/bonding_v2_razmetka.json
+  OUT_MESTA: data/krivaya_27_mesta.json
 
 jobs:
   razmetka:
@@ -60,8 +69,11 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "Сборка модуля"
-        run: python3 -m py_compile analysis/bonding_v2_razmetka.py
+      - name: "Сборка модулей"
+        run: |
+          set -e
+          python3 -m py_compile analysis/bonding_v2_razmetka.py
+          python3 -m py_compile analysis/krivaya_27_mesta.py
 
       - name: "SSH key"
         env:
@@ -75,6 +87,7 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Раскладка на хосте"
+        if: ${{ inputs.podpis != '' }}
         run: |
           set -e
           set -o pipefail
@@ -91,10 +104,45 @@ jobs:
           fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
 
+      # КАРТА МЕСТ ПРОДАЖИ 27-СЧЁТНОЙ РАЗНОВИДНОСТИ -- ИЗМЕРЕНИЕМ (п.2 (а) 02.10).
+      # Шаг идёт ТОЛЬКО по названному минту: без пары покупка+продажа одного пула
+      # карты нет, и угадывать её нельзя. Самопроверка модуля -- на хосте и ДО
+      # любой сети: на бегунке solders нет, и там она была бы непроверяемой.
+      - name: "Карта мест продажи 27-счётной разновидности (только чтение)"
+        if: ${{ inputs.mesta_prodazhi_mint != '' && inputs.mesta_prodazhi_podpis != '' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/bonding_v2_razmetka.py" < analysis/bonding_v2_razmetka.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/krivaya_27_mesta.py" < analysis/krivaya_27_mesta.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $RABOTA && PYTHONPATH=$RABOTA $PY_HOSTA $RABOTA/krivaya_27_mesta.py --self-test | tail -3"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $RABOTA
+            env BLOOM_STATE_DIR=\$BLOOM_STATE_DIR HELIUS_API_KEY=\$HELIUS_API_KEY \
+              PYTHONPATH=$RABOTA $PY_HOSTA $RABOTA/krivaya_27_mesta.py \
+                --mint '${{ inputs.mesta_prodazhi_mint }}' \
+                --prodazha '${{ inputs.mesta_prodazhi_podpis }}' \
+                --out $RABOTA/mesta.json" 2>&1 | tail -80 || echo "MESTA_NE_OK=1" >> "$GITHUB_ENV"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/mesta.json 2>/dev/null || true" > /tmp/mesta.json || true
+          if python3 -c "import json; json.load(open('/tmp/mesta.json'))" 2>/dev/null; then
+            cp /tmp/mesta.json "$OUT_MESTA"
+            echo "obnovlen $OUT_MESTA"
+          else
+            echo "SBOY: svodka karty mest ne sobralas"
+            exit 1
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA"
+
       - name: "Ключей в отчёте быть не должно"
         if: always()
         run: |
-          [ -f "$OUT_FILE" ] && python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE" || true
+          set -e
+          for F in "$OUT_FILE" "$OUT_MESTA"; do
+            if [ -f "$F" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$F"; fi
+          done
 
       - name: "Коммит"
         if: always()
@@ -102,7 +150,9 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          for F in "$OUT_FILE" "$OUT_MESTA"; do
+            if [ -f "$F" ]; then git add "$F"; fi
+          done
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
           git commit -m "Bonding V2: raskladka po cepi [automated]"
           for i in 1 2 3 4 5; do
