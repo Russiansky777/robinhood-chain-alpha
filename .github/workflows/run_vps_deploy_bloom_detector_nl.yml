@@ -809,9 +809,17 @@ jobs:
       - name: "АВАРИИ ГРУПП: что стоит, и снятие по слову владельца"
         run: |
           set -e
+          # PIPEFAIL ОБЯЗАТЕЛЕН. Первая версия этого шага молча "прошла": ssh
+          # отдал ошибку, но код уходил в tail|tee, и шаг считался успешным --
+          # аварии не прочитались и не снялись, а в отчёте стояло только
+          # "Permission denied".
+          set -o pipefail
+          # КАТАЛОГ СОСТОЯНИЯ -- ПРЯМО, А НЕ ЧЕРЕЗ env. Файл $ENV_DIR/env
+          # читается только root (каталог 711), и `. env` из-под bot падает на
+          # Permission denied -- ровно это и случилось 19:20:15Z. Состоянию
+          # нужен ОДИН ключ, и он известен прогону.
           ssh -n $SSH_OPTS root@$TARGET_HOST "
-            set -a; . $ENV_DIR/env; set +a
-            su -s /bin/sh bot -c 'set -a; . $ENV_DIR/env; set +a; \
+            su -s /bin/sh bot -c 'BLOOM_STATE_DIR=$STATE_DIR \
               /home/bot/robinhood-chain-alpha/venv/bin/python \
               $CODE_DIR/bloom_exec_state.py --avarii'
           " 2>&1 | tail -40 | tee -a data/bloom_detector_deploy.txt
@@ -834,8 +842,7 @@ jobs:
           echo "план снятия аварий: ${SNJAT:-(пусто)}" | tee -a data/bloom_detector_deploy.txt
           if [ -n "$SNJAT" ]; then
             ssh -n $SSH_OPTS root@$TARGET_HOST "
-              set -a; . $ENV_DIR/env; set +a
-              su -s /bin/sh bot -c 'set -a; . $ENV_DIR/env; set +a; \
+              su -s /bin/sh bot -c 'BLOOM_STATE_DIR=$STATE_DIR \
                 /home/bot/robinhood-chain-alpha/venv/bin/python \
                 $CODE_DIR/bloom_exec_state.py \
                 --avarija-snjat \"$SNJAT\" --kem \"владелец\"'
