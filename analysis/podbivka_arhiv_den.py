@@ -87,6 +87,8 @@ XYK = {"pump-amm", "raydium-cpmm", "meteora-damm-v1"}
 р_qmint = re.compile(r'"quoteMint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_mint = re.compile(r'"mint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_trader = re.compile(r'"trader":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
+р_action = re.compile(r'"action":\s*"(buy|sell)"')
+р_qam = re.compile(r'"quoteAmount":\s*"?([0-9.eE+-]+)')
 
 
 def резерв(e: dict, курс_q: float | None) -> dict:
@@ -387,13 +389,17 @@ def адреса_файла(путь: str) -> set:
 
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
-           минты: set | None = None, не_sol: bool = False, окно_докупки: int | None = None) -> Path:
+           минты: set | None = None, не_sol: bool = False, окно_докупки: int | None = None,
+           перед_слотов: int = 0) -> Path:
     import requests  # noqa: PLC0415
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
     import zstandard  # noqa: PLC0415
     адр = {} if БЕЗ_АДРЕСОВ else dict(json.loads((КОРЕНЬ / "data" / "podbivka" / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"])
     доп = доп or set()
     ист = ист or set()
+    # «кто покупал тот же пул за 1…N слотов до нас»: кольцо последних покупок ВСЕХ пулов.
+    # Дёшево: предфильтр и так достаёт poolId, block и трейдеров из строки; держим только N слотов.
+    недавние: collections.deque = collections.deque()
     for a in доп | ист:
         адр.setdefault(a, {"группы": ["доп"]})
     наши_события, сигналы, цели_события, покупки_ист = [], [], [], []
@@ -492,6 +498,19 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                             наши = наши + sorted(только_сигнал)
                         сг = р_sig.search(стр)
                         цель = bool(сг and сг.group(1) in celi)
+                        if перед_слотов and pid and блок:
+                            ам = р_action.search(стр)
+                            if ам and ам.group(1) == "buy":
+                                км = р_qam.search(стр)
+                                try:
+                                    кв_п = float(км.group(1)) if км else 0.0
+                                except ValueError:
+                                    кв_п = 0.0
+                                qм_п = р_qmint.search(стр)
+                                кто_п = sorted(трейдеры)[0] if трейдеры else (sn.group(1) if sn else None)
+                                недавние.append((блок, pid, кто_п, кв_п, qм_п.group(1) if qм_п else None))
+                            while недавние and недавние[0][0] < блок - перед_слотов:
+                                недавние.popleft()
                         мм = р_mint.search(стр) if минты else None
                         по_минту = bool(мм and мм.group(1) in минты)
                         if not (в_активе or наши or цель or по_минту):
@@ -585,7 +604,17 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                             новый = по_окну if по_окну is not None else первая
                             if (e["action"] == "buy" and новый and sol is not None and sol >= порог_t and (q == WSOL or (не_sol and курс_q))
                                     and (e.get("pool") in XYK or e.get("pool") in КРИВЫЕ) and pid):
+                                перед_нами = None
+                                if перед_слотов:
+                                    s0_ = e.get("block") or 0
+                                    перед_нами = [{"кто": к_, "слотов": s0_ - бл_,
+                                                   "sol": round(кв_, 6) if qm_ == WSOL else None,
+                                                   "quote": None if qm_ == WSOL else round(кв_, 6),
+                                                   "quoteMint": qm_}
+                                                  for бл_, pid_, к_, кв_, qm_ in недавние
+                                                  if pid_ == pid and 1 <= s0_ - бл_ <= перед_слотов][:30]
                                 с_нов = {"trader": t, "signature": e["signature"], "pool": e.get("pool"),
+                                                "перед": перед_нами,
                                                 "подписант": ПОДПИСАНТ if t in только_сигнал else None,
                                                 "первая": первая, "по_окну": по_окну,
                                                 "poolId": pid, "mint": e.get("mint"), "block": e.get("block"),
@@ -639,7 +668,7 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     import gzip  # noqa: PLC0415
     out = КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{метка}.json.gz"   # > 100 МБ несжатым -- предел GitHub
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(gzip.compress(json.dumps({"день": день, "часы": часы, "порог_sol": porog, "окно_слотов": окно, "счёт": счёт,
+    out.write_bytes(gzip.compress(json.dumps({"день": день, "часы": часы, "порог_sol": porog, "окно_слотов": окно, "перед_слотов": перед_слотов, "счёт": счёт,
                                "наши_события": наши_события, "сигналы": сигналы, "цели": цели_события,
                                "покупки_ист": покупки_ист, "ленты_минтов": ленты_минтов,
                                "ряды_целей": ряды_целей},
@@ -660,6 +689,8 @@ def main() -> int:
     р.add_argument("--minty", default="", help="через запятую: минты, все события которых пишутся целиком")
     р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
     р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
+    р.add_argument("--pered", type=int, default=0,
+                   help="писать в сигнал, кто покупал тот же пул за 1…N слотов до нас (0 -- не писать)")
     р.add_argument("--bilety", default="0.3,0.5", help="билеты модели, SOL, через запятую (pyg9: 0.3,0.5,1,3)")
     р.add_argument("--okno-vsem", action="store_true",
                    help="правило Code-1 (--okno-dokupki) для ВСЕХ наших адресов, порог -- --porog (не только --istochniki)")
@@ -681,7 +712,7 @@ def main() -> int:
     доп = адреса_файла(а.dop_adresa) if а.dop_adresa else set()
     ист = {x for x in а.istochniki.split(",") if x}
     out = прогон(а.s, часы, а.porog, а.okno, celi, а.metka, доп, а.porog_dop, ист,
-                 {x for x in а.minty.split(",") if x}, а.ne_sol, а.okno_dokupki)
+                 {x for x in а.minty.split(",") if x}, а.ne_sol, а.okno_dokupki, а.pered)
     import podbivka_run as R  # noqa: PLC0415
     R.записано(out)
     R.пуш(f"Podbivka-2: arhiv den {а.metka} [automated]", [str(out)])
