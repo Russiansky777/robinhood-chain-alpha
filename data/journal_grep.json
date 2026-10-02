@@ -1,28 +1,1437 @@
 {
- "patterns": "lane-own-2vvsBHHqXDeFHAPCAXE5w9ZtpBtvXscnx6xxGyyd,Custom",
+ "patterns": "5wVoGwHsGtPHpErRCGeq4M8CgD4ehTRwZ9bGeBchGGR9PmKtPsZLLhGaXNT88ghV33PjNebL2nSh69PX2r82HxCc,2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
  "file": "decisions",
  "rows": [
   {
-   "ts_utc": "2026-10-02T14:31:46Z",
-   "client_order_id": null,
-   "stage": "sent",
-   "code": null,
-   "action": null,
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:41:29Z",
+   "signature": "2LgvNbm35upG6SHuxG8db4KcRjnkMxwqfi3S9nXYtsh1WTsBEbmf58UoJYT9zTx3aNGseinFugVodYWGjnrMXTjC",
+   "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "slot": 452626644,
+   "kind": "buy",
+   "spend_sol_eq": 4.872986817910152,
+   "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "spend_ui": 600.0,
+   "first_entry": true,
+   "dex_programs": [
+    "Pump AMM"
+   ],
+   "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "route": {
+    "programs": [
+     "Pump AMM"
+    ],
+    "intermediate_mints": [],
+    "mints_in_route": 2,
+    "hops_by_mints": 1,
+    "dex_calls": 2,
+    "via_intermediate": false,
+    "intermediate_from": "промежуточных нет",
+    "authorized_only_mints": [],
+    "other_tx_mints": [],
+    "all_tx_mints": [
+     "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+     "So11111111111111111111111111111111111111112"
+    ]
+   },
+   "source_pool": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+   "source_pool_candidates": [
+    {
+     "address": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+     "with_wsol": true,
+     "dex_programs": [
+      "Pump AMM"
+     ],
+     "rejected": null
+    },
+    {
+     "address": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+     "with_wsol": false,
+     "dex_programs": [
+      "Pump AMM"
+     ],
+     "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"
+    }
+   ],
+   "spend_candidates": {
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 600.0
+   },
+   "rent_new_accounts_sol": 0.00151384,
+   "native_delta_sol": 0.0,
+   "received_ui": 20352717.713598,
+   "slot_lag": 0,
+   "dokupka": false,
+   "dokupka_why": "предыдущей покупки этой пары источник+минт мы не видели",
+   "route_transfer_fee_bps": 0,
+   "token_fee_bps": null,
+   "route_transfers_of_token": 1,
+   "route_taxed_intermediates": [],
+   "route_tax_from": "source",
+   "route_tax_mints_unknown": 2,
+   "route_tax_lower_bound": true,
+   "route_tax_why_not": "ставка не прочитана у 2 минтов маршрута: на пути покупки сеть не спрашиваем, читает фон",
+   "route_tax_ms": 0.46,
+   "route_tax_mints_asked": 0,
+   "would_skip_fee": false,
+   "action": "skip",
+   "code": "INSUFFICIENT_BALANCE",
+   "reason": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "filter": "наш лимит",
+   "dbot_бы_купил": true,
+   "lane_allowed": true,
+   "test_source": false,
+   "parse_ms": 4.18,
+   "gate_ms": 10.8,
+   "via": "transactionSubscribe",
+   "parsed_from": "PARSE_VIA_MSG",
+   "tx_version": 0,
+   "t_recv_ts": 1790948489.52771,
+   "t_recv_utc": "2026-10-02T13:41:29Z",
+   "t_decide_ts": 1790948489.542691,
+   "decide_latency_ms": 15.0,
+   "source_slot": 452626644,
+   "net_slot_at_decision": 452626644,
+   "net_slot_age_s": 0.136,
+   "rate_note": "по курсу 123.13 USD/SOL",
+   "rate_age_s": 36.5,
+   "rate_state": "курс свежий (36 с)",
+   "rate_source": "geckoterminal",
+   "source_task": "cand2",
+   "mode": "live"
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:41:29Z",
+   "stage": "shadow",
+   "signature": "2LgvNbm35upG6SHuxG8db4KcRjnkMxwqfi3S9nXYtsh1WTsBEbmf58UoJYT9zTx3aNGseinFugVodYWGjnrMXTjC",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+   "ok": true,
+   "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "pool_label": "Pump AMM",
+   "quote_mint": "So11111111111111111111111111111111111111112",
+   "supported": true,
+   "build_ms": 2.854,
+   "sim_ms": 23.8,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "sim_logs_tail": [],
+   "min_out": 488907710652,
+   "expected_out": 752165708696,
+   "min_out_method": "xyk_reserves_after_source",
    "why_not": null,
-   "chain_ok": null,
-   "chain_err": null,
-   "lane_group": null,
+   "route": "one_hop",
+   "cap_usd": null,
+   "would_skip_cap": null,
+   "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL",
+   "tx_size": 1090,
+   "shadow_total_ms": 26.71,
+   "shadow_credits_day": 400
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:41:29Z",
+   "stage": "lane_sim",
+   "source_sig": "2LgvNbm35upG6SHuxG8db4KcRjnkMxwqfi3S9nXYtsh1WTsBEbmf58UoJYT9zTx3aNGseinFugVodYWGjnrMXTjC",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "op": "own-2LgvNbm35upG6SHuxG8db4KcRjnkMxwqfi3S9nXY",
+   "sim_verdict": "would_pass",
+   "sim_err": null,
+   "sim_units": 115093,
+   "sim_logs_tail": [
+    "Program pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA success",
+    "Program 11111111111111111111111111111111 invoke [1]",
+    "Program 11111111111111111111111111111111 success",
+    "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+    "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 118 of 55025 compute units",
+    "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success"
+   ],
+   "sim_ms": 25.14
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:41:29Z",
+   "signature": "3tG9xpt5Zg5D6wrTeofs5it1hQfNRu31szjNQc94NhvtwBm3jMp9mjwSudu7Rc2n7dB3vqxZEHwxYdFin1Verzzi",
+   "source": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "slot": 452626645,
+   "kind": "buy",
+   "spend_sol_eq": 0.10099999999999999,
+   "spend_mint": "So11111111111111111111111111111111111111112",
+   "spend_ui": 0.10099999999999999,
+   "first_entry": true,
+   "dex_programs": [
+    "Pump AMM"
+   ],
+   "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "route": {
+    "programs": [
+     "Pump AMM"
+    ],
+    "intermediate_mints": [],
+    "mints_in_route": 2,
+    "hops_by_mints": 1,
+    "dex_calls": 2,
+    "via_intermediate": false,
+    "intermediate_from": "промежуточных нет",
+    "authorized_only_mints": [],
+    "other_tx_mints": [],
+    "all_tx_mints": [
+     "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+     "So11111111111111111111111111111111111111112"
+    ]
+   },
+   "source_pool": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+   "source_pool_candidates": [
+    {
+     "address": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+     "with_wsol": true,
+     "dex_programs": [
+      "Pump AMM"
+     ],
+     "rejected": null
+    }
+   ],
+   "spend_candidates": {
+    "So11111111111111111111111111111111111111112": 0.10099999999999999
+   },
+   "sol_out_gross": 0.10251384,
+   "rent_new_accounts_sol": 0.00151384,
+   "native_delta_sol": -0.10251384,
+   "received_ui": 315454.002923,
+   "slot_lag": 0,
+   "dokupka": false,
+   "dokupka_why": "предыдущей покупки этой пары источник+минт мы не видели",
+   "action": "skip",
+   "code": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "reason": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "filter": "задача DBot",
+   "test_source": false,
+   "parse_ms": 0.81,
+   "gate_ms": 3.58,
+   "via": "transactionSubscribe",
+   "parsed_from": "PARSE_VIA_MSG",
+   "tx_version": 0,
+   "t_recv_ts": 1790948489.668944,
+   "t_recv_utc": "2026-10-02T13:41:29Z",
+   "t_decide_ts": 1790948489.673326,
+   "decide_latency_ms": 4.4,
+   "source_slot": 452626645,
+   "net_slot_at_decision": 452626645,
+   "net_slot_age_s": 0.007,
+   "rate_note": "трата в SOL/WSOL, курс не нужен",
+   "rate_age_s": 36.6,
+   "rate_state": "курс свежий (37 с)",
+   "rate_source": "geckoterminal",
+   "source_task": null,
+   "mode": "live"
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:41:29Z",
+   "stage": "shadow",
+   "signature": "3tG9xpt5Zg5D6wrTeofs5it1hQfNRu31szjNQc94NhvtwBm3jMp9mjwSudu7Rc2n7dB3vqxZEHwxYdFin1Verzzi",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "source": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "ok": true,
+   "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "pool_label": "Pump AMM",
+   "quote_mint": "So11111111111111111111111111111111111111112",
+   "supported": true,
+   "build_ms": 1.332,
+   "sim_ms": 20.3,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "sim_logs_tail": [],
+   "min_out": 408291930505,
+   "expected_out": 628141431546,
+   "min_out_method": "xyk_reserves_after_source",
+   "why_not": null,
+   "route": "one_hop",
+   "cap_usd": null,
+   "would_skip_cap": null,
+   "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL",
+   "tx_size": 1090,
+   "shadow_total_ms": 21.71,
+   "shadow_credits_day": 401
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:41:32Z",
+   "stage": "sent",
+   "signature": "2uGg1CnwZybThiyo2k36enMnw6eNMKEUitkyZAnicDbAF5kX9XR5bDkFkXxhB4y3tadcqGQ58SbcdwwBbWjPZsPi",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+   "ok": true,
+   "sent": true,
+   "dry": false,
+   "why_not": null,
+   "lane": "own_send",
+   "source_sig": "2LgvNbm35upG6SHuxG8db4KcRjnkMxwqfi3S9nXYtsh1WTsBEbmf58UoJYT9zTx3aNGseinFugVodYWGjnrMXTjC",
+   "cid": "lane-own-2LgvNbm35upG6SHuxG8db4KcRjnkMxwqfi3S9nXY",
+   "group": "cand2",
+   "slippage": 0.35,
+   "hold_slots": 108.0,
+   "source_spend_sol_eq": 4.872986817910152,
+   "size_why": null,
+   "first_trades": false,
+   "group_landed": 5,
+   "bilet_sol": 0.1,
+   "bilet_dolya": null,
+   "bilet_ot_rezerva": false,
+   "bilet_rezerv_sol": 49.412939102,
+   "bilet_rezerv_otkuda": "сделка источника: остаток хранилища котировки",
+   "bilet_rezerv_vid": "реальный",
+   "bilet_rezerv_why_not": null,
+   "lamports": 100000000,
+   "size_sol": 0.1,
+   "lane_state": {
+    "open": 1,
+    "stuck": 0,
+    "day": "20261002",
+    "day_start_ts": 1790892000.0,
+    "day_how": "Europe/Madrid",
+    "pnl_all_groups_sol": 0.673294621,
+    "pnl_chain_sol": 0.037349952,
+    "pnl_chain_all_groups_sol": 0.744394301,
+    "pnl_chain_n": 4,
+    "pnl_chain_fields_n": 0,
+    "pnl_chain_open_n": 1,
+    "pnl_chain_why_not": [
+     "итог по цепи в записи не посчитан"
+    ],
+    "pnl_vs_chain_sol": -0.00454152,
+    "today_all_groups": 52,
+    "today": 5,
+    "failed_in_row": 0,
+    "pnl_sol": 0.032808432,
+    "pnl_trade_sol": -0.052052044,
+    "spend_sol": -0.084860476,
+    "uncountable_today": 0,
+    "no_result_today": 1,
+    "uncountable_why": [],
+    "total": 5,
+    "group": "cand2",
+    "day_turnover_sol": 0.510025,
+    "day_spend_sol": -0.084860476
+   },
+   "ts_decision": 1790948489.5577955,
+   "pool_tips": {
+    "ok": true,
+    "tips": [
+     [
+      "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+      1000000
+     ],
+     [
+      "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm",
+      100000
+     ],
+     [
+      "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
+      1000000
+     ],
+     [
+      "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+      1000
+     ],
+     [
+      "noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4",
+      1000000
+     ],
+     [
+      "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4",
+      1000000
+     ]
+    ],
+    "total_lamports": 4101000,
+    "senders": [
+     {
+      "sender": "astralane",
+      "tip_account": "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "blockrazor",
+      "tip_account": "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm",
+      "tip_lamports": 100000
+     },
+     {
+      "sender": "helius",
+      "tip_account": "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "jito",
+      "tip_account": "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+      "tip_lamports": 1000
+     },
+     {
+      "sender": "nozomi",
+      "tip_account": "noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "zeroslot",
+      "tip_account": "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4",
+      "tip_lamports": 1000000
+     }
+    ],
+    "why_not": null,
+    "total_sol": 0.004101
+   },
+   "nonce_ms": 0.013,
+   "pool_nonce": {
+    "account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "ok": true,
+    "why_not": null,
+    "warm": true,
+    "warm_age_s": 2.809,
+    "warm_why_not": null,
+    "nonce_ms": 0.013,
+    "n_variants": 6,
+    "candidates": [
+     "5Jy1tMuHvMwm3SzLhUEdiarV8nKrpxnsYuVJ5kH49eBxTVyHbUiUtnK3yLBXbQcfo9A6S1naqYrfzCqbGxWrQcYH",
+     "s4yYvHx29h8wcJKCZdmbJ8XnqoTaiENLM9JoG3CLpvBETnt6ku6ngXrmfVh7mQBEwcnKcF8GiVTzz7tFmmUGWe8",
+     "2dJC4kG2rTkeeo2B739mrRHjSC1pdPumqbXy8YFBGAt2mVYvcyV5cJNcmQAT8YLAF11RrZCKFK2C5AfGthnpUnui",
+     "4cT1dXaRawbj8cQhmWg8bR1fFTVNv13CkeGecPMrV8uLszqrrQb6s5QHAGZeGghZPE4D5p1Bk1iNktn1HbbFSsLf",
+     "3tG9xpt5Zg5D6wrTeofs5it1hQfNRu31szjNQc94NhvtwBm3jMp9mjwSudu7Rc2n7dB3vqxZEHwxYdFin1Verzzi",
+     "5ZE66Z5ULj1saHVQ2UbDCNdW3iHyXHLNgkpk29YBxz4DuSNScsLXye1LiYqRLHKCYGwEFH6X9pR4gRLSDAbLTqj6"
+    ],
+    "tips_total_lamports": 4101000,
+    "sizes": [
+     1213,
+     1213,
+     1213,
+     1213,
+     1213,
+     1213
+    ],
+    "landing": {
+     "landed": true,
+     "signature": "3tG9xpt5Zg5D6wrTeofs5it1hQfNRu31szjNQc94NhvtwBm3jMp9mjwSudu7Rc2n7dB3vqxZEHwxYdFin1Verzzi",
+     "sender": "nozomi",
+     "why_not": null,
+     "waited_s": 3.2,
+     "waited_slots": 8
+    },
+    "shift": null
+   },
+   "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "min_out": 244803796664,
+   "expected_out": 376621225638,
+   "build_ms": 1.031,
+   "size": 1139,
+   "tip_account": "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
+   "pool_reserve_sol": 49.412939102,
+   "pool_reserve_kind": "реальный",
+   "pool_senders": [
+    "astralane",
+    "blockrazor",
+    "helius",
+    "jito",
+    "nozomi",
+    "zeroslot"
+   ],
+   "sim_shadow": "запущена в своём потоке",
+   "blockhash_age_s": 2.84,
+   "sign_ms": 0.3,
+   "variants_ms": 14.17,
+   "variants_reads": {
+    "запросов": 0,
+    "в_сеть": 0,
+    "из_кэша": 0
+   },
+   "ts_signed": 1790948489.5749269,
+   "podshagi_ms": {
+    "разбор и размер": 9.166,
+    "гейт полосы": 2.787,
+    "веер контролей": 0.005,
+    "чаевые пула и нонс": 0.18,
+    "сборка": 1.339,
+    "симуляция": 1.103,
+    "blockhash": 0.003,
+    "подпись": 14.5,
+    "всего": 29.083
+   },
+   "ts_sent_buy": 1790948489.5749388,
+   "region_send": {
+    "регион": "EU",
+    "лидер": "G3a3iYZKNLbivothF3twqcaTCEvoPb9uJ2bFc9DNKkBQ",
+    "точек": 6,
+    "отправители": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "точки": {
+     "astralane": {
+      "host": "fr.gateway.astralane.io",
+      "регион_точки": "EU"
+     },
+     "blockrazor": {
+      "host": "amsterdam-cherryservers.solana.blockrazor.xyz",
+      "регион_точки": "EU"
+     },
+     "helius": {
+      "host": "ams-sender.helius-rpc.com",
+      "регион_точки": "EU"
+     },
+     "jito": {
+      "host": "amsterdam.mainnet.block-engine.jito.wtf",
+      "регион_точки": "EU"
+     },
+     "nozomi": {
+      "host": "ams.nozomi.temporal.xyz",
+      "регион_точки": "EU"
+     },
+     "zeroslot": {
+      "host": "ams.0slot.trade",
+      "регион_точки": "EU"
+     }
+    },
+    "слот": 452626645,
+    "why_not": null
+   },
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "EU",
+     "лидер": "G3a3iYZKNLbivothF3twqcaTCEvoPb9uJ2bFc9DNKkBQ",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "candidates": [
+     "5Jy1tMuHvMwm3SzLhUEdiarV8nKrpxnsYuVJ5kH49eBxTVyHbUiUtnK3yLBXbQcfo9A6S1naqYrfzCqbGxWrQcYH",
+     "s4yYvHx29h8wcJKCZdmbJ8XnqoTaiENLM9JoG3CLpvBETnt6ku6ngXrmfVh7mQBEwcnKcF8GiVTzz7tFmmUGWe8",
+     "2dJC4kG2rTkeeo2B739mrRHjSC1pdPumqbXy8YFBGAt2mVYvcyV5cJNcmQAT8YLAF11RrZCKFK2C5AfGthnpUnui",
+     "4cT1dXaRawbj8cQhmWg8bR1fFTVNv13CkeGecPMrV8uLszqrrQb6s5QHAGZeGghZPE4D5p1Bk1iNktn1HbbFSsLf",
+     "3tG9xpt5Zg5D6wrTeofs5it1hQfNRu31szjNQc94NhvtwBm3jMp9mjwSudu7Rc2n7dB3vqxZEHwxYdFin1Verzzi",
+     "5ZE66Z5ULj1saHVQ2UbDCNdW3iHyXHLNgkpk29YBxz4DuSNScsLXye1LiYqRLHKCYGwEFH6X9pR4gRLSDAbLTqj6"
+    ],
+    "tips_total_lamports": 4101000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "5Jy1tMuHvMwm3SzLhUEdiarV8nKrpxnsYuVJ5kH49eBxTVyHbUiUtnK3yLBXbQcfo9A6S1naqYrfzCqbGxWrQcYH",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.08,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "s4yYvHx29h8wcJKCZdmbJ8XnqoTaiENLM9JoG3CLpvBETnt6ku6ngXrmfVh7mQBEwcnKcF8GiVTzz7tFmmUGWe8",
+      "tip_lamports": 100000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 7.82,
+      "why_not": null
+     },
+     {
+      "sender": "helius",
+      "signature": "2dJC4kG2rTkeeo2B739mrRHjSC1pdPumqbXy8YFBGAt2mVYvcyV5cJNcmQAT8YLAF11RrZCKFK2C5AfGthnpUnui",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 6.09,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "4cT1dXaRawbj8cQhmWg8bR1fFTVNv13CkeGecPMrV8uLszqrrQb6s5QHAGZeGghZPE4D5p1Bk1iNktn1HbbFSsLf",
+      "tip_lamports": 1000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 2.73,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "3tG9xpt5Zg5D6wrTeofs5it1hQfNRu31szjNQc94NhvtwBm3jMp9mjwSudu7Rc2n7dB3vqxZEHwxYdFin1Verzzi",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 51.34,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "5ZE66Z5ULj1saHVQ2UbDCNdW3iHyXHLNgkpk29YBxz4DuSNScsLXye1LiYqRLHKCYGwEFH6X9pR4gRLSDAbLTqj6",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.85,
+      "why_not": null
+     }
+    ],
+    "accepted_first": "jito"
+   },
+   "pool_winner": "nozomi",
+   "signature_landed": "3tG9xpt5Zg5D6wrTeofs5it1hQfNRu31szjNQc94NhvtwBm3jMp9mjwSudu7Rc2n7dB3vqxZEHwxYdFin1Verzzi",
+   "http": 200,
+   "send_ms": 55.08,
+   "duplicate": null,
+   "signature_sender": "4cT1dXaRawbj8cQhmWg8bR1fFTVNv13CkeGecPMrV8uLszqrrQb6s5QHAGZeGghZPE4D5p1Bk1iNktn1HbbFSsLf",
+   "own_send_total_ms": 3336.83
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:41:57Z",
+   "signature": "5CGrD6KbautQG5Rcf7aP65m7tgsSMH8QGCT7FL24JxoWBNBpAt1GUj76oyGxhoQx2xr9UeUw4Vx81kx8ecDscns3",
+   "source": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "slot": 452626752,
+   "kind": "sell",
+   "spend_sol_eq": null,
+   "spend_mint": null,
+   "spend_ui": null,
+   "first_entry": null,
+   "dex_programs": [
+    "Jupiter v6",
+    "Pump AMM"
+   ],
+   "token_program": null,
+   "route": null,
+   "native_delta_sol": 0.097607892,
+   "slot_lag": 0,
+   "action": "skip",
+   "code": "NOT_A_BUY",
+   "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки",
+   "filter": "задача DBot",
+   "test_source": false,
+   "parse_ms": 0.41,
+   "gate_ms": 0.26,
+   "via": "transactionSubscribe",
+   "parsed_from": "PARSE_VIA_MSG",
+   "tx_version": 0,
+   "t_recv_ts": 1790948517.971572,
+   "t_recv_utc": "2026-10-02T13:41:57Z",
+   "t_decide_ts": 1790948517.972242,
+   "decide_latency_ms": 0.7,
+   "source_slot": 452626752,
+   "net_slot_at_decision": 452626752,
+   "net_slot_age_s": 0.141,
+   "rate_note": "трата не определена",
+   "rate_age_s": 2.6,
+   "rate_state": "курс свежий (3 с)",
+   "rate_source": "geckoterminal",
+   "source_task": null,
+   "mode": "live"
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:46:03Z",
+   "signature": "5AUnXY1NUc9a8BiDpuPyXjEKCX8Zxjo2bJazQ9zkAfGrjU99LDuBSAr873ViJbtXnTR2BTLNZMTFQpysvdzkQUSo",
+   "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "slot": 452627666,
+   "kind": "buy",
+   "spend_sol_eq": 1.6248605853316211,
+   "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "spend_ui": 200.0,
+   "first_entry": false,
+   "dex_programs": [
+    "Pump AMM"
+   ],
+   "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "route": {
+    "programs": [
+     "Pump AMM"
+    ],
+    "intermediate_mints": [],
+    "mints_in_route": 2,
+    "hops_by_mints": 1,
+    "dex_calls": 2,
+    "via_intermediate": false,
+    "intermediate_from": "промежуточных нет",
+    "authorized_only_mints": [],
+    "other_tx_mints": [],
+    "all_tx_mints": [
+     "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "So11111111111111111111111111111111111111112"
+    ]
+   },
+   "source_pool": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+   "source_pool_candidates": [
+    {
+     "address": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+     "with_wsol": true,
+     "dex_programs": [
+      "Pump AMM"
+     ],
+     "rejected": null
+    },
+    {
+     "address": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+     "with_wsol": false,
+     "dex_programs": [
+      "Pump AMM"
+     ],
+     "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"
+    }
+   ],
+   "spend_candidates": {
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 200.0
+   },
+   "native_delta_sol": 0.0,
+   "received_ui": 5614380.243366,
+   "slot_lag": 0,
+   "dokupka": true,
+   "dokupka_why": "источник уже покупал этот минт (разница 1022 слотов) -- берём только первую покупку пары",
+   "action": "skip",
+   "code": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "reason": "вход источника 1.625 SOL-эквивалента меньше targetMinAmountUI=2.0 (81.2 % от порога)",
+   "filter": "задача DBot",
+   "test_source": false,
+   "parse_ms": 2.84,
+   "gate_ms": 1.6,
+   "via": "transactionSubscribe",
+   "parsed_from": "PARSE_VIA_MSG",
+   "tx_version": 0,
+   "t_recv_ts": 1790948763.474662,
+   "t_recv_utc": "2026-10-02T13:46:03Z",
+   "t_decide_ts": 1790948763.479101,
+   "decide_latency_ms": 4.4,
+   "source_slot": 452627666,
+   "net_slot_at_decision": 452627666,
+   "net_slot_age_s": 0.035,
+   "rate_note": "по курсу 123.09 USD/SOL",
+   "rate_age_s": 60.3,
+   "rate_state": "курс протух на 60 с при TTL 60 -- взят с оговоркой: порог проверяется с запасом в разы",
+   "rate_source": "geckoterminal",
+   "source_task": "cand2",
+   "mode": "live"
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T13:46:03Z",
+   "stage": "shadow",
+   "signature": "5AUnXY1NUc9a8BiDpuPyXjEKCX8Zxjo2bJazQ9zkAfGrjU99LDuBSAr873ViJbtXnTR2BTLNZMTFQpysvdzkQUSo",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+   "ok": true,
+   "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "pool_label": "Pump AMM",
+   "quote_mint": "So11111111111111111111111111111111111111112",
+   "supported": true,
+   "build_ms": 1.414,
+   "sim_ms": 20.2,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "sim_logs_tail": [],
+   "min_out": 436543820110,
+   "expected_out": 671605877092,
+   "min_out_method": "xyk_reserves_after_source",
+   "why_not": null,
+   "route": "one_hop",
+   "cap_usd": null,
+   "would_skip_cap": null,
+   "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL",
+   "tx_size": 1090,
+   "shadow_total_ms": 21.71,
+   "shadow_credits_day": 406
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T14:09:14Z",
+   "signature": "3GNTPevfCvmfcdxrZs3ZgDd75cAoHddinyk4PURLJPhBv9yT2pfwbzAxezqTEutXZhkLwDurqJxR1CET8MV3P4Tp",
+   "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "slot": 452632884,
+   "kind": "sell",
+   "spend_sol_eq": null,
+   "spend_mint": null,
+   "spend_ui": null,
+   "first_entry": null,
+   "dex_programs": [
+    "Pump AMM",
+    "Meteora DLMM"
+   ],
+   "token_program": null,
+   "route": null,
+   "native_delta_sol": 0.0,
+   "slot_lag": 0,
+   "action": "skip",
+   "code": "NOT_A_BUY",
+   "reason": "продажа источника: sellSettings.mode=only_pnl, DBot копирует только покупки",
+   "filter": "задача DBot",
+   "test_source": false,
+   "parse_ms": 0.63,
+   "gate_ms": 0.43,
+   "via": "transactionSubscribe",
+   "parsed_from": "PARSE_VIA_MSG",
+   "tx_version": 0,
+   "t_recv_ts": 1790950154.198451,
+   "t_recv_utc": "2026-10-02T14:09:14Z",
+   "t_decide_ts": 1790950154.19951,
+   "decide_latency_ms": 1.1,
+   "source_slot": 452632884,
+   "net_slot_at_decision": 452632884,
+   "net_slot_age_s": 0.189,
+   "rate_note": "трата не определена",
+   "rate_age_s": 9.8,
+   "rate_state": "курс свежий (10 с)",
+   "rate_source": "geckoterminal",
+   "source_task": "cand2",
+   "mode": "live"
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T14:31:42Z",
+   "signature": "2vvsBHHqXDeFHAPCAXE5w9ZtpBtvXscnx6xxGyydMDX3x7XgMiRg1ZBToxuxaeodKygwrGcoo3Vi9ueXbp36Wz1p",
    "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
    "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
-   "program": null,
-   "lane_pool_program": null,
+   "slot": 452637966,
+   "kind": "buy",
+   "spend_sol_eq": 4.926013037591055,
+   "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "spend_ui": 600.0,
+   "first_entry": true,
+   "dex_programs": [
+    "Jupiter v6",
+    "Pump AMM"
+   ],
+   "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "route": {
+    "programs": [
+     "Jupiter v6",
+     "Pump AMM"
+    ],
+    "intermediate_mints": [],
+    "mints_in_route": 2,
+    "hops_by_mints": 1,
+    "dex_calls": 4,
+    "via_intermediate": false,
+    "intermediate_from": "промежуточных нет",
+    "authorized_only_mints": [],
+    "other_tx_mints": [],
+    "all_tx_mints": [
+     "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "So11111111111111111111111111111111111111112"
+    ]
+   },
+   "source_pool": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+   "source_pool_candidates": [
+    {
+     "address": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+     "with_wsol": true,
+     "dex_programs": [
+      "Jupiter v6",
+      "Pump AMM"
+     ],
+     "rejected": null
+    },
+    {
+     "address": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+     "with_wsol": false,
+     "dex_programs": [
+      "Jupiter v6",
+      "Pump AMM"
+     ],
+     "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"
+    }
+   ],
+   "spend_candidates": {
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 600.0
+   },
+   "sol_out_gross": 0.00055084,
+   "rent_new_accounts_sol": 0.00151384,
+   "native_delta_sol": -0.00055084,
+   "received_ui": 24684126.808848,
+   "slot_lag": 0,
+   "dokupka": false,
+   "dokupka_why": "предыдущей покупки этой пары источник+минт мы не видели",
+   "route_transfer_fee_bps": 0,
+   "token_fee_bps": null,
+   "route_transfers_of_token": 1,
+   "route_taxed_intermediates": [],
+   "route_tax_from": "source",
+   "route_tax_mints_unknown": 2,
+   "route_tax_lower_bound": true,
+   "route_tax_why_not": "ставка не прочитана у 2 минтов маршрута: на пути покупки сеть не спрашиваем, читает фон",
+   "route_tax_ms": 0.49,
+   "route_tax_mints_asked": 0,
+   "would_skip_fee": false,
+   "action": "skip",
+   "code": "INSUFFICIENT_BALANCE",
+   "reason": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "filter": "наш лимит",
+   "dbot_бы_купил": true,
+   "lane_allowed": true,
+   "test_source": false,
+   "parse_ms": 0.96,
+   "gate_ms": 6.56,
+   "via": "transactionSubscribe",
+   "parsed_from": "PARSE_VIA_MSG",
+   "tx_version": 0,
+   "t_recv_ts": 1790951502.46427,
+   "t_recv_utc": "2026-10-02T14:31:42Z",
+   "t_decide_ts": 1790951502.471793,
+   "decide_latency_ms": 7.5,
+   "source_slot": 452637966,
+   "net_slot_at_decision": 452637966,
+   "net_slot_age_s": 0.024,
+   "rate_note": "по курсу 121.80 USD/SOL",
+   "rate_age_s": 42.3,
+   "rate_state": "курс свежий (42 с)",
+   "rate_source": "geckoterminal",
+   "source_task": "cand2",
+   "mode": "live"
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T14:31:42Z",
+   "stage": "shadow",
+   "signature": "2vvsBHHqXDeFHAPCAXE5w9ZtpBtvXscnx6xxGyydMDX3x7XgMiRg1ZBToxuxaeodKygwrGcoo3Vi9ueXbp36Wz1p",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+   "ok": true,
+   "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "pool_label": "Pump AMM",
+   "quote_mint": "So11111111111111111111111111111111111111112",
+   "supported": true,
+   "build_ms": 2.858,
+   "sim_ms": 26.6,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "sim_logs_tail": [],
+   "min_out": 577970779157,
+   "expected_out": 889185814088,
+   "min_out_method": "xyk_reserves_after_source",
+   "why_not": null,
+   "route": "one_hop",
+   "cap_usd": null,
+   "would_skip_cap": null,
+   "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL",
+   "tx_size": 1090,
+   "shadow_total_ms": 29.55,
+   "shadow_credits_day": 425
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T14:31:42Z",
+   "stage": "lane_sim",
+   "source_sig": "2vvsBHHqXDeFHAPCAXE5w9ZtpBtvXscnx6xxGyydMDX3x7XgMiRg1ZBToxuxaeodKygwrGcoo3Vi9ueXbp36Wz1p",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "op": "own-2vvsBHHqXDeFHAPCAXE5w9ZtpBtvXscnx6xxGyyd",
+   "sim_verdict": "would_pass",
+   "sim_err": null,
+   "sim_units": 102426,
+   "sim_logs_tail": [
+    "Program pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA success",
+    "Program 11111111111111111111111111111111 invoke [1]",
+    "Program 11111111111111111111111111111111 success",
+    "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+    "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 118 of 67692 compute units",
+    "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success"
+   ],
+   "sim_ms": 30.4
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T14:31:46Z",
+   "stage": "sent",
    "signature": "5wVoGwHsGtPHpErRCGeq4M8CgD4ehTRwZ9bGeBchGGR9PmKtPsZLLhGaXNT88ghV33PjNebL2nSh69PX2r82HxCc",
-   "lane_signature": null,
-   "lane_err": null,
-   "sol_in": null,
-   "cu_limit": null,
-   "lane_cu_limit": null,
-   "reason": null
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+   "ok": true,
+   "sent": true,
+   "dry": false,
+   "why_not": null,
+   "lane": "own_send",
+   "source_sig": "2vvsBHHqXDeFHAPCAXE5w9ZtpBtvXscnx6xxGyydMDX3x7XgMiRg1ZBToxuxaeodKygwrGcoo3Vi9ueXbp36Wz1p",
+   "cid": "lane-own-2vvsBHHqXDeFHAPCAXE5w9ZtpBtvXscnx6xxGyyd",
+   "group": "cand2",
+   "slippage": 0.35,
+   "hold_slots": 108.0,
+   "source_spend_sol_eq": 4.926013037591055,
+   "size_why": null,
+   "first_trades": false,
+   "group_landed": 7,
+   "bilet_sol": 0.1,
+   "bilet_dolya": null,
+   "bilet_ot_rezerva": false,
+   "bilet_rezerv_sol": 43.963618795,
+   "bilet_rezerv_otkuda": "сделка источника: остаток хранилища котировки",
+   "bilet_rezerv_vid": "реальный",
+   "bilet_rezerv_why_not": null,
+   "lamports": 100000000,
+   "size_sol": 0.1,
+   "lane_state": {
+    "open": 0,
+    "stuck": 0,
+    "day": "20261002",
+    "day_start_ts": 1790892000.0,
+    "day_how": "Europe/Madrid",
+    "pnl_all_groups_sol": 0.691770763,
+    "pnl_chain_sol": 0.058853774,
+    "pnl_chain_all_groups_sol": 0.765898123,
+    "pnl_chain_n": 7,
+    "pnl_chain_fields_n": 0,
+    "pnl_chain_open_n": 0,
+    "pnl_chain_why_not": [],
+    "pnl_vs_chain_sol": -0.0075692,
+    "today_all_groups": 54,
+    "today": 7,
+    "failed_in_row": 0,
+    "pnl_sol": 0.051284574,
+    "pnl_trade_sol": -0.028052062,
+    "spend_sol": -0.079336636,
+    "uncountable_today": 0,
+    "no_result_today": 0,
+    "uncountable_why": [],
+    "total": 7,
+    "group": "cand2",
+    "day_turnover_sol": 0.714035,
+    "day_spend_sol": -0.079336636
+   },
+   "ts_decision": 1790951502.49155,
+   "pool_tips": {
+    "ok": true,
+    "tips": [
+     [
+      "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+      1000000
+     ],
+     [
+      "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
+      100000
+     ],
+     [
+      "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+      1000000
+     ],
+     [
+      "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+      1000
+     ],
+     [
+      "TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq",
+      1000000
+     ],
+     [
+      "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4",
+      1000000
+     ]
+    ],
+    "total_lamports": 4101000,
+    "senders": [
+     {
+      "sender": "astralane",
+      "tip_account": "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "blockrazor",
+      "tip_account": "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
+      "tip_lamports": 100000
+     },
+     {
+      "sender": "helius",
+      "tip_account": "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "jito",
+      "tip_account": "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+      "tip_lamports": 1000
+     },
+     {
+      "sender": "nozomi",
+      "tip_account": "TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "zeroslot",
+      "tip_account": "4HiwLEP2Bzqj3hM2ENxJuzhcPCdsafwiet3oGkMkuQY4",
+      "tip_lamports": 1000000
+     }
+    ],
+    "why_not": null,
+    "total_sol": 0.004101
+   },
+   "nonce_ms": 0.01,
+   "pool_nonce": {
+    "account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "ok": true,
+    "why_not": null,
+    "warm": true,
+    "warm_age_s": 11.91,
+    "warm_why_not": null,
+    "nonce_ms": 0.01,
+    "n_variants": 6,
+    "candidates": [
+     "2x6dVjQowjvAG8WewTcYp2XjdAZojfVyxa8F6jCGBwEx2bCQqo8htaateyQjwaztHrP5byeyzrVcAq68qg1sZMQX",
+     "kvH7YPBQFBgPv2j33pZKx9yGCej1cNEpACTsCy5Wg4Riw5k6BWyfXP8UrALT1jz322P6ZLHEhRiAUg9JwdRBp4u",
+     "5aeCkpiVwiGr4eEEZzo3snZqGvxETpaLXL2hE3XnNURNcUBaVpgF7xjB2EUEYScEhJcFimoMUaiiUpwoigysGCyQ",
+     "5sb1J14TRkjbWLBtt2AHUirvhmQNoz54SaV9U7wNervYzAtQEjmJWcaRH7k5p6H6LN9fHKQ2bNHiWxdxzbr2BHsm",
+     "4dYvphi64ac7FCkoggGGxFDyjwUR9TQWhJRX258nawLoW6xchzFZ3KQ5B1QfTYYhK5LJ4C63uTQ49u4m9731cLPe",
+     "XNt3ftno9QNzr9B4G1kNwFBvNmsvWbZeF96KtuqB6LiM7Uuqiws2JQeCA9QCgytNyKmUHHG9gHbvqnCaHdv2DHy"
+    ],
+    "tips_total_lamports": 4101000,
+    "sizes": [
+     1213,
+     1213,
+     1213,
+     1213,
+     1213,
+     1213
+    ],
+    "landing": {
+     "landed": true,
+     "signature": "4dYvphi64ac7FCkoggGGxFDyjwUR9TQWhJRX258nawLoW6xchzFZ3KQ5B1QfTYYhK5LJ4C63uTQ49u4m9731cLPe",
+     "sender": "nozomi",
+     "why_not": null,
+     "waited_s": 3.2,
+     "waited_slots": 8
+    },
+    "shift": null
+   },
+   "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "min_out": 289432515503,
+   "expected_out": 445280793081,
+   "build_ms": 4.408,
+   "size": 1139,
+   "tip_account": "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+   "pool_reserve_sol": 43.963618795,
+   "pool_reserve_kind": "реальный",
+   "pool_senders": [
+    "astralane",
+    "blockrazor",
+    "helius",
+    "jito",
+    "nozomi",
+    "zeroslot"
+   ],
+   "sim_shadow": "запущена в своём потоке",
+   "blockhash_age_s": 11.94,
+   "sign_ms": 0.39,
+   "variants_ms": 8.82,
+   "variants_reads": {
+    "запросов": 0,
+    "в_сеть": 0,
+    "из_кэша": 0
+   },
+   "ts_signed": 1790951502.5074503,
+   "podshagi_ms": {
+    "разбор и размер": 16.27,
+    "гейт полосы": 1.469,
+    "веер контролей": 0.005,
+    "чаевые пула и нонс": 0.232,
+    "сборка": 5.251,
+    "симуляция": 1.174,
+    "blockhash": 0.006,
+    "подпись": 9.233,
+    "всего": 33.64
+   },
+   "ts_sent_buy": 1790951502.5074627,
+   "region_send": {
+    "регион": "EU",
+    "лидер": "A1vqhA2fS6K7CvHsJKX1ACcHJFEmyRg4KuR5pctHANy4",
+    "точек": 6,
+    "отправители": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "точки": {
+     "astralane": {
+      "host": "fr.gateway.astralane.io",
+      "регион_точки": "EU"
+     },
+     "blockrazor": {
+      "host": "amsterdam-cherryservers.solana.blockrazor.xyz",
+      "регион_точки": "EU"
+     },
+     "helius": {
+      "host": "ams-sender.helius-rpc.com",
+      "регион_точки": "EU"
+     },
+     "jito": {
+      "host": "amsterdam.mainnet.block-engine.jito.wtf",
+      "регион_точки": "EU"
+     },
+     "nozomi": {
+      "host": "ams.nozomi.temporal.xyz",
+      "регион_точки": "EU"
+     },
+     "zeroslot": {
+      "host": "ams.0slot.trade",
+      "регион_точки": "EU"
+     }
+    },
+    "слот": 452637967,
+    "why_not": null
+   },
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "EU",
+     "лидер": "A1vqhA2fS6K7CvHsJKX1ACcHJFEmyRg4KuR5pctHANy4",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "candidates": [
+     "2x6dVjQowjvAG8WewTcYp2XjdAZojfVyxa8F6jCGBwEx2bCQqo8htaateyQjwaztHrP5byeyzrVcAq68qg1sZMQX",
+     "kvH7YPBQFBgPv2j33pZKx9yGCej1cNEpACTsCy5Wg4Riw5k6BWyfXP8UrALT1jz322P6ZLHEhRiAUg9JwdRBp4u",
+     "5aeCkpiVwiGr4eEEZzo3snZqGvxETpaLXL2hE3XnNURNcUBaVpgF7xjB2EUEYScEhJcFimoMUaiiUpwoigysGCyQ",
+     "5sb1J14TRkjbWLBtt2AHUirvhmQNoz54SaV9U7wNervYzAtQEjmJWcaRH7k5p6H6LN9fHKQ2bNHiWxdxzbr2BHsm",
+     "4dYvphi64ac7FCkoggGGxFDyjwUR9TQWhJRX258nawLoW6xchzFZ3KQ5B1QfTYYhK5LJ4C63uTQ49u4m9731cLPe",
+     "XNt3ftno9QNzr9B4G1kNwFBvNmsvWbZeF96KtuqB6LiM7Uuqiws2JQeCA9QCgytNyKmUHHG9gHbvqnCaHdv2DHy"
+    ],
+    "tips_total_lamports": 4101000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "2x6dVjQowjvAG8WewTcYp2XjdAZojfVyxa8F6jCGBwEx2bCQqo8htaateyQjwaztHrP5byeyzrVcAq68qg1sZMQX",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 10.08,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "kvH7YPBQFBgPv2j33pZKx9yGCej1cNEpACTsCy5Wg4Riw5k6BWyfXP8UrALT1jz322P6ZLHEhRiAUg9JwdRBp4u",
+      "tip_lamports": 100000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 26.06,
+      "why_not": null
+     },
+     {
+      "sender": "helius",
+      "signature": "5aeCkpiVwiGr4eEEZzo3snZqGvxETpaLXL2hE3XnNURNcUBaVpgF7xjB2EUEYScEhJcFimoMUaiiUpwoigysGCyQ",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 7.97,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "5sb1J14TRkjbWLBtt2AHUirvhmQNoz54SaV9U7wNervYzAtQEjmJWcaRH7k5p6H6LN9fHKQ2bNHiWxdxzbr2BHsm",
+      "tip_lamports": 1000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 3.5,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "4dYvphi64ac7FCkoggGGxFDyjwUR9TQWhJRX258nawLoW6xchzFZ3KQ5B1QfTYYhK5LJ4C63uTQ49u4m9731cLPe",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 60.08,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "XNt3ftno9QNzr9B4G1kNwFBvNmsvWbZeF96KtuqB6LiM7Uuqiws2JQeCA9QCgytNyKmUHHG9gHbvqnCaHdv2DHy",
+      "tip_lamports": 1000000,
+      "size": 1213,
+      "ok": true,
+      "http": 200,
+      "send_ms": 45.3,
+      "why_not": null
+     }
+    ],
+    "accepted_first": "jito"
+   },
+   "pool_winner": "nozomi",
+   "signature_landed": "4dYvphi64ac7FCkoggGGxFDyjwUR9TQWhJRX258nawLoW6xchzFZ3KQ5B1QfTYYhK5LJ4C63uTQ49u4m9731cLPe",
+   "http": 200,
+   "send_ms": 63.5,
+   "duplicate": null,
+   "signature_sender": "5sb1J14TRkjbWLBtt2AHUirvhmQNoz54SaV9U7wNervYzAtQEjmJWcaRH7k5p6H6LN9fHKQ2bNHiWxdxzbr2BHsm",
+   "own_send_total_ms": 3927.95
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T15:15:26Z",
+   "signature": "4Zdk4ZYE93iRqyw5oDEmy4a7va7YPpbsrsZskB4BSaZzPboUoyMXDChwawFs1WquqvQ59fatMZPumHD6kMUGef84",
+   "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "slot": 452647773,
+   "kind": "buy",
+   "spend_sol_eq": 0.8333501786763242,
+   "spend_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "spend_ui": 100.0,
+   "first_entry": false,
+   "dex_programs": [
+    "Jupiter v6",
+    "Orca Whirlpool",
+    "Pump AMM"
+   ],
+   "token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "route": {
+    "programs": [
+     "Jupiter v6",
+     "Orca Whirlpool",
+     "Pump AMM"
+    ],
+    "intermediate_mints": [],
+    "mints_in_route": 2,
+    "hops_by_mints": 1,
+    "dex_calls": 5,
+    "via_intermediate": false,
+    "intermediate_from": "промежуточных нет",
+    "authorized_only_mints": [],
+    "other_tx_mints": [],
+    "all_tx_mints": [
+     "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "So11111111111111111111111111111111111111112"
+    ]
+   },
+   "source_pool": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+   "source_pool_candidates": [
+    {
+     "address": "8wrqNam5rYkwh2DY8x6TqKPkVYV1jXLaMDZ821AGgc7y",
+     "with_wsol": true,
+     "dex_programs": [
+      "Jupiter v6",
+      "Pump AMM"
+     ],
+     "rejected": null
+    },
+    {
+     "address": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+     "with_wsol": false,
+     "dex_programs": [
+      "Jupiter v6",
+      "Orca Whirlpool",
+      "Pump AMM"
+     ],
+     "rejected": "это кошелёк сделки, а не пул (подписант или плательщик)"
+    }
+   ],
+   "spend_candidates": {
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 100.0,
+    "So11111111111111111111111111111111111111112": 0.00055084
+   },
+   "sol_out_gross": 0.00055084,
+   "native_delta_sol": -0.00055084,
+   "received_ui": 5010531.852007,
+   "slot_lag": 0,
+   "dokupka": true,
+   "dokupka_why": "источник уже покупал этот минт (разница 9807 слотов) -- берём только первую покупку пары",
+   "action": "skip",
+   "code": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "reason": "вход источника 0.833 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.7 % от порога)",
+   "filter": "задача DBot",
+   "test_source": false,
+   "parse_ms": 3.19,
+   "gate_ms": 7.86,
+   "via": "transactionSubscribe",
+   "parsed_from": "PARSE_VIA_MSG",
+   "tx_version": 0,
+   "t_recv_ts": 1790954126.975113,
+   "t_recv_utc": "2026-10-02T15:15:26Z",
+   "t_decide_ts": 1790954126.986172,
+   "decide_latency_ms": 11.1,
+   "source_slot": 452647773,
+   "net_slot_at_decision": 452647773,
+   "net_slot_age_s": 0.206,
+   "rate_note": "две ноги: 0.000551 SOL и 100.000000 стейбла = 0.833350 SOL по курсу 120.00 USD/SOL -- взята большая",
+   "rate_age_s": 29.5,
+   "rate_state": "курс свежий (29 с)",
+   "rate_source": "geckoterminal",
+   "source_task": "cand2",
+   "mode": "live"
+  },
+  {
+   "schema_version": 2,
+   "ts_utc": "2026-10-02T15:15:27Z",
+   "stage": "shadow",
+   "signature": "4Zdk4ZYE93iRqyw5oDEmy4a7va7YPpbsrsZskB4BSaZzPboUoyMXDChwawFs1WquqvQ59fatMZPumHD6kMUGef84",
+   "mint": "2pki9gZ4BGjYjD8eLeyrw8Y6ZxJtsKo8XoXbUovkn1Js",
+   "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+   "ok": true,
+   "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "pool_label": "Pump AMM",
+   "quote_mint": "So11111111111111111111111111111111111111112",
+   "supported": true,
+   "build_ms": 1.791,
+   "sim_ms": 17.9,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "sim_logs_tail": [],
+   "min_out": 771214547254,
+   "expected_out": 1186483918852,
+   "min_out_method": "xyk_reserves_after_source",
+   "why_not": null,
+   "route": "one_hop",
+   "cap_usd": null,
+   "would_skip_cap": null,
+   "cap_why_not": "нет траты источника в SOL-экв или курса USD/SOL",
+   "tx_size": 1090,
+   "shadow_total_ms": 19.72,
+   "shadow_credits_day": 450
   }
  ]
 }
