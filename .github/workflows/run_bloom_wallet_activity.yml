@@ -27,14 +27,23 @@ on:
         description: "подписи через запятую: разобрать транзакции ЦЕЛИКОМ (все владельцы и минты)"
         required: false
         default: ""
+      runner:
+        description: "'nl' -- свой бегунок на хосте (по умолчанию), 'cloud' -- запасной облачный"
+        required: false
+        default: "nl"
 
 concurrency:
   group: bloom-wallet-activity
   cancel-in-progress: false
 
+# СВОЙ БЕГУНОК, А НЕ ОБЛАЧНЫЙ (слово владельца 02.10, п.6). Ночью 02->03.10
+# чужая сессия заняла облачные бегунки счёта одиннадцатью параллельными
+# работами, и служебные прогоны встали в очередь: учёт на 27 минут, живучесть и
+# чтение кошельков -- больше часа. Служебное чтение не должно зависеть от чужой
+# очереди. Облачный путь остаётся запасным: вход runner=cloud.
 jobs:
   diag:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
     timeout-minutes: 15
     permissions:
       contents: write

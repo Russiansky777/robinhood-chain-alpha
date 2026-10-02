@@ -23,17 +23,25 @@ on:
         description: "разбор сбоев за N минут: журнал детектора + строки HANDLER_CRASHED/UNSOLD (0 -- не делать)"
         required: false
         default: "0"
+      runner:
+        description: "'nl' -- свой бегунок на хосте (по умолчанию), 'cloud' -- запасной облачный"
+        required: false
+        default: "nl"
 
 concurrency:
   group: vps-health-nl
   cancel-in-progress: false
 
-env:
-  HOST: 45.59.170.76
-
+# СВОЙ БЕГУНОК, А НЕ ОБЛАЧНЫЙ (слово владельца 02.10, п.6). Ночью 02->03.10
+# чужая сессия заняла облачные бегунки счёта одиннадцатью параллельными
+# работами, и служебные прогоны встали в очередь: учёт на 27 минут, живучесть и
+# чтение кошельков -- больше часа. Служебное чтение не должно зависеть от чужой
+# очереди. Облачный путь остаётся запасным: вход runner=cloud.
 jobs:
   health:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    env:
+      HOST: ${{ inputs.runner == 'cloud' && '45.59.170.76' || '127.0.0.1' }}
     timeout-minutes: 12
     permissions:
       contents: write
