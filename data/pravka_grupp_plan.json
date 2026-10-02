@@ -1,47 +1,52 @@
 {
- "zachem": "Дополнение владельца в ночь 01->02.10: lane_s0 билет 0.5 и суточный стоп группы -1.0; новая группа cand1_03 на трёх адресах куста DYAn4XpA с билетом 0.3, удержанием 108 слотов, стопом -0.6 и пределом 150 сделок в сутки; эти три адреса из cand1 убрать.",
- "chto_menyaetsya": "lane_sol/lane_size у lane_s0 -> 0.5 (потолок полосы 0.5, выше нельзя без отдельного слова), stop_loss_sol у lane_s0 -> 1.0. Создаётся cand1_03 политикой, скопированной с cand1 по торгующим признакам, и три адреса переносятся В НЕЁ -- в этом порядке, иначе переносить некуда. lane_pools у новой группы -- тот же список девяти типов, что у lane_s0: без этого поля полоса по группе не торгует, и создание группы выглядело бы сделанным, а сделок не было бы ни одной.",
- "pravki": [
-  {
-   "gruppa": "lane_s0",
-   "pole": "lane_sol",
-   "znachenie": "0.5",
-   "pochemu": "билет 0.5 -- слово владельца; это ровно потолок полосы, выше без слова нельзя"
-  },
-  {
-   "gruppa": "lane_s0",
-   "pole": "lane_size",
-   "znachenie": "0.5",
-   "pochemu": "lane_size читается наравне с lane_sol -- оставить их разными значило бы два числа одного билета"
-  },
-  {
-   "gruppa": "lane_s0",
-   "pole": "stop_loss_sol",
-   "znachenie": "1.0",
-   "pochemu": "суточный стоп группы -1.0 при билете 0.5 -- слово владельца"
-  },
-  {
-   "sozdat": "cand1_03",
-   "politika": "{\"lane_trades\": 1, \"bloom_trades\": 0, \"subscribe\": 1, \"fanout\": 0, \"lane_sol\": 0.3, \"lane_size\": 0.3, \"stop_loss_sol\": 0.6, \"per_day\": 150, \"hold_slots\": 108, \"lane_open_max\": 1, \"note\": \"куст DYAn4XpA: один минт в одном слоте не покупать дважды -- поэтому lane_open_max 1\", \"lane_pools\": \"pump_amm,cpmm,bonding,two_step,damm2,dbc,clmm,launchlab,dlmm\"}",
-   "pochemu": "новая группа: билет 0.3, удержание 108, стоп -0.6, предел 150; lane_pools -- тот же список, что у lane_s0/batch5/sniper_src: без него полоса по группе не торгует вовсе, и новая группа молча стояла бы пустой"
-  },
-  {
-   "perenesti": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
-   "v": "cand1_03",
-   "pometka": "куст DYAn4XpA, из cand1 по слову владельца 02.10",
-   "pochemu": "из cand1 в cand1_03"
-  },
-  {
-   "perenesti": "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt",
-   "v": "cand1_03",
-   "pometka": "куст DYAn4XpA (корень), из cand1 по слову владельца 02.10",
-   "pochemu": "из cand1 в cand1_03"
-  },
-  {
-   "perenesti": "Gf2wYM2k5ojfPzN5Uqi3mbP1nWEdZhhzMyDBsKrHA3kC",
-   "v": "cand1_03",
-   "pometka": "куст DYAn4XpA, из cand1 по слову владельца 02.10",
-   "pochemu": "из cand1 в cand1_03"
-  }
- ]
+  "zachem": "Дневной пакет владельца 02.10: новая группа cand1_05 на двух худших адресах cand1 с билетом 0.05 и стопом -0.15; Gf2wYM2k обратно в log_only как дубль куста DYAn4XpA; cand1_03 lane_open_max 3. cand2 НЕ заводится: по слову владельца она ждёт списка Code-2 и отдельного слова, и выдумывать её состав нельзя.",
+  "chto_menyaetsya": "cand1_05 создаётся политикой, скопированной с cand1 по НЕназванным полям (min_target_sol 2.0, lane_trades/subscribe как у cand1), с назначенными владельцем числами: билет 0.05 (lane_sol и lane_size оба -- иначе два числа одного билета), hold_slots 108, stop_loss_sol 0.15, per_day 100, lane_open_max 3. lane_pools -- ДОСЛОВНО одиннадцать типов lane_s0. Потом два адреса переносятся в неё, и только в этом порядке: переносить в несуществующую группу некуда. ОТДЕЛЬНО, КАК ИСПРАВЛЕНИЕ МОЕЙ ЖЕ НОЧНОЙ ПРАВКИ: lane_pools у cand1_03 стоит СТРОКОЙ из ДЕВЯТИ типов, а у lane_s0 -- СПИСОК из ОДИННАДЦАТИ (нет amm_v4 и whirlpool). Ночью я доложил 'тот же список девяти типов, что у lane_s0' -- это было неверно дважды. Слово владельца было 'как у lane_s0', поэтому приводится к одиннадцати.",
+  "pravki": [
+    {
+      "sozdat": "cand1_05",
+      "politika": {
+        "lane_trades": true,
+        "subscribe": true,
+        "bloom_trades": false,
+        "bloom_sol": null,
+        "lane_sol": 0.05,
+        "lane_size": 0.05,
+        "stop_loss_sol": 0.15,
+        "per_day": 100,
+        "hold_slots": 108,
+        "lane_open_max": 3,
+        "min_target_sol": 2.0,
+        "day_cap_sol": null,
+        "lane_pools": "amm_v4,bonding,clmm,cpmm,damm2,dbc,dlmm,launchlab,pump_amm,two_step,whirlpool"
+      },
+      "pochemu": "билет 0.05, удержание 108, стоп -0.15 за сутки, предел 100 сделок, одновременно 3 -- слово владельца; пулы как у lane_s0, одиннадцать типов; остальные поля -- как у cand1, из которой адреса уходят, чтобы кроме названного ничего не поехало"
+    },
+    {
+      "perenesti": "GM7Hrz2bDq33ezMtL6KGidSWZXMWgZ6qBuugkb5H8NvN",
+      "v": "cand1_05",
+      "pometka": "худший источник суток 01.10: 23 сделки, итог по цепи -0.165819552 SOL -- билет режется с 0.1 до 0.05 по слову владельца"
+    },
+    {
+      "perenesti": "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh",
+      "v": "cand1_05",
+      "pometka": "худший источник суток 02.10: 9 сделок, итог по цепи -0.140006886 SOL, половина всего минуса cand1 -- билет режется с 0.1 до 0.05 по слову владельца"
+    },
+    {
+      "perenesti": "Gf2wYM2k5ojfPzN5Uqi3mbP1nWEdZhhzMyDBsKrHA3kC",
+      "v": "log_only",
+      "pometka": "дубль куста DYAn4XpA: за сутки 02.10 ни одного сигнала и ни одной сделки -- слово владельца вернуть в log_only"
+    },
+    {
+      "gruppa": "cand1_03",
+      "pole": "lane_open_max",
+      "znachenie": "3",
+      "pochemu": "слово владельца: одновременно 3. Ночью я поставил 1, прочитав 'один минт в одном слоте не покупать дважды' как предел одновременных позиций группы -- это было не то поле: дубль минта в слоте ловится не им"
+    },
+    {
+      "gruppa": "cand1_03",
+      "pole": "lane_pools",
+      "znachenie": "amm_v4,bonding,clmm,cpmm,damm2,dbc,dlmm,launchlab,pump_amm,two_step,whirlpool",
+      "pochemu": "исправление моей ночной правки: стояло девять типов, у lane_s0 -- одиннадцать (не было amm_v4 и whirlpool). Слово владельца ночью было 'как у lane_s0'"
+    }
+  ]
 }
