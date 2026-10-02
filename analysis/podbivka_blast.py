@@ -145,6 +145,7 @@ def main() -> int:
     р.add_argument("--podpisi", default="", help="через запятую: подписи-ориентиры (наша покупка, источник)")
     р.add_argument("--prefiksy", default="", help="через запятую: префиксы подписей-ориентиров (ист 7JVQ...)")
     р.add_argument("--metka", default="blast_15-45")
+    р.add_argument("--stranic", type=int, default=80, help="предел страниц по 1000 подписей пула")
     а = р.parse_args()
     т0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
     т1 = calendar.timegm(time.strptime(а.do, "%Y-%m-%dT%H:%M:%SZ"))
@@ -156,7 +157,7 @@ def main() -> int:
     with уз.на("helius"):
         # подписи пула от конца окна назад
         подписи, до, страниц = [], None, 0
-        while страниц < 20:
+        while страниц < а.stranic:
             стр = уз.подписи(а.pul, до=до, limit=1000)
             страниц += 1
             if not стр:
@@ -165,6 +166,8 @@ def main() -> int:
             if (стр[-1].get("blockTime") or 0) < т0 or len(стр) < 1000:
                 break
             до = стр[-1]["signature"]
+        самая_старая = min((з.get("blockTime") or 0) for з in подписи) if подписи else 0
+        дошли = bool(подписи) and самая_старая < т0
         в_окне = [з for з in подписи if т0 <= (з.get("blockTime") or 0) <= т1]
         ориентиры = [x for x in а.podpisi.split(",") if x]
         префиксы = [x for x in а.prefiksy.split(",") if x]
@@ -204,7 +207,11 @@ def main() -> int:
     строки.sort(key=lambda r: (r.get("слот") or 0, r.get("место_в_блоке") if r.get("место_в_блоке") is not None else 10**9))
     крупные = [r for r in строки if r.get("направление") == "покупка" and (r.get("sol") or 0) >= а.min_sol
                and (not кр or (кр[0] <= calendar.timegm(time.strptime(r["utc"], "%Y-%m-%dT%H:%M:%SZ")) <= кр[1]))]
-    из_ = {"пул": а.pul, "минт": а.mint, "владелец_хранилищ_пула": вл_пула, "доля_свопов_с_ним": доля_пула, "окно": [а.s, а.do], "крупные_окно": [а.krupnye_s, а.krupnye_do],
+    из_ = {"пул": а.pul, "минт": а.mint, "владелец_хранилищ_пула": вл_пула, "доля_свопов_с_ним": доля_пула,
+           "страниц_подписей": страниц, "подписей_просмотрено": len(подписи),
+           "самая_старая_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(самая_старая)) if самая_старая else None,
+           "дошли_до_окна": дошли,
+           "why_not": None if дошли else f"предел страниц {а.stranic}: до начала окна не дочитали", "окно": [а.s, а.do], "крупные_окно": [а.krupnye_s, а.krupnye_do],
            "мин_sol": а.min_sol, "транзакций": len(строки), "ориентиры": ор,
            "по_слотам": {str(сл): {"транзакций_пула": sum(1 for r in строки if r.get("слот") == сл),
                                    "покупок": sum(1 for r in строки if r.get("слот") == сл and r.get("направление") == "покупка"),
@@ -217,6 +224,8 @@ def main() -> int:
     out = П / f"{а.metka}.json"
     out.write_text(json.dumps(из_, ensure_ascii=False, indent=1), encoding="utf-8")
     R.записано(out)
+    print(f"{out.name}: страниц подписей {страниц}, просмотрено {len(подписи)}, самая старая "
+          f"{из_['самая_старая_utc']}, дошли до окна {дошли}", flush=True)
     print(f"{out.name}: транзакций пула в окне {len(строки)}, крупных покупок (≥ {а.min_sol:g} SOL) "
           f"{len(крупные)}, слотов {len(из_['по_слотам'])}", flush=True)
     for r in крупные:
