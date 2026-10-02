@@ -1,76 +1,80 @@
 # Подбивка: куст DYAn4XpA / HT5EVAzf / Gf2wYM2k -- кто входит быстрее и есть ли уникальные
 
-7 суток архива (окно 24.09 17:00Z → 01.10 17:00Z, файлы `kust_*T16`, порог сигнала 0.01 SOL): событий трёх адресов 981 (покупок 472, продаж 509), сигналов 304, ошибок чтения часов 0. Места в блоке -- отдельный проход по цепи (`getBlock`), в архиве их нет -- ещё не собраны, столбцы мест пустые. Ничего не рекомендуется.
+7 суток архива (окно 24.09 17:00Z → 01.10 17:00Z, файлы `kust_*T16`, порог сигнала 0.01 SOL): событий трёх адресов 981 (покупок 472, продаж 509), сигналов 304, ошибок чтения часов 0. Места в блоке -- отдельный проход по цепи (`getBlock`), в архиве их нет: слотов с местами 104. Ничего не рекомендуется.
 
 ## а. Общие минт + слот: кто раньше внутри блока
 
-Случаев, где тот же минт в том же слоте купили хотя бы двое из трёх: **104**; из них одна и та же транзакция на двоих -- **0**, без мест в блоке (блок не отдан) -- 104.
+Случаев, где тот же минт в том же слоте купили хотя бы двое из трёх: **104**; из них одна и та же транзакция на двоих -- **0**.
 
 | слот | минт | кто | размеры, SOL-экв | одна транзакция | места в блоке | разница | первый |
 |---|---|---|---|---|---|---|---|
-| 450097196 | `CARDSccU` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 0, HT5EVAzf 0 | нет | Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450098725 | `CARDSccU` | Gf2wYM2k, HT5EVAzf | HT5EVAzf 0, Gf2wYM2k 0 | нет | HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450102294 | `5fzMbRfA` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.957, HT5EVAzf 3.8404, Gf2wYM2k 3.7119 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450153884 | `B2JBQ98Z` | Gf2wYM2k, HT5EVAzf | HT5EVAzf 2.0452, Gf2wYM2k 1.8659 | нет | HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450239630 | `FbGdsWgE` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 0.4887, HT5EVAzf 0.4851 | нет | Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450239730 | `2EZWjn3j` | Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.8177, Gf2wYM2k 1.6332 | нет | HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450243489 | `9VREH2LV` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 2.0304, DYAn4XpA 1.8807 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450251171 | `5piXiXot` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.1678, HT5EVAzf 1.7922 | нет | Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450257569 | `26bJc6U5` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 5.3166, DYAn4XpA 6.4167 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450258421 | `26bJc6U5` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 0.0469, DYAn4XpA 0.0521 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450264385 | `MhtEiW13` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.2204, DYAn4XpA 1.1604, Gf2wYM2k 1.1917 | нет | HT5EVAzf —, DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450266623 | `6uv5Qm6p` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.4824, HT5EVAzf 3.1617, Gf2wYM2k 3.1337 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450285289 | `HXxBRPLZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.7754, Gf2wYM2k 1.9232, DYAn4XpA 1.9991 | нет | HT5EVAzf —, Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450421123 | `EhR6VWs3` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 1.9686, DYAn4XpA 2.0746, HT5EVAzf 1.8235 | нет | Gf2wYM2k —, DYAn4XpA —, HT5EVAzf — | — | — |
-| 450421964 | `qikeUfbJ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.9306, HT5EVAzf 3.1282, DYAn4XpA 2.925 | нет | Gf2wYM2k —, HT5EVAzf —, DYAn4XpA — | — | — |
-| 450422152 | `qikeUfbJ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 0.0277, HT5EVAzf 0.0321, Gf2wYM2k 0.0286 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450424027 | `FeSBGcJt` | DYAn4XpA, HT5EVAzf | HT5EVAzf 3.1591, DYAn4XpA 3.3032 | нет | HT5EVAzf —, DYAn4XpA — | — | — |
-| 450427327 | `J9pJ964H` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 2.049, Gf2wYM2k 1.868, HT5EVAzf 1.9497 | нет | DYAn4XpA —, Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450433976 | `3o4hLASZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 1.5886, HT5EVAzf 1.6588, Gf2wYM2k 1.4573 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450476328 | `8J69rbLT` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 1.7942, DYAn4XpA 2.1658 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450478224 | `FF6t1Uqg` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 4.2356, Gf2wYM2k 4.446, DYAn4XpA 4.0295 | нет | HT5EVAzf —, Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450515670 | `9WsnqeW3` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 1.7515, HT5EVAzf 1.469, Gf2wYM2k 1.6685 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450517132 | `6ruHjSeQ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.8091, DYAn4XpA 2.5914, HT5EVAzf 2.4217 | нет | Gf2wYM2k —, DYAn4XpA —, HT5EVAzf — | — | — |
-| 450517840 | `9WsnqeW3` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.6109, HT5EVAzf 2.7732, DYAn4XpA 2.4381 | нет | Gf2wYM2k —, HT5EVAzf —, DYAn4XpA — | — | — |
-| 450525694 | `6ruHjSeQ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.29, HT5EVAzf 3.2409, DYAn4XpA 3.2469 | нет | Gf2wYM2k —, HT5EVAzf —, DYAn4XpA — | — | — |
-| 450526452 | `FQ4X5Zyq` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 3.1105, Gf2wYM2k 2.6848, DYAn4XpA 3.1147 | нет | HT5EVAzf —, Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450527162 | `HdwhHdht` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 2.5038, DYAn4XpA 2.8226 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450527597 | `9GGVdGxG` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 4.6589, DYAn4XpA 4.2511 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450528534 | `HdwhHdht` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 2.2638, Gf2wYM2k 2.6251 | нет | DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450550652 | `FL4UmMcs` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 2.8368, DYAn4XpA 2.3709, Gf2wYM2k 2.6145 | нет | HT5EVAzf —, DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450551748 | `BMp3jDPE` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 4.8806, Gf2wYM2k 5.0194 | нет | DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450554480 | `8cn4avN4` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 6.3443, DYAn4XpA 5.5357 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450555553 | `AMqJDyt4` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 4.9875, Gf2wYM2k 4.9125 | нет | DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450556457 | `EGP1nZ7A` | DYAn4XpA, HT5EVAzf | DYAn4XpA 4.0392, HT5EVAzf 4.5964 | нет | DYAn4XpA —, HT5EVAzf — | — | — |
-| 450559291 | `BVMWcqRK` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.4415, HT5EVAzf 2.1162, DYAn4XpA 2.2867 | нет | Gf2wYM2k —, HT5EVAzf —, DYAn4XpA — | — | — |
-| 450563547 | `41g3m5wZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.1818, DYAn4XpA 2.7744, HT5EVAzf 2.8439 | нет | Gf2wYM2k —, DYAn4XpA —, HT5EVAzf — | — | — |
-| 450563893 | `3NbEzSgg` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.3143, HT5EVAzf 3.5302 | нет | Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450564246 | `AfUbRxQZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 1.7166, Gf2wYM2k 1.6509, HT5EVAzf 1.5214 | нет | DYAn4XpA —, Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450565398 | `TtB1Gze4` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 2.5199, HT5EVAzf 2.5648, Gf2wYM2k 2.7375 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 450565769 | `D7vohC4w` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 1.5903, HT5EVAzf 1.5112, DYAn4XpA 1.7874 | нет | Gf2wYM2k —, HT5EVAzf —, DYAn4XpA — | — | — |
-| 450765209 | `7dCbJXTA` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 1.2797, HT5EVAzf 1.4094, DYAn4XpA 1.2219 | нет | Gf2wYM2k —, HT5EVAzf —, DYAn4XpA — | — | — |
-| 450767652 | `Edxe1mAe` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 3.3882, Gf2wYM2k 3.4563 | нет | DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450771439 | `oPAiAikW` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 4.7906, DYAn4XpA 5.0189 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450772132 | `oPAiAikW` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.1972, DYAn4XpA 2.4886, HT5EVAzf 2.186 | нет | Gf2wYM2k —, DYAn4XpA —, HT5EVAzf — | — | — |
-| 450772626 | `Gxoazs3H` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.136, HT5EVAzf 2.2992, DYAn4XpA 2.4093 | нет | Gf2wYM2k —, HT5EVAzf —, DYAn4XpA — | — | — |
-| 450772804 | `7jVD3WnR` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.1506, DYAn4XpA 2.917, HT5EVAzf 2.7324 | нет | Gf2wYM2k —, DYAn4XpA —, HT5EVAzf — | — | — |
-| 450773180 | `Ge3cA5kY` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 3.5376, DYAn4XpA 3.3069 | нет | Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450774179 | `88AmJzX1` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.6015, DYAn4XpA 2.6578, HT5EVAzf 2.5629 | нет | Gf2wYM2k —, DYAn4XpA —, HT5EVAzf — | — | — |
-| 450898631 | `CC5D6puF` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.5825, Gf2wYM2k 3.7981, HT5EVAzf 3.375 | нет | DYAn4XpA —, Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450903292 | `AHp2e4b2` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 2.1375, Gf2wYM2k 1.8576, DYAn4XpA 1.8715 | нет | HT5EVAzf —, Gf2wYM2k —, DYAn4XpA — | — | — |
-| 450929381 | `ESC5ym7V` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.475, Gf2wYM2k 3.02, HT5EVAzf 3.2827 | нет | DYAn4XpA —, Gf2wYM2k —, HT5EVAzf — | — | — |
-| 450933772 | `7qzph6zU` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 6.4343, Gf2wYM2k 5.2991 | нет | DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450938635 | `CxfF3tvA` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 2.3685, Gf2wYM2k 2.605 | нет | DYAn4XpA —, Gf2wYM2k — | — | — |
-| 450940145 | `HEtmfSgc` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 0, HT5EVAzf 0, Gf2wYM2k 0 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 451388879 | `SPCXxcqX` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.3693, Gf2wYM2k 1.5571, DYAn4XpA 1.6039 | нет | HT5EVAzf —, Gf2wYM2k —, DYAn4XpA — | — | — |
-| 451390928 | `4KLjGoYR` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 0.6746, HT5EVAzf 0.6141, Gf2wYM2k 0.5854 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 451409702 | `APLwmQEy` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.5613, Gf2wYM2k 4.1853, HT5EVAzf 3.9868 | нет | DYAn4XpA —, Gf2wYM2k —, HT5EVAzf — | — | — |
-| 451413885 | `Xs3oZwbH` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 18.5941, Gf2wYM2k 19.0409, DYAn4XpA 21.46 | нет | HT5EVAzf —, Gf2wYM2k —, DYAn4XpA — | — | — |
-| 451415220 | `5bKYTe4L` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 2.644, HT5EVAzf 2.7462, Gf2wYM2k 2.432 | нет | DYAn4XpA —, HT5EVAzf —, Gf2wYM2k — | — | — |
-| 451416347 | `CLHfpxeL` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.0122, Gf2wYM2k 3.4149, HT5EVAzf 3.3507 | нет | DYAn4XpA —, Gf2wYM2k —, HT5EVAzf — | — | — |
+| 450097196 | `CARDSccU` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 0, HT5EVAzf 0 | нет | Gf2wYM2k 18, HT5EVAzf 22 | 4 | Gf2wYM2k |
+| 450098725 | `CARDSccU` | Gf2wYM2k, HT5EVAzf | HT5EVAzf 0, Gf2wYM2k 0 | нет | HT5EVAzf 68, Gf2wYM2k 71 | 3 | HT5EVAzf |
+| 450102294 | `5fzMbRfA` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.957, HT5EVAzf 3.8404, Gf2wYM2k 3.7119 | нет | DYAn4XpA 546, HT5EVAzf 550, Gf2wYM2k 558 | 12 | DYAn4XpA |
+| 450153884 | `B2JBQ98Z` | Gf2wYM2k, HT5EVAzf | HT5EVAzf 2.0452, Gf2wYM2k 1.8659 | нет | HT5EVAzf 54, Gf2wYM2k 94 | 40 | HT5EVAzf |
+| 450239630 | `FbGdsWgE` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 0.4887, HT5EVAzf 0.4851 | нет | Gf2wYM2k 1056, HT5EVAzf 1058 | 2 | Gf2wYM2k |
+| 450239730 | `2EZWjn3j` | Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.8177, Gf2wYM2k 1.6332 | нет | HT5EVAzf 1303, Gf2wYM2k 1310 | 7 | HT5EVAzf |
+| 450243489 | `9VREH2LV` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 2.0304, DYAn4XpA 1.8807 | нет | Gf2wYM2k 280, DYAn4XpA 282 | 2 | Gf2wYM2k |
+| 450251171 | `5piXiXot` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.1678, HT5EVAzf 1.7922 | нет | Gf2wYM2k 16, HT5EVAzf 19 | 3 | Gf2wYM2k |
+| 450257569 | `26bJc6U5` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 5.3166, DYAn4XpA 6.4167 | нет | Gf2wYM2k 425, DYAn4XpA 427 | 2 | Gf2wYM2k |
+| 450258421 | `26bJc6U5` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 0.0469, DYAn4XpA 0.0521 | нет | Gf2wYM2k 503, DYAn4XpA 527 | 24 | Gf2wYM2k |
+| 450264385 | `MhtEiW13` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.2204, DYAn4XpA 1.1604, Gf2wYM2k 1.1917 | нет | HT5EVAzf 191, DYAn4XpA 197, Gf2wYM2k 201 | 10 | HT5EVAzf |
+| 450266623 | `6uv5Qm6p` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.4824, HT5EVAzf 3.1617, Gf2wYM2k 3.1337 | нет | DYAn4XpA 283, HT5EVAzf 286, Gf2wYM2k 289 | 6 | DYAn4XpA |
+| 450285289 | `HXxBRPLZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.7754, Gf2wYM2k 1.9232, DYAn4XpA 1.9991 | нет | HT5EVAzf 192, Gf2wYM2k 215, DYAn4XpA 218 | 26 | HT5EVAzf |
+| 450421123 | `EhR6VWs3` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 1.9686, DYAn4XpA 2.0746, HT5EVAzf 1.8235 | нет | Gf2wYM2k 916, DYAn4XpA 921, HT5EVAzf 924 | 8 | Gf2wYM2k |
+| 450421964 | `qikeUfbJ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.9306, HT5EVAzf 3.1282, DYAn4XpA 2.925 | нет | Gf2wYM2k 1524, HT5EVAzf 1531, DYAn4XpA 1538 | 14 | Gf2wYM2k |
+| 450422152 | `qikeUfbJ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 0.0277, HT5EVAzf 0.0321, Gf2wYM2k 0.0286 | нет | DYAn4XpA 371, HT5EVAzf 378, Gf2wYM2k 383 | 12 | DYAn4XpA |
+| 450424027 | `FeSBGcJt` | DYAn4XpA, HT5EVAzf | HT5EVAzf 3.1591, DYAn4XpA 3.3032 | нет | HT5EVAzf 1141, DYAn4XpA 1249 | 108 | HT5EVAzf |
+| 450427327 | `J9pJ964H` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 2.049, Gf2wYM2k 1.868, HT5EVAzf 1.9497 | нет | DYAn4XpA 676, Gf2wYM2k 681, HT5EVAzf 706 | 30 | DYAn4XpA |
+| 450433976 | `3o4hLASZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 1.5886, HT5EVAzf 1.6588, Gf2wYM2k 1.4573 | нет | DYAn4XpA 1099, HT5EVAzf 1103, Gf2wYM2k 1106 | 7 | DYAn4XpA |
+| 450476328 | `8J69rbLT` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 1.7942, DYAn4XpA 2.1658 | нет | Gf2wYM2k 1382, DYAn4XpA 1385 | 3 | Gf2wYM2k |
+| 450478224 | `FF6t1Uqg` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 4.2356, Gf2wYM2k 4.446, DYAn4XpA 4.0295 | нет | HT5EVAzf 216, Gf2wYM2k 245, DYAn4XpA 253 | 37 | HT5EVAzf |
+| 450515670 | `9WsnqeW3` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 1.7515, HT5EVAzf 1.469, Gf2wYM2k 1.6685 | нет | DYAn4XpA 414, HT5EVAzf 419, Gf2wYM2k 421 | 7 | DYAn4XpA |
+| 450517132 | `6ruHjSeQ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.8091, DYAn4XpA 2.5914, HT5EVAzf 2.4217 | нет | Gf2wYM2k 198, DYAn4XpA 202, HT5EVAzf 209 | 11 | Gf2wYM2k |
+| 450517840 | `9WsnqeW3` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.6109, HT5EVAzf 2.7732, DYAn4XpA 2.4381 | нет | Gf2wYM2k 666, HT5EVAzf 670, DYAn4XpA 676 | 10 | Gf2wYM2k |
+| 450525694 | `6ruHjSeQ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.29, HT5EVAzf 3.2409, DYAn4XpA 3.2469 | нет | Gf2wYM2k 683, HT5EVAzf 831, DYAn4XpA 839 | 156 | Gf2wYM2k |
+| 450526452 | `FQ4X5Zyq` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 3.1105, Gf2wYM2k 2.6848, DYAn4XpA 3.1147 | нет | HT5EVAzf 1353, Gf2wYM2k 1365, DYAn4XpA 1370 | 17 | HT5EVAzf |
+| 450527162 | `HdwhHdht` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 2.5038, DYAn4XpA 2.8226 | нет | Gf2wYM2k 1249, DYAn4XpA 1263 | 14 | Gf2wYM2k |
+| 450527597 | `9GGVdGxG` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 4.6589, DYAn4XpA 4.2511 | нет | Gf2wYM2k 368, DYAn4XpA 389 | 21 | Gf2wYM2k |
+| 450528534 | `HdwhHdht` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 2.2638, Gf2wYM2k 2.6251 | нет | DYAn4XpA 891, Gf2wYM2k 895 | 4 | DYAn4XpA |
+| 450550652 | `FL4UmMcs` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 2.8368, DYAn4XpA 2.3709, Gf2wYM2k 2.6145 | нет | HT5EVAzf 1016, DYAn4XpA 1020, Gf2wYM2k 1022 | 6 | HT5EVAzf |
+| 450551748 | `BMp3jDPE` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 4.8806, Gf2wYM2k 5.0194 | нет | DYAn4XpA 653, Gf2wYM2k 687 | 34 | DYAn4XpA |
+| 450554480 | `8cn4avN4` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 6.3443, DYAn4XpA 5.5357 | нет | Gf2wYM2k 851, DYAn4XpA 1384 | 533 | Gf2wYM2k |
+| 450555553 | `AMqJDyt4` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 4.9875, Gf2wYM2k 4.9125 | нет | DYAn4XpA 73, Gf2wYM2k 75 | 2 | DYAn4XpA |
+| 450556457 | `EGP1nZ7A` | DYAn4XpA, HT5EVAzf | DYAn4XpA 4.0392, HT5EVAzf 4.5964 | нет | DYAn4XpA 22, HT5EVAzf 88 | 66 | DYAn4XpA |
+| 450559291 | `BVMWcqRK` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.4415, HT5EVAzf 2.1162, DYAn4XpA 2.2867 | нет | Gf2wYM2k 1256, HT5EVAzf 1258, DYAn4XpA 1260 | 4 | Gf2wYM2k |
+| 450563547 | `41g3m5wZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.1818, DYAn4XpA 2.7744, HT5EVAzf 2.8439 | нет | Gf2wYM2k 1114, DYAn4XpA 1119, HT5EVAzf 1126 | 12 | Gf2wYM2k |
+| 450563893 | `3NbEzSgg` | Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.3143, HT5EVAzf 3.5302 | нет | Gf2wYM2k 62, HT5EVAzf 68 | 6 | Gf2wYM2k |
+| 450564246 | `AfUbRxQZ` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 1.7166, Gf2wYM2k 1.6509, HT5EVAzf 1.5214 | нет | DYAn4XpA 552, Gf2wYM2k 556, HT5EVAzf 563 | 11 | DYAn4XpA |
+| 450565398 | `TtB1Gze4` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 2.5199, HT5EVAzf 2.5648, Gf2wYM2k 2.7375 | нет | DYAn4XpA 390, HT5EVAzf 394, Gf2wYM2k 398 | 8 | DYAn4XpA |
+| 450565769 | `D7vohC4w` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 1.5903, HT5EVAzf 1.5112, DYAn4XpA 1.7874 | нет | Gf2wYM2k 73, HT5EVAzf 90, DYAn4XpA 118 | 45 | Gf2wYM2k |
+| 450765209 | `7dCbJXTA` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 1.2797, HT5EVAzf 1.4094, DYAn4XpA 1.2219 | нет | Gf2wYM2k 296, HT5EVAzf 316, DYAn4XpA 318 | 22 | Gf2wYM2k |
+| 450767652 | `Edxe1mAe` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 3.3882, Gf2wYM2k 3.4563 | нет | DYAn4XpA 246, Gf2wYM2k 248 | 2 | DYAn4XpA |
+| 450771439 | `oPAiAikW` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 4.7906, DYAn4XpA 5.0189 | нет | Gf2wYM2k 266, DYAn4XpA 277 | 11 | Gf2wYM2k |
+| 450772132 | `oPAiAikW` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.1972, DYAn4XpA 2.4886, HT5EVAzf 2.186 | нет | Gf2wYM2k 1657, DYAn4XpA 1659, HT5EVAzf 1668 | 11 | Gf2wYM2k |
+| 450772626 | `Gxoazs3H` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.136, HT5EVAzf 2.2992, DYAn4XpA 2.4093 | нет | Gf2wYM2k 914, HT5EVAzf 917, DYAn4XpA 921 | 7 | Gf2wYM2k |
+| 450772804 | `7jVD3WnR` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 3.1506, DYAn4XpA 2.917, HT5EVAzf 2.7324 | нет | Gf2wYM2k 498, DYAn4XpA 502, HT5EVAzf 506 | 8 | Gf2wYM2k |
+| 450773180 | `Ge3cA5kY` | DYAn4XpA, Gf2wYM2k | Gf2wYM2k 3.5376, DYAn4XpA 3.3069 | нет | Gf2wYM2k 687, DYAn4XpA 688 | 1 | Gf2wYM2k |
+| 450774179 | `88AmJzX1` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | Gf2wYM2k 2.6015, DYAn4XpA 2.6578, HT5EVAzf 2.5629 | нет | Gf2wYM2k 33, DYAn4XpA 56, HT5EVAzf 75 | 42 | Gf2wYM2k |
+| 450898631 | `CC5D6puF` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.5825, Gf2wYM2k 3.7981, HT5EVAzf 3.375 | нет | DYAn4XpA 706, Gf2wYM2k 714, HT5EVAzf 925 | 219 | DYAn4XpA |
+| 450903292 | `AHp2e4b2` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 2.1375, Gf2wYM2k 1.8576, DYAn4XpA 1.8715 | нет | HT5EVAzf 252, Gf2wYM2k 257, DYAn4XpA 261 | 9 | HT5EVAzf |
+| 450929381 | `ESC5ym7V` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.475, Gf2wYM2k 3.02, HT5EVAzf 3.2827 | нет | DYAn4XpA 166, Gf2wYM2k 186, HT5EVAzf 194 | 28 | DYAn4XpA |
+| 450933772 | `7qzph6zU` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 6.4343, Gf2wYM2k 5.2991 | нет | DYAn4XpA 758, Gf2wYM2k 760 | 2 | DYAn4XpA |
+| 450938635 | `CxfF3tvA` | DYAn4XpA, Gf2wYM2k | DYAn4XpA 2.3685, Gf2wYM2k 2.605 | нет | DYAn4XpA 1048, Gf2wYM2k 1058 | 10 | DYAn4XpA |
+| 450940145 | `HEtmfSgc` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 0, HT5EVAzf 0, Gf2wYM2k 0 | нет | DYAn4XpA 1089, HT5EVAzf 1098, Gf2wYM2k 1100 | 11 | DYAn4XpA |
+| 451388879 | `SPCXxcqX` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 1.3693, Gf2wYM2k 1.5571, DYAn4XpA 1.6039 | нет | HT5EVAzf 415, Gf2wYM2k 432, DYAn4XpA 436 | 21 | HT5EVAzf |
+| 451390928 | `4KLjGoYR` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 0.6746, HT5EVAzf 0.6141, Gf2wYM2k 0.5854 | нет | DYAn4XpA 54, HT5EVAzf 58, Gf2wYM2k 61 | 7 | DYAn4XpA |
+| 451409702 | `APLwmQEy` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.5613, Gf2wYM2k 4.1853, HT5EVAzf 3.9868 | нет | DYAn4XpA 1095, Gf2wYM2k 1098, HT5EVAzf 1102 | 7 | DYAn4XpA |
+| 451413885 | `Xs3oZwbH` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | HT5EVAzf 18.5941, Gf2wYM2k 19.0409, DYAn4XpA 21.46 | нет | HT5EVAzf 268, Gf2wYM2k 274, DYAn4XpA 280 | 12 | HT5EVAzf |
+| 451415220 | `5bKYTe4L` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 2.644, HT5EVAzf 2.7462, Gf2wYM2k 2.432 | нет | DYAn4XpA 236, HT5EVAzf 258, Gf2wYM2k 274 | 38 | DYAn4XpA |
+| 451416347 | `CLHfpxeL` | DYAn4XpA, Gf2wYM2k, HT5EVAzf | DYAn4XpA 3.0122, Gf2wYM2k 3.4149, HT5EVAzf 3.3507 | нет | DYAn4XpA 951, Gf2wYM2k 962, HT5EVAzf 970 | 19 | DYAn4XpA |
 | … ещё 44 случаев в `data/podbivka/kust_svod.json` | | | | | | | |
 
-**Доля случаев, где первым каждый:** .
+**Доля случаев, где первым каждый:** Gf2wYM2k -- 41 (39%), DYAn4XpA -- 39 (38%), HT5EVAzf -- 24 (23%).
+
+**Разница мест в блоке:** медиана 11, среднее 31.6, от 1 до 570 мест (случаев с местами 104).
+
+**Случаев, где покупали все трое:** 61; первым в них DYAn4XpA 22, Gf2wYM2k 21, HT5EVAzf 18.
 
 ## б. Уникальные сигналы каждого (минт без двух других в окне 1800 слотов)
 
