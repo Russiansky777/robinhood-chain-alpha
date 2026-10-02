@@ -20,6 +20,10 @@ on:
         description: "что искать в журнале службы (расширенное регулярное)"
         required: false
         default: "Traceback|Error|ошибк|обрыв|drop"
+      istochniki:
+        description: "карта {подпись: источник} -- включает вердикт классификатора (пусто -- шага нет)"
+        required: false
+        default: ""
 
 concurrency:
   group: bloom-signal-forensics
@@ -57,6 +61,23 @@ jobs:
             ARGS="$ARGS --sig $S"
           done
           python3 analysis/bloom_tx_dump.py $ARGS --out data/bloom_tx_raw.json
+
+      # ВЕРДИКТ КЛАССИФИКАТОРА -- ПО ТОМУ ЖЕ ДАМПУ, ОФЛАЙН (вопрос владельца
+      # 02.10: источник ПОКУПАТЕЛЬ или только УПОМЯНУТ). Шага нет, если карта
+      # подписей не передана: прогон остаётся тем, чем был. Сети здесь нет
+      # вовсе -- разбор идёт по уже скачанным ответам узла, --merge копит
+      # вердикт по порциям подписей.
+      - name: "Вердикт классификатора по дампу"
+        if: inputs.istochniki != ''
+        run: |
+          set -e
+          set -o pipefail
+          python3 analysis/c2_klassifikator_proverka.py --self-test | tail -1
+          test -s "${{ inputs.istochniki }}" || { echo "СБОЙ: карты подписей нет: ${{ inputs.istochniki }}"; exit 1; }
+          python3 analysis/c2_klassifikator_proverka.py \
+            --dump data/bloom_tx_raw.json \
+            --istochniki "${{ inputs.istochniki }}" \
+            --out data/klassifikator_proverka.json --merge
 
       - name: "SSH key"
         env:
@@ -101,6 +122,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for f in data/bloom_tx_raw.json data/bloom_seller_diag.json \
+                   data/klassifikator_proverka.json \
                    data/bloom_detector_log_tail.txt data/bloom_detector_log_hits.txt; do
             [ -f "$f" ] && git add "$f"
           done
