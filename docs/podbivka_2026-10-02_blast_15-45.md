@@ -186,8 +186,8 @@
 | адрес | SOL покупок в окне BLAST | файлы архива | n | среднее, п.п. | медиана, п.п. | в плюсе | толпа | проходит правило |
 |---|---|---|---|---|---|---|---|---|
 | `Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6` | 9.901186 | cand2 | 44 | +9.73 | +6.76 | 61% | 1.0 | **да** |
-| `Cimru76wtHmHbnHWPrDYvt51UqNNnX9GaDGUK4aoinzX` | 5.881304 | — | 0 | — | — | — | — | нет |
-| `55y7SRi21s2x6hS3RUoMTkbgt15jqk8X4J1QZceCK7QV` | 4.950593 | — | 0 | — | — | — | — | нет |
+| `Cimru76wtHmHbnHWPrDYvt51UqNNnX9GaDGUK4aoinzX` | 5.881304 | blast3 | 25 | -3.00 | -2.12 | 40% | 0.96 | нет |
+| `55y7SRi21s2x6hS3RUoMTkbgt15jqk8X4J1QZceCK7QV` | 4.950593 | blast3 | 4 | -10.50 | -1.63 | 25% | 1.0 | нет |
 
 ## 5. Сколько стоит прогнать метод по всем нашим сделкам за 7 суток
 
