@@ -95,10 +95,6 @@ on:
         description: "'1' -- вариант пула на долговечном nonce: по транзакции на сервис, только его чаевые (нужен созданный аккаунт nonce)"
         required: false
         default: "0"
-      avarii_snjat:
-        description: "снять аварии групп (список через запятую или ВСЕ) -- ТОЛЬКО по слову владельца; пусто -- только напечатать стоящие"
-        required: false
-        default: ""
       protokol_env:
         description: "'yes' -- напечатать значения флагов BLOOM_* и имена всех ключей env (только чтение, секреты не печатаются)"
         required: false
@@ -819,13 +815,30 @@ jobs:
               /home/bot/robinhood-chain-alpha/venv/bin/python \
               $CODE_DIR/bloom_exec_state.py --avarii'
           " 2>&1 | tail -40 | tee -a data/bloom_detector_deploy.txt
-          if [ -n "${{ inputs.avarii_snjat }}" ]; then
+          # СПИСОК СНЯТИЯ -- ФАЙЛОМ В ДЕРЕВЕ, А НЕ ВХОДОМ ПРОГОНА: у
+          # workflow_dispatch предел 25 входов, и он уже занят. Тот же
+          # порядок, что у правок групп: план лежит в data/, прогон его
+          # применяет, в отчёте видно, что именно сняли. Пустой список --
+          # ничего не снимаем.
+          SNJAT=$(python3 - <<'PY'
+          import json, pathlib
+          п = pathlib.Path("data/avarii_plan.json")
+          try:
+              д = json.loads(п.read_text(encoding="utf-8"))
+          except Exception:
+              д = {}
+          сп = д.get("snjat") or []
+          print(",".join(str(x).strip() for x in сп if str(x).strip()))
+          PY
+          )
+          echo "план снятия аварий: ${SNJAT:-(пусто)}" | tee -a data/bloom_detector_deploy.txt
+          if [ -n "$SNJAT" ]; then
             ssh -n $SSH_OPTS root@$TARGET_HOST "
               set -a; . $ENV_DIR/env; set +a
               su -s /bin/sh bot -c 'set -a; . $ENV_DIR/env; set +a; \
                 /home/bot/robinhood-chain-alpha/venv/bin/python \
                 $CODE_DIR/bloom_exec_state.py \
-                --avarija-snjat "${{ inputs.avarii_snjat }}" --kem "владелец"'
+                --avarija-snjat \"$SNJAT\" --kem \"владелец\"'
             " 2>&1 | tail -40 | tee -a data/bloom_detector_deploy.txt
           else
             echo "снятие аварий НЕ запрашивалось -- только чтение" \
