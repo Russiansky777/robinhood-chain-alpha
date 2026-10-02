@@ -226,11 +226,15 @@ def модель(сигнал: dict, ряд: list) -> dict:
             входы[f"N{n}"] = пок_после[n - 1]
             из_[f"N{n}_слотов"] = (пок_после[n - 1].get("block") or s0) - s0
     res = {}
+    # состояния пула на входе и на выходах: по ним ЛЮБОЙ билет и сдвиг цены считаются офлайн,
+    # без нового прохода архива (вопрос владельца 03.10 про билеты 1 и 3 и «сколько съедает сдвиг»)
+    состояния: dict = {"вход": {}, "выход": {}, "масштаб": масштаб}
     for имя, e_вх in входы.items():
         с_вх = ст(e_вх) if e_вх else None
         if not с_вх:
             continue
         x, y = с_вх
+        состояния["вход"][имя] = [x, y, e_вх.get("block")]
         for a_sol in БИЛЕТЫ:
             a = a_sol * масштаб
             if пул in XYK:
@@ -249,6 +253,7 @@ def модель(сигнал: dict, ряд: list) -> dict:
                 с_вых = ст(e_вых) if e_вых else None
                 if not с_вых:
                     continue
+                состояния["выход"][str(H)] = [с_вых[0], с_вых[1], e_вых.get("block")]
                 X, Y = с_вых[0] + вст_x, с_вых[1] - т
                 if Y <= 0:
                     continue
@@ -258,6 +263,7 @@ def модель(сигнал: dict, ряд: list) -> dict:
                     out = X * т / (Y + т) * (1 - fee)
                 res[f"{имя}|{a_sol}|{H}"] = round((out - a - ИЗДЕРЖКИ * масштаб) / a * 100, 3)
     из_["пп"] = res
+    из_["состояния"] = состояния
     из_["наценка_S1_пп"] = None
     return из_
 
@@ -387,6 +393,9 @@ def адреса_файла(путь: str) -> set:
     return из_
 
 
+ВСЕЛЕННАЯ = 0          # --vselennaya N: сито по всей вселенной архива, порог первых покупок -- N штук
+
+
 def прогон(день: str, часы: list, porog: float, окно: int, celi: set, метка: str,
            доп: set | None = None, porog_доп: float | None = None, ист: set | None = None,
            минты: set | None = None, не_sol: bool = False, окно_докупки: int | None = None,
@@ -400,6 +409,10 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     # «кто покупал тот же пул за 1…N слотов до нас»: кольцо последних покупок ВСЕХ пулов.
     # Дёшево: предфильтр и так достаёт poolId, block и трейдеров из строки; держим только N слотов.
     недавние: collections.deque = collections.deque()
+    # сито вселенной (--vselennaya): первые покупки ЛЮБОГО кошелька от porog SOL (котировка WSOL),
+    # правило окна докупки -- то же. Модель не считается, события не пишутся.
+    вс_счёт: dict = {}
+    вс_посл: dict = {}
     for a in доп | ист:
         адр.setdefault(a, {"группы": ["доп"]})
     наши_события, сигналы, цели_события, покупки_ист = [], [], [], []
@@ -498,6 +511,34 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
                             наши = наши + sorted(только_сигнал)
                         сг = р_sig.search(стр)
                         цель = bool(сг and сг.group(1) in celi)
+                        if ВСЕЛЕННАЯ:
+                            ам_в = р_action.search(стр)
+                            if not (ам_в and ам_в.group(1) == "buy" and блок):
+                                continue
+                            qм_в = р_qmint.search(стр)
+                            if not (qм_в and qм_в.group(1) == WSOL):
+                                continue
+                            км_в = р_qam.search(стр)
+                            try:
+                                кв_в = float(км_в.group(1)) if км_в else 0.0
+                            except ValueError:
+                                кв_в = 0.0
+                            if кв_в < porog:
+                                continue
+                            мм_в = р_mint.search(стр)
+                            кто_в = sorted(трейдеры)[0] if трейдеры else (sn.group(1) if sn else None)
+                            if not (мм_в and кто_в):
+                                continue
+                            кл_в = (кто_в, мм_в.group(1))
+                            пред_в = вс_посл.get(кл_в)
+                            if пред_в is None or блок - пред_в > (окно_докупки or 1800):
+                                вс_счёт[кто_в] = вс_счёт.get(кто_в, 0) + 1
+                            вс_посл[кл_в] = блок
+                            if len(вс_посл) > 1_500_000:        # память: дальше окна правило не смотрит
+                                гр_в = блок - (окно_докупки or 1800)
+                                for к_ in [k for k, v in вс_посл.items() if v < гр_в]:
+                                    del вс_посл[к_]
+                            continue
                         if перед_слотов and pid and блок:
                             ам = р_action.search(стр)
                             if ам and ам.group(1) == "buy":
@@ -668,6 +709,13 @@ def прогон(день: str, часы: list, porog: float, окно: int, cel
     import gzip  # noqa: PLC0415
     out = КОРЕНЬ / "data" / "podbivka" / "arhiv_den" / f"{метка}.json.gz"   # > 100 МБ несжатым -- предел GitHub
     out.parent.mkdir(parents=True, exist_ok=True)
+    if ВСЕЛЕННАЯ:
+        отобр = {k: v for k, v in вс_счёт.items() if v >= ВСЕЛЕННАЯ}
+        out.write_bytes(gzip.compress(json.dumps(
+            {"день": день, "часы": часы, "порог_sol": porog, "вселенная_мин": ВСЕЛЕННАЯ, "счёт": счёт,
+             "кошельков_всего": len(вс_счёт), "кошельков_отобрано": len(отобр), "вселенная": отобр},
+            ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6))
+        return out
     out.write_bytes(gzip.compress(json.dumps({"день": день, "часы": часы, "порог_sol": porog, "окно_слотов": окно, "перед_слотов": перед_слотов, "счёт": счёт,
                                "наши_события": наши_события, "сигналы": сигналы, "цели": цели_события,
                                "покупки_ист": покупки_ист, "ленты_минтов": ленты_минтов,
@@ -689,6 +737,9 @@ def main() -> int:
     р.add_argument("--minty", default="", help="через запятую: минты, все события которых пишутся целиком")
     р.add_argument("--istochniki", default="", help="через запятую: адреса с отдельным порогом сигнала --porog-dop")
     р.add_argument("--porog-dop", type=float, default=None, help="порог сигнала для --istochniki, SOL")
+    р.add_argument("--vselennaya", type=int, default=0,
+                   help="сито по всей вселенной архива: писать кошельки с не меньше N первых покупок от --porog "
+                        "(модель и события не считаются)")
     р.add_argument("--pered", type=int, default=0,
                    help="писать в сигнал, кто покупал тот же пул за 1…N слотов до нас (0 -- не писать)")
     р.add_argument("--bilety", default="0.3,0.5", help="билеты модели, SOL, через запятую (pyg9: 0.3,0.5,1,3)")
@@ -706,6 +757,8 @@ def main() -> int:
     БЕЗ_АДРЕСОВ = а.bez_adresov
     ПОДПИСАНТ = а.podpisant
     БЕЗ_СОБЫТИЙ = а.bez_sobytij
+    global ВСЕЛЕННАЯ                 # noqa: PLW0603
+    ВСЕЛЕННАЯ = а.vselennaya
     t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
     часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k)) for k in range(а.chasov + 1)]  # +1 час хвоста окна
     celi = set(json.loads(Path(а.celi).read_text(encoding="utf-8"))) if а.celi else set()
