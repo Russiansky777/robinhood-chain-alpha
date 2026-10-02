@@ -234,6 +234,17 @@ jobs:
           # она видит сразу и до траты денег.
           "$PY" check_workflow_bash.py --self-test
           python3 check_workflow_bash.py ../.github/workflows
+          # ХОСТОВЫЕ ТАЙМЕРЫ. Самопроверка установщика проверяет не только текст
+          # юнитов, но и ПРОВОДКУ в прогонах: что в деплое продавца строка ключа
+          # кошелька действительно переносится, что в этом деплое установщик
+          # зовётся, и что прогон живучести забирает выгрузку с хоста. Здесь она
+          # идёт на бегунке, где ветка на месте -- на хосте этих файлов нет и
+          # часть проверок там честно помечается пропуском.
+          # БЕЗ | tail: у шага нет pipefail, и конвейер отдал бы код tail, то
+          # есть ноль при провалившейся самопроверке -- ровно тот тихий зелёный,
+          # который мы здесь и ловим.
+          "$PY" ../deploy/hostovye_tajmery.py --self-test
+          "$PY" ../deploy/zhivuchest_na_hoste.py --self-test
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -1128,6 +1139,97 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $STATE_DIR/decisions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
           echo "--- позиций в журнале (должно быть 0: покупать нечем) ---" | tee -a data/bloom_detector_deploy.txt
           ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $STATE_DIR/positions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
+
+      - name: "ХОСТОВЫЕ ТАЙМЕРЫ: три работы по часам хоста, а не по расписанию GitHub"
+        # ЗАЧЕМ, И ПОВОД ИЗМЕРЕН. За ночь 01->02.10 GitHub пропустил ПЯТЬ
+        # назначенных прогонов учёта, и таблица полосы отставала на шесть часов.
+        # Два cron-а в час (ledger_hourly.yml) беду уменьшили, но не убрали: оба
+        # стоят в одной очереди одного планировщика. Таймер systemd на хосте
+        # стоит в своей, а пропущенный из-за перезагрузки запуск догоняет сам.
+        #
+        # ПОЧЕМУ ШАГ ЗДЕСЬ, А НЕ НОВЫМ ПРОГОНОМ: правило 12 владельца -- новых
+        # workflow не заводить. И почему в деплое детектора, а не продавца: у
+        # workflow_dispatch предел 25 входов, у продавца он не исчерпан, а
+        # установка таймеров входа не требует вовсе -- она идемпотентна и ничего
+        # не покупает, поэтому идёт каждым деплоем без отдельного флага.
+        #
+        # ЧЕГО ХОСТ НЕ УМЕЕТ, И ЭТО НАЗВАНО, А НЕ ОБОЙДЕНО: хост не рабочий клон
+        # нашей ветки и ПУШИТЬ НА ВЕТКУ НЕ МОЖЕТ -- токена записи у него нет, и
+        # заводить его без слова владельца нельзя. Поэтому таймер делает РАБОТУ и
+        # кладёт результат в файл, а копия на ветку приезжает прогоном живучести
+        # (run_vps_health_nl.yml) -- он с хоста файлы и так забирает.
+        run: |
+          set -e
+          set -o pipefail
+          TAJM_DIR=/home/bot/host_tajmery
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            install -d -o bot -g bot -m 755 $TAJM_DIR $TAJM_DIR/uchet $TAJM_DIR/uchet/analysis $TAJM_DIR/uchet/data $TAJM_DIR/vygruzki $TAJM_DIR/zhivuchest
+            ls -ld $TAJM_DIR
+          "
+          # ДОСТАВКА СО СВЕРКОЙ sha256 И БЕЗ ЛИШНЕЙ ПЕРЕЗАПИСИ -- как у кода
+          # служб: совпало по сумме, значит mtime не трогаем.
+          # Каталог учёта -- КОРЕНЬ для solana_ledger_run.py: он считает свой
+          # data/ как ../data от себя, поэтому модуль лежит в uchet/analysis.
+          for PARA in "deploy/hostovye_tajmery.py $TAJM_DIR/hostovye_tajmery.py" \
+                      "deploy/zhivuchest_na_hoste.py $TAJM_DIR/zhivuchest_na_hoste.py" \
+                      "deploy/checks/sdelki_polosy_vygruzka.py $TAJM_DIR/sdelki_polosy_vygruzka.py" \
+                      "analysis/solana_ledger_run.py $TAJM_DIR/uchet/analysis/solana_ledger_run.py" \
+                      "data/leader_regions.json $TAJM_DIR/leader_regions.json" \
+                      "data/solana_dbot_realized_ledger.json $TAJM_DIR/uchet/data/solana_dbot_realized_ledger.json"; do
+            OTKUDA=$(echo "$PARA" | cut -d' ' -f1)
+            KUDA=$(echo "$PARA" | cut -d' ' -f2)
+            [ -s "$OTKUDA" ] || { echo "SBOY: lokalnyj $OTKUDA pust ili otsutstvuet"; exit 1; }
+            LOC=$(sha256sum "$OTKUDA" | cut -d' ' -f1)
+            REM=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $KUDA 2>/dev/null | cut -d' ' -f1" || true)
+            if [ "$LOC" = "$REM" ]; then echo "$KUDA: uzhe takoj ($LOC), ne perepisan"; continue; fi
+            # BEZ -n: on podmenjaet stdin na /dev/null, i na host uehala by pustota.
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $KUDA" < "$OTKUDA"
+            NEW=$(ssh -n $SSH_OPTS root@$TARGET_HOST "chown bot:bot $KUDA && chmod 644 $KUDA && sha256sum $KUDA | cut -d' ' -f1")
+            [ "$LOC" = "$NEW" ] || { echo "SBOY: sha256 rashoditsja dlja $KUDA ($LOC vs $NEW)"; exit 1; }
+            echo "dostavlen $KUDA sha256 $NEW"
+          done
+          # КЭШ ЦЕПИ -- ТОЛЬКО ЗАСЕВ, И НИКОГДА ПОВЕРХ. Хост наращивает свой
+          # кэш каждый час; копия в ветке её растит прогон GitHub, и перезапись
+          # поверх выбросила бы работу того, кто отстал меньше. Холодный старт
+          # без засева стоил бы кредитов Helius на пересбор 2.5 тысяч транзакций.
+          if ssh -n $SSH_OPTS root@$TARGET_HOST "test -s $TAJM_DIR/uchet/data/chain_tx_cache.json"; then
+            echo "kesh cepi na hoste uzhe est -- ne trogaem"
+          else
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $TAJM_DIR/uchet/data/chain_tx_cache.json" < data/chain_tx_cache.json
+            ssh -n $SSH_OPTS root@$TARGET_HOST "chown bot:bot $TAJM_DIR/uchet/data/chain_tx_cache.json && wc -c < $TAJM_DIR/uchet/data/chain_tx_cache.json"
+            echo "kesh cepi zasejan iz vetki"
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $TAJM_DIR"
+          # САМОПРОВЕРКИ НА ХОСТЕ ТЕМ ПИТОНОМ, КОТОРЫМ ПОЙДЁТ ТАЙМЕР: другой
+          # питон означал бы другие версии и другое поведение на тех же данных.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/hostovye_tajmery.py --self-test
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/zhivuchest_na_hoste.py --self-test
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/sdelki_polosy_vygruzka.py --self-test
+          " 2>&1 | tee -a data/bloom_detector_deploy.txt
+          # БЕЗ tail: обрезанный хвост самопроверки прячет ИМЕННО ту строку, из-за
+          # которой она упала, а pipefail у шага стоит -- падение мы увидим, но
+          # без причины. Полный вывод в отчёте дороже его краткости.
+          # УСТАНОВКА ОТ root: юниты лежат в /etc/systemd/system. Установщик сам
+          # откажется, если часы хоста не UTC -- 06:00 в чужом поясе выстрелит не
+          # в 06:00Z, и окно суток поедет молча.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $TAJM_DIR/hostovye_tajmery.py --ustanovit --vkljuchit" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
+          # ПЕРВЫЙ НАСТОЯЩИЙ ПРОГОН ЖИВУЧЕСТИ СРАЗУ, А НЕ ЖДАТЬ ТИКА: иначе
+          # неизвестно, пишет ли таймер файл вообще. Ненулевой код службы здесь
+          # ОЖИДАЕМ -- он означает тревогу в докладе, а не сломанный таймер,
+          # поэтому судим по наличию файла.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl start bloom-zhivuchest-chas.service" || \
+            echo "zhivuchest otdala nenulevoj kod -- smotrim fajl doklada"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "test -s $TAJM_DIR/zhivuchest/zhivuchest.json" || {
+            echo "SBOY: tajmer zhivuchesti ne napisal fajl doklada"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u bloom-zhivuchest-chas -n 40 --no-pager"
+            exit 1; }
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers bloom-uchet-chas.timer bloom-zhivuchest-chas.timer bloom-vygruzka-sutki.timer --no-pager" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
+          python3 deploy/checks/bez_klyuchey_v_otchete.py data/bloom_detector_deploy.txt
 
       - name: "Коммит отчёта"
         if: always()

@@ -163,6 +163,13 @@ jobs:
           "$PY" bloom_detector.py --self-test
           "$PY" check_shell_ascii.py --self-test
           python3 check_shell_ascii.py ../.github/workflows ../deploy
+          # ПЕРЕНОС СТРОКИ EXEC_WALLET_KEY ПРИ ПОЛНОЙ ПЕРЕЗАПИСИ env ПРОВЕРЯЕТСЯ
+          # ЗДЕСЬ, А НЕ ГЛАЗАМИ. Самопроверка установщика хостовых таймеров читает
+          # ЭТОТ прогон и падает, если имени EXEC_WALLET_KEY нет в отборе прежних
+          # значений: именно так оно и было до 02.10 -- разбор строки стоял, а
+          # grep её не пропускал, и ключ при перезаписи пропадал.
+          "$PY" ../deploy/hostovye_tajmery.py --self-test
+          "$PY" ../deploy/zhivuchest_na_hoste.py --self-test
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -318,13 +325,40 @@ jobs:
           echo "ключей в env до правки: $(wc -l < "$RUNNER_TEMP/env_keys_before.txt")"
           cat "$RUNNER_TEMP/env_keys_before.txt" | tr "\n" " "
           echo ""
+          # ВТОРОЙ СНИМОК: ИМЕНА КЛЮЧЕЙ, У КОТОРЫХ ЗНАЧЕНИЕ НЕ ПУСТО. Гейт ниже
+          # сверял только МНОЖЕСТВО ИМЁН, и строка EXEC_WALLET_KEY= (имя есть,
+          # значение пустое) прошла бы его насквозь: имя на месте, а ключа нет.
+          # Для пути Jupiter и для подписи полосы это ровно та же потеря денег,
+          # что и исчезнувшая строка, только незаметная. Отбирается по "=" плюс
+          # ОДИН любой знак; сам знак остаётся в файле на бегунке и в вывод шага
+          # не идёт -- печатается только счётчик.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=.' $ENV_DIR/env | sed 's/=.\$//' | sort -u" > "$RUNNER_TEMP/env_znachenija_before.txt"
+          S_ZNACHENIEM=$(wc -l < "$RUNNER_TEMP/env_znachenija_before.txt")
+          echo "из них с непустым значением: $S_ZNACHENIEM"
+          # ПУСТОЙ СНИМОК -- ЭТО НЕ "ВСЁ ХОРОШО", А НЕПРОЧИТАННОЕ СОСТОЯНИЕ.
+          # Удалённый grep при пустой выборке отдаёт код 1, а sort после него --
+          # ноль, поэтому ssh вернул бы успех с пустым файлом, и гейт ниже прошёл
+          # бы, ничего не сравнив. Тихого зелёного гейта быть не должно.
+          [ "$S_ZNACHENIEM" -gt 0 ] || {
+            echo "ДЕПЛОЙ ОТМЕНЁН: в env на хосте не прочитано ни одного непустого значения."
+            echo "Либо файл не читается, либо он пуст -- в обоих случаях правка env запрещена."
+            exit 1; }
 
       - name: "Прежние боевые настройки с хоста (перенести, а не затереть)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         run: |
           set -e
-          # Читаем только два значения и только их. Ключи не печатаются.
-          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL|TELEGRAM_LOG_CHAT_ID|JUPITER_API_KEY|BLOOM_OWN_SEND|BLOOM_OWN_SEND_LIVE|BLOOM_OWN_SEND_SOL|BLOOM_SENDER_REGION)=' $ENV_DIR/env || true")
+          # Читаем ТОЛЬКО перечисленные ниже имена и ничего больше. Значения в
+          # журнал не идут: ключи маскируются, у флагов печатается само значение.
+          # (Прежняя строка здесь говорила "только два значения" -- их давно
+          # девять, и неверный комментарий хуже отсутствующего.)
+          # EXEC_WALLET_KEY СТОИТ В ЭТОМ ЖЕ grep, И ЭТО НЕ УКРАШЕНИЕ. Ниже уже
+          # лежал разбор EXEC_WALLET_KEY= из $PREV, но самого имени в отборе НЕ
+          # БЫЛО: grep его не пропускал, EXEC_KEY_PREV выходил пустым ВСЕГДА, и
+          # перезапись без секрета теряла строку ключа ровно так, как комментарий
+          # ниже обещал не терять. Проверка на это -- в самопроверке
+          # deploy/hostovye_tajmery.py, и она падает именно на пустом отборе.
+          PREV=$(ssh -n $SSH_OPTS root@$TARGET_HOST "grep -E '^(BLOOM_LIVE_BUY|BLOOM_BUY_SOL|TELEGRAM_LOG_CHAT_ID|JUPITER_API_KEY|EXEC_WALLET_KEY|BLOOM_OWN_SEND|BLOOM_OWN_SEND_LIVE|BLOOM_OWN_SEND_SOL|BLOOM_SENDER_REGION)=' $ENV_DIR/env || true")
           LB=$(echo "$PREV" | sed -n 's/^BLOOM_LIVE_BUY=//p' | tail -1)
           BS=$(echo "$PREV" | sed -n 's/^BLOOM_BUY_SOL=//p' | tail -1)
           LG=$(echo "$PREV" | sed -n 's/^TELEGRAM_LOG_CHAT_ID=//p' | tail -1)
@@ -358,10 +392,19 @@ jobs:
           # НОВОГО кошелька, который никогда не пополняется, а секрет
           # репозитория владелец удаляет -- значит хост остаётся ЕДИНСТВЕННЫМ
           # местом, где этот ключ есть. Перезапись env без переноса стёрла бы
-          # его молча, как уже стирала ключ Jupiter V2. Длина, не значение.
+          # его молча, как уже стирала ключ Jupiter V2.
+          #
+          # ПЕЧАТАЕТСЯ ТОЛЬКО ИМЯ И ФАКТ. Даже длина теперь не печатается
+          # (слово владельца 02.10): длина base58-ключа -- это подсказка о его
+          # виде, а знать её прогону незачем. Маскировка стоит ДО всякого вывода:
+          # если значение случайно попадёт в строку шага, GitHub его затрёт.
           EK=$(echo "$PREV" | sed -n 's/^EXEC_WALLET_KEY=//p' | tail -1)
-          echo "прежний EXEC_WALLET_KEY: длина ${#EK}"
-          echo "::add-mask::$EK"
+          if [ -n "$EK" ]; then
+            echo "::add-mask::$EK"
+            echo "EXEC_WALLET_KEY: строка на хосте есть и будет ПЕРЕНЕСЕНА, если секрета в прогоне нет"
+          else
+            echo "EXEC_WALLET_KEY: строки на хосте нет -- переносить нечего"
+          fi
           echo "EXEC_KEY_PREV=$EK" >> $GITHUB_ENV
 
       - name: "env: бэкап перед правкой, затем запись 600 root:root"
@@ -379,8 +422,20 @@ jobs:
           TELEGRAM_LIVE_TEST: ${{ github.event.inputs.telegram_live_test || '1' }}
           VIA_JUPITER: ${{ github.event.inputs.via_jupiter || '0' }}
           EXEC_WALLET_KEY: ${{ secrets.EXEC_WALLET_KEY || env.EXEC_KEY_PREV }}
+          # НЕ ЗНАЧЕНИЕ, А ОТВЕТ ДА/НЕТ: по нему шаг говорит, откуда взялся ключ.
+          # Без этого в журнале не отличить "ключ из секрета" от "ключ перенесён
+          # с хоста", а это два разных состояния стенда.
+          EXEC_KEY_IZ_SEKRETA: ${{ secrets.EXEC_WALLET_KEY != '' }}
         run: |
           set -e
+          # ОТКУДА ВЗЯЛСЯ EXEC_WALLET_KEY -- ИМЯ И ФАКТ, значение не печатается.
+          if [ -z "$EXEC_WALLET_KEY" ]; then
+            echo "EXEC_WALLET_KEY: нет ни в секрете, ни на хосте -- строка не будет записана"
+          elif [ "$EXEC_KEY_IZ_SEKRETA" = "true" ]; then
+            echo "EXEC_WALLET_KEY: взят из секрета прогона"
+          else
+            echo "EXEC_WALLET_KEY: секрета в прогоне нет -- прежняя строка ПЕРЕНЕСЕНА с хоста как есть"
+          fi
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             f=$ENV_DIR/env
             if [ -f \"\$f\" ]; then cp -a \"\$f\" \"\$f.bak.\$(date +%s)\"; echo 'бэкап env сделан'; fi
@@ -480,7 +535,19 @@ jobs:
           set -e
           set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort -u" > "$RUNNER_TEMP/env_keys_after.txt"
+          # ВТОРАЯ ПОЛОВИНА ГЕЙТА: КЛЮЧ, КОТОРЫЙ ОСТАЛСЯ ИМЕНЕМ, НО ОПУСТЕЛ.
+          # Сверка только имён пропускала строку вида EXEC_WALLET_KEY= насквозь:
+          # имя на месте, значения нет, путь Jupiter и подпись полосы мертвы, а
+          # гейт говорит "все ключи env на месте". Именно этот случай и просил
+          # поймать владелец 02.10. Печатаются только ИМЕНА.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=.' $ENV_DIR/env | sed 's/=.\$//' | sort -u" > "$RUNNER_TEMP/env_znachenija_after.txt"
           LOST=$(comm -23 "$RUNNER_TEMP/env_keys_before.txt" "$RUNNER_TEMP/env_keys_after.txt" | tr "\n" " ")
+          comm -23 "$RUNNER_TEMP/env_znachenija_before.txt" "$RUNNER_TEMP/env_znachenija_after.txt" \
+            > "$RUNNER_TEMP/env_opusteli.txt"
+          # Пересечение с именами ПОСЛЕ правки: ключ, пропавший целиком, о нём
+          # говорит первая ветка, и дважды его называть незачем. Здесь остаются
+          # ровно те, чьё ИМЯ выжило, а ЗНАЧЕНИЕ ушло.
+          OBESCENENY=$(comm -12 "$RUNNER_TEMP/env_opusteli.txt" "$RUNNER_TEMP/env_keys_after.txt" | tr "\n" " ")
           if [ -n "$(echo "$LOST" | tr -d " ")" ]; then
             echo "ДЕПЛОЙ ОТМЕНЁН: правка env потеряла ключи: $LOST"
             # Возврат к известному состоянию, а не оставить полуфайл: бэкап
@@ -496,7 +563,23 @@ jobs:
             "
             exit 1
           fi
-          echo "гейт пройден: все ключи env на месте ($(wc -l < "$RUNNER_TEMP/env_keys_after.txt"))"
+          if [ -n "$(echo "$OBESCENENY" | tr -d " ")" ]; then
+            echo "ДЕПЛОЙ ОТМЕНЁН: ключи ОБЕСЦЕНЕНЫ -- имя на месте, значение ушло: $OBESCENENY"
+            echo "Это та же потеря, что исчезнувшая строка, только незаметная:"
+            echo "EXEC_WALLET_KEY= означает 'ключ есть, но пустой', и путь продажи"
+            echo "через Jupiter считал бы себя готовым."
+            ssh -n $SSH_OPTS root@$TARGET_HOST "
+              set -e
+              newest=\$(ls -1t $ENV_DIR/env.bak.* 2>/dev/null | head -1)
+              [ -n \"\$newest\" ] || { echo 'бэкапа нет -- восстановить нечем'; exit 1; }
+              cp -a \"\$newest\" $ENV_DIR/env
+              chown root:root $ENV_DIR/env
+              chmod 600 $ENV_DIR/env
+              echo \"env восстановлен из \$newest\"
+            "
+            exit 1
+          fi
+          echo "гейт пройден: все ключи env на месте ($(wc -l < "$RUNNER_TEMP/env_keys_after.txt")), из них с непустым значением $(wc -l < "$RUNNER_TEMP/env_znachenija_after.txt")"
 
       - name: "Зависимость solders в venv хоста (только для пути Jupiter)"
         if: ${{ github.event.inputs.via_jupiter == '1' }}

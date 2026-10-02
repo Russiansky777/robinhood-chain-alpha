@@ -30,7 +30,6 @@ import argparse
 import json
 import os
 import subprocess  # noqa: S404 -- только systemctl show, только чтение
-import sys
 import time
 
 # Те же пять служб, что перечисляет прогон живучести. Список держится рядом с
