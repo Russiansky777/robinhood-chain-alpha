@@ -1,4 +1,4 @@
-progon 173, 2026-10-02T19:19:27Z
+progon 174, 2026-10-02T19:21:36Z
   "slippage_pct": 35.0,
   "priority_fee": 0.001,
   "processor_tip": 0.001,
@@ -43,12 +43,12 @@ progon 173, 2026-10-02T19:19:27Z
       "api_error_last_ts": 1790381356.4951322
     },
     "day_pnl": {
-      "realized_sol": 0.158166192,
-      "spent_sol": -0.022203848,
+      "realized_sol": 0.174452181,
+      "spent_sol": -0.048469616,
       "buys": 0,
-      "sells": 102,
+      "sells": 103,
       "tz_unavailable": false,
-      "updated_utc": "2026-10-02T19:08:04Z"
+      "updated_utc": "2026-10-02T19:21:42Z"
     },
     "bloom_request_budget": {
       "limit_week": 10000,
@@ -59,9 +59,56 @@ progon 173, 2026-10-02T19:19:27Z
     }
   }
 }
-sh: 1: .: cannot open /etc/bloom-executor/env: Permission denied
+{
+  "файл": "/home/bot/bloom_executor_live_data/avarii_grupp.json",
+  "стоят": {
+    "cand1_03": {
+      "группа": "cand1_03",
+      "признак": "а",
+      "что": "2 позиции подряд закрыты без продажи или с итогом -100 %",
+      "число": "сделки lane-own-2mbbw3Gkuv6guD3JKCWFVFJ4bqh2S7nyt82PKckR, lane-own-5wJqH2cu4nt7kb63BiWF77eqUdoF9cd8w4cdaFmq",
+      "поставлена_utc": "2026-10-02T19:08:24Z",
+      "сутки": "20261002",
+      "снята": false,
+      "снята_кем": null,
+      "снята_utc": null
+    },
+    "cand1_05": {
+      "группа": "cand1_05",
+      "признак": "а",
+      "что": "2 позиции подряд закрыты без продажи или с итогом -100 %",
+      "число": "сделки lane-own-2da4ZfopzuNvm1yCDNpaHCu8F66EuLh1CoMzMzQy, lane-own-VPVtkZsHZsRhhy8jZpcCQD5Jfgp16R9wqveUm68Q",
+      "поставлена_utc": "2026-10-02T19:13:15Z",
+      "сутки": "20261002",
+      "снята": false,
+      "снята_кем": null,
+      "снята_utc": null
+    },
+    "cand1": {
+      "группа": "cand1",
+      "признак": "а",
+      "что": "2 последние позиции закрыты без продажи или с итогом -100 %",
+      "число": "сделки lane-own-2mPm8P27g6Q2FsrMvushNS7QWd9xgpAYU3FmGY2R, lane-own-M2PnwkcpWEzDfYLXTbC1g6ndVd2EB5KZN6WjmSzU",
+      "поставлена_utc": "2026-10-02T19:18:43Z",
+      "сутки": "20261002",
+      "снята": false,
+      "снята_кем": null,
+      "снята_utc": null
+    }
+  }
+}
 план снятия аварий: batch5,cand1,cand1_03,cand1_05,cand2,cand3,lane_s0,leader,sniper_src
-sh: 1: .: cannot open /etc/bloom-executor/env: Permission denied
+{"стояли": ["cand1", "cand1_03", "cand1_05"], "снимаем": ["batch5", "cand1", "cand1_03", "cand1_05", "cand2", "cand3", "lane_s0", "leader", "sniper_src"]}
+batch5: НЕ снята (аварии этой группы не стоит)
+cand1: снята (ок)
+cand1_03: снята (ок)
+cand1_05: снята (ок)
+cand2: НЕ снята (аварии этой группы не стоит)
+cand3: НЕ снята (аварии этой группы не стоит)
+lane_s0: НЕ снята (аварии этой группы не стоит)
+leader: НЕ снята (аварии этой группы не стоит)
+sniper_src: НЕ снята (аварии этой группы не стоит)
+{"осталось_стоять": []}
   "balance_sol": 0.0,
   "min_balance_sol": 0.3,
   "dry_positions": 0,
@@ -74,7 +121,7 @@ sh: 1: .: cannot open /etc/bloom-executor/env: Permission denied
     "checked": 40,
     "window_h": 24.0,
     "boundary_from": "окно",
-    "boundary_utc": "2026-10-01T19:20:16Z",
+    "boundary_utc": "2026-10-01T19:22:26Z",
     "recent": [],
     "recent_count": 0,
     "older_count": 29,
@@ -92,12 +139,12 @@ sh: 1: .: cannot open /etc/bloom-executor/env: Permission denied
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 192390,
+      "v2": 192551,
       "unreadable": 0
     },
     "positions": {
       "v1": 0,
-      "v2": 4335,
+      "v2": 4364,
       "unreadable": 0
     },
     "mixed": false
@@ -117,7 +164,7 @@ sh: 1: .: cannot open /etc/bloom-executor/env: Permission denied
 режим: live, вердикт: старт заблокирован, причин 1
 кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.0 SOL при пороге 0.3
 чужая активность: известно=True, свежих за 24.0 ч 0, прежних 29 (самая свежая 2026-10-01T19:11:08Z)
-граница чужой активности: окно (2026-10-01T19:20:16Z)
+граница чужой активности: окно (2026-10-01T19:22:26Z)
 позиции: dry-run 0, настоящих открытых 0
   БЛОКЕР: баланс 0.0000 SOL ниже порога 0.3
   примечание: у кошелька есть прежняя история: 29 сделок старше окна, самая свежая из них 2026-10-01T19:11:08Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
@@ -263,20 +310,20 @@ bloom-uchet-chas.timer: is-enabled=enabled
 bloom-zhivuchest-chas.timer: is-enabled=enabled
 bloom-vygruzka-sutki.timer: is-enabled=enabled
 bloom-uborshchik-chas.timer: is-enabled=enabled
-NEXT                             LEFT LAST                            PASSED UNIT                          ACTIVATES
-Fri 2026-10-02 21:23:00 CEST 2min 37s Fri 2026-10-02 20:23:01 CEST 57min ago bloom-uchet-chas.timer        bloom-uchet-chas.service
-Fri 2026-10-02 21:38:00 CEST    17min Fri 2026-10-02 20:38:01 CEST 42min ago bloom-zhivuchest-chas.timer   bloom-zhivuchest-chas.service
-Fri 2026-10-02 21:44:00 CEST    23min Fri 2026-10-02 21:14:01 CEST  6min ago bloom-stroka-balansov.timer   bloom-stroka-balansov.service
-Fri 2026-10-02 21:53:00 CEST    32min Fri 2026-10-02 20:53:01 CEST 27min ago bloom-uborshchik-chas.timer   bloom-uborshchik-chas.service
-Fri 2026-10-02 22:10:00 CEST    49min Fri 2026-10-02 21:10:01 CEST 10min ago bloom-samoproverka-chas.timer bloom-samoproverka-chas.service
-Sat 2026-10-03 08:00:00 CEST      10h -                                    - bloom-vygruzka-sutki.timer    bloom-vygruzka-sutki.service
+NEXT                          LEFT LAST                            PASSED UNIT                          ACTIVATES
+Fri 2026-10-02 21:23:00 CEST   27s Fri 2026-10-02 20:23:01 CEST 59min ago bloom-uchet-chas.timer        bloom-uchet-chas.service
+Fri 2026-10-02 21:38:00 CEST 15min Fri 2026-10-02 20:38:01 CEST 44min ago bloom-zhivuchest-chas.timer   bloom-zhivuchest-chas.service
+Fri 2026-10-02 21:44:00 CEST 21min Fri 2026-10-02 21:14:01 CEST  8min ago bloom-stroka-balansov.timer   bloom-stroka-balansov.service
+Fri 2026-10-02 21:53:00 CEST 30min Fri 2026-10-02 20:53:01 CEST 29min ago bloom-uborshchik-chas.timer   bloom-uborshchik-chas.service
+Fri 2026-10-02 22:10:00 CEST 47min Fri 2026-10-02 21:10:01 CEST 12min ago bloom-samoproverka-chas.timer bloom-samoproverka-chas.service
+Sat 2026-10-03 08:00:00 CEST   10h -                                    - bloom-vygruzka-sutki.timer    bloom-vygruzka-sutki.service
 
 6 timers listed.
 Pass --all to see loaded but inactive timers, too.
-NEXT                             LEFT LAST                            PASSED UNIT                        ACTIVATES
-Fri 2026-10-02 21:23:00 CEST 2min 36s Fri 2026-10-02 20:23:01 CEST 57min ago bloom-uchet-chas.timer      bloom-uchet-chas.service
-Fri 2026-10-02 21:38:00 CEST    17min Fri 2026-10-02 20:38:01 CEST 42min ago bloom-zhivuchest-chas.timer bloom-zhivuchest-chas.service
-Sat 2026-10-03 08:00:00 CEST      10h -                                    - bloom-vygruzka-sutki.timer  bloom-vygruzka-sutki.service
+NEXT                          LEFT LAST                            PASSED UNIT                        ACTIVATES
+Fri 2026-10-02 21:23:00 CEST   27s Fri 2026-10-02 20:23:01 CEST 59min ago bloom-uchet-chas.timer      bloom-uchet-chas.service
+Fri 2026-10-02 21:38:00 CEST 15min Fri 2026-10-02 20:38:01 CEST 44min ago bloom-zhivuchest-chas.timer bloom-zhivuchest-chas.service
+Sat 2026-10-03 08:00:00 CEST   10h -                                    - bloom-vygruzka-sutki.timer  bloom-vygruzka-sutki.service
 
 3 timers listed.
 Pass --all to see loaded but inactive timers, too.
