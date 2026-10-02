@@ -56,7 +56,7 @@ def списки() -> dict:
         из_["копировщики"] = {}
     try:
         о = json.loads((П / "cand2_otbor.json").read_text(encoding="utf-8"))
-        из_["cand2_отбор"] = {a: "прошёл отбор cand2" for a, v in (о.get("адресов") or {}).items()
+        из_["cand2_отбор"] = {a: "прошёл отбор cand2" for a, v in (о.get("ряды") or {}).items()
                               if (v or {}).get("прошёл_отбор")}
     except FileNotFoundError:
         из_["cand2_отбор"] = {}

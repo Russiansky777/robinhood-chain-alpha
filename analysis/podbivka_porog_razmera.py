@@ -17,6 +17,7 @@ import calendar
 import glob
 import gzip
 import json
+import re
 import statistics
 import sys
 import time
@@ -38,7 +39,10 @@ N_МИН = 20                                     # меньше -- писать
 
 def окно(с: dict, f: str) -> bool:
     """Сутки файла без первого «разгонного» часа -- как в отборе cand1 / cand2."""
-    d0 = calendar.timegm(time.strptime(Path(f).name.split("_")[1][:13], "%Y-%m-%dT%H")) + 3600
+    м = re.search(r"\d{4}-\d{2}-\d{2}T\d{2}", Path(f).name)
+    if not м:
+        return False
+    d0 = calendar.timegm(time.strptime(м.group(0), "%Y-%m-%dT%H")) + 3600
     return d0 <= K.ts(с) < d0 + 86400
 
 
