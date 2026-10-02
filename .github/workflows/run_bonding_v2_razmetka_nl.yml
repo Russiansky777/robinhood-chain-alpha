@@ -129,6 +129,7 @@ jobs:
               PYTHONPATH=$RABOTA $PY_HOSTA $RABOTA/krivaya_27_mesta.py \
                 --mint '${{ inputs.mesta_prodazhi_mint }}' \
                 --schet '${{ inputs.mesta_prodazhi_schet }}' \
+                --imena \
                 --prodazha '${{ inputs.mesta_prodazhi_podpis }}' \
                 --out $RABOTA/mesta.json" 2>&1 | tail -80 || echo "MESTA_NE_OK=1" >> "$GITHUB_ENV"
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/mesta.json 2>/dev/null || true" > /tmp/mesta.json || true
