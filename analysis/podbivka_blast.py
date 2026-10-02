@@ -131,6 +131,47 @@ def дополнить(r: dict, вл_пула: str | None) -> dict:
     return r
 
 
+def по_блокам(уз, а, т0: int, т1: int) -> tuple[list, dict, dict]:
+    """Строки пула по блокам: getBlock с transactionDetails=accounts -- счета, балансы и порядок в блоке.
+
+    Зачем: пул BLAST даёт больше 20 транзакций в слот, и getSignaturesForAddress листать до окна бессмысленно
+    (120 000 подписей -- это всего 35 минут). Блоков в окне десятки, и в режиме accounts приходят ровно нужные
+    поля: accountKeys с признаком подписанта, pre/postTokenBalances с владельцами, err и место в блоке.
+    """
+    строки, блоки, счёт = [], {}, {"блоков": 0, "вне_окна": 0, "не_отдано": 0, "транзакций": 0}
+    for сл in range(а.slot_s, а.slot_do + 1):
+        б = уз.вызов("getBlock", [сл, {"transactionDetails": "accounts", "rewards": False,
+                                       "maxSupportedTransactionVersion": 0}], срок=120.0)
+        if not б:
+            счёт["не_отдано"] += 1
+            continue
+        вр = б.get("blockTime") or 0
+        счёт["блоков"] += 1
+        тр = б.get("transactions") or []
+        блоки[сл] = {"всего": len(тр), "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(вр)) if вр else None}
+        if вр and not (т0 <= вр <= т1):
+            счёт["вне_окна"] += 1
+            continue
+        for и, тх in enumerate(тр):
+            счёт["транзакций"] += 1
+            кл = ((тх.get("transaction") or {}).get("accountKeys") or [])
+            плоские = [k if isinstance(k, str) else (k or {}).get("pubkey") for k in кл]
+            if а.pul not in плоские:
+                continue
+            т = {"slot": сл, "blockTime": вр, "transaction": {"message": {"accountKeys": кл}},
+                 "meta": тх.get("meta") or {}}
+            r = разбор(т, а.mint, а.pul)
+            подписи_ = (тх.get("transaction") or {}).get("signatures") or []
+            r["signature"] = подписи_[0] if подписи_ else None
+            r["место_в_блоке"] = и
+            r["транзакций_в_блоке"] = len(тр)
+            r["pump_amm"] = None            # в режиме accounts инструкций нет -- программу не проверяем
+            r["программ"] = None
+            строки.append(r)
+        del б, тр
+    return строки, блоки, счёт
+
+
 def main() -> int:
     import podbivka_run as R  # noqa: PLC0415
     import podbivka_sim as S  # noqa: PLC0415
@@ -146,6 +187,10 @@ def main() -> int:
     р.add_argument("--prefiksy", default="", help="через запятую: префиксы подписей-ориентиров (ист 7JVQ...)")
     р.add_argument("--metka", default="blast_15-45")
     р.add_argument("--stranic", type=int, default=80, help="предел страниц по 1000 подписей пула")
+    р.add_argument("--po-blokam", action="store_true",
+                   help="читать блоки слотов --slot-s…--slot-do (accounts), а не подписи пула -- для активных пулов")
+    р.add_argument("--slot-s", type=int, default=0)
+    р.add_argument("--slot-do", type=int, default=0)
     а = р.parse_args()
     т0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
     т1 = calendar.timegm(time.strptime(а.do, "%Y-%m-%dT%H:%M:%SZ"))
@@ -154,61 +199,86 @@ def main() -> int:
           if а.krupnye_s and а.krupnye_do else None)
     уз = S.Узел()
     строки, блоки = [], {}
-    with уз.на("helius"):
-        # подписи пула от конца окна назад
-        подписи, до, страниц = [], None, 0
-        while страниц < а.stranic:
-            стр = уз.подписи(а.pul, до=до, limit=1000)
-            страниц += 1
-            if not стр:
-                break
-            подписи += стр
-            if (стр[-1].get("blockTime") or 0) < т0 or len(стр) < 1000:
-                break
-            до = стр[-1]["signature"]
-        самая_старая = min((з.get("blockTime") or 0) for з in подписи) if подписи else 0
-        дошли = bool(подписи) and самая_старая < т0
-        в_окне = [з for з in подписи if т0 <= (з.get("blockTime") or 0) <= т1]
-        ориентиры = [x for x in а.podpisi.split(",") if x]
-        префиксы = [x for x in а.prefiksy.split(",") if x]
-        нужные = {з["signature"] for з in в_окне} | set(ориентиры)
-        txs = уз.пакет(sorted(нужные), {з["signature"]: з.get("blockTime") for з in в_окне})
-        for з in в_окне:
-            т = txs.get(з["signature"])
-            if not т:
-                строки.append({"signature": з["signature"], "why_not": "узел не отдал транзакцию",
-                               "слот": з.get("slot")})
-                continue
-            r = разбор(т, а.mint, а.pul)
-            r["signature"] = з["signature"]
-            строки.append(r)
-        # место в блоке: подписи блоков окна по порядку
-        слоты = sorted({r.get("слот") for r in строки if r.get("слот")})
-        for сл in слоты:
-            б = уз.вызов("getBlock", [сл, {"transactionDetails": "signatures", "rewards": False,
-                                           "maxSupportedTransactionVersion": 0}], срок=60.0)
-            сп = (б or {}).get("signatures") or []
-            блоки[сл] = {"всего": len(сп), "места": {s: и for и, s in enumerate(сп)}}
-        вл_пула, доля_пула = сторона_пула(строки, а.pul)
-        for r in строки:
-            дополнить(r, вл_пула)
-        for r in строки:
-            б = блоки.get(r.get("слот")) or {}
-            r["место_в_блоке"] = (б.get("места") or {}).get(r.get("signature"))
-            r["транзакций_в_блоке"] = б.get("всего")
-        # ориентиры: наша покупка и источник (по полной подписи или по префиксу из окна)
-        ор = {}
-        for п in ориентиры:
-            т = txs.get(п)
-            ор[п] = (дополнить(разбор(т, а.mint, а.pul), вл_пула) | {"signature": п}) if т else {"signature": п, "why_not": "нет тела"}
-        for пр in префиксы:
-            наш = [r for r in строки if r["signature"].startswith(пр)]
-            ор[пр] = наш[0] if наш else {"префикс": пр, "why_not": "в окне не найдено"}
+    счёт_блоков: dict = {}
+    if а.po_blokam:
+        if not (а.slot_s and а.slot_do and а.slot_do >= а.slot_s):
+            raise SystemExit("--po-blokam нужен --slot-s и --slot-do")
+        with уз.на("helius"):
+            строки, блоки, счёт_блоков = по_блокам(уз, а, т0, т1)
+            вл_пула, доля_пула = сторона_пула(строки, а.pul)
+            for r in строки:
+                дополнить(r, вл_пула)
+            ор = {}
+            for п in [x for x in а.podpisi.split(",") if x]:
+                наш = [r for r in строки if r.get("signature") == п]
+                if наш:
+                    ор[п] = наш[0]
+                    continue
+                т = уз.вызов("getTransaction", [п, {"encoding": "jsonParsed", "commitment": "confirmed",
+                                                    "maxSupportedTransactionVersion": 0}], срок=60.0)
+                ор[п] = (дополнить(разбор(т, а.mint, а.pul), вл_пула) | {"signature": п}) if т else \
+                    {"signature": п, "why_not": "нет тела"}
+            for пр in [x for x in а.prefiksy.split(",") if x]:
+                наш = [r for r in строки if (r.get("signature") or "").startswith(пр)
+                       or r.get("подписант", "").startswith(пр) or (r.get("получил_токен") or "").startswith(пр)]
+                ор[пр] = наш[0] if наш else {"префикс": пр, "why_not": "в окне не найдено"}
+        страниц, подписи, самая_старая, дошли = 0, [], 0, True
+    else:
+      with уз.на("helius"):
+          # подписи пула от конца окна назад
+          подписи, до, страниц = [], None, 0
+          while страниц < а.stranic:
+              стр = уз.подписи(а.pul, до=до, limit=1000)
+              страниц += 1
+              if not стр:
+                  break
+              подписи += стр
+              if (стр[-1].get("blockTime") or 0) < т0 or len(стр) < 1000:
+                  break
+              до = стр[-1]["signature"]
+          самая_старая = min((з.get("blockTime") or 0) for з in подписи) if подписи else 0
+          дошли = bool(подписи) and самая_старая < т0
+          в_окне = [з for з in подписи if т0 <= (з.get("blockTime") or 0) <= т1]
+          ориентиры = [x for x in а.podpisi.split(",") if x]
+          префиксы = [x for x in а.prefiksy.split(",") if x]
+          нужные = {з["signature"] for з in в_окне} | set(ориентиры)
+          txs = уз.пакет(sorted(нужные), {з["signature"]: з.get("blockTime") for з in в_окне})
+          for з in в_окне:
+              т = txs.get(з["signature"])
+              if not т:
+                  строки.append({"signature": з["signature"], "why_not": "узел не отдал транзакцию",
+                                 "слот": з.get("slot")})
+                  continue
+              r = разбор(т, а.mint, а.pul)
+              r["signature"] = з["signature"]
+              строки.append(r)
+          # место в блоке: подписи блоков окна по порядку
+          слоты = sorted({r.get("слот") for r in строки if r.get("слот")})
+          for сл in слоты:
+              б = уз.вызов("getBlock", [сл, {"transactionDetails": "signatures", "rewards": False,
+                                             "maxSupportedTransactionVersion": 0}], срок=60.0)
+              сп = (б or {}).get("signatures") or []
+              блоки[сл] = {"всего": len(сп), "места": {s: и for и, s in enumerate(сп)}}
+          вл_пула, доля_пула = сторона_пула(строки, а.pul)
+          for r in строки:
+              дополнить(r, вл_пула)
+          for r in строки:
+              б = блоки.get(r.get("слот")) or {}
+              r["место_в_блоке"] = (б.get("места") or {}).get(r.get("signature"))
+              r["транзакций_в_блоке"] = б.get("всего")
+          # ориентиры: наша покупка и источник (по полной подписи или по префиксу из окна)
+          ор = {}
+          for п in ориентиры:
+              т = txs.get(п)
+              ор[п] = (дополнить(разбор(т, а.mint, а.pul), вл_пула) | {"signature": п}) if т else {"signature": п, "why_not": "нет тела"}
+          for пр in префиксы:
+              наш = [r for r in строки if r["signature"].startswith(пр)]
+              ор[пр] = наш[0] if наш else {"префикс": пр, "why_not": "в окне не найдено"}
     строки.sort(key=lambda r: (r.get("слот") or 0, r.get("место_в_блоке") if r.get("место_в_блоке") is not None else 10**9))
     крупные = [r for r in строки if r.get("направление") == "покупка" and (r.get("sol") or 0) >= а.min_sol
                and (not кр or (кр[0] <= calendar.timegm(time.strptime(r["utc"], "%Y-%m-%dT%H:%M:%SZ")) <= кр[1]))]
     из_ = {"пул": а.pul, "минт": а.mint, "владелец_хранилищ_пула": вл_пула, "доля_свопов_с_ним": доля_пула,
-           "страниц_подписей": страниц, "подписей_просмотрено": len(подписи),
+           "по_блокам": bool(а.po_blokam), "счёт_блоков": счёт_блоков, "страниц_подписей": страниц, "подписей_просмотрено": len(подписи),
            "самая_старая_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(самая_старая)) if самая_старая else None,
            "дошли_до_окна": дошли,
            "why_not": None if дошли else f"предел страниц {а.stranic}: до начала окна не дочитали", "окно": [а.s, а.do], "крупные_окно": [а.krupnye_s, а.krupnye_do],
