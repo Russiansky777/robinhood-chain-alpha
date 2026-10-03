@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""Недельный документ по билету и группам (понедельник). Офлайн, по готовому архиву и выгрузкам.
+
+Задание владельца 03.10, п.4. Один документ docs/podbivka_<дата>_nedelya_bilet.md:
+
+  (а) недельная таблица групп -- подпись «поднять / держать / понизить / снять» по каждому
+      источнику. Подпись считается ПО ЧИСЛАМ и названа в документе; решение -- владельца:
+        «снять»    -- не держится по числам три сутки подряд (Правило 18 п.5, по файлам конвейера);
+        «понизить» -- держится, но на текущем билете группы медиана архивного сигнала <= 0
+                      (минимальный выгодный билет выше текущего);
+        «поднять»  -- держится, медиана растёт и её пик по сетке выше текущего билета,
+                      и билет пика не больше 2 % резерва пула p10 по его сигналам;
+        «держать»  -- всё остальное.
+  (б) билет на большой выборке: живые сделки (выгрузка Code-1 с 27.09, если она есть -- иначе
+      по тем выгрузкам, что лежат) -- n, итог SOL, сигнал до постоянных расходов по дням;
+      архив 11 суток при билетах 0.1 / 0.3 / 0.5 / 1 / 2 / 3: среднее, медиана, среднее без
+      верхних 2 %, SOL в сутки, худшие сутки -- по группам и по источникам.
+  (в) гибкий билет, три варианта: (1) билет <= k % резерва пула (k = 1 / 2 / 3) с потолком
+      группы; (2) ступени по размеру покупки источника (2--5 / 5--15 / >= 15 SOL-экв);
+      (3) сочетание. По каждому: SOL в сутки, медиана, худшие сутки. Подбор -- первые 8 суток
+      окна, проверка -- последние 3.
+
+Формулы: ячейка и п.п. -- podbivka_cand2 / podbivka_kandidaty_vne, любой билет по состояниям --
+podbivka_bilet.пп_по_состояниям, стабильность -- podbivka_stabilnost. Своих копий формул нет.
+"""
+from __future__ import annotations
+
+import argparse
+import collections
+import glob
+import gzip
+import json
+import statistics
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import podbivka_bilet as B  # noqa: E402
+import podbivka_cand2 as C2  # noqa: E402
+import podbivka_kandidaty_vne as K  # noqa: E402
+import podbivka_masshtab as M  # noqa: E402
+import podbivka_stabilnost as ST  # noqa: E402
+
+КОРЕНЬ = C2.КОРЕНЬ
+П = C2.П
+БИЛЕТЫ = (0.1, 0.3, 0.5, 1.0, 2.0, 3.0)
+ПОТОЛОК = {"lane_s0": 0.5, "batch5": 0.3, "cand1": 0.1, "cand1_03": 0.3, "cand1_05": 0.5,
+           "cand2": 0.1, "cand3": 0.1, "leader": 3.0, "konveyer": 0.1}
+СТУПЕНИ = ((2.0, 5.0, 0.1), (5.0, 15.0, 0.3), (15.0, float("inf"), 0.5))
+K_ДОЛИ = (0.01, 0.02, 0.03)
+ИЗДЕРЖКИ = 0.002
+N_МИН = 20
+
+
+def сутки(ts: float) -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime(ts))
+
+
+def стат_без_верхних(v: list, доля: float = 0.02) -> float | None:
+    """Среднее без верхних `доля` значений (хвост не тащит вывод)."""
+    з = sorted(x for x in v if x is not None)
+    if not з:
+        return None
+    убрать = int(len(з) * доля)
+    о = з[:len(з) - убрать] if убрать else з
+    return round(statistics.mean(о), 2) if о else None
+
+
+def собрать(файлы: list) -> tuple[dict, dict]:
+    """По источникам: ячейки с временем, состояниями, размером покупки и резервом."""
+    по: dict = {}
+    счёт = {"файлов": 0, "сигналов": 0, "ячеек": 0, "дублей": 0, "ошибки": []}
+    видел: set = set()
+    for f in файлы:
+        try:
+            д = json.loads(gzip.decompress(Path(f).read_bytes()))
+        except Exception as exc:  # noqa: BLE001
+            счёт["ошибки"].append(f"{Path(f).name}: {type(exc).__name__}")
+            continue
+        счёт["файлов"] += 1
+        for с in д.get("сигналы") or []:
+            счёт["сигналов"] += 1
+            if not M.PR.окно(с, f):
+                continue
+            if с["signature"] in видел:
+                счёт["дублей"] += 1
+                continue
+            видел.add(с["signature"])
+            if (с.get("sol") or 0) < 2.0 or not C2.ячейка(с):
+                continue
+            сост = ((с.get("модель") or {}).get("состояния") or {}).get("вход")
+            if not сост:
+                continue
+            счёт["ячеек"] += 1
+            к = по.setdefault(с["trader"], {"ячейки": []})
+            к["ячейки"].append({"ts": K.ts(с), "сутки": сутки(K.ts(с)),
+                                "размер": float(с.get("sol") or 0),
+                                "резерв": float(с.get("резерв_sol") or 0) or None,
+                                "сигнал": с})
+        del д
+    return по, счёт
+
+
+def пп(с: dict, б: float):
+    return B.пп_по_состояниям(с, б)
+
+
+def свод_билета(ячейки: list, б: float) -> dict:
+    зн, по_суткам = [], collections.defaultdict(float)
+    for я in ячейки:
+        v = пп(я["сигнал"], б)
+        if v is None:
+            continue
+        зн.append(v)
+        по_суткам[я["сутки"]] += б * v / 100.0
+    if not зн:
+        return {"n": 0}
+    сут = sorted(по_суткам.items())
+    return {"n": len(зн), "среднее": round(statistics.mean(зн), 2),
+            "медиана": round(statistics.median(зн), 2),
+            "среднее_без_2": стат_без_верхних(зн),
+            "в_плюсе": round(sum(1 for x in зн if x > 0) / len(зн), 3),
+            "sol_в_сутки": round(statistics.median([v for _, v in сут]), 4) if сут else None,
+            "sol_всего": round(sum(v for _, v in сут), 4),
+            "худшие_сутки": (min(сут, key=lambda kv: kv[1]) if сут else None),
+            "суток": len(сут)}
+
+
+def гибкий(ячейки: list, вид: str, k: float | None, потолок: float) -> dict:
+    """Билет по правилу: 'dolya' -- k % резерва с потолком; 'stupeni' -- по размеру покупки;
+    'oboe' -- меньшее из двух."""
+    зн, по_суткам = [], collections.defaultdict(float)
+    for я in ячейки:
+        б_д = (k * я["резерв"]) if (k and я["резерв"]) else None
+        б_с = next((б for низ, верх, б in СТУПЕНИ if низ <= я["размер"] < верх), None)
+        if вид == "dolya":
+            б = min(б_д, потолок) if б_д else None
+        elif вид == "stupeni":
+            б = min(б_с, потолок) if б_с else None
+        else:
+            кандидаты = [x for x in (б_д, б_с) if x]
+            б = min(min(кандидаты), потолок) if кандидаты else None
+        if not б or б <= 0:
+            continue
+        v = пп(я["сигнал"], round(б, 4))
+        if v is None:
+            continue
+        зн.append(v)
+        по_суткам[я["сутки"]] += б * v / 100.0
+    if not зн:
+        return {"n": 0}
+    сут = sorted(по_суткам.items())
+    return {"n": len(зн), "медиана": round(statistics.median(зн), 2),
+            "среднее": round(statistics.mean(зн), 2), "среднее_без_2": стат_без_верхних(зн),
+            "sol_в_сутки": round(statistics.median([v for _, v in сут]), 4),
+            "sol_всего": round(sum(v for _, v in сут), 4), "по_суткам_ряд": сут,
+            "худшие_сутки": min(сут, key=lambda kv: kv[1]), "суток": len(сут)}
+
+
+def main() -> int:
+    import podbivka_run as R  # noqa: PLC0415
+    р = argparse.ArgumentParser()
+    р.add_argument("--metka", default=time.strftime("%Y-%m-%d", time.gmtime()))
+    р.add_argument("--shablony", default="zakem_*T16.json.gz")
+    р.add_argument("--podbor-sutok", type=int, default=8)
+    а = р.parse_args()
+    файлы = sorted(glob.glob(str(П / "arhiv_den" / а.shablony)), key=lambda f: Path(f).name)
+    по, счёт = собрать(файлы)
+    адр = json.loads((П / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
+    конв = sorted((КОРЕНЬ / "data" / "konveyer").glob("*.json"))
+    посл_конв = json.loads(конв[-1].read_text(encoding="utf-8")) if конв else {"ряды": {}}
+
+    # ---- живые сделки (п.4б): выгрузка с 27.09, если она есть
+    живые_файл = КОРЕНЬ / "data" / "sdelki_polosy_vse_s_2709.json"
+    свои = sorted((П / "sdelki").glob("sdelki_polosy_*.json"))
+    живые_откуда, живые = [], []
+    if живые_файл.exists():
+        живые_откуда.append(живые_файл.name)
+        for r in json.loads(живые_файл.read_text(encoding="utf-8")).get("ряды") or []:
+            живые.append(r)
+    else:
+        по_cid: dict = {}
+        for f in свои:
+            живые_откуда.append(f.name)
+            for r in json.loads(f.read_text(encoding="utf-8")).get("ряды") or []:
+                по_cid[r["cid"]] = r
+        живые = list(по_cid.values())
+    живые = [r for r in живые if r.get("итог_po_cepi_sol") is not None and r.get("sol_in")]
+
+    по_группам: dict = collections.defaultdict(list)
+    for r in живые:
+        по_группам[r.get("group") or "?"].append(r)
+
+    def живой_свод(ряды: list) -> dict:
+        пп_ж = [100 * r["итог_po_cepi_sol"] / r["sol_in"] for r in ряды]
+        до = [M.до_расходов(r) for r in ряды]
+        до = [x for x in до if x is not None]
+        по_дням: dict = collections.defaultdict(float)
+        for r in ряды:
+            д = (r.get("utc") or "")[:10]
+            по_дням[д] += float(r["итог_po_cepi_sol"])
+        return {"n": len(ряды), "итог_sol": round(sum(r["итог_po_cepi_sol"] for r in ряды), 4),
+                "медиана_пп": round(statistics.median(пп_ж), 2) if пп_ж else None,
+                "до_расходов_медиана": round(statistics.median(до), 2) if до else None,
+                "по_дням": {д: round(v, 4) for д, v in sorted(по_дням.items())}}
+
+    # ---- (а) подпись по числам
+    подписи = {}
+    for a, к in по.items():
+        группы = [g for g in ((адр.get(a) or {}).get("группы") or []) if g in ПОТОЛОК]
+        текущий = min((ПОТОЛОК[g] for g in группы), default=None)
+        сетка = {б: свод_билета(к["ячейки"], б) for б in БИЛЕТЫ}
+        есть = [(б, s["медиана"]) for б, s in сетка.items() if (s.get("n") or 0) >= N_МИН]
+        пик = max(есть, key=lambda bm: bm[1])[0] if есть else None
+        ст = ST.стабильность([(я["ts"], пп(я["сигнал"], текущий or 0.1)) for я in к["ячейки"]])
+        мед_тек = (сетка.get(текущий) or {}).get("медиана") if текущий in сетка else None
+        рез10 = [я["резерв"] for я in к["ячейки"] if я["резерв"]]
+        рез_p10 = (sorted(рез10)[max(0, int(0.10 * len(рез10)) - 1)] if рез10 else None)
+        подряд = ((посл_конв.get("ряды") or {}).get(a) or {}).get("подряд_суток") or 0
+        if подряд >= 3:
+            подпись = "снять"
+        elif текущий and мед_тек is not None and мед_тек <= 0:
+            подпись = "понизить"
+        elif (ст["стабилен"] and пик and текущий and пик > текущий
+              and рез_p10 and пик <= 0.02 * рез_p10):
+            подпись = "поднять"
+        else:
+            подпись = "держать"
+        подписи[a] = {"группы": (адр.get(a) or {}).get("группы") or [], "текущий_билет": текущий,
+                      "медиана_на_текущем": мед_тек, "пик_сетки": пик, "стабилен": ст["стабилен"],
+                      "медиана_1": ст["медиана_1"], "медиана_2": ст["медиана_2"],
+                      "суток_в_плюсе": f"{ст['суток_в_плюсе']} / {ст['суток']}" if ст["суток"] else None,
+                      "подряд_суток_не_держится": подряд, "резерв_p10": рез_p10,
+                      "ячеек": len(к["ячейки"]), "подпись": подпись,
+                      "сетка": {f"{б:g}": сетка[б] for б in БИЛЕТЫ}}
+
+    # ---- (в) гибкий билет: подбор на первых N сутках, проверка на последних 3
+    все_сутки = sorted({я["сутки"] for к in по.values() for я in к["ячейки"]})
+    подбор_сут = set(все_сутки[:а.podbor_sutok])
+    пров_сут = set(все_сутки[-3:])
+    гибко = {}
+    for имя, вид, k in ([(f"доля {k:.0%} резерва", "dolya", k) for k in K_ДОЛИ]
+                        + [("ступени по размеру", "stupeni", None),
+                           ("сочетание (2 % и ступени)", "oboe", 0.02)]):
+        итог = {"подбор": {"n": 0, "sol_всего": 0.0, "по_суткам": collections.defaultdict(float)},
+                "проверка": {"n": 0, "sol_всего": 0.0, "по_суткам": collections.defaultdict(float)}}
+        for a, к in по.items():
+            группы = [g for g in ((адр.get(a) or {}).get("группы") or []) if g in ПОТОЛОК]
+            потолок = min((ПОТОЛОК[g] for g in группы), default=0.1)
+            for часть, набор in (("подбор", подбор_сут), ("проверка", пров_сут)):
+                мои = [я for я in к["ячейки"] if я["сутки"] in набор]
+                if not мои:
+                    continue
+                r = гибкий(мои, вид, k, потолок)
+                if not r.get("n"):
+                    continue
+                итог[часть]["n"] += r["n"]
+                итог[часть]["sol_всего"] += r["sol_всего"]
+                for д, v in r.get("по_суткам_ряд") or []:
+                    итог[часть]["по_суткам"][д] += v
+        for часть in ("подбор", "проверка"):
+            сут = sorted(итог[часть]["по_суткам"].items())
+            итог[часть]["sol_в_сутки"] = (round(statistics.median([v for _, v in сут]), 4)
+                                          if сут else None)
+            итог[часть]["худшие_сутки"] = (min(сут, key=lambda kv: kv[1]) if сут else None)
+            итог[часть]["sol_всего"] = round(итог[часть]["sol_всего"], 4)
+            итог[часть]["по_суткам"] = {д: round(v, 4) for д, v in сут}
+        гибко[имя] = {**итог, "суток_подбора": len(подбор_сут), "суток_проверки": len(пров_сут)}
+
+    дт = {"метка": а.metka, "счёт": счёт, "файлов": len(файлы), "источников": len(по),
+          "живые_откуда": живые_откуда, "живых_сделок": len(живые),
+          "подписи": подписи, "гибкий": гибко,
+          "живые_по_группам": {г: живой_свод(v) for г, v in по_группам.items()},
+          "все_сутки": все_сутки}
+    out_j = П / f"nedelya_bilet_{а.metka}.json"
+    out_j.write_text(json.dumps(дт, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    R.записано(out_j)
+
+    md = [f"# Неделя: билет и группы ({а.metka})", "",
+          f"Архив: файлов суток {счёт['файлов']}, сигналов {счёт['сигналов']}, ячеек с состояниями "
+          f"{счёт['ячеек']}, дублей подписи {счёт['дублей']}, ошибок чтения {len(счёт['ошибки'])}. "
+          f"Источников с ячейками {len(по)}. Живые сделки -- {', '.join(живые_откуда) or 'выгрузок нет'} "
+          f"({len(живые)} сделок с итогом по цепи). Билеты сетки: "
+          + ", ".join(f"{б:g}" for б in БИЛЕТЫ) + f". Издержки {ИЗДЕРЖКИ:g} SOL на круг. "
+          "Подписи «поднять / держать / понизить / снять» считаны ПО ЧИСЛАМ (правила -- в шапке "
+          "скрипта); решение принимает владелец.", "",
+          "## (а) Группы и источники: подпись по числам", "",
+          "| источник | группы | текущий билет | медиана на текущем | пик сетки | стабилен | "
+          "половины | суток в плюсе | не держится подряд | резерв p10 | ячеек | подпись |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for a, v in sorted(подписи.items(), key=lambda kv: (kv[1]["подпись"], -(kv[1]["ячеек"]))):
+        md.append(f"| `{a[:8]}` | {', '.join(v['группы']) or '—'} | "
+                  + (f"{v['текущий_билет']:g}" if v["текущий_билет"] else "—") + " | "
+                  + (f"{v['медиана_на_текущем']:+.2f}" if v["медиана_на_текущем"] is not None else "—")
+                  + f" | {v['пик_сетки'] or '—'} | {'да' if v['стабилен'] else 'нет'} | "
+                  + (f"{v['медиана_1']:+.2f} / {v['медиана_2']:+.2f}"
+                     if v["медиана_1"] is not None and v["медиана_2"] is not None else "—")
+                  + f" | {v['суток_в_плюсе'] or '—'} | {v['подряд_суток_не_держится']} | "
+                  + (f"{v['резерв_p10']:.1f}" if v["резерв_p10"] else "—")
+                  + f" | {v['ячеек']} | **{v['подпись']}** |")
+
+    md += ["", "## (б) Билет на большой выборке", "", "### Живые сделки по группам", "",
+           "| группа | сделок | итог, SOL | медиана итога, п.п. | медиана до расходов, п.п. |",
+           "|---|---|---|---|---|"]
+    for г, v in sorted(дт["живые_по_группам"].items(), key=lambda kv: -kv[1]["n"]):
+        md.append(f"| {г} | {v['n']} | {v['итог_sol']:+.4f} | "
+                  + (f"{v['медиана_пп']:+.2f}" if v["медиана_пп"] is not None else "—") + " | "
+                  + (f"{v['до_расходов_медиана']:+.2f}" if v["до_расходов_медиана"] is not None else "—")
+                  + " |")
+    md += ["", "### Архив по билетам (по источникам)", "",
+           "| источник | билет | n | среднее | медиана | среднее без верхних 2 % | SOL в сутки | "
+           "SOL всего | худшие сутки |", "|---|---|---|---|---|---|---|---|---|"]
+    for a, v in sorted(подписи.items(), key=lambda kv: -(kv[1]["ячеек"])):
+        for б in БИЛЕТЫ:
+            s = v["сетка"][f"{б:g}"]
+            if not s.get("n"):
+                continue
+            х = s.get("худшие_сутки")
+            md.append(f"| `{a[:8]}` | {б:g} | {s['n']} | "
+                      + (f"{s['среднее']:+.2f}" if s["n"] >= N_МИН else f"n={s['n']}") + " | "
+                      + (f"{s['медиана']:+.2f}" if s["n"] >= N_МИН else "—") + " | "
+                      + (f"{s['среднее_без_2']:+.2f}" if s["n"] >= N_МИН and s["среднее_без_2"] is not None else "—")
+                      + " | " + (f"{s['sol_в_сутки']:+.4f}" if s.get("sol_в_сутки") is not None else "—")
+                      + " | " + (f"{s['sol_всего']:+.4f}" if s.get("sol_всего") is not None else "—")
+                      + " | " + (f"{х[0]}: {х[1]:+.4f}" if х else "—") + " |")
+
+    md += ["", "## (в) Гибкий билет: подбор на первых "
+           f"{а.podbor_sutok} сутках, проверка на последних {len(пров_сут)}", "",
+           "| вариант | подбор: ячеек | подбор: SOL в сутки | подбор: SOL всего | "
+           "подбор: худшие сутки | проверка: ячеек | проверка: SOL в сутки | проверка: SOL всего | "
+           "проверка: худшие сутки |", "|---|---|---|---|---|---|---|---|---|"]
+    for имя, v in гибко.items():
+        def кл3(ч: dict) -> str:
+            х = ч.get("худшие_сутки")
+            return (f"{ч['n']} | "
+                    + (f"{ч['sol_в_сутки']:+.4f}" if ч.get("sol_в_сутки") is not None else "—")
+                    + f" | {ч['sol_всего']:+.4f} | "
+                    + (f"{х[0]}: {х[1]:+.4f}" if х else "—"))
+        md.append(f"| {имя} | {кл3(v['подбор'])} | {кл3(v['проверка'])} |")
+    md += ["", "Ничего не рекомендуется -- решает владелец.", ""]
+    out_m = КОРЕНЬ / "docs" / f"podbivka_{а.metka}_nedelya_bilet.md"
+    out_m.write_text("\n".join(md) + "\n", encoding="utf-8")
+    R.записано(out_m)
+    счёт_п = collections.Counter(v["подпись"] for v in подписи.values())
+    print(f"{out_m.name}: источников {len(подписи)}, подписи {dict(счёт_п)}, живых сделок {len(живые)}",
+          flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
