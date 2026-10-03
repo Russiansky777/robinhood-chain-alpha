@@ -77,7 +77,22 @@ jobs:
           set -e
           set -o pipefail
           python3 -m py_compile analysis/c3_konveyer_primenitel.py
-          python3 analysis/c3_konveyer_primenitel.py | tail -2
+          # ВЫВОД САМОПРОВЕРКИ -- В ФАЙЛ, А НЕ ТОЛЬКО В ЖУРНАЛ ПРОГОНА. Журнал
+          # прогона читается не всегда (у агента нет доступа к логам Actions), и
+          # "упало на самопроверке" без строк -- это тупик. Файл едет в ветку
+          # шагом коммита вместе с остальным каталогом konveyer.
+          mkdir -p data/konveyer
+          set +e
+          python3 analysis/c3_konveyer_primenitel.py \
+            > data/konveyer/primenitel_selftest.txt 2>&1
+          rc=$?
+          set -e
+          tail -4 data/konveyer/primenitel_selftest.txt
+          if [ "$rc" != "0" ]; then
+            echo "САМОПРОВЕРКА НЕ ПРОШЛА (код $rc) -- хост не трогаем"
+            grep -iE "ПЛОХО|СБОЙ|Traceback|Error" data/konveyer/primenitel_selftest.txt | head -10 || true
+            exit "$rc"
+          fi
 
       - name: "SSH key"
         env:
