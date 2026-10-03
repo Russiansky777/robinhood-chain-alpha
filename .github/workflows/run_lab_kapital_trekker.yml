@@ -102,6 +102,26 @@ jobs:
             grep -rlE "(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|LANE_WALLET_KEY)" /etc /root /home 2>/dev/null | head -3
             exit $NAJDENO' | tee -a "$OUT"
 
+      - name: "Питон хоста: версия записана не была -- значит проверяем"
+        run: |
+          set -e
+          # В репозитории версия python на lab-miami не записана НИГДЕ, поэтому
+          # она не предполагается, а спрашивается. Модулю хватает 3.7 (все
+          # аннотации вида `int | None` лежат под from __future__ import
+          # annotations, то есть во время работы это строки), но ниже 3.8 мы
+          # просто откажемся: лучше отказ установки, чем мёртвая служба,
+          # которую systemd будет перезапускать вечно.
+          V=$(ssh -n $SSH_OPTS root@"$HOST" "python3 -c 'import sys;print(\"%d.%d\" % sys.version_info[:2])'")
+          echo "python3 na hoste: $V" | tee -a "$OUT"
+          BOLSHOJ=${V%%.*}; MALYJ=${V##*.}
+          if [ "$BOLSHOJ" -lt 3 ] || { [ "$BOLSHOJ" -eq 3 ] && [ "$MALYJ" -lt 8 ]; }; then
+            echo "OTKAZ: nuzhen python3 >= 3.8, na hoste $V" | tee -a "$OUT"; exit 1
+          fi
+          # Модуль обязан хотя бы компилироваться ТЕМ ЖЕ питоном, что будет его
+          # запускать -- проверяем до установки службы.
+          scp $SSH_OPTS analysis/c3_kapital_trekker.py root@"$HOST":/tmp/kt_proba.py
+          ssh -n $SSH_OPTS root@"$HOST" "python3 -m py_compile /tmp/kt_proba.py && echo 'modul kompiliruetsja pitonom hosta' && rm -f /tmp/kt_proba.py" | tee -a "$OUT"
+
       - name: "Диск: на lab-miami он уже кончался 03.10"
         run: |
           set -e
