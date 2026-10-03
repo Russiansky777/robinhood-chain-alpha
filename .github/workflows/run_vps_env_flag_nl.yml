@@ -21,6 +21,19 @@ name: "Одна строка окружения службы: поставить
 #   * BLOOM_DLMM_BEZ_CHTENIY=1 -- ТЕНЬ нуля чтений DLMM: считает и пишет, на
 #     сделки не влияет. Поэтому и ставится отдельным флагом, а не через lane_pools.
 #
+# ДОБАВЛЕНО 03.10 вечером (пункт 0 владельца: покупок нет два часа).
+# BLOOM_SOURCE_GROUPS -- ПУТЬ К ФАЙЛУ ГРУПП, и без него служба берёт умолчание
+# модуля data/sources_live.json. Это имя КОПИИ В ВЕТКЕ, а на хосте файл зовётся
+# иначе (/home/bot/data/sources_2026-09-25.json), поэтому умолчание не находится,
+# политик нет, и bloom_source_groups по правилу "молчание значит не торгуем"
+# ставит ВСЕМ адресам группу off. Полоса после этого отказывает каждому пути
+# словами "по группе off полоса не торгует", и покупки встают целиком -- молча,
+# потому что сами по себе эти отказы выглядят законным отбором.
+# Живой процесс держит прочитанные политики в памяти, поэтому пропажа строки
+# действует не сразу, а с ПЕРЕЗАПУСКОМ: 03.10 последняя сделка прошла в 18:33Z,
+# детектор перезапущен в 18:38:27Z, и дальше ноль покупок при 47 увиденных
+# сигналах. Значение -- только путь, безопасными знаками, как и всё здесь.
+#
 # ЗАМКА BLOOM_DBC_PORT_SVEREN В БЕЛОМ СПИСКЕ НЕТ НАРОЧНО. Владелец: "DBC под
 # замком, не открывать" -- до сверки Code-2 по живым сделкам. Чтобы его открыть,
 # придётся сначала править этот список, и это нужное трение, а не забытая строка.
@@ -80,7 +93,7 @@ jobs:
         run: |
           set -e
           case "$IMYA" in
-            CLOSE_ACCOUNTS_LIVE|BLOOM_CLOSE_ON_SELL|BLOOM_TG_FORMAT|BLOOM_REGION_SEND|BLOOM_LANE_MAX_POOL_FEE|BLOOM_COPIERS_FILE|LANE_BONDING_CURVE_GROUPS|BLOOM_DAILY_LOSS_SOL|BLOOM_MAX_OPEN|BLOOM_LANE_CONTROL|LANE_DAILY_LOSS_SOL|LANE_KILL_DROP_SOL|BLOOM_SHADOW_LEGS_OFF|BLOOM_SHADOW_LEGS|BLOOM_SHADOW_LEGS_CREDITS|LANE_SELL_TWO_STEP|BLOOM_STALE_SLOTS|BLOOM_SELLER_LOOP_S|BLOOM_LANE_CU_LIMIT|BLOOM_SELL_OWN_SIMULATE|BLOOM_SELL_MIN_OUT_ZAPAS|BLOOM_CLMM_STROITEL|BLOOM_CLMM_STROITEL_GROUPS|BLOOM_WHIRLPOOL_STROITEL|BLOOM_WHIRLPOOL_STROITEL_GROUPS|BLOOM_DLMM_ODNO_CHTENIE|BLOOM_DLMM_ODNO_CHTENIE_GROUPS|BLOOM_AMMV4_STROITEL|BLOOM_AMMV4_STROITEL_GROUPS|LANE_AMMV4|LANE_AMMV4_GROUPS|BLOOM_NALOG_2022|BLOOM_NALOG_2022_GROUPS|BLOOM_USDC_NOGA|BLOOM_USDC_NOGA_POTOLOK_SOL|BLOOM_DLMM_BEZ_CHTENIY) ;;
+            CLOSE_ACCOUNTS_LIVE|BLOOM_CLOSE_ON_SELL|BLOOM_TG_FORMAT|BLOOM_REGION_SEND|BLOOM_LANE_MAX_POOL_FEE|BLOOM_COPIERS_FILE|LANE_BONDING_CURVE_GROUPS|BLOOM_DAILY_LOSS_SOL|BLOOM_MAX_OPEN|BLOOM_LANE_CONTROL|LANE_DAILY_LOSS_SOL|LANE_KILL_DROP_SOL|BLOOM_SHADOW_LEGS_OFF|BLOOM_SHADOW_LEGS|BLOOM_SHADOW_LEGS_CREDITS|LANE_SELL_TWO_STEP|BLOOM_STALE_SLOTS|BLOOM_SELLER_LOOP_S|BLOOM_LANE_CU_LIMIT|BLOOM_SELL_OWN_SIMULATE|BLOOM_SELL_MIN_OUT_ZAPAS|BLOOM_CLMM_STROITEL|BLOOM_CLMM_STROITEL_GROUPS|BLOOM_WHIRLPOOL_STROITEL|BLOOM_WHIRLPOOL_STROITEL_GROUPS|BLOOM_DLMM_ODNO_CHTENIE|BLOOM_DLMM_ODNO_CHTENIE_GROUPS|BLOOM_AMMV4_STROITEL|BLOOM_AMMV4_STROITEL_GROUPS|LANE_AMMV4|LANE_AMMV4_GROUPS|BLOOM_NALOG_2022|BLOOM_NALOG_2022_GROUPS|BLOOM_USDC_NOGA|BLOOM_USDC_NOGA_POTOLOK_SOL|BLOOM_DLMM_BEZ_CHTENIY|BLOOM_SOURCE_GROUPS) ;;
             *) echo "СБОЙ: имя $IMYA не из белого списка"; exit 1 ;;
           esac
           case "$IMYA" in
