@@ -72,49 +72,6 @@ jobs:
           ref: claude/nifty-sagan-r0polg
           fetch-depth: 0
 
-      - name: "Питон с solders (venv хоста), иначе системный"
-        run: |
-          set -e
-          # САМОПРОВЕРКА ПРИМЕНИТЕЛЯ ТЕПЕРЬ ТРЕБУЕТ solders. У версии Code-3
-          # появился вывод адресов (PDA и ATA получателей), а у СИСТЕМНОГО
-          # питона бегунка solders нет -- ровно на этом прогон упал дважды
-          # (ModuleNotFoundError, видно в data/konveyer/primenitel_selftest.txt).
-          # Бегунок живёт НА хосте, поэтому тот же venv, которым работают
-          # службы, лежит рядом. Нет venv -- берём системный и говорим это.
-          PY=python3
-          for К in /home/bot/robinhood-chain-alpha/venv/bin/python \
-                   /home/bot/bloom_executor/venv/bin/python; do
-            if [ -x "$К" ] && "$К" -c "import solders" 2>/dev/null; then
-              PY="$К"; break
-            fi
-          done
-          echo "питон прогона: $PY"
-          "$PY" -c "import sys; print('версия', sys.version.split()[0]); import solders; print('solders есть')" || \
-            echo "solders НЕТ -- самопроверка применителя это скажет сама"
-          echo "PY=$PY" >> "$GITHUB_ENV"
-
-      - name: "Самопроверка применителя (111/111) до любых действий"
-        run: |
-          set -e
-          set -o pipefail
-          "$PY" -m py_compile analysis/c3_konveyer_primenitel.py
-          # ВЫВОД САМОПРОВЕРКИ -- В ФАЙЛ, А НЕ ТОЛЬКО В ЖУРНАЛ ПРОГОНА. Журнал
-          # прогона читается не всегда (у агента нет доступа к логам Actions), и
-          # "упало на самопроверке" без строк -- это тупик. Файл едет в ветку
-          # шагом коммита вместе с остальным каталогом konveyer.
-          mkdir -p data/konveyer
-          set +e
-          "$PY" analysis/c3_konveyer_primenitel.py \
-            > data/konveyer/primenitel_selftest.txt 2>&1
-          rc=$?
-          set -e
-          tail -4 data/konveyer/primenitel_selftest.txt
-          if [ "$rc" != "0" ]; then
-            echo "САМОПРОВЕРКА НЕ ПРОШЛА (код $rc) -- хост не трогаем"
-            grep -iE "ПЛОХО|СБОЙ|Traceback|Error" data/konveyer/primenitel_selftest.txt | head -10 || true
-            exit "$rc"
-          fi
-
       - name: "SSH key"
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -125,6 +82,40 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Самопроверка применителя НА ХОСТЕ (111/111) до любых действий"
+        run: |
+          set -e
+          set -o pipefail
+          # ПОЧЕМУ НА ХОСТЕ, А НЕ НА БЕГУНКЕ. У версии применителя Code-3
+          # появился вывод адресов (PDA и ATA получателей), а значит нужен
+          # solders. У питона БЕГУНКА его нет, и venv боевой службы бегунку
+          # недоступен -- прогон падал трижды с ModuleNotFoundError (видно в
+          # data/konveyer/primenitel_selftest.txt). Тот же venv, которым
+          # работают службы, доступен ПО SSH как bot -- так самопроверку гонят
+          # и все прогоны деплоя.
+          python3 -m py_compile analysis/c3_konveyer_primenitel.py
+          ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/c3_konveyer_primenitel.py" < analysis/c3_konveyer_primenitel.py
+          ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim/data/konveyer"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/konveyer/$(date -u +%Y-%m-%d).json" < "data/konveyer/$(date -u +%Y-%m-%d).json" 2>/dev/null || echo "живого файла Code-2 за сегодня в ветке нет -- самопроверка скажет это сама"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_2026-09-25_USTAREL_2809.json" < data/sources_2026-09-25_USTAREL_2809.json
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_live.json" < data/sources_live.json
+          mkdir -p data/konveyer
+          set +e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            cd /tmp/konvprim
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python \
+              c3_konveyer_primenitel.py" > data/konveyer/primenitel_selftest.txt 2>&1
+          rc=$?
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "rm -rf /tmp/konvprim" || true
+          tail -4 data/konveyer/primenitel_selftest.txt
+          if [ "$rc" != "0" ]; then
+            echo "САМОПРОВЕРКА НЕ ПРОШЛА (код $rc) -- файл групп не трогаем"
+            grep -iE "ПЛОХО|СБОЙ|Traceback|Error" data/konveyer/primenitel_selftest.txt | head -10 || true
+            exit "$rc"
+          fi
 
       - name: "Сторож: копия учёта в ветке не старше 1.5 ч"
         if: ${{ inputs.storozh != 'no' }}
@@ -196,7 +187,7 @@ jobs:
           set -e
           set -o pipefail
           D="${{ steps.vhod.outputs.data }}"
-          "$PY" analysis/c3_konveyer_primenitel.py \
+          python3 analysis/c3_konveyer_primenitel.py \
             --vhod "data/konveyer/$D.json" \
             --gruppy /tmp/gruppy_live.json \
             --kat data/konveyer | tee "$OUT"
@@ -216,7 +207,7 @@ jobs:
           # применена целиком" на втором тике красила бы прогон красным каждый
           # день. Код 5 отдаётся ТОЛЬКО когда каждый адрес правки лежит ровно в
           # konveyer; любой адрес в чужой группе -- по-прежнему код 3 и стоп.
-          "$PY" analysis/c3_konveyer_primenitel.py --sverit "$P" \
+          python3 analysis/c3_konveyer_primenitel.py --sverit "$P" \
             --gruppy /tmp/gruppy_live_sverka.json \
             || { rc=$?; [ "$rc" = "5" ] && { echo "правка уже применена -- применять нечего"; exit 0; }; exit "$rc"; }
 
