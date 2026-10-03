@@ -33,13 +33,18 @@ WSOL = "So11111111111111111111111111111111111111112"
 
 
 def сделки() -> list:
-    из_ = []
+    """Сделки выгрузок, ОДНА СТРОКА НА cid: выгрузки перекрываются по времени.
+
+    Без склейки один и тот же блок читался бы дважды, а сделка попадала бы в
+    счёт сэндвичей столько раз, в сколько выгрузок она попала.
+    """
+    по_cid: dict = {}
     for f in sorted((П / "sdelki").glob("sdelki_polosy_*.json")):
         for r in json.loads(f.read_text(encoding="utf-8")).get("ряды") or []:
             if r.get("buy_sig") and r.get("landed_slot") and r.get("mint"):
                 r["_файл"] = f.name
-                из_.append(r)
-    return из_
+                по_cid[r["cid"]] = r
+    return list(по_cid.values())
 
 
 def подписант(тх: dict) -> str | None:
