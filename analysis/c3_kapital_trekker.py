@@ -79,6 +79,38 @@ WSOL = "So11111111111111111111111111111111111111112"
 # нужно трекеру (балансы, счета, подписи, транзакции), и стоит нуль кредитов.
 УЗЕЛ_ПО_УМОЛЧАНИЮ = "https://api.mainnet-beta.solana.com"
 
+# ВЕРСИЯ ТРАНЗАКЦИИ И ПОДТВЕРЖДЕНИЕ -- ОДНОЙ НАСТРОЙКОЙ НА ВЕСЬ МОДУЛЬ, И ЭТО
+# СТОИЛО ТРЕКЕРУ ПЕРВЫХ СУТОК. На хосте 03--04.10 он не дал НИ ОДНОЙ цифры:
+# `kapital.json` не создавался вовсе, потому что КАЖДЫЙ тик падал на
+#   {'code': -32015, 'message': 'Transaction version (1) is not supported by
+#    the requesting client...'}
+# (journalctl lab-miami, тики 1..14 на Helius -- доклад Code-1 04.10). Модуль
+# просил `maxSupportedTransactionVersion: 0`, то есть соглашался только на
+# legacy и версию 0, а в цепи есть ВЕРСИЯ 1 -- и это не догадка: в фикстурах
+# самого репозитория (data/c2_pool_samples) 119 транзакций версии 0, ДВАДЦАТЬ
+# ДВЕ версии 1 и 2 legacy. Один -32015 роняет весь тик, поэтому ряда не было
+# совсем.
+#
+# ОБРАЗЕЦ ЛЕЖАЛ РЯДОМ, и взят он, а не придуман: analysis/night_trade_
+# forensics.py, функция `продажи_кошелька` -- getTransaction с
+# {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1,
+#  "commitment": "finalized"} и getSignaturesForAddress с тем же
+# "commitment": "finalized".
+#
+# ПОЧЕМУ `finalized` ВЕЗДЕ, А НЕ ТОЛЬКО В getTransaction. Подтверждение обязано
+# быть ОДНО на все четыре вызова: если баланс и счета читать на `finalized`, а
+# транзакции разбирать на `confirmed`, то покупка уже легла в позицию по цене
+# входа, а SOL с кошелька по мнению узла ещё не ушёл -- капитал подскочит на
+# целый билет и опустится через секунды. Это ровно та ПИЛА, против которой
+# капитал и считается. Плюс `finalized` снимает двойной счёт на откате блока:
+# подтверждённую, но отменённую транзакцию мы бы разобрали и запомнили навсегда.
+# Цена -- запаздывание примерно на 13 секунд; для окон 1Ч/24Ч/3Д это ничто.
+МАКС_ВЕРСИЯ_TX = 1
+ПОДТВЕРЖДЕНИЕ = "finalized"
+НАСТРОЙКА_TX = {"encoding": "jsonParsed",
+                "maxSupportedTransactionVersion": МАКС_ВЕРСИЯ_TX,
+                "commitment": ПОДТВЕРЖДЕНИЕ}
+
 # ОКНА СТРАНИЦЫ И ШАГ СВЁРТКИ -- слово владельца: 1Ч минутой, 24Ч десятью
 # минутами, 3Д получасом; значение корзины -- ПОСЛЕДНЕЕ в ней.
 ОКНА = (
@@ -571,7 +603,8 @@ def sol_koshelka(rpc_call, koshelek: str, *, schjotchik=None) -> dict:
     """Лампорты кошелька и слот ответа."""
     if schjotchik:
         schjotchik.zov("getBalance")
-    р = _rezultat(rpc_call("getBalance", [koshelek, {"commitment": "confirmed"}]),
+    р = _rezultat(rpc_call("getBalance",
+                           [koshelek, {"commitment": ПОДТВЕРЖДЕНИЕ}]),
                   "getBalance")
     зн = р.get("value") if isinstance(р, dict) else р
     слот = ((р.get("context") or {}).get("slot") if isinstance(р, dict) else None)
@@ -592,7 +625,7 @@ def tokennye_scheta(rpc_call, koshelek: str, *, schjotchik=None) -> list:
         р = _rezultat(rpc_call("getTokenAccountsByOwner",
                                [koshelek, {"programId": прог},
                                 {"encoding": "jsonParsed",
-                                 "commitment": "confirmed"}]),
+                                 "commitment": ПОДТВЕРЖДЕНИЕ}]),
                       "getTokenAccountsByOwner")
         ряд = (р.get("value") if isinstance(р, dict) else р) or []
         if not isinstance(ряд, list):
@@ -647,7 +680,8 @@ def podpisi_koshelka(rpc_call, koshelek: str, *, do_sig: str | None = None,
     из_ = []
     до = None
     for _ in range(max(1, int(stranic))):
-        пар = {"limit": min(1000, int(predel)), "commitment": "confirmed"}
+        пар = {"limit": min(1000, int(predel)),
+               "commitment": ПОДТВЕРЖДЕНИЕ}
         if до:
             пар["before"] = до
         if do_sig:
@@ -665,13 +699,15 @@ def podpisi_koshelka(rpc_call, koshelek: str, *, do_sig: str | None = None,
 
 
 def tranzakciya(rpc_call, sig: str, *, schjotchik=None) -> dict:
-    """Разобранная транзакция. Версии 0 тоже нужны -- иначе узел откажет."""
+    """Разобранная транзакция. Настройка -- ОДНА на модуль, см. НАСТРОЙКА_TX.
+
+    Просить версию 0 нельзя: в цепи есть версия 1, и узел отвечает на неё
+    -32015, то есть роняет весь тик. Образец настройки взят у
+    night_trade_forensics.продажи_кошелька, а не придуман.
+    """
     if schjotchik:
         schjotchik.zov("getTransaction")
-    р = _rezultat(rpc_call("getTransaction",
-                           [sig, {"encoding": "jsonParsed",
-                                  "maxSupportedTransactionVersion": 0,
-                                  "commitment": "confirmed"}]),
+    р = _rezultat(rpc_call("getTransaction", [sig, dict(НАСТРОЙКА_TX)]),
                   "getTransaction")
     return р or {}
 
@@ -2336,7 +2372,7 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
 
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: меньше -- значит что-то пропущено молча, и
 # это считается провалом, а не мелочью.
-ZHDEM_PROVEROK = 87
+ZHDEM_PROVEROK = 92
 # СУТОЧНЫЕ ИТОГИ УЧЁТА ПОЛОСЫ -- ЗАМЕР ПО ФАЙЛУ data/sdelki_polosy_vse_s_2709.json
 # (снят 03.10T17:07Z, 578 рядов), поле «итог_po_cepi_sol» КИРИЛЛИЦЕЙ. Числа
 # объявлены, чтобы смена файла была видна числом, а не молчанием.
@@ -2375,6 +2411,11 @@ ZHDEM_PROVEROK = 87
 # эти сутки. Числа замерены по data/sdelki_polosy_2026-10-02_sutki-madrid-02-10
 # .json: 166 сделок с двумя частями, сумма +0.657385977 SOL.
 ЖДЁМ_СКВОЗНОЙ_СВЕРКИ = {"sdelok": 166, "lamports": 657_385_977}
+# ВЕРСИИ ТРАНЗАКЦИЙ В ФИКСТУРАХ РЕПОЗИТОРИЯ -- замер по data/c2_pool_samples
+# (11 файлов). Версия 1 в цепи ЕСТЬ, и ровно на ней узел отвечал -32015.
+ЖДЁМ_ВЕРСИЙ = {"0": 119, "1": 22, "legacy": 2}
+# Первый образец версии 1 по порядку файлов: CPMM, подпись hwWsyoRR3Med7Zbw…
+ЖДЁМ_ОБРАЗЦА_В1 = {"vid": "своп", "chistoe": -0.007601397}
 
 
 def _tx(*, kljuchi: list, do: list, posle: list, token_do=None,
@@ -3428,6 +3469,132 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             "выгрузка берётся от самого пути, а не относительным именем",
             "var БАЗА" in html and "location.pathname" in html
             and 'fetch(БАЗА + "kapital.json' in html, None)
+
+
+        # ------------------------- 15. ВЕРСИОННАЯ ТРАНЗАКЦИЯ: ТО, НА ЧЁМ ТРЕКЕР
+        #                              СТОЯЛ СУТКИ И НЕ ДАЛ НИ ОДНОЙ ЦИФРЫ
+        # Настройка запроса берётся у ОБРАЗЦА, а не из головы, и это проверяется
+        # по его исходнику -- не по памяти о нём.
+        п_обр = КОРЕНЬ / "analysis" / "night_trade_forensics.py"
+        ист_обр = (п_обр.read_text(encoding="utf-8") if п_обр.exists() else "")
+        нач = ист_обр.find("def продажи_кошелька")
+        кусок = ист_обр[нач:нач + 3000] if нач >= 0 else ""
+        chk("настройка getTransaction -- ровно та, что у образца "
+            "night_trade_forensics.продажи_кошелька (jsonParsed, "
+            f"maxSupportedTransactionVersion {МАКС_ВЕРСИЯ_TX}, "
+            f"commitment {ПОДТВЕРЖДЕНИЕ})",
+            bool(кусок)
+            and '"encoding": "jsonParsed"' in кусок
+            and f'"maxSupportedTransactionVersion": {МАКС_ВЕРСИЯ_TX}' in кусок
+            and f'"commitment": "{ПОДТВЕРЖДЕНИЕ}"' in кусок
+            and НАСТРОЙКА_TX == {"encoding": "jsonParsed",
+                                  "maxSupportedTransactionVersion": 1,
+                                  "commitment": "finalized"},
+            (bool(кусок), НАСТРОЙКА_TX))
+        # ВЕРСИЯ 1 В ЦЕПИ ЕСТЬ, И ЭТО ЗАМЕР ПО ФИКСТУРАМ РЕПОЗИТОРИЯ.
+        версии: dict = {}
+        образец_в1 = None
+        кат_ф2 = КОРЕНЬ / "data" / "c2_pool_samples"
+        for ф2 in sorted(кат_ф2.glob("*.json")) if кат_ф2.exists() else []:
+            for x2 in json.loads(ф2.read_text(encoding="utf-8")):
+                if not (isinstance(x2, dict) and isinstance(x2.get("tx"), dict)):
+                    continue
+                в2 = x2["tx"].get("version")
+                версии[str(в2)] = версии.get(str(в2), 0) + 1
+                if в2 == 1 and образец_в1 is None:
+                    образец_в1 = x2["tx"]
+        chk(f"в фикстурах репозитория версии транзакций {ЖДЁМ_ВЕРСИЙ} -- версия "
+            "1 в цепи ЕСТЬ, поэтому просить версию 0 значит получать -32015",
+            версии == ЖДЁМ_ВЕРСИЙ and образец_в1 is not None, версии)
+        if образец_в1 is not None:
+            ключи_в1 = (((образец_в1.get("transaction") or {}).get("message")
+                         or {}).get("accountKeys") or [])
+            подп_в1 = sorted(к.get("pubkey") for к in ключи_в1
+                             if isinstance(к, dict) and к.get("signer")
+                             and к.get("pubkey"))
+            р_в1 = razbor_tranzakcii(образец_в1, подп_в1[0])
+            чистое_в1 = round((р_в1["sol_delta"] + р_в1["renta_delta"])
+                              / ЛАМПОРТОВ_В_SOL, 9)
+            chk("ОБРАЗЕЦ ВЕРСИОННОЙ ТРАНЗАКЦИИ (version 1, живая, из фикстур) "
+                f"разбирается и даёт {ЖДЁМ_ОБРАЗЦА_В1['chistoe']} SOL -- то же, "
+                "что чужая формула на ней же",
+                р_в1["ok"] and р_в1["vid"] == ЖДЁМ_ОБРАЗЦА_В1["vid"]
+                and чистое_в1 == ЖДЁМ_ОБРАЗЦА_В1["chistoe"],
+                (р_в1["ok"], р_в1["vid"], чистое_в1))
+            # УЗЕЛ, КОТОРЫЙ ВЕДЁТ СЕБЯ КАК HELIUS: версия выше запрошенной --
+            # ошибка -32015, и она роняет ВЕСЬ тик. Это ровно то, что было на
+            # хосте; проверка существует, чтобы это не вернулось молча.
+            зовы_в1: list = []
+
+            def _узел_версий(метод, параметры):
+                зовы_в1.append((метод, параметры))
+                if метод == "getTransaction":
+                    хотим = int((параметры[1] or {}).get(
+                        "maxSupportedTransactionVersion", -1))
+                    if хотим < 1:
+                        return {"error": {
+                            "code": -32015,
+                            "message": ("Transaction version (1) is not "
+                                        "supported by the requesting client. "
+                                        "Please try the request again with the "
+                                        "following configuration parameter: "
+                                        "maxSupportedTransactionVersion: 1")}}
+                    return {"result": образец_в1}
+                if метод == "getBalance":
+                    return {"result": {"context": {"slot": 1}, "value": SOL0}}
+                if метод == "getTokenAccountsByOwner":
+                    return {"result": {"context": {"slot": 1}, "value": []}}
+                if метод == "getSignaturesForAddress":
+                    # Время подписи -- свежее окна восстановления, иначе она
+                    # отбросится как старая и до getTransaction дело не дойдёт.
+                    return {"result": [{"signature": "v1",
+                                        "blockTime": 1_700_000_400}]}
+                return {"result": None}
+            вышло = tranzakciya(_узел_версий, "v1")
+            было_наст = dict(НАСТРОЙКА_TX)
+            СТАРАЯ_ВЕРСИЯ = 0
+            try:
+                НАСТРОЙКА_TX["maxSupportedTransactionVersion"] = СТАРАЯ_ВЕРСИЯ
+                упало = None
+                try:
+                    tranzakciya(_узел_версий, "v1")
+                except ОшибкаТрекера as сбой_в1:
+                    упало = str(сбой_в1)
+                кат_в1 = врем / "versija"
+                р_тик = progon(кат_в1, rpc_call=_узел_версий, koshelek=КОШ,
+                               sejchas=1_700_000_500)
+            finally:
+                НАСТРОЙКА_TX.clear()
+                НАСТРОЙКА_TX.update(было_наст)
+            chk("с просьбой о версии 0 узел отвечает -32015, ОДИН такой ответ "
+                "роняет ВЕСЬ тик и kapital.json не создаётся -- ровно то, что "
+                "было на хосте 03--04.10; с версией 1 транзакция приходит",
+                вышло and вышло.get("version") == 1
+                and упало and "-32015" in упало
+                and not р_тик.get("ok")
+                and "32015" in (р_тик.get("why_not") or "")
+                and not (кат_в1 / ФАЙЛ_ВЫГРУЗКИ).exists(),
+                (bool(вышло), упало, р_тик.get("why_not"),
+                 (кат_в1 / ФАЙЛ_ВЫГРУЗКИ).exists()))
+        # ПОДТВЕРЖДЕНИЕ -- ОДНО НА ВСЕ ЧЕТЫРЕ ВЫЗОВА. Разное подтверждение у
+        # баланса и у транзакций даёт ту самую ПИЛУ: покупка уже в позиции, а
+        # SOL по мнению узла ещё на кошельке.
+        зовы_п: list = []
+
+        def _узел_зовов(метод, параметры):
+            зовы_п.append((метод, параметры))
+            return узел_сш(метод, параметры)
+        progon(врем / "podtverzhdenie", rpc_call=_узел_зовов, koshelek=КОШ,
+               sejchas=1_700_000_600)
+        подтв = {м: ((п[1] if м == "getBalance" else
+                      (п[2] if м == "getTokenAccountsByOwner" else p1))
+                     or {}).get("commitment")
+                 for м, п in зовы_п
+                 for p1 in [п[1] if len(п) > 1 else {}]}
+        chk(f"подтверждение «{ПОДТВЕРЖДЕНИЕ}» стоит во ВСЕХ вызовах цепи, а не "
+            "только в getTransaction: разное подтверждение у баланса и у "
+            "транзакций даёт пилу на целый билет",
+            зовы_п and set(подтв.values()) == {ПОДТВЕРЖДЕНИЕ}, подтв)
 
     finally:
         shutil.rmtree(врем, ignore_errors=True)
