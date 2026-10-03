@@ -82,13 +82,32 @@ jobs:
             # правка его унесла, здесь печатается ряд копий с ответом да/нет по
             # каждому следящему имени. Значения не печатаются никогда.
             echo '--- sledim za imenami po kopijam (est/net, bez znachenij) ---'
-            for b in $ENV_DIR/env \$(ls -1t $ENV_DIR/env.bak.* 2>/dev/null | head -8); do
+            for b in $ENV_DIR/env \$(ls -1t $ENV_DIR/env.bak.* 2>/dev/null | head -40); do
               stroka=\"\$b\"
               for n in BLOOM_SOURCE_GROUPS BLOOM_COPIERS_FILE CLOSE_ACCOUNTS_LIVE BLOOM_CLOSE_ON_SELL BLOOM_DLMM_ODNO_CHTENIE BLOOM_USDC_NOGA LANE_DAILY_LOSS_SOL; do
                 if grep -q \"^\$n=\" \"\$b\" 2>/dev/null; then stroka=\"\$stroka \$n:est\"; else stroka=\"\$stroka \$n:NET\"; fi
               done
               echo \"\$stroka\"
-            done" | tee -a "$OUT"
+            done
+            # ОТКУДА СЛУЖБА БЕРЁТ ПЕРЕМЕННЫЕ, КРОМЕ ФАЙЛА ОКРУЖЕНИЯ. Найдено
+            # 03.10: BLOOM_SOURCE_GROUPS нет ни в одной копии env назад до
+            # 02.10, а политики у детектора весь день были -- значит путь
+            # приходил не из этого файла. Юнит systemd может нести свои строки
+            # Environment=, и тогда правка env их не видит вовсе. Печатаются
+            # ТОЛЬКО имена и имена файлов окружения, без значений.
+            echo '--- otkuda sluzhby berut peremennye (imena, bez znachenij) ---'
+            for u in bloom-detector bloom-seller; do
+              f=/etc/systemd/system/\$u.service
+              [ -f \"\$f\" ] || { echo \"\$u: junita net po puti \$f\"; continue; }
+              echo \"\$u EnvironmentFile: \$(grep -c '^EnvironmentFile=' \"\$f\")\"
+              grep -o '^EnvironmentFile=.*' \"\$f\" || true
+              echo \"\$u strok Environment=: \$(grep -c '^Environment=' \"\$f\")\"
+              grep -oE '^Environment=\"?[A-Za-z_][A-Za-z0-9_]*' \"\$f\" | sed 's/^Environment=\"\?//' | sort || true
+              echo \"\$u WorkingDirectory: \$(grep -o '^WorkingDirectory=.*' \"\$f\" || echo net)\"
+            done
+            echo '--- fajl grupp na hoste: chto lezhit rjadom ---'
+            ls -la /home/bot/data/ 2>/dev/null | grep -iE 'sources|groups' || echo 'katalog /home/bot/data ne prochitan'
+            ls -la /home/bot/bloom_executor/data/ 2>/dev/null | grep -iE 'sources|groups' || echo 'kataloga /home/bot/bloom_executor/data net'" | tee -a "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
         if: always()
