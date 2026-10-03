@@ -20,6 +20,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import c2_common as C  # noqa: E402
+
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 П = КОРЕНЬ / "data" / "podbivka"
 ЛАМП = 1_000_000_000
@@ -49,15 +51,18 @@ def разбор(тх: dict, кошельки: set, чаевые_счета: dic
     из_ = {"ok": False, "комиссия_sol": None, "чаевые_sol": 0.0, "по_сервисам": {},
            "наш_натив_sol": None, "why_not": None}
     мета = (тх or {}).get("meta") or {}
-    кл = ((тх or {}).get("transaction") or {}).get("accountKeys")
+    # КЛЮЧИ ЛЕЖАТ В transaction.message.accountKeys (и частью в meta.loadedAddresses):
+    # первый заход читал transaction.accountKeys и получил 0 из 261 с причиной
+    # «в транзакции нет балансов или ключей». Берём тем же помощником, что весь разбор цепи.
+    кл = C.account_keys(тх)
     pre, post = мета.get("preBalances"), мета.get("postBalances")
     if not кл or not pre or not post or len(pre) != len(post) or len(кл) != len(pre):
-        из_["why_not"] = "в транзакции нет балансов или ключей"
+        из_["why_not"] = (f"ключей {len(кл or [])}, балансов {len(pre or [])}/{len(post or [])}"
+                          if (кл or pre) else "в транзакции нет балансов и ключей")
         return из_
     из_["комиссия_sol"] = round(int(мета.get("fee") or 0) / ЛАМП, 9)
     наш = 0
-    for i, k in enumerate(кл):
-        адр = k.get("pubkey") if isinstance(k, dict) else k
+    for i, адр in enumerate(кл):
         д = int(post[i]) - int(pre[i])
         if адр in кошельки:
             наш += д
@@ -105,7 +110,7 @@ def main() -> int:
                 счёт["не_отдано"] += 1
             из_.append(строка)
     out = П / "rashod_prodazhi.json"
-    out.write_text(json.dumps({"счёт": счёт, "вызовов": уз.вызовов, "сделки": из_},
+    out.write_text(json.dumps({"счёт": счёт, "расход_узла": уз.расход(), "сделки": из_},
                               ensure_ascii=False, indent=1), encoding="utf-8")
     R.записано(out)
     гот = [x for x in из_ if x.get("расход_всего_sol") is not None]
