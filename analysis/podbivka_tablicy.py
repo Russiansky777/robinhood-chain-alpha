@@ -141,12 +141,21 @@ _РЯД: list = []
 
 
 def курс_детектора(bt) -> float | None:
-    """USD за SOL из data/podbivka/kurs_sol_usd.json -- ближайший снимок не дальше 12 ч."""
+    """USD за SOL -- ближайший снимок не дальше 12 ч.
+
+    ДВА РЯДА: снимки детектора (data/podbivka/kurs_sol_usd.json, GeckoTerminal из признака
+    жизни) и часовой ряд по ОПОРНОМУ пулу SOL/USDC (kurs_sol_usd_opornyy.json, прогон
+    podbivka_kurs_opornyy.py). Первый кончился 26.09 17:11Z, и из-за этого в проходах архива
+    с 27.09 ветка «USD-котировка» не включалась: стейблы получали курс, выведенный из пар
+    архива, завышенный в 3.2 раза по медиане. Берётся ближайший снимок из ОБОИХ рядов.
+    """
     import calendar
     import time
     if not _РЯД:
-        п = КОРЕНЬ / "data" / "podbivka" / "kurs_sol_usd.json"
-        if п.exists():
+        for имя in ("kurs_sol_usd.json", "kurs_sol_usd_opornyy.json"):
+            п = КОРЕНЬ / "data" / "podbivka" / имя
+            if not п.exists():
+                continue
             for x in json.loads(п.read_text(encoding="utf-8"))["ряд"]:
                 _РЯД.append((calendar.timegm(time.strptime(x["utc"], "%Y-%m-%dT%H:%M:%SZ")), x["usd_sol"]))
     if not _РЯД or not bt:

@@ -62,10 +62,16 @@ def имя_кв(q: str | None, имена: dict) -> str:
 
 
 def сбор(а) -> dict:
-    """Покупки лидера по цепи в окне: он владелец получившего токен-счёта или подписант."""
+    """Покупки адреса по цепи в окне: он владелец получившего токен-счёта или подписант.
+
+    Адрес -- `--adres` (по умолчанию лидер Beqv6dzT), файл вывода -- `--out`. Тем же сбором
+    считаются и адреса торгующих групп (сколько их первых покупок от 2 SOL-экв и сколько из
+    них прошло ЧУЖОЙ подписью) -- задание владельца 03.10, п.3.
+    """
     import podbivka_run as R  # noqa: PLC0415
     import podbivka_sim as S  # noqa: PLC0415
     import podbivka_rezhim2 as R2  # noqa: PLC0415
+    адрес = getattr(а, "adres", "") or ЛИДЕР
     с_ts = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H:%M:%SZ"))
     до_ts = calendar.timegm(time.strptime(а.do, "%Y-%m-%dT%H:%M:%SZ")) if а.do else None
     уз = S.Узел()
@@ -74,7 +80,7 @@ def сбор(а) -> dict:
     with уз.на("helius"):
         while страниц < а.stranic:
             try:
-                стр = уз.подписи(ЛИДЕР, до=до, limit=1000)
+                стр = уз.подписи(адрес, до=до, limit=1000)
             except Exception as exc:  # noqa: BLE001
                 сбои.append(f"страница {страниц}: {type(exc).__name__}: {S.чисто(str(exc))[:200]}")
                 break
@@ -109,18 +115,18 @@ def сбор(а) -> dict:
                 if not прог:
                     счёт["без_пула"] += 1
                     continue
-                к = L.разбор_упоминания(т, ЛИДЕР)
+                к = L.разбор_упоминания(т, адрес)
                 if not (к["получил_токен"] or (к["подписант"] and к["владелец_токенсчёта"])):
                     счёт["не_покупатель"] += 1
                     continue
                 ряды = [r for r in C.token_rows(т).values()
-                        if r["owner"] == ЛИДЕР and r["post"] > r["pre"] and r["mint"] not in SOLы]
+                        if r["owner"] == адрес and r["post"] > r["pre"] and r["mint"] not in SOLы]
                 if not ряды:
                     счёт["нет_прихода_токена"] += 1
                     continue
                 ряды.sort(key=lambda r: r["post"] - r["pre"], reverse=True)
                 минт = ряды[0]["mint"]
-                пул = C.identify_pool(т, ЛИДЕР, минт)
+                пул = C.identify_pool(т, адрес, минт)
                 if not пул.get("pool_vault"):
                     счёт["пул_не_опознан"] += 1
                     continue
@@ -154,7 +160,7 @@ def сбор(а) -> dict:
                         sol_экв, сырое = None, None
                 import c2_pool_programs as PP  # noqa: PLC0415
                 прг = PP.pool_program(т, пул["pool_vault"], PP.labels()).get("pool_program")
-                покупки.append({"signature": з["signature"], "mint": минт, "wallet": ЛИДЕР,
+                покупки.append({"signature": з["signature"], "mint": минт, "wallet": адрес,
                                 "blockTime": з.get("blockTime"), "slot": т.get("slot"),
                                 "sol_экв": sol_экв, "quote_mint": q, "quote_raw": сырое,
                                 "program": прг, "программа": L.ИМЕНА.get(прг) or (прг or "")[:8],
@@ -176,12 +182,12 @@ def сбор(а) -> dict:
             p["слотов_от_предыдущей"] = сл - пред
             p["вид"] = "докупка" if сл - пред < 1800 else "первая"
         посл[p["mint"]] = сл
-    из_ = {"адрес": ЛИДЕР, "с_utc": а.s, "до_utc": а.do or "сейчас",
+    из_ = {"адрес": адрес, "с_utc": а.s, "до_utc": а.do or "сейчас",
            "подписей": len(подписи), "упавших": len(подписи) - len(удачных),
            "счёт": dict(счёт), "сбои": сбои[:50], "сбоев": len(сбои),
            "курсы_котировочных": {k: v[1] for k, v in курсы.items()},
            "покупки": покупки, "расход": уз.расход()}
-    out = П / "lider_cep_pokupki.json"
+    out = П / (getattr(а, "out", "") or "lider_cep_pokupki.json")
     out.write_text(json.dumps(из_, ensure_ascii=False, indent=1), encoding="utf-8")
     R.записано(out)
     print(f"сбор: подписей {len(подписи)}, страниц {страниц}, покупок {счёт['покупок']}, "
@@ -372,6 +378,8 @@ def свод(а) -> int:
 
 def main() -> int:
     р = argparse.ArgumentParser()
+    р.add_argument("--adres", default="", help="чей адрес (по умолчанию лидер)")
+    р.add_argument("--out", default="", help="имя файла в data/podbivka (по умолчанию lider_cep_pokupki.json)")
     р.add_argument("--s", default="2026-09-26T12:00:00Z")
     р.add_argument("--do", default="")
     р.add_argument("--stranic", type=int, default=40)
