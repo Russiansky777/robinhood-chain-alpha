@@ -1,6 +1,6 @@
 # USDC-нога для типов, куда идут сигналы: как врезать, что проверено и чего нет
 
-Модуль: `analysis/c3_usdc_noga_signaly.py` (самопроверка **174/174**,
+Модуль: `analysis/c3_usdc_noga_signaly.py` (самопроверка **180/180**,
 `python3 analysis/c3_usdc_noga_signaly.py`). Замер таблицей:
 `python3 analysis/c3_usdc_noga_signaly.py --zamer data/c3_usdc_noga_signaly/zamer.json`.
 База — голова `claude/nifty-sagan-r0polg`, слита в `claude/stroiteli` (правило 8).
@@ -319,6 +319,96 @@ Token-2022, и с ней выходил другой адрес) и в `user_acc
 Мой модуль продолжает выводить места сам (`mesta_krivoj_v2`), и самопроверка
 теперь сверяет **два независимых вывода — его и мой — значение в значение**: оба
 дают одни и те же пять мест. Расхождение значило бы, что один из них сломался.
+
+## 7г. Кривая v2 с ФИКСИРОВАННЫМИ получателями: набор адресов и размер
+
+Слово владельца 03.10: всегда один свой получатель из `Global`. Сделано, и вот
+чем это подтверждено.
+
+### Какое ограничение стоит на счёте
+
+| источник | что говорит |
+|---|---|
+| **IDL** (`idl/pump.json`, `buy_exact_quote_in_v2`) | у счёта 6 `fee_recipient` и счёта 8 `buyback_fee_recipient` **нет ни `pda`, ни `relations`** — только `writable`. Значит адрес **не выводится семенами**, и проверка живёт внутри программы |
+| **IDL, счёт `Global`** | `fee_recipient` + `fee_recipients[7]` = **8** обычных; `reserved_fee_recipient` + `reserved_fee_recipients[7]` = **8** для mayhem; `buyback_fee_recipients[8]` = **8** buyback |
+| **ошибки программы** | `6057 BuybackFeeRecipientNotAuthorized`, `6029 UnsortedNotUniqueFeeRecipients`, `6061 buyback fee recipients require exactly 8 remaining accounts (or none)`, `6058/6059` про непустые и неуникальные |
+| **публичные документы** | `docs/FEE_RECIPIENTS.md`: «There are 24 fee recipient addresses in total: 8 normal … 8 reserved … 8 buyback»; «For non-mayhem coins, choose **one of** the normal fee recipients» |
+| **замер по цепи** | на живых v2-сделках (включая **нашу собственную** покупку `Nhe6axYT1eHB…`) на месте 6 стояли **4 разных** обычных получателя, на месте 8 — **4 разных** buyback, и все сделки сели |
+
+То есть ограничение — **принадлежность списку из восьми**, а не фиксированный
+адрес: программа примет любого из своих, и выбрать своего можно. Все 24 адреса
+лежат в модуле константами (`POLUCHATELI_OBYCHNYE / _MAYHEM / _BUYBACK`), и
+самопроверка сверяет их со всеми живыми: каждый увиденный на цепи получатель
+обязан быть в списке, иначе списки устарели.
+
+**ATA получателей — наоборот, выводимые**: в IDL у счетов 7 и 9 стоит
+`pda.seeds = [получатель, quote_token_program, quote_mint]` под ATA-программой.
+Поэтому для нашего получателя ATA постоянен для каждой котировки.
+
+### Наш выбор — и почему именно этот
+
+```
+получатель комиссии  7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX   (обычный #2)
+buyback-получатель   5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD   (buyback #6)
+для mayhem-монет     GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS   (reserved #0)
+```
+
+Первые два **уже лежат в таблице адресов полосы** — те же получатели
+обслуживают пул первой ноги SOL → USDC, — и их **ATA для WSOL тоже уже там**.
+То есть фиксация выбора сама по себе не стоит ни одного нового адреса и сразу
+снимает 32…64 байта с пакета. Mayhem-получатель живой сделкой не проверен: монет
+в mayhem у нас не было ни одной, и это сказано полем.
+
+### Набор для таблицы — 18 адресов, из них 7 уже в ней
+
+Полный список с состоянием каждого адреса:
+`data/c3_usdc_noga_signaly/krivaya_v2_nabor_adresov.json` (считается
+`nabor_adresov_dlya_tablicy()`, адресов в коде нет — выводятся числом).
+**Добавить 11**, а без mayhem — **8**:
+
+| адрес | что |
+|---|---|
+| `FC6zaBZjnJ1tF5nY4b2nrPgu62thjXdRkk2sEtjxU16E` | ATA получателя для USDC |
+| `BJQ1HTx43bBDF1ba8GfZAfxSMZneTmQNr5m9yUfx6vAu` | ATA buyback для USDC |
+| `2xysiaXVPiqvRWr31xb9AvrwpD8Nc8gGYjZBnRwDbBUh` | наш накопитель объёма (PDA, кошелёк `4dPZMbRe…`) |
+| `LqccLat2Kxr96Af1YxwrZ6XcqZPYPoUnuHeuEBgRk7W` | ATA накопителя для USDC |
+| `4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf` | `global` (PDA["global"]) |
+| `Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y` | `global_volume_accumulator` |
+| `8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt` | `fee_config` |
+| `Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1` | `event_authority` |
+| `GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS` | получатель для mayhem (reserved) |
+| `C93K8DX4YsABYJtHX9awzgZW3LWzBqBVezEbbLJH4yet` | ATA mayhem-получателя для WSOL |
+| `41xY1DU1zzo893bEg2HzTFxPVVM84UvDCNsQm6aKRq8Z` | ATA mayhem-получателя для USDC |
+
+Таблица станет **45 адресов** (была 34). Чего в наборе НЕТ: счетов пула (кривая,
+её хранилища, минт базы) и счетов создателя — они у каждой монеты свои.
+
+### Размер кривой v2 в БОЕВОМ режиме (nonce + чужой чаевый)
+
+Замер на живом образце `3bn6wPKuLm…`, с нашими получателями и нашими местами
+продажи. «+N» — сколько адресов добавлено в таблицу:
+
+| добавка | покупка | продажа | продажа без закрытия счёта |
+|---|---|---|---|
+| ничего | 1323 ❌ | 1331 ❌ | 1293 ❌ |
+| **+4** (постоянные программы) | **1199 ✅** | 1238 ❌ | **1200 ✅** |
+| +6 (+2 ATA получателей для USDC) | 1199 ✅ | 1238 ❌ | 1200 ✅ |
+| **+8** (+накопитель и его ATA) | **1168 ✅** | **1207 ✅** | **1169 ✅** |
+
+**Восьми адресов хватает и покупке, и продаже** — с закрытием токенового счёта
+той же транзакцией. На четырёх продажа влезает только без закрытия.
+
+Два уточнения, оба в нашу пользу:
+
+* на образце котировка — **Token-2022-токен**, и ATA получателей для НЕГО в
+  таблице нет; на настоящей USDC-котировке в пакете стоят их **USDC**-ATA,
+  которые в таблицу добавляются, то есть пакет будет **ещё на ~62 байта меньше**;
+* числа «продажи» считаны с подстановкой наших мест: до этой правки шаблон
+  продажи нёс места и получателей из ЧУЖОЙ покупки (1331 → было бы 1458), и это
+  не только размер — такая продажа ушла бы с чужими счетами. Теперь
+  `nashi_mesta_prodazhi_v2` подставляет все девять наших мест и выставляет им
+  `writable` по IDL, а `c3_prodavec_sborka.места_кривая_v2` (чужая проверка)
+  подтверждает вывод по семенам.
 
 ## 7в. Диф №5 (Code-1, `c2_swap_build`) — порядок резервов у LaunchLab обратный
 
