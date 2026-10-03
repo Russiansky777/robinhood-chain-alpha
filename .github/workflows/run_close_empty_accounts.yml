@@ -42,6 +42,10 @@ on:
         description: "'yes' -- разрешить без стоящего рубильника KILL (по умолчанию нельзя)"
         required: false
         default: "no"
+      min_age_s:
+        description: "окно молодости в секундах (0 -- по политикам групп: max(hold_slots)*0.4 + 600)"
+        required: false
+        default: "0"
 
 concurrency:
   group: close-empty-accounts
@@ -128,6 +132,7 @@ jobs:
               PYTHONPATH=$CODE_DIR \
               /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py \
                 $WALLET_ARG $FIRST \
+                --min-age-s '${{ inputs.min_age_s }}' \
                 --batch '${{ inputs.batch }}' \
                 --max-batches '${{ inputs.max_batches }}' \
                 --out /tmp/close_accounts_plan.json \
