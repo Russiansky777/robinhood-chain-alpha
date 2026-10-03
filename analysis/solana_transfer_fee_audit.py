@@ -365,6 +365,70 @@ def closed_trades() -> list:
             and x.get("bot") != "tradewiz"]
 
 
+def polosa_trades(с_utc: str = "2026-09-27T00:00:00Z") -> list:
+    """Сделки ПОЛОСЫ в той же форме, что у closed_trades, из выгрузок полосы.
+
+    ЗАЧЕМ (слово владельца 03.10, п.5а: "полоса 4dPZMbRe с 27.09 --
+    run_solana_transfer_fee_audit"). Проверено числом: в data/solana_trades_all.json
+    у кошелька полосы 4dPZMbRe НОЛЬ строк (там 10849 dbot, 425 bloom, 3 tradewiz),
+    то есть closed_trades() сделок полосы не видит ВОВСЕ и аудит по ним молча
+    посчитал бы ноль. Источник сделок полосы -- её собственные выгрузки
+    data/sdelki_polosy_*.json, снятые с хоста: в них есть и подписи, и группа.
+
+    ГРУППА ВСТАЁТ НА МЕСТО ЗАДАЧИ: по_задачам в своде -- это и есть разбивка
+    "по группам", которую просил владелец, без второй таблицы.
+
+    Одна сделка -- один cid. Выгрузок за сутки несколько и они пересекаются,
+    поэтому записи сливаются по cid, а не складываются.
+    """
+    import datetime as _dt  # noqa: PLC0415
+    граница = _dt.datetime.strptime(с_utc, "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=_dt.timezone.utc).timestamp()
+    слито: dict = {}
+    for ф in sorted((REPO_ROOT / "data").glob("sdelki_polosy_*.json")):
+        try:
+            д = json.loads(ф.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        for x in (д.get("ряды") or []):
+            cid = x.get("cid")
+            т = x.get("utc")
+            if not cid or not т:
+                continue
+            try:
+                ts = _dt.datetime.strptime(т, "%Y-%m-%dT%H:%M:%SZ").replace(
+                    tzinfo=_dt.timezone.utc).timestamp()
+            except ValueError:
+                continue
+            if ts < граница:
+                continue
+            слито.setdefault(cid, {}).update({к: v for к, v in x.items()
+                                               if v is not None})
+    из_ = []
+    for cid, x in слито.items():
+        buy = x.get("buy_sig") or x.get("landed_sig")
+        sell = x.get("sell_sig")
+        if not (buy and sell and x.get("mint")):
+            continue
+        # ЗНАКИ -- КАК У УЧЁТА ПЛОЩАДКИ, иначе свод посчитал бы другое:
+        # sol_in положительный (вложено), sol_out -- возврат, net_sol -- итог
+        # ПО ЦЕПИ из самой выгрузки (поле итог_sol, оно же lane_chain_pnl_sol).
+        # Своей арифметики итога здесь нет: у полосы он уже посчитан по цепи.
+        из_.append({"buy_signature": buy, "sell_signature": sell,
+                     "mint": x["mint"], "task_name": x.get("group") or "без группы",
+                     "sol_in": float(x.get("sol_in") or 0.0),
+                     "sol_out": float(x.get("возврат_sol") or 0.0),
+                     "net_sol": (None if x.get("итог_sol") is None
+                                 else float(x["итог_sol"])),
+                     "итог_откуда": x.get("итог_откуда"),
+                     "источник": x.get("source"), "источник_метка": None,
+                     "кошелёк": x.get("wallet") or "",
+                     "held_seconds": x.get("hold_s_fact"), "gross_pct": None,
+                     "client_order_id": cid, "bot": "polosa"})
+    из_.sort(key=lambda q: q["client_order_id"])
+    return из_
+
+
 def find_pair_trades(rpc, wallet: str, mint: str, limit: int = 300) -> list:
     """Сделки кошелька по минту -- по его же подписям, а не по учёту:
     свежие сделки в учёт попадают с задержкой."""
@@ -432,6 +496,11 @@ def main() -> None:
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--min-interval-s", type=float, default=0.05)
     ap.add_argument("--limit", type=int, default=0, help="ограничить число сделок (отладка)")
+    ap.add_argument("--istochnik", default="dbot", choices=("dbot", "polosa"),
+                    help="чьи сделки считать: dbot (учёт площадки) или polosa "
+                         "(выгрузки полосы -- её сделок в учёте площадки НЕТ)")
+    ap.add_argument("--s-utc", default="2026-09-27T00:00:00Z",
+                    help="граница окна для --istochnik polosa")
     args = ap.parse_args()
     if args.self_test:
         self_test()
@@ -463,7 +532,18 @@ def main() -> None:
     rep["пары"] = пары
 
     # 3. Свод по закрытым сделкам.
-    trades = closed_trades()
+    trades = (polosa_trades(args.s_utc) if args.istochnik == "polosa"
+              else closed_trades())
+    rep["источник_сделок"] = args.istochnik
+    if args.istochnik == "polosa":
+        rep["окно_полосы_с"] = args.s_utc
+        rep["ЧЕСТНЫЕ_ОГОВОРКИ"] = [*rep["ЧЕСТНЫЕ_ОГОВОРКИ"],
+            "Сделки полосы взяты из её выгрузок data/sdelki_polosy_*.json: в учёте "
+            "площадки (solana_trades_all.json) у кошелька полосы НОЛЬ строк. Что в "
+            "выгрузки не попало -- в этот свод не попало тоже, и это предел охвата, "
+            "а не ноль налога.",
+            "Разбивка 'по задачам' здесь -- это разбивка ПО ГРУППАМ полосы: имя "
+            "группы встаёт на место имени задачи."]
     if args.limit:
         trades = trades[:args.limit]
     cache = load_cache()
