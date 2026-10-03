@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       groups:
-        description: "группы через запятую (speed_only; пусто -- выключить кривую)"
+        description: "группы через запятую, или слово UDALIT -- убрать оба ключа кривой из env"
         required: false
         default: "speed_only"
       restart_detector:
@@ -76,11 +76,26 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             cp -a $ENV_DIR/env $ENV_DIR/env.bak-curve-\$(date -u +%Y%m%dT%H%M%SZ)
             sed -i '/^LANE_BONDING_CURVE=/d; /^LANE_BONDING_CURVE_GROUPS=/d' $ENV_DIR/env
-            echo 'LANE_BONDING_CURVE_GROUPS=${{ inputs.groups }}' >> $ENV_DIR/env
+            # УДАЛЕНИЕ -- ПО СЛОВУ UDALIT, А НЕ ПО ПУСТОМУ ВХОДУ. И вот почему
+            # именно так, ценой моей же ошибки 02.10 15:25Z: я сделал удаление
+            # по пустому входу и запустил прогон с groups=''. GitHub на ПУСТОЙ
+            # вход workflow_dispatch подставляет УМОЛЧАНИЕ, то есть в выражение
+            # пришло 'speed_only' -- условие не сработало, и в env вместо четырёх
+            # мёртвых групп легла одна строка speed_only. Поведение не
+            # изменилось (список типов берётся из файла групп), но цель пункта не
+            # была достигнута, а env я тронул не так, как собирался. Явное слово
+            # подстановке умолчания не подвержено.
+            if [ '${{ inputs.groups }}' = 'UDALIT' ] || [ -z '${{ inputs.groups }}' ]; then
+              echo 'groups=UDALIT: oba klyucha krivoj udaleny iz env, stroki net'
+            else
+              echo 'LANE_BONDING_CURVE_GROUPS=${{ inputs.groups }}' >> $ENV_DIR/env
+            fi
             chmod 600 $ENV_DIR/env
             grep -E '^LANE_BONDING_CURVE' $ENV_DIR/env
             echo '--- ключей в env всего ---'
-            grep -c '=' $ENV_DIR/env"
+            grep -c '=' $ENV_DIR/env
+            echo '--- строки кривой после правки (пусто -- их нет) ---'
+            grep -E '^LANE_BONDING_CURVE' $ENV_DIR/env || echo 'strok krivoj v env net'"
 
       - name: "Перезапуск детектора (по флагу)"
         if: ${{ inputs.restart_detector == 'yes' }}

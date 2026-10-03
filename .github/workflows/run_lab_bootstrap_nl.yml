@@ -199,28 +199,68 @@ jobs:
           # кошельков, env полосы, торговых служб -- никогда". Обещание живёт
           # ровно до первого прогона, который что-то скопирует "на минутку";
           # проверка роняет прогон и называет находку.
-          ssh -n $SSH_OPTS root@$HOST "
-            set -e
-            NAJDENO=0
-            for P in /etc/bloom-executor /home/bot/bloom_executor /home/bot/bloom_executor_live_data; do
-              if [ -e \"\$P\" ]; then echo \"NAJDENO: \$P\"; NAJDENO=1; fi
-            done
-            for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe shred-listener; do
-              if systemctl list-unit-files \"\$S.service\" 2>/dev/null | grep -q \"\$S\"; then
-                echo \"NAJDENO: sluzhba \$S\"; NAJDENO=1
-              fi
-            done
-            # Имена ключей кошельков ищутся ПО ИМЕНИ ПЕРЕМЕННОЙ, значения не
-            # печатаются никогда.
-            if grep -rlE '(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)' /etc /home 2>/dev/null | head -3 | grep -q .; then
-              echo 'NAJDENO: imja kljucha koshelka v fajlah /etc ili /home'
+          #
+          # ПОЧЕМУ У ГРЕПА ЕСТЬ ИСКЛЮЧЕНИЕ, И ПОЧЕМУ ЭТО НЕ ОСЛАБЛЕНИЕ.
+          # ЖИВОЙ СЛУЧАЙ: 30.09 страж прошёл, бегунок lab-miami встал. Он
+          # отработал задание -- и GitHub Actions САМ положил НАШ репозиторий в
+          # /home/ghrunner/actions-runner/_work/robinhood-chain-alpha/. С этой
+          # минуты страж находил в нём 12 файлов (прогоны и модули, где имя
+          # EXEC_WALLET_KEY стоит законно: в прогоне -- ссылкой на секрет, в
+          # коде -- чтением os.environ[…]) и
+          # отказывал. Получалась ловушка: бегунок не может работать без
+          # рабочего дерева, а с рабочим деревом страж больше никогда не пройдёт
+          # -- ровно это и держало lab-miami внизу 01 и 02.10, а не общий ключ.
+          # Поэтому ВНЕ рабочего дерева бегунка правило то же: любое ИМЯ ключа --
+          # отказ. ВНУТРИ рабочего дерева отказ даёт только ЗНАЧЕНИЕ ключа
+          # (base58 от 32 знаков или массив байтов), а не упоминание имени:
+          # имя в нашем же исходнике -- не ключ на машине. Содержимое файлов не
+          # печатается никогда, наружу идут только имена файлов.
+          ssh $SSH_OPTS root@$HOST 'bash -s' <<'PROVERKA' | tee -a "$OUT_FILE"
+          set -e
+          NAJDENO=0
+          for P in /etc/bloom-executor /home/bot/bloom_executor /home/bot/bloom_executor_live_data; do
+            if [ -e "$P" ]; then echo "NAJDENO: $P"; NAJDENO=1; fi
+          done
+          for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe shred-listener; do
+            if systemctl list-unit-files "$S.service" 2>/dev/null | grep -q "$S"; then
+              echo "NAJDENO: sluzhba $S"; NAJDENO=1
+            fi
+          done
+          # Имена ключей кошельков ищутся ПО ИМЕНИ ПЕРЕМЕННОЙ, значения не
+          # печатаются никогда.
+          IMENA='(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|BLOOM_LIVE_TESTS_KEY|LANE_WALLET_KEY)'
+          VSE=$(grep -rlE "$IMENA" /etc /home 2>/dev/null || true)
+          # Рабочее дерево ищется, а не вписывается: пользователь бегунка -- вход
+          # прогона, и зашитый 'ghrunner' тихо перестал бы совпадать.
+          DEREVO=$(ls -d /home/*/actions-runner/_work 2>/dev/null | head -1)
+          SNARUZHI="$VSE"
+          VNUTRI=''
+          if [ -n "$DEREVO" ] && [ -n "$VSE" ]; then
+            SNARUZHI=$(printf '%s\n' "$VSE" | grep -v "^$DEREVO/" || true)
+            VNUTRI=$(printf '%s\n' "$VSE" | grep "^$DEREVO/" || true)
+          fi
+          if [ -n "$SNARUZHI" ]; then
+            echo 'NAJDENO: imja kljucha koshelka v fajlah /etc ili /home vne rabochego dereva begunka; puti nizhe (tolko imena fajlov):'
+            printf '  %s\n' $(printf '%s\n' "$SNARUZHI" | head -20)
+            echo "vsego takih fajlov: $(printf '%s\n' "$SNARUZHI" | grep -c . || true)"
+            NAJDENO=1
+          fi
+          if [ -n "$VNUTRI" ]; then
+            SO_ZNACHENIEM=$(printf '%s\n' "$VNUTRI" | xargs -r grep -lE "$IMENA[[:space:]]*[=:][[:space:]]*['\"]?([1-9A-HJ-NP-Za-km-z]{32,}|\[?[[:space:]]*[0-9]{1,3}[[:space:]]*,[[:space:]]*[0-9]{1,3})" 2>/dev/null || true)
+            if [ -n "$SO_ZNACHENIEM" ]; then
+              echo 'NAJDENO: ZNACHENIE kljucha koshelka v rabochem dereve begunka; puti nizhe (tolko imena fajlov):'
+              printf '  %s\n' $(printf '%s\n' "$SO_ZNACHENIEM" | head -20)
               NAJDENO=1
+            else
+              echo "rabocheje derevo begunka $DEREVO: imja kljucha vstrechajetsja v $(printf '%s\n' "$VNUTRI" | grep -c . || true) fajlah nashego repozitorija, ZNACHENIJ net -- eto ne nahodka"
             fi
-            if [ \"\$NAJDENO\" = 1 ]; then
-              echo 'OTKAZ: eto ne chistaja laboratorija -- na nej est torgovoe'
-              exit 1
-            fi
-            echo 'laboratorija chista: ni env polosy, ni torgovyh sluzhb, ni imjon kljuchej koshelkov'" | tee -a "$OUT_FILE"
+          fi
+          if [ "$NAJDENO" = 1 ]; then
+            echo 'OTKAZ: eto ne chistaja laboratorija -- na nej est torgovoe'
+            exit 1
+          fi
+          echo 'laboratorija chista: ni env polosy, ni torgovyh sluzhb, ni imjon kljuchej koshelkov'
+          PROVERKA
 
       - name: "Питон как у зондов (venv пользователя бегунка, без ключей)"
         if: ${{ inputs.remove != 'yes' }}

@@ -1,35 +1,38 @@
-=== NL-хост, живучесть служб, 2026-10-02T00:13:17Z ===
+=== NL-хост, живучесть служб, 2026-10-03T00:34:50Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Thu 2026-10-01 21:01:53 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Thu 2026-10-01 21:01:53 CEST
-bloom-seller: active=active enabled=enabled restarts=0 since=Fri 2026-10-02 01:51:24 CEST
-bloom-detector: active=active enabled=enabled restarts=0 since=Fri 2026-10-02 02:08:42 CEST
+bloom-seller: active=active enabled=enabled restarts=0 since=Sat 2026-10-03 02:34:03 CEST
+bloom-detector: active=active enabled=enabled restarts=0 since=Sat 2026-10-03 02:33:52 CEST
 grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 02:08:31 CEST
 
 --- признаки жизни ---
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-10-02T00:12:54Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-10-03T00:33:52Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-10-02T00:12:54Z",
-  "updated_ts": 1790899974.7330568,
-  "alive_since_utc": "2026-10-02T00:08:42Z",
+  "updated_utc": "2026-10-03T00:33:52Z",
+  "updated_ts": 1790987632.9081326,
+  "alive_since_utc": "2026-10-03T00:33:52Z",
   "mode": "live",
-  "sources": 625,
+  "sources": 633,
   "source_groups": {
     "file": "/home/bot/data/sources_2026-09-25.json",
     "why_not": null,
-    "hash": "6ffa299c2b31",
-    "mtime_utc": "2026-10-02T00:03:26Z",
+    "hash": "efc53802a81a",
+    "mtime_utc": "2026-10-03T00:18:54Z",
     "alarm": null,
     "in_file": {
       "leader": 1,
       "batch5": 12,
       "lane_s0": 10,
       "off": 9,
-      "log_only": 573,
+      "log_only": 567,
       "sniper_src": 2,
       "kandidaty": 6,
-      "cand1": 7,
-      "cand1_03": 3
+      "cand1": 4,
+      "cand1_03": 2,
+      "cand1_05": 2,
+      "cand2": 12,
+      "cand3": 4
     },
     "subscribed": {
       "batch5": 12,
@@ -37,20 +40,23 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
       "lane_s0": 10,
       "sniper_src": 2,
       "kandidaty": 6,
-      "cand1": 7,
-      "cand1_03": 3,
+      "cand1": 4,
+      "cand1_03": 2,
+      "cand1_05": 2,
+      "cand2": 12,
+      "cand3": 4,
       "off": 2
     },
     "policies": {
       "leader": {
-        "lane_sol": 0.5,
+        "lane_sol": 0.3,
         "bloom_trades": false,
         "subscribe": true,
         "lane_trades": true,
         "bloom_sol": null,
         "fanout": false,
         "day_cap_sol": null,
-        "stop_loss_sol": 0.75,
+        "stop_loss_sol": null,
         "min_target_sol": 3,
         "lane_open_max": 3,
         "per_day": null,
@@ -74,7 +80,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
         "hold_slots": 150.0,
         "hold_slots_small": null,
         "hold_slots_small_below_sol": null,
-        "lane_size": 0.5
+        "lane_size": 0.3
       },
       "batch5": {
         "lane_sol": 0.3,
@@ -84,8 +90,8 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
         "bloom_sol": null,
         "fanout": false,
         "day_cap_sol": null,
-        "stop_loss_sol": 0.45,
-        "min_target_sol": 2,
+        "stop_loss_sol": null,
+        "min_target_sol": 2.0,
         "lane_open_max": 3,
         "per_day": null,
         "lane_pools": [
@@ -123,8 +129,8 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
         "bloom_sol": null,
         "fanout": false,
         "day_cap_sol": null,
-        "stop_loss_sol": 1.0,
-        "min_target_sol": 2,
+        "stop_loss_sol": null,
+        "min_target_sol": 2.0,
         "lane_open_max": 3,
         "per_day": null,
         "lane_pools": [
@@ -216,7 +222,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
         "bloom_sol": null,
         "fanout": false,
         "day_cap_sol": null,
-        "stop_loss_sol": 0.45,
+        "stop_loss_sol": null,
         "min_target_sol": 2,
         "lane_open_max": 3,
         "per_day": null,
@@ -280,7 +286,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
         "bloom_sol": null,
         "fanout": false,
         "day_cap_sol": null,
-        "stop_loss_sol": 0.3,
+        "stop_loss_sol": null,
         "min_target_sol": 2.0,
         "lane_open_max": 3,
         "per_day": 150,
@@ -312,18 +318,30 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
         "lane_size": 0.1
       },
       "cand1_03": {
-        "lane_sol": 0.3,
+        "lane_sol": 0.5,
         "bloom_trades": false,
         "subscribe": true,
         "lane_trades": true,
         "bloom_sol": null,
         "fanout": false,
         "day_cap_sol": null,
-        "stop_loss_sol": 0.6,
+        "stop_loss_sol": null,
         "min_target_sol": null,
-        "lane_open_max": 1,
+        "lane_open_max": 3,
         "per_day": 150,
-        "lane_pools": "pump_amm,cpmm,bonding,two_step,damm2,dbc,clmm,launchlab,dlmm",
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
         "lane_route": null,
         "lane_route_tax_bps": null,
         "max_slots_from_source": null,
@@ -336,98 +354,209 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
         "hold_slots": 108.0,
         "hold_slots_small": null,
         "hold_slots_small_below_sol": null,
-        "lane_size": 0.3
+        "lane_size": 0.5
+      },
+      "cand1_05": {
+        "lane_sol": 0.05,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": 0.05,
+        "lane_open_max": 3,
+        "per_day": 100,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.05
+      },
+      "cand2": {
+        "lane_sol": 0.1,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": 2.0,
+        "lane_open_max": 3,
+        "per_day": 150,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.1
+      },
+      "cand3": {
+        "lane_sol": 0.1,
+        "bloom_trades": false,
+        "subscribe": true,
+        "lane_trades": true,
+        "bloom_sol": null,
+        "fanout": false,
+        "day_cap_sol": null,
+        "stop_loss_sol": null,
+        "min_target_sol": 2.0,
+        "lane_open_max": 3,
+        "per_day": 150,
+        "lane_pools": [
+          "amm_v4",
+          "bonding",
+          "clmm",
+          "cpmm",
+          "damm2",
+          "dbc",
+          "dlmm",
+          "launchlab",
+          "pump_amm",
+          "two_step",
+          "whirlpool"
+        ],
+        "lane_route": null,
+        "lane_route_tax_bps": null,
+        "max_slots_from_source": null,
+        "skip_flippers": false,
+        "allow_taxed_route": null,
+        "slippage": null,
+        "slippage_thin_pool": null,
+        "thin_pool_below_sol": null,
+        "min_pool_sol_reserve": null,
+        "hold_slots": 108.0,
+        "hold_slots_small": null,
+        "hold_slots_small_below_sol": null,
+        "lane_size": 0.1
       }
     }
   },
   "sender_connections": {
     "by_sender": {
       "astralane": {
-        "age_s": 249.8,
+        "age_s": 0.2,
         "last_use_s": null,
-        "last_ping_s": 0.1,
-        "pings_ok": 5,
+        "last_ping_s": 0.2,
+        "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "blockrazor": {
-        "age_s": 249.8,
+        "age_s": 0.2,
         "last_use_s": null,
         "last_ping_s": 0.1,
-        "pings_ok": 5,
+        "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "helius": {
-        "age_s": 249.8,
+        "age_s": 0.1,
         "last_use_s": null,
         "last_ping_s": 0.1,
-        "pings_ok": 5,
+        "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "jito": {
-        "age_s": 249.8,
+        "age_s": 0.1,
         "last_use_s": null,
         "last_ping_s": 0.1,
-        "pings_ok": 5,
+        "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "nozomi": {
-        "age_s": 249.8,
+        "age_s": 0.1,
         "last_use_s": null,
-        "last_ping_s": 0.0,
-        "pings_ok": 5,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "zeroslot": {
-        "age_s": 249.7,
+        "age_s": 0.1,
         "last_use_s": null,
-        "last_ping_s": 0.0,
-        "pings_ok": 5,
+        "last_ping_s": 0.1,
+        "pings_ok": 1,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       }
     },
     "warm_period_s": 25.0,
-    "last_warm_s": 0.1,
+    "last_warm_s": 0.2,
     "last_warm": {
       "ok": 6,
       "failed": 0
     }
   },
   "bloom_skipped_by_group": 0,
-  "sources_from": "DBot живьём + групп источников: 605 + тестовых источников из окружения: 2",
+  "sources_from": "DBot живьём + групп источников: 613 + тестовых источников из окружения: 2",
   "sources_generation": 0,
-  "subscribed_addresses": 62,
-  "unsubscribed_addresses": 582,
+  "subscribed_addresses": 76,
+  "unsubscribed_addresses": 576,
   "credits": {
-    "за_сеанс": 3799,
-    "за_час": 4983,
+    "за_сеанс": 7,
+    "за_час": 6219,
     "за_прошлый_час": null,
-    "за_сутки": 4983,
+    "за_сутки": 6219,
     "бюджет_за_сутки": 2000000,
     "why_not": null
   },
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 0,
-  "signals_seen": 43,
+  "signals_seen": 0,
   "to_buy": 0,
-  "by_code": {
-    "TOKEN_RECEIVED_NOT_BOUGHT": 3,
-    "NOT_A_BUY": 29,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 8,
-    "SKIP_TARGET_INCREASE_POSITION": 2,
-    "INSUFFICIENT_BALANCE": 1
-  },
+  "by_code": {},
   "by_code_test_source": {},
   "test_sources": [
     "DNJeTYni5QQVCwNNt1SrHu1GjYR4ak5Zw7LeuFsKYmXX",
@@ -443,18 +572,18 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "без_ставки": 0
   },
   "dlmm_bin_steps": {
-    "в_кэше": 12,
+    "в_кэше": 11,
     "ждут_чтения": 0,
     "без_шага": 0
   },
   "lane_cu_limit": 140000,
   "summary_minute": 2,
-  "summary_last_hour": "2026-10-01T23:00Z",
+  "summary_last_hour": "2026-10-02T23:00Z",
   "summary_write_error": null,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 118.57017349417771,
+  "rate_usd_sol": 118.93774473029524,
   "rate_fresh": true,
-  "rate_stale_used": 2,
+  "rate_stale_used": 0,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
@@ -463,38 +592,28 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
   "kill_bloom_path": "/etc/bloom-executor/KILL_BLOOM",
   "kill_bloom_active": false,
   "kill_bloom_note": "",
-  "net_slot": 452445172,
-  "slot_notifications": 940,
-  "ws_baity_po_vidam": {
-    "источники": 104783949,
-    "слоты": 104962
-  },
-  "dlina_slota": {
-    "измерено_с": 0.26402,
-    "слотов": 76,
-    "окно_с": 20.065,
-    "когда": 1790899742.861932
-  },
+  "net_slot": 452772773,
+  "slot_notifications": 1,
+  "ws_baity_po_vidam": {},
+  "dlina_slota": {},
   "dlina_slota_v_rabote": {
-    "длина_слота_с": 0.26402,
+    "длина_слота_с": 0.26337,
     "источник": "замер",
-    "возраст_замера_с": 231.9,
+    "возраст_замера_с": 213.5,
     "константа_в_коде_с": 0.4
   },
-  "net_slot_age_s": 0.23,
+  "net_slot_age_s": 0.15,
   "balance_sol": 0.0,
-  "balance_age_s": 0.44,
-  "rpc_calls": 215,
+  "balance_age_s": 0.2,
+  "rpc_calls": 7,
   "rpc_by_method": {
-    "getMultipleAccounts": 57,
-    "getBalance": 52,
-    "getSlot": 2,
-    "getLatestBlockhash": 21,
-    "getAccountInfo": 21,
-    "getTransaction": 60,
-    "simulateTransaction": 2
+    "getMultipleAccounts": 2,
+    "getBalance": 2,
+    "getSlot": 1,
+    "getLatestBlockhash": 1,
+    "getAccountInfo": 1
   },
-  "session_credits": 3799,
+  "session_credits": 7,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -506,7 +625,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "sent": 0,
     "failed": 0,
     "last_error": "",
-    "off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
+    "off_reason": "",
     "log_configured": false,
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
@@ -540,44 +659,31 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "hour_seconds": 0.0,
     "on_fallback_now": false,
     "report_threshold_s": 30.0,
-    "silent_ticks": 7,
+    "silent_ticks": 0,
     "tick_s": 2.0,
     "breaks_by_reason": {}
   },
   "shadow": {
     "enabled": true,
-    "built": 11,
+    "built": 0,
     "would_pass": 0,
     "over_cap": 0,
     "failed": 0,
     "module_loaded": true,
     "module_why_not": "",
-    "passed_in_row_by_pool": {
-      "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C": 0,
-      "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": 0,
-      "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": 0,
-      "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj": 0,
-      "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P": 0,
-      "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN": 0
-    },
+    "passed_in_row_by_pool": {},
     "hour": {
-      "since_ts": 1790899722.466536,
-      "since_utc": "2026-10-02T00:08:42Z",
-      "signals": 11,
-      "built": 2,
-      "sim_failed": 2,
-      "not_built": {
-        "котировка не SOL: шаблона SOL -> Q в кэше нет": 2,
-        "шаблон: у источника инструкция 9527de9bd37c981a, не buy_exact_in": 3,
-        "шаблон: счетов 28, ожидалось 27": 2,
-        "сборка: ValueError: роли счетов не восстановились": 1,
-        "шаблон: у источника инструкция b75d992818e6c297, не swap": 1
-      },
+      "since_ts": 1790987632.3763719,
+      "since_utc": "2026-10-03T00:33:52Z",
+      "signals": 0,
+      "built": 0,
+      "sim_failed": 0,
+      "not_built": {},
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 2,
+    "credits_day": 10,
     "credits_write_why_not": ""
   },
   "route_tax_filter": {
@@ -594,13 +700,11 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "live": true,
     "module_loaded": true,
     "module_why_not": "",
-    "paths": 1,
-    "starts": 1,
+    "paths": 0,
+    "starts": 0,
     "threads_alive": 0,
     "sent": 0,
-    "by_stage": {
-      "build": 1
-    },
+    "by_stage": {},
     "bought_backfilled": 0,
     "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
     "own_wallet": true,
@@ -610,16 +714,16 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
       "ok": true,
       "why_not": null
     },
-    "balance_sol": 4.332260344,
+    "balance_sol": 4.37221921,
     "balance_day_threshold": {
       "ok": true,
       "kill": false,
-      "why": "просадка от 00:00 0.083302 SOL при пороге 2.0",
+      "why": "просадка от 00:00 0.127826 SOL при рубильнике 2.0",
       "threshold_sol": 2.0,
-      "day": "20261002",
-      "open_sol": 4.415562519,
-      "balance_sol": 4.332260344,
-      "drop_sol": 0.083302175,
+      "day": "20261003",
+      "open_sol": 4.500045049,
+      "balance_sol": 4.37221921,
+      "drop_sol": 0.127825839,
       "withdrawals_sol": 0.0,
       "deposits_sol": 0.0,
       "net_owner_sol": 0.0,
@@ -628,21 +732,21 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     },
     "lane_daily_stop": {
       "threshold_sol": 1.5,
-      "pnl_all_groups_sol": -0.099700164,
+      "pnl_all_groups_sol": -0.176892452,
       "stopped": false,
       "why_not": null
     },
     "lane_chain_day": {
       "годен": true,
       "почему_нет": null,
-      "итог_sol": -0.083302175,
-      "день": "20261002",
-      "начало_суток_ts": 1790892000.0,
+      "итог_sol": -0.127825839,
+      "день": "20261003",
+      "начало_суток_ts": 1790978400.0,
       "как_считаются_сутки": "Europe/Madrid",
-      "баланс_sol": 4.332260344,
+      "баланс_sol": 4.37221921,
       "возраст_баланса_с": 0.0,
       "предел_возраста_с": 300.0,
-      "открытие_sol": 4.415562519,
+      "открытие_sol": 4.500045049,
       "выводы_sol": 0.0,
       "выводов": 0,
       "вводы_sol": 0.0,
@@ -652,24 +756,17 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
       "открытых": 0,
       "открытых_по_входу_sol": 0.0,
       "открытых_без_числа": 0,
-      "итог_с_открытыми_sol": -0.083302175
+      "итог_с_открытыми_sol": -0.127825839
     },
-    "balance_age_s": 0.4,
+    "balance_age_s": 0.2,
     "sim_shadow": {
       "done": 0,
       "would_fail": 0
     },
-    "blockhash_age_s": 10.0,
-    "blockhash_updates": 21,
+    "blockhash_age_s": 0.2,
+    "blockhash_updates": 1,
     "blockhash_why_not": "",
-    "last": {
-      "stage": "build",
-      "ok": false,
-      "why_not": "тип пула вне полосы: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-      "signature": null,
-      "pool_program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-      "ts_utc": "2026-10-02T00:10:56Z"
-    },
+    "last": {},
     "lane_kill": [
       false,
       ""
@@ -680,7 +777,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
       "open_by_group": {
         "batch5": 3,
         "cand1": 3,
-        "cand1_03": 1,
+        "cand1_03": 3,
+        "cand1_05": 3,
+        "cand2": 3,
+        "cand3": 3,
         "kandidaty": 1,
         "lane_s0": 3,
         "leader": 3,
@@ -696,81 +796,81 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "lane_state": {
       "open": 0,
       "stuck": 0,
-      "day": "20261002",
-      "day_start_ts": 1790892000.0,
+      "day": "20261003",
+      "day_start_ts": 1790978400.0,
       "day_how": "Europe/Madrid",
-      "pnl_all_groups_sol": -0.099700164,
-      "pnl_chain_sol": -0.073964884,
-      "pnl_chain_all_groups_sol": -0.073964884,
-      "pnl_chain_n": 17,
+      "pnl_all_groups_sol": -0.176892452,
+      "pnl_chain_sol": -0.137532612,
+      "pnl_chain_all_groups_sol": -0.137532612,
+      "pnl_chain_n": 36,
       "pnl_chain_fields_n": 2,
       "pnl_chain_open_n": 0,
       "pnl_chain_why_not": [
         "итог по цепи в записи не посчитан",
         "итог по цепи в записи не посчитан"
       ],
-      "pnl_vs_chain_sol": -0.02573528,
-      "today_all_groups": 19,
-      "today": 19,
+      "pnl_vs_chain_sol": -0.03935984,
+      "today_all_groups": 38,
+      "today": 38,
       "failed_in_row": 0,
-      "pnl_sol": -0.099700164,
-      "pnl_trade_sol": -0.15539787,
-      "spend_sol": -0.055697706,
+      "pnl_sol": -0.176892452,
+      "pnl_trade_sol": -0.282306816,
+      "spend_sol": -0.105414364,
       "uncountable_today": 0,
       "no_result_today": 0,
       "uncountable_why": [],
-      "total": 197,
+      "total": 209,
       "group": "деньги (все группы кроме скорости)",
-      "day_turnover_sol": 2.137095,
-      "day_spend_sol": -0.055697706
+      "day_turnover_sol": 6.42419,
+      "day_spend_sol": -0.105414364
     },
     "lane_state_by_group": {
       "money": {
         "open": 0,
         "stuck": 0,
-        "day": "20261002",
-        "day_start_ts": 1790892000.0,
+        "day": "20261003",
+        "day_start_ts": 1790978400.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": -0.099700164,
-        "pnl_chain_sol": -0.073964884,
-        "pnl_chain_all_groups_sol": -0.073964884,
-        "pnl_chain_n": 17,
+        "pnl_all_groups_sol": -0.176892452,
+        "pnl_chain_sol": -0.137532612,
+        "pnl_chain_all_groups_sol": -0.137532612,
+        "pnl_chain_n": 36,
         "pnl_chain_fields_n": 2,
         "pnl_chain_open_n": 0,
         "pnl_chain_why_not": [
           "итог по цепи в записи не посчитан",
           "итог по цепи в записи не посчитан"
         ],
-        "pnl_vs_chain_sol": -0.02573528,
-        "today_all_groups": 19,
-        "today": 19,
+        "pnl_vs_chain_sol": -0.03935984,
+        "today_all_groups": 38,
+        "today": 38,
         "failed_in_row": 0,
-        "pnl_sol": -0.099700164,
-        "pnl_trade_sol": -0.15539787,
-        "spend_sol": -0.055697706,
+        "pnl_sol": -0.176892452,
+        "pnl_trade_sol": -0.282306816,
+        "spend_sol": -0.105414364,
         "uncountable_today": 0,
         "no_result_today": 0,
         "uncountable_why": [],
-        "total": 197,
+        "total": 209,
         "group": "деньги (все группы кроме скорости)",
-        "day_turnover_sol": 2.137095,
-        "day_spend_sol": -0.055697706
+        "day_turnover_sol": 6.42419,
+        "day_spend_sol": -0.105414364
       },
       "speed_only": {
         "open": 0,
         "stuck": 0,
-        "day": "20261002",
-        "day_start_ts": 1790892000.0,
+        "day": "20261003",
+        "day_start_ts": 1790978400.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": -0.099700164,
+        "pnl_all_groups_sol": -0.176892452,
         "pnl_chain_sol": 0.0,
-        "pnl_chain_all_groups_sol": -0.073964884,
+        "pnl_chain_all_groups_sol": -0.137532612,
         "pnl_chain_n": 0,
         "pnl_chain_fields_n": 0,
         "pnl_chain_open_n": 0,
         "pnl_chain_why_not": [],
         "pnl_vs_chain_sol": 0.0,
-        "today_all_groups": 19,
+        "today_all_groups": 38,
         "today": 0,
         "failed_in_row": 0,
         "pnl_sol": 0.0,
@@ -789,7 +889,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
       "enabled": false,
       "senders_seen": 0,
       "spent_today": {
-        "day": "20261002",
+        "day": "20261003",
         "n": 0,
         "signals": 0,
         "spent_lamports": 0,
@@ -805,68 +905,12 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     },
     "pool": {
       "enabled": true,
-      "tip_cap_sol": 0.005,
-      "winners": {
-        "helius": 20,
-        "blockrazor": 12,
-        "astralane": 81,
-        "jito": 75,
-        "nozomi": 8,
-        "zeroslot": 1
-      }
-    },
-    "pool_nonce": {
-      "enabled": true,
-      "account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-      "wait_slots": 8,
-      "wait_s": 3.2,
-      "pending_shift": false,
-      "pending_why": null,
-      "shift_signature": null,
-      "warm": {
-        "есть": true,
-        "возраст_с": 10.02,
-        "почему": "",
-        "обновлений": 21,
-        "взят_тёплым": 1,
-        "взят_по_сети": 0,
-        "срок_с": 30.0
-      }
-    }
-  },
-  "leg_cache": {
-    "enabled": true,
-    "pools": 17,
-    "templates": {
-      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-        "age_s": 0.5,
-        "flipped": false,
-        "sig": "5Z2dnoiBLyqBe63YnffNLVWWJAjAajpu4Vt7FP2gTpUCqPdUxen2aqJQeH5CDWo2gvznhCPdf6HqHFtxJCLsdgy4"
-      },
-      "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
-        "age_s": 0.0,
-        "flipped": false,
-        "sig": "2H6sREWHiyBP7Er8W5kaumAFJCeZtpTpkE4euWmdi6ugVN8Ltoed3kfqsfYGjrXGd8gVL6ut5EQ5q9wdiCizNMGQ"
-      },
-      "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump": {
-        "age_s": 10.3,
-        "flipped": false,
-        "sig": "M4r6UqEeHU6txysqtqYhKs3432aME3dNAPfKEuyphDB5HiYgCApXWUDiEbkZ97gt3EH25bmwbCdVWoU6pQFePS3"
-      },
-      "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
-        "age_s": 84.3,
-        "flipped": false,
-        "sig": "5kTdTmmkKMFKUBkyn5FY9Vv4fxgsnKf6epHcDXjX2DpiocNVUS3yJHnQfc2qE4XjhskGNUjeDxhWJmxEo2FTZixf"
-      },
-      "Cm6fNnMk7NfzStP9CZpsQA2v3jjzbcYGAxdJySmHpump": {
-        "age_s": 10.0,
-        "flipped": false,
-        "sig": "2nZYk7HjSLXMmYaLnZjip
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-10-02T00:13:25Z):
+      "tip_cap_sol": 0.00
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-10-03T00:34:51Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-10-02T00:13:25Z",
-  "updated_ts": 1790900005.5157979,
+  "updated_utc": "2026-10-03T00:34:51Z",
+  "updated_ts": 1790987691.4475596,
   "mode": "live",
   "positions_in_cycle": 0,
   "last_cycle": [],
@@ -874,6 +918,26 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "module": true,
     "why_not": null,
     "unsold_pause_works": true
+  },
+  "svoj_prodavec": {
+    "module": true,
+    "why_not": null,
+    "tipov": 11,
+    "kotiruem": 10,
+    "prodajom_svoim": 11,
+    "otkuda": "c3_prodavec_sborka + c3_kotirovka_prodazhi",
+    "krivaya_kotiruetsja": true,
+    "krivaya_prodajotsja": true
+  },
+  "krug_001": {
+    "krug_sol": 0.01,
+    "reestr": true,
+    "why_not": null,
+    "fajl": "/home/bot/bloom_executor_live_data/own_sell_obkatany.json",
+    "obkatano": 0,
+    "obkatany": [],
+    "imena": [],
+    "kogda": {}
   },
   "max_attempts": 2,
   "jupiter": {
@@ -906,7 +970,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "format3": true,
     "tracked_messages": 0,
     "tracked_texts": 0,
-    "sent": 2,
+    "sent": 0,
     "failed": 0,
     "last_error": "",
     "off_reason": "",
@@ -914,7 +978,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
       "main": {
-        "sent": 2,
+        "sent": 0,
         "failed": 0,
         "last_error": ""
       },
@@ -926,49 +990,49 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     }
   },
   "metrics": {
-    "за_сутки_с": 1790899200.0,
-    "продаж_в_окне": 0,
+    "за_сутки_с": 1790985600.0,
+    "продаж_в_окне": 7,
     "без_времени_блока": 0,
     "от_таймера_до_посадки_с": {
-      "n": 0,
-      "медиана": null,
-      "p90": null,
-      "макс": null
+      "n": 7,
+      "медиана": 0.58,
+      "p90": 16.06,
+      "макс": 16.35
     },
     "от_таймера_до_отправки_с": {
-      "n": 0,
-      "медиана": null,
-      "p90": null,
-      "макс": null
+      "n": 7,
+      "медиана": 0.99,
+      "p90": 16.72,
+      "макс": 16.75
     },
     "от_отправки_до_посадки_с": {
-      "n": 0,
-      "медиана": null,
-      "p90": null,
-      "макс": null
+      "n": 7,
+      "медиана": -0.84,
+      "p90": -0.37,
+      "макс": -0.33
     },
     "от_отправки_до_посадки_слотов": {
-      "n": 0,
-      "медиана": null,
-      "p90": null,
-      "макс": null
+      "n": 7,
+      "медиана": -2.0,
+      "p90": -1.0,
+      "макс": -1.0
     },
-    "отправка_позже_посадки": 0,
+    "отправка_позже_посадки": 7,
     "без_слота_отправки": 0,
     "неудачных_попыток": 0,
     "позиций_с_неудачами": 0,
     "отказов_jupiter": 0,
     "порог_p90_с": 5.0,
-    "вернуться_к_своей": false,
+    "вернуться_к_своей": true,
     "попыток_на_продажу": {
-      "n": 0,
-      "медиана": null,
-      "p90": null,
-      "макс": null
+      "n": 7,
+      "медиана": 1.0,
+      "p90": 1.0,
+      "макс": 1.0
     },
     "отказы_по_причинам": {}
   },
-  "credits_logged": true,
+  "credits_logged": null,
   "credits_log_error": "",
   "kill_sell": {
     "path": "/etc/bloom-executor/KILL_SELL",
@@ -977,64 +1041,101 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "note": "путь рубильника доступен на чтение"
   }
 }
-/home/bot/dbot_detect_probe/status.json (изменён 2026-10-02T00:13:25Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-10-03T00:34:07Z):
 {
-  "updated_utc": "2026-10-02T00:13:25Z",
-  "uptime_s": 18691.5,
+  "updated_utc": "2026-10-03T00:34:07Z",
+  "uptime_s": 106333.9,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
-      "utc": "2026-10-01T19:01:54Z",
-      "method": "transactionSubscribe",
-      "acked": 18,
-      "of": 18
-    },
-    {
-      "utc": "2026-10-01T20:23:46Z",
+      "utc": "2026-10-02T06:01:45Z",
       "method": "logsSubscribe",
       "acked": 18,
       "of": 18
     },
     {
-      "utc": "2026-10-01T21:56:00Z",
+      "utc": "2026-10-02T13:03:22Z",
       "method": "logsSubscribe",
       "acked": 18,
       "of": 18
     },
     {
-      "utc": "2026-10-01T22:28:07Z",
+      "utc": "2026-10-02T14:43:44Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-10-02T15:42:31Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-10-02T16:03:06Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-10-02T16:41:59Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-10-02T18:34:09Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-10-02T18:54:35Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-10-02T21:36:37Z",
+      "method": "logsSubscribe",
+      "acked": 18,
+      "of": 18
+    },
+    {
+      "utc": "2026-10-02T22:46:33Z",
       "method": "logsSubscribe",
       "acked": 18,
       "of": 18
     }
   ],
   "источников": 18,
-  "событий_записано": 308,
+  "событий_записано": 1640,
   "дублей_пропущено": 0,
-  "неудачных_пропущено": 49,
-  "переподключений_tx": 3,
+  "неудачных_пропущено": 389,
+  "переподключений_tx": 14,
   "причины_разрыва_tx": {
-    "ConnectionClosedError: no close frame received or sent": 3
+    "ConnectionClosedError: no close frame received or sent": 13,
+    "RuntimeError: logsSubscribe: сервер закрыл соединение": 1
   },
-  "слепое_время_с": 3.2,
-  "слепое_время_доля": 0.00017,
-  "переподключений_slot": 2,
-  "slot_уведомлений": 69637,
-  "текущий_слот": 452445290,
-  "последнее_событие_utc": "2026-10-02T00:13:17Z",
+  "слепое_время_с": 15.1,
+  "слепое_время_доля": 0.00014,
+  "переподключений_slot": 10,
+  "slot_уведомлений": 396935,
+  "текущий_слот": 452772828,
+  "последнее_событие_utc": "2026-10-03T00:33:18Z",
   "часы": {
-    "checked_at_utc": "2026-10-02T00:01:54Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Fri 2026-10-02 02:01:54 CEST\nRTCTimeUSec=Fri 2026-10-02 02:01:54 CEST",
+    "checked_at_utc": "2026-10-03T00:01:55Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Sat 2026-10-03 02:01:55 CEST\nRTCTimeUSec=Sat 2026-10-03 02:01:55 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
-/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-10-02T00:13:22Z):
+/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-10-03T00:34:45Z):
 {
-  "utc": "2026-10-02T00:13:22Z",
+  "utc": "2026-10-03T00:34:45Z",
   "started_utc": "2026-10-02T00:08:32Z",
-  "uptime_s": 290.4,
+  "uptime_s": 87973.6,
   "channels": 4,
   "channel_names": [
     "grpc",
@@ -1121,7 +1222,7 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "spent_today": 14,
     "limit": 300000,
     "share": 0.0,
-    "projected_daily": 4165,
+    "projected_daily": 13,
     "threshold": 0.7,
     "projection_limit": 200000,
     "window_s": 0.0,
@@ -1153,10 +1254,10 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "rabbit_ams": 1565,
-      "rabbit_fra": 1565,
-      "grpc2": 1563,
-      "grpc": 1563
+      "rabbit_ams": 3238,
+      "rabbit_fra": 3237,
+      "grpc2": 2895,
+      "grpc": 2895
     },
     "duplicates": {},
     "unpaired_single_channel": {
@@ -1170,223 +1271,267 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
     "by_group": {},
     "pairwise": {
       "grpc_vs_grpc2": {
-        "pairs": 1563,
-        "first_share": 0.2105,
-        "median_ms": -3.08,
-        "p10_ms": -9.42,
-        "p90_ms": 0.66,
-        "p95_ms": 1.24,
-        "mean_ms": -3.98
+        "pairs": 54,
+        "first_share": 0.1111,
+        "median_ms": -3.22,
+        "p10_ms": -7.36,
+        "p90_ms": 0.19,
+        "p95_ms": 0.25,
+        "mean_ms": -4.75
       },
       "grpc_vs_rabbit_ams": {
-        "pairs": 1563,
-        "first_share": 0.4626,
-        "median_ms": -0.59,
-        "p10_ms": -7.33,
-        "p90_ms": 85.12,
-        "p95_ms": 180.59,
-        "mean_ms": 21.21
+        "pairs": 54,
+        "first_share": 0.0,
+        "median_ms": -5.18,
+        "p10_ms": -15.59,
+        "p90_ms": -2.51,
+        "p95_ms": -2.39,
+        "mean_ms": -7.98
       },
       "grpc_vs_rabbit_fra": {
-        "pairs": 1563,
-        "first_share": 0.0813,
-        "median_ms": -5.65,
-        "p10_ms": -12.91,
-        "p90_ms": -0.26,
-        "p95_ms": 0.53,
-        "mean_ms": -5.89
+        "pairs": 54,
+        "first_share": 0.0556,
+        "median_ms": -5.73,
+        "p10_ms": -10.29,
+        "p90_ms": -1.92,
+        "p95_ms": -1.17,
+        "mean_ms": -6.06
       },
       "grpc2_vs_rabbit_ams": {
-        "pairs": 1563,
-        "first_share": 0.739,
-        "median_ms": 2.73,
-        "p10_ms": -3.7,
-        "p90_ms": 89.0,
-        "p95_ms": 184.39,
-        "mean_ms": 25.19
+        "pairs": 54,
+        "first_share": 0.1852,
+        "median_ms": -2.28,
+        "p10_ms": -8.29,
+        "p90_ms": 1.23,
+        "p95_ms": 2.02,
+        "mean_ms": -3.23
       },
       "grpc2_vs_rabbit_fra": {
-        "pairs": 1563,
-        "first_share": 0.1644,
-        "median_ms": -1.24,
-        "p10_ms": -6.59,
-        "p90_ms": 0.38,
-        "p95_ms": 0.94,
-        "mean_ms": -1.91
+        "pairs": 54,
+        "first_share": 0.0741,
+        "median_ms": -2.15,
+        "p10_ms": -6.14,
+        "p90_ms": -0.33,
+        "p95_ms": 1.17,
+        "mean_ms": -1.31
       },
       "rabbit_ams_vs_rabbit_fra": {
-        "pairs": 1565,
-        "first_share": 0.2204,
-        "median_ms": -5.65,
-        "p10_ms": -92.58,
-        "p90_ms": 2.2,
-        "p95_ms": 3.6,
-        "mean_ms": -27.07
+        "pairs": 78,
+        "first_share": 0.4872,
+        "median_ms": -0.2,
+        "p10_ms": -3.3,
+        "p90_ms": 3.98,
+        "p95_ms": 5.86,
+        "mean_ms": 2.4
       }
     },
-    "pairs_total": 1565
+    "pairs_total": 78
   }
 }
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 3015 строк
-/home/bot/bloom_executor_live_data/positions.jsonl: 1854 строк
-/home/bot/dbot_detect_probe/events.jsonl: 17133 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 11268 строк
+/home/bot/bloom_executor_live_data/positions.jsonl: 1117 строк
+/home/bot/dbot_detect_probe/events.jsonl: 18465 строк
 
 --- решения детектора по кодам ---
-всего решений: 3019
-первое: "ts_utc": "2026-10-01T22:00:16Z"
-последнее: "ts_utc": "2026-10-02T00:13:26Z"
+всего решений: 11268
+первое: "ts_utc": "2026-10-02T22:00:03Z"
+последнее: "ts_utc": "2026-10-03T00:34:44Z"
 по кодам:
-   1785 NOT_A_BUY
-    300 TOKEN_RECEIVED_NOT_BOUGHT
-    257 TARGET_AMOUNT_OUT_OF_RANGE
-     46 INSUFFICIENT_BALANCE
-     23 SKIP_TARGET_INCREASE_POSITION
-      3 THRESHOLD_EDGE
-      3 AMBIGUOUS_TX
-      2 WS_BREAK
+   9286 NOT_A_BUY
+    280 TARGET_AMOUNT_OUT_OF_RANGE
+    231 TOKEN_RECEIVED_NOT_BOUGHT
+     80 SKIP_TARGET_INCREASE_POSITION
+     60 INSUFFICIENT_BALANCE
+     42 STALE
+     24 DAILY_LOSS_LIMIT
+      6 THRESHOLD_EDGE
+      1 AMBIGUOUS_TX
 по задачам источника:
-   1897 cand1
-    165 lane_s0
-    100 sniper_src
-     76 kandidaty
-     53 BATCH-5
-     41 BATCH-3
-     39 batch5
-      8 cand1_03
-забран bloom_detector.json (27566 байт)
-забран bloom_seller.json (16332 байт)
+   8606 cand3
+    476 cand1
+    285 cand2
+    210 lane_s0
+    106 BATCH-5
+     65 cand1_05
+     53 batch5
+     45 sniper_src
+     40 cand1_03
+     30 BATCH-3
+     19 kandidaty
+забран bloom_detector.json (30773 байт)
+забран bloom_seller.json (19495 байт)
 забран c2_own_send_dry.json (793 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 5490 кредитов, бюджет 2000000, доля 0.0027
-  ВСЕГО за 2026-10-02: 5490 кредитов
+  bloom_detector: 6371 кредитов, бюджет 2000000, доля 0.0032
+  bloom_seller: 1785 кредитов, бюджет 30000, доля 0.0595
+  ВСЕГО за 2026-10-03: 8156 кредитов
+
+--- работа хостовых таймеров ---
+NEXT                             LEFT LAST                            PASSED UNIT                        ACTIVATES
+Sat 2026-10-03 02:38:00 CEST  3min 5s Sat 2026-10-03 01:38:01 CEST 56min ago bloom-zhivuchest-chas.timer bloom-zhivuchest-chas.service
+Sat 2026-10-03 03:23:00 CEST    48min Sat 2026-10-03 02:23:00 CEST 11min ago bloom-uchet-chas.timer      bloom-uchet-chas.service
+Sat 2026-10-03 08:00:00 CEST 5h 25min -                                    - bloom-vygruzka-sutki.timer  bloom-vygruzka-sutki.service
+
+3 timers listed.
+Pass --all to see loaded but inactive timers, too.
+забран /home/bot/host_tajmery/zhivuchest/zhivuchest.json -> data/zhivuchest_hosta.json (2756 байт)
+забран /home/bot/host_tajmery/uchet/data/ledger_status.json -> data/ledger_status_hosta.json (5086 байт)
+выгрузок полосы на хосте нет: таймер 06:00Z ещё не отрабатывал
 
 --- возраст признаков жизни (порог 600 с) ---
-/home/bot/bloom_executor_live_data/detector_status.json: 40 с (свежий)
-/home/bot/bloom_executor_live_data/seller_heartbeat.json: 0 с (свежий)
-/home/bot/dbot_detect_probe/status.json: 9 с (свежий)
-/home/bot/grpc_feed_probe_data/heartbeat.json: 2 с (свежий)
+/home/bot/bloom_executor_live_data/detector_status.json: 2 с (свежий)
+/home/bot/bloom_executor_live_data/seller_heartbeat.json: 1 с (свежий)
+/home/bot/dbot_detect_probe/status.json: 48 с (свежий)
+/home/bot/grpc_feed_probe_data/heartbeat.json: 10 с (свежий)
 
 --- старт служб против mtime модулей ---
-самый свежий модуль: /home/bot/bloom_executor/c2_doklad_format.py (2026-10-02T00:04:28Z)
-bloom-detector: старт 2026-10-02T00:08:42Z, модули 2026-10-02T00:04:28Z, старт_позже_модулей (254 с)
-bloom-seller: старт 2026-10-01T23:51:24Z, модули 2026-10-02T00:04:28Z, СТАРЫЙ_КОД_В_ПАМЯТИ (-784 с)
+самый свежий модуль: /home/bot/bloom_executor/c2_doklad_format.py (2026-10-03T00:33:41Z)
+bloom-detector: старт 2026-10-03T00:33:52Z, модули 2026-10-03T00:33:41Z, старт_позже_модулей (11 с)
+bloom-seller: старт 2026-10-03T00:34:03Z, модули 2026-10-03T00:33:41Z, старт_позже_модулей (22 с)
 
 --- сбои за последние 60 минут ---
 сбоев в окне нет
 --- сторож продаж: UNSOLD и автопауза ---
-{"ts_utc": "2026-10-01T23:28:18Z", "client_order_id": "lane-own-M2PnwkcpWEzDfYLXTbC1g6ndVd2EB5KZN6WjmSzU", "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "action": "Jupiter не продал", "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "jupiter": {"ok": false, "steps": [{"step": "api", "ok": true, "api": "swap-v2", "plan": ["swap-v2", "ultra"], "why_not": "ключ V2 есть, Ultra запасной"}, {"step": "key", "ok": true, "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x", "why_not": null}, {"step": "order", "api": "swap-v2", "ok": true, "why_not": null, "out_amount": "13389154", "threshold": "9372407", "router": "metis"}, {"step": "floor", "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}], "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "amount_raw": 484865346455, "api_plan": ["swap-v2", "ultra"], "api": "swap-v2", "api_tried": ["swap-v2"], "api_used": "swap-v2", "floor": {"ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "unsold": true}}
-{"ts_utc": "2026-10-01T23:28:18Z", "stage": "jupiter_otpravlena", "signature": null, "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "seconds": 3955.1, "expected_out_lamports": 13389154}
-{"ts_utc": "2026-10-01T23:28:29Z", "client_order_id": "lane-own-M2PnwkcpWEzDfYLXTbC1g6ndVd2EB5KZN6WjmSzU", "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "action": "Jupiter не продал", "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "jupiter": {"ok": false, "steps": [{"step": "api", "ok": true, "api": "swap-v2", "plan": ["swap-v2", "ultra"], "why_not": "ключ V2 есть, Ultra запасной"}, {"step": "key", "ok": true, "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x", "why_not": null}, {"step": "order", "api": "swap-v2", "ok": true, "why_not": null, "out_amount": "13389154", "threshold": "9372407", "router": "metis"}, {"step": "floor", "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}], "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "amount_raw": 484865346455, "api_plan": ["swap-v2", "ultra"], "api": "swap-v2", "api_tried": ["swap-v2"], "api_used": "swap-v2", "floor": {"ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "unsold": true}}
-{"ts_utc": "2026-10-01T23:28:29Z", "stage": "jupiter_otpravlena", "signature": null, "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "seconds": 3966.2, "expected_out_lamports": 13389154}
-{"ts_utc": "2026-10-01T23:28:40Z", "client_order_id": "lane-own-M2PnwkcpWEzDfYLXTbC1g6ndVd2EB5KZN6WjmSzU", "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "action": "Jupiter не продал", "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "jupiter": {"ok": false, "steps": [{"step": "api", "ok": true, "api": "swap-v2", "plan": ["swap-v2", "ultra"], "why_not": "ключ V2 есть, Ultra запасной"}, {"step": "key", "ok": true, "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x", "why_not": null}, {"step": "order", "api": "swap-v2", "ok": true, "why_not": null, "out_amount": "13389154", "threshold": "9372407", "router": "metis"}, {"step": "floor", "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}], "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "amount_raw": 484865346455, "api_plan": ["swap-v2", "ultra"], "api": "swap-v2", "api_tried": ["swap-v2"], "api_used": "swap-v2", "floor": {"ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "unsold": true}}
-{"ts_utc": "2026-10-01T23:28:40Z", "stage": "jupiter_otpravlena", "signature": null, "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "seconds": 3977.0, "expected_out_lamports": 13389154}
-{"ts_utc": "2026-10-01T23:28:52Z", "client_order_id": "lane-own-M2PnwkcpWEzDfYLXTbC1g6ndVd2EB5KZN6WjmSzU", "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "action": "Jupiter не продал", "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "jupiter": {"ok": false, "steps": [{"step": "api", "ok": true, "api": "swap-v2", "plan": ["swap-v2", "ultra"], "why_not": "ключ V2 есть, Ultra запасной"}, {"step": "key", "ok": true, "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x", "why_not": null}, {"step": "order", "api": "swap-v2", "ok": true, "why_not": null, "out_amount": "13389154", "threshold": "9372407", "router": "metis"}, {"step": "floor", "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}], "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "amount_raw": 484865346455, "api_plan": ["swap-v2", "ultra"], "api": "swap-v2", "api_tried": ["swap-v2"], "api_used": "swap-v2", "floor": {"ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "unsold": true}}
-{"ts_utc": "2026-10-01T23:28:52Z", "stage": "jupiter_otpravlena", "signature": null, "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "seconds": 3987.9, "expected_out_lamports": 13389154}
-{"ts_utc": "2026-10-01T23:29:03Z", "client_order_id": "lane-own-M2PnwkcpWEzDfYLXTbC1g6ndVd2EB5KZN6WjmSzU", "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "action": "Jupiter не продал", "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "jupiter": {"ok": false, "steps": [{"step": "api", "ok": true, "api": "swap-v2", "plan": ["swap-v2", "ultra"], "why_not": "ключ V2 есть, Ultra запасной"}, {"step": "key", "ok": true, "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x", "why_not": null}, {"step": "order", "api": "swap-v2", "ok": true, "why_not": null, "out_amount": "13389154", "threshold": "9372407", "router": "metis"}, {"step": "floor", "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}], "mint": "BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo", "amount_raw": 484865346455, "api_plan": ["swap-v2", "ultra"], "api": "swap-v2", "api_tried": ["swap-v2"], "api_used": "swap-v2", "floor": {"ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 13389154, "threshold": 9372407, "floor_needed": 9372407, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 13.39, "entry_lamports": 100000000}, "unsold": true}, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "unsold": true}}
-{"ts_utc": "2026-10-01T23:29:03Z", "stage": "jupiter_otpravlena", "signature": null, "ok": false, "why_not": "котировка 13.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "seconds": 4000.0, "expected_out_lamports": 13389154}
+{"ts_utc": "2026-10-02T22:03:14Z", "client_order_id": "lane-own-5Ze2hZUjtALQYZKDfH2jfWfNDknwHNCK4GZ9WVeA", "mint": "HgqNsyhfFY1f4x6UwvLAWAayYZ34irgUGjXyh1eEpump", "action": "Jupiter не продал", "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "jupiter": {"ok": false, "steps": [{"step": "api", "ok": true, "api": "swap-v2", "plan": ["swap-v2", "ultra"], "why_not": "ключ V2 есть, Ultra запасной"}, {"step": "key", "ok": true, "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x", "why_not": null}, {"step": "order", "api": "swap-v2", "ok": true, "why_not": null, "out_amount": "49078829", "threshold": "34355180", "router": "metis"}, {"step": "floor", "ok": false, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 49078829, "threshold": 34355180, "floor_needed": 34355180, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 16.36, "entry_lamports": 300000000}, "unsold": true}], "mint": "HgqNsyhfFY1f4x6UwvLAWAayYZ34irgUGjXyh1eEpump", "amount_raw": 1774333122592, "api_plan": ["swap-v2", "ultra"], "api": "swap-v2", "api_tried": ["swap-v2"], "api_used": "swap-v2", "floor": {"ok": false, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 49078829, "threshold": 34355180, "floor_needed": 34355180, "floor_pct": 70.0, "slippage_bps": 3000, "router": "metis", "in_tx": {"known": true, "bytes_len": 787, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 16.36, "entry_lamports": 300000000}, "unsold": true}, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "unsold": true}}
+{"ts_utc": "2026-10-02T22:03:14Z", "stage": "jupiter_otpravlena", "signature": null, "ok": false, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "seconds": 9049.7, "expected_out_lamports": 49078829}
+{"ts_utc": "2026-10-02T22:03:14Z", "client_order_id": "lane-own-5Ze2hZUjtALQYZKDfH2jfWfNDknwHNCK4GZ9WVeA", "mint": "HgqNsyhfFY1f4x6UwvLAWAayYZ34irgUGjXyh1eEpump", "action": "второе мнение о цене", "почему": "котировка Jupiter 16.4 % ниже 30 %, а котировка пула не прочитана: продавать за бесценок на незнании нельзя -- UNSOLD и тревога", "why_not": "котировка Jupiter 16.4 % ниже 30 %, а котировка пула не прочитана: продавать за бесценок на незнании нельзя -- UNSOLD и тревога", "второе_мнение": {"решение": {"путь": null, "любая_цена": false, "тревога": true, "порог_pct": 30.0, "вход_lamports": 300000000, "котировка_jupiter_lamports": 49078829, "котировка_пула_lamports": null, "доля_jup_pct": 16.36, "доля_пула_pct": null, "почему": "котировка Jupiter 16.4 % ниже 30 %, а котировка пула не прочитана: продавать за бесценок на незнании нельзя -- UNSOLD и тревога"}, "пул": {"ok": false, "why_not": "разновидность покупки кривой не 18-счётная -- карта мест продажи проверена только на ней: дискриминатор c2ab1c46684d5b2f, счетов 27", "lamports": null, "по_кривой": null, "гарантированный": null, "пул": null, "минт_котировки": "So11111111111111111111111111111111111111112", "чтений_резервов": null, "минимум": null, "путь_котировки": null, "способ": "krivaya", "через_c3": true, "имя_типа": "кривая pump.fun"}}}
+{"ts_utc": "2026-10-02T22:18:15Z", "client_order_id": "lane-own-5Ze2hZUjtALQYZKDfH2jfWfNDknwHNCK4GZ9WVeA", "mint": "HgqNsyhfFY1f4x6UwvLAWAayYZ34irgUGjXyh1eEpump", "action": "Jupiter не продал", "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "jupiter": {"ok": false, "steps": [{"step": "api", "ok": true, "api": "swap-v2", "plan": ["swap-v2", "ultra"], "why_not": "ключ V2 есть, Ultra запасной"}, {"step": "key", "ok": true, "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x", "why_not": null}, {"step": "order", "api": "swap-v2", "ok": true, "why_not": null, "out_amount": "49078829", "threshold": "34355180", "router": "dflow"}, {"step": "floor", "ok": false, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 49078829, "threshold": 34355180, "floor_needed": 34355180, "floor_pct": 70.0, "slippage_bps": 3000, "router": "dflow", "in_tx": {"known": true, "bytes_len": 717, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 16.36, "entry_lamports": 300000000}, "unsold": true}], "mint": "HgqNsyhfFY1f4x6UwvLAWAayYZ34irgUGjXyh1eEpump", "amount_raw": 1774333122592, "api_plan": ["swap-v2", "ultra"], "api": "swap-v2", "api_tried": ["swap-v2"], "api_used": "swap-v2", "floor": {"ok": false, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "checks": {"out_amount": 49078829, "threshold": 34355180, "floor_needed": 34355180, "floor_pct": 70.0, "slippage_bps": 3000, "router": "dflow", "in_tx": {"known": true, "bytes_len": 717, "threshold_found": false, "quote_found": true, "slippage_found": true, "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"}, "quote_share_of_entry_pct": 16.36, "entry_lamports": 300000000}, "unsold": true}, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "unsold": true}}
+{"ts_utc": "2026-10-02T22:18:15Z", "stage": "jupiter_otpravlena", "signature": null, "ok": false, "why_not": "котировка 16.4 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу", "seconds": 9951.0, "expected_out_lamports": 49078829}
+{"ts_utc": "2026-10-02T22:18:15Z", "client_order_id": "lane-own-5Ze2hZUjtALQYZKDfH2jfWfNDknwHNCK4GZ9WVeA", "mint": "HgqNsyhfFY1f4x6UwvLAWAayYZ34irgUGjXyh1eEpump", "action": "второе мнение о цене", "почему": "котировка Jupiter 16.4 % ниже 30 %, а котировка пула не прочитана: продавать за бесценок на незнании нельзя -- UNSOLD и тревога", "why_not": "котировка Jupiter 16.4 % ниже 30 %, а котировка пула не прочитана: продавать за бесценок на незнании нельзя -- UNSOLD и тревога", "второе_мнение": {"решение": {"путь": null, "любая_цена": false, "тревога": true, "порог_pct": 30.0, "вход_lamports": 300000000, "котировка_jupiter_lamports": 49078829, "котировка_пула_lamports": null, "доля_jup_pct": 16.36, "доля_пула_pct": null, "почему": "котировка Jupiter 16.4 % ниже 30 %, а котировка пула не прочитана: продавать за бесценок на незнании нельзя -- UNSOLD и тревога"}, "пул": {"ok": false, "why_not": "разновидность покупки кривой не 18-счётная -- карта мест продажи проверена только на ней: дискриминатор c2ab1c46684d5b2f, счетов 27", "lamports": null, "по_кривой": null, "гарантированный": null, "пул": null, "минт_котировки": "So11111111111111111111111111111111111111112", "чтений_резервов": null, "минимум": null, "путь_котировки": null, "способ": "krivaya", "через_c3": true, "имя_типа": "кривая pump.fun"}}}
 
 --- журнал детектора (ключи вычищены) ---
-Oct 02 01:14:34 claude-nl python[2871557]: 2026-10-02 01:14:34,931 INFO таблицы адресов догружены: 5, в очереди осталось 0
-Oct 02 01:17:41 claude-nl python[2871557]: 2026-10-02 01:17:41,753 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:18:44 claude-nl python[2871557]: 2026-10-02 01:18:44,149 INFO таблицы адресов догружены: 4, в очереди осталось 0
-Oct 02 01:19:46 claude-nl python[2871557]: 2026-10-02 01:19:46,648 INFO таблицы адресов догружены: 10, в очереди осталось 0
-Oct 02 01:20:44 claude-nl python[2871557]: 2026-10-02 01:20:44,197 INFO полоса: старт на 2JRXY11aWdNp
-Oct 02 01:20:44 claude-nl python[2871557]: 2026-10-02 01:20:44,207 INFO полоса: конец на 2JRXY11aWdNp -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Oct 02 01:20:49 claude-nl python[2871557]: 2026-10-02 01:20:49,058 INFO таблицы адресов догружены: 6, в очереди осталось 0
-Oct 02 01:21:51 claude-nl python[2871557]: 2026-10-02 01:21:51,444 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Oct 02 01:21:53 claude-nl python[2871557]: 2026-10-02 01:21:53,732 INFO полоса: старт на 2rWuUPTxAhjt
-Oct 02 01:21:53 claude-nl python[2871557]: 2026-10-02 01:21:53,743 INFO полоса: конец на 2rWuUPTxAhjt -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Oct 02 01:22:53 claude-nl python[2871557]: 2026-10-02 01:22:53,672 INFO таблицы адресов догружены: 31, в очереди осталось 0
-Oct 02 01:23:56 claude-nl python[2871557]: 2026-10-02 01:23:56,092 INFO таблицы адресов догружены: 14, в очереди осталось 0
-Oct 02 01:24:58 claude-nl python[2871557]: 2026-10-02 01:24:58,504 INFO таблицы адресов догружены: 14, в очереди осталось 0
-Oct 02 01:26:00 claude-nl python[2871557]: 2026-10-02 01:26:00,946 INFO таблицы адресов догружены: 6, в очереди осталось 0
-Oct 02 01:27:03 claude-nl python[2871557]: 2026-10-02 01:27:03,331 INFO таблицы адресов догружены: 3, в очереди осталось 1
-Oct 02 01:27:18 claude-nl python[2871557]: 2026-10-02 01:27:18,151 INFO полоса: старт на 5ByKNpgFRUiA
-Oct 02 01:27:18 claude-nl python[2871557]: 2026-10-02 01:27:18,159 INFO полоса: конец на 5ByKNpgFRUiA -- build шаблон: счетов 28, ожидалось 27
-Oct 02 01:27:23 claude-nl python[2871557]: 2026-10-02 01:27:23,882 INFO полоса: старт на 2UziVMXVy4vt
-Oct 02 01:27:27 claude-nl python[2871557]: 2026-10-02 01:27:27,505 INFO полоса: конец на 2UziVMXVy4vt -- sent
-Oct 02 01:27:54 claude-nl python[2871557]: 2026-10-02 01:27:54,433 INFO полоса: старт на 5enkUQQvZXBb
-Oct 02 01:27:54 claude-nl python[2871557]: 2026-10-02 01:27:54,446 INFO полоса: конец на 5enkUQQvZXBb -- build шаблон: у источника инструкция swap2, не swap
-Oct 02 01:28:06 claude-nl python[2871557]: 2026-10-02 01:28:06,589 INFO таблицы адресов догружены: 13, в очереди осталось 0
-Oct 02 01:29:04 claude-nl python[2871557]: 2026-10-02 01:29:04,639 INFO полоса: старт на 3Cd9oaNtK5Tp
-Oct 02 01:29:04 claude-nl python[2871557]: 2026-10-02 01:29:04,648 INFO полоса: конец на 3Cd9oaNtK5Tp -- build шаблон: счетов 28, ожидалось 27
-Oct 02 01:29:09 claude-nl python[2871557]: 2026-10-02 01:29:09,021 INFO таблицы адресов догружены: 12, в очереди осталось 0
-Oct 02 01:30:11 claude-nl python[2871557]: 2026-10-02 01:30:11,466 INFO таблицы адресов догружены: 2, в очереди осталось 0
-Oct 02 01:32:15 claude-nl python[2871557]: 2026-10-02 01:32:15,911 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:32:16 claude-nl python[2871557]: 2026-10-02 01:32:16,078 INFO полоса: старт на 5NPLTqWZMHQA
-Oct 02 01:32:19 claude-nl python[2871557]: 2026-10-02 01:32:19,493 INFO полоса: конец на 5NPLTqWZMHQA -- sent
-Oct 02 01:33:09 claude-nl python[2871557]: 2026-10-02 01:33:09,779 INFO полоса: старт на 37JnB5DTVEPL
-Oct 02 01:33:13 claude-nl python[2871557]: 2026-10-02 01:33:13,087 INFO полоса: конец на 37JnB5DTVEPL -- sent
-Oct 02 01:33:18 claude-nl python[2871557]: 2026-10-02 01:33:18,184 INFO таблицы адресов догружены: 2, в очереди осталось 0
-Oct 02 01:33:58 claude-nl python[2871557]: 2026-10-02 01:33:58,183 INFO полоса: старт на GZWbjEAJKHTQ
-Oct 02 01:33:58 claude-nl python[2871557]: 2026-10-02 01:33:58,192 INFO полоса: конец на GZWbjEAJKHTQ -- build шаблон: у источника инструкция swap2, не swap
-Oct 02 01:35:23 claude-nl python[2871557]: 2026-10-02 01:35:23,041 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Oct 02 01:36:25 claude-nl python[2871557]: 2026-10-02 01:36:25,286 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Oct 02 01:37:27 claude-nl python[2871557]: 2026-10-02 01:37:27,681 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Oct 02 01:38:30 claude-nl python[2871557]: 2026-10-02 01:38:30,102 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:40:34 claude-nl python[2871557]: 2026-10-02 01:40:34,734 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Oct 02 01:41:37 claude-nl python[2871557]: 2026-10-02 01:41:37,147 INFO таблицы адресов догружены: 17, в очереди осталось 0
-Oct 02 01:41:59 claude-nl python[2871557]: 2026-10-02 01:41:59,506 INFO полоса: старт на 23RpgpvkSYDq
-Oct 02 01:41:59 claude-nl python[2871557]: 2026-10-02 01:41:59,513 INFO полоса: конец на 23RpgpvkSYDq -- two_step_build котировка пула не SOL -- полоса только одношаговая
-Oct 02 01:42:39 claude-nl python[2871557]: 2026-10-02 01:42:39,502 INFO таблицы адресов догружены: 4, в очереди осталось 0
-Oct 02 01:42:49 claude-nl python[2871557]: 2026-10-02 01:42:49,783 INFO полоса: старт на 54hmsrYKr2bJ
-Oct 02 01:42:49 claude-nl python[2871557]: 2026-10-02 01:42:49,793 INFO полоса: конец на 54hmsrYKr2bJ -- build шаблон: у источника инструкция swap2, не swap
-Oct 02 01:44:44 claude-nl python[2871557]: 2026-10-02 01:44:44,282 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:45:25 claude-nl python[2871557]: 2026-10-02 01:45:25,019 INFO полоса: старт на 2RyvsZYUUtCr
-Oct 02 01:45:25 claude-nl python[2871557]: 2026-10-02 01:45:25,108 INFO полоса: конец на 2RyvsZYUUtCr -- sent
-Oct 02 01:45:46 claude-nl python[2871557]: 2026-10-02 01:45:46,683 INFO таблицы адресов догружены: 63, в очереди осталось 0
-Oct 02 01:46:49 claude-nl python[2871557]: 2026-10-02 01:46:49,145 INFO таблицы адресов догружены: 7, в очереди осталось 0
-Oct 02 01:46:50 claude-nl python[2871557]: 2026-10-02 01:46:50,698 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Oct 02 01:48:42 claude-nl python[2871557]: 2026-10-02 01:48:42,581 INFO полоса: старт на 5H8p6FhXe17S
-Oct 02 01:48:42 claude-nl python[2871557]: 2026-10-02 01:48:42,591 INFO полоса: конец на 5H8p6FhXe17S -- build шаблон: счетов 28, ожидалось 27
-Oct 02 01:48:54 claude-nl python[2871557]: 2026-10-02 01:48:54,168 INFO таблицы адресов догружены: 3, в очереди осталось 0
-Oct 02 01:50:58 claude-nl python[2871557]: 2026-10-02 01:50:58,770 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:53:04 claude-nl python[2871557]: 2026-10-02 01:53:04,654 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:53:18 claude-nl python[2871557]: 2026-10-02 01:53:18,754 INFO полоса: старт на 2rYxj8ZFPmTw
-Oct 02 01:53:18 claude-nl python[2871557]: 2026-10-02 01:53:18,759 INFO полоса: конец на 2rYxj8ZFPmTw -- gate предел полосы: убыток полосы за сутки ПО ЦЕПИ -0.345571818 SOL при пороге -0.3 (
-Oct 02 01:53:26 claude-nl python[2871557]: 2026-10-02 01:53:26,867 INFO полоса: старт на 2JRX8LkcL4CW
-Oct 02 01:53:26 claude-nl python[2871557]: 2026-10-02 01:53:26,877 INFO полоса: конец на 2JRX8LkcL4CW -- gate предел полосы: убыток полосы за сутки ПО ЦЕПИ -0.345571818 SOL при пороге -0.3 (
-Oct 02 01:54:06 claude-nl python[2871557]: 2026-10-02 01:54:06,894 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:55:03 claude-nl python[2871557]: 2026-10-02 01:55:03,838 INFO полоса: старт на 4UkUohdhk5os
-Oct 02 01:55:03 claude-nl python[2871557]: 2026-10-02 01:55:03,848 INFO полоса: конец на 4UkUohdhk5os -- gate предел полосы: убыток полосы за сутки ПО ЦЕПИ -0.345571818 SOL при пороге -0.3 (
-Oct 02 01:55:09 claude-nl python[2871557]: 2026-10-02 01:55:09,405 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:56:11 claude-nl python[2871557]: 2026-10-02 01:56:11,810 INFO таблицы адресов догружены: 2, в очереди осталось 0
-Oct 02 01:56:45 claude-nl python[2871557]: 2026-10-02 01:56:45,654 INFO полоса: старт на 4WC1oJLeeoi1
-Oct 02 01:56:45 claude-nl python[2871557]: 2026-10-02 01:56:45,662 INFO полоса: конец на 4WC1oJLeeoi1 -- gate предел полосы: убыток полосы за сутки ПО ЦЕПИ -0.345571818 SOL при пороге -0.3 (
-Oct 02 01:57:14 claude-nl python[2871557]: 2026-10-02 01:57:14,232 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:58:16 claude-nl python[2871557]: 2026-10-02 01:58:16,454 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 01:59:18 claude-nl python[2871557]: 2026-10-02 01:59:18,868 INFO таблицы адресов догружены: 4, в очереди осталось 0
-Oct 02 01:59:29 claude-nl python[2871557]: 2026-10-02 01:59:29,100 INFO полоса: старт на 3HqMg6MyRdvY
-Oct 02 01:59:29 claude-nl python[2871557]: 2026-10-02 01:59:29,109 INFO полоса: конец на 3HqMg6MyRdvY -- gate предел полосы: убыток полосы за сутки ПО ЦЕПИ -0.345571818 SOL при пороге -0.3 (
-Oct 02 02:00:35 claude-nl python[2871557]: 2026-10-02 02:00:35,771 INFO полоса: старт на 3CRJMev99LBs
-Oct 02 02:00:35 claude-nl python[2871557]: 2026-10-02 02:00:35,779 INFO полоса: конец на 3CRJMev99LBs -- gate предел полосы: убыток полосы за сутки ПО ЦЕПИ -0.345571818 SOL при пороге -0.3 (
-Oct 02 02:02:26 claude-nl python[2871557]: 2026-10-02 02:02:26,198 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 02:05:33 claude-nl python[2871557]: 2026-10-02 02:05:33,822 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 02:06:02 claude-nl python[2871557]: 2026-10-02 02:06:02,224 INFO полоса: старт на 61uyXW3UZyKR
-Oct 02 02:06:02 claude-nl python[2871557]: 2026-10-02 02:06:02,232 INFO полоса: конец на 61uyXW3UZyKR -- gate предел полосы: убыток полосы за сутки ПО ЦЕПИ -0.345571818 SOL при пороге -0.3 (
-Oct 02 02:06:36 claude-nl python[2871557]: 2026-10-02 02:06:36,236 INFO полоса: старт на 5FWMvX6G5ZfN
-Oct 02 02:06:36 claude-nl python[2871557]: 2026-10-02 02:06:36,246 INFO полоса: конец на 5FWMvX6G5ZfN -- build тип пула вне полосы: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-Oct 02 02:08:41 claude-nl python[2871557]: 2026-10-02 02:08:41,225 INFO таблицы адресов догружены: 1, в очереди осталось 0
-Oct 02 02:08:42 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
-Oct 02 02:08:42 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
-Oct 02 02:08:42 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Oct 02 02:08:42 claude-nl systemd[1]: bloom-detector.service: Consumed 6min 57.787s CPU time, 302.6M memory peak, 0B memory swap peak.
-Oct 02 02:08:42 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,464 INFO исполнитель подключён, режим live
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,626 INFO прогрев соединения к Bloom: раз в 20 с
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,627 INFO команды Telegram: слушаю
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,627 INFO источников: 625 (BATCH-3, BATCH-5, TEST, batch5, cand1, cand1_03, kandidaty, lane_s0, log_only, off, sniper_src), откуда: DBot живьём + групп источников: 605 + тестовых источников из окружения: 2
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,648 INFO таблицы адресов прогреты: 18 из 18 запрошенных
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,783 INFO ставки CLMM из файла: 9 конфигов
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,783 INFO шаги корзин DLMM из файла: 11 пулов
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,874 INFO slotSubscribe подтверждён (подписка 3820065)
-Oct 02 02:08:42 claude-nl python[2948884]: 2026-10-02 02:08:42,884 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 62
-Oct 02 02:09:42 claude-nl python[2948884]: 2026-10-02 02:09:42,908 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
-Oct 02 02:09:45 claude-nl python[2948884]: 2026-10-02 02:09:45,484 INFO таблицы адресов догружены: 39, в очереди осталось 0
-Oct 02 02:10:47 claude-nl python[2948884]: 2026-10-02 02:10:47,765 INFO таблицы адресов догружены: 22, в очереди осталось 0
-Oct 02 02:10:56 claude-nl python[2948884]: 2026-10-02 02:10:56,016 INFO полоса: старт на ABd849BtcHM8
-Oct 02 02:10:56 claude-nl python[2948884]: 2026-10-02 02:10:56,031 INFO полоса: конец на ABd849BtcHM8 -- build тип пула вне полосы: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-Oct 02 02:11:50 claude-nl python[2948884]: 2026-10-02 02:11:50,019 INFO таблицы адресов догружены: 20, в очереди осталось 0
-Oct 02 02:12:52 claude-nl python[2948884]: 2026-10-02 02:12:52,517 INFO таблицы адресов догружены: 13, в очереди осталось 0
+Oct 03 01:35:39 claude-nl python[3279625]: 2026-10-03 01:35:39,855 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 01:36:20 claude-nl python[3279625]: 2026-10-03 01:36:20,806 INFO полоса: старт на 67VdpoCahaEJ
+Oct 03 01:36:24 claude-nl python[3279625]: 2026-10-03 01:36:24,228 INFO полоса: конец на 67VdpoCahaEJ -- sent
+Oct 03 01:36:40 claude-nl python[3279625]: 2026-10-03 01:36:40,186 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 01:36:49 claude-nl python[3279625]: 2026-10-03 01:36:49,323 INFO полоса: старт на 3zd4ycqJ8JSb
+Oct 03 01:36:49 claude-nl python[3279625]: 2026-10-03 01:36:49,330 INFO полоса: конец на 3zd4ycqJ8JSb -- build шаблон: у источника инструкция b75d992818e6c297, не swap
+Oct 03 01:37:39 claude-nl python[3279625]: 2026-10-03 01:37:39,849 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
+Oct 03 01:38:40 claude-nl python[3279625]: 2026-10-03 01:38:40,926 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 01:39:41 claude-nl python[3279625]: 2026-10-03 01:39:41,298 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 01:40:41 claude-nl python[3279625]: 2026-10-03 01:40:41,625 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 01:42:42 claude-nl python[3279625]: 2026-10-03 01:42:42,303 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Oct 03 01:45:54 claude-nl python[3279625]: 2026-10-03 01:45:54,245 INFO полоса: старт на 35XwSU7XpEuK
+Oct 03 01:45:54 claude-nl python[3279625]: 2026-10-03 01:45:54,251 INFO полоса: конец на 35XwSU7XpEuK -- build шаблон: разновидность инструкции кривой не известна: b817ee6167c5d33d
+Oct 03 01:46:43 claude-nl python[3279625]: 2026-10-03 01:46:43,718 INFO таблицы адресов догружены: 6, в очереди осталось 0
+Oct 03 01:47:44 claude-nl python[3279625]: 2026-10-03 01:47:44,797 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 01:49:45 claude-nl python[3279625]: 2026-10-03 01:49:45,712 INFO таблицы адресов догружены: 4, в очереди осталось 0
+Oct 03 01:50:08 claude-nl python[3279625]: 2026-10-03 01:50:08,756 INFO полоса: старт на 5ozSfYoGuCqd
+Oct 03 01:50:08 claude-nl python[3279625]: 2026-10-03 01:50:08,762 INFO полоса: конец на 5ozSfYoGuCqd -- build пул: неоднозначная котировка: 5 встречных счетов (Dz9mQ9, EPjFWd, So1111)
+Oct 03 01:50:46 claude-nl python[3279625]: 2026-10-03 01:50:46,027 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 01:51:58 claude-nl python[3279625]: 2026-10-03 01:51:58,091 INFO полоса: старт на 67Pa56N7X2Y1
+Oct 03 01:52:01 claude-nl python[3279625]: 2026-10-03 01:52:01,394 INFO полоса: конец на 67Pa56N7X2Y1 -- sent
+Oct 03 01:52:46 claude-nl python[3279625]: 2026-10-03 01:52:46,687 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Oct 03 01:54:18 claude-nl python[3279625]: 2026-10-03 01:54:18,902 INFO полоса: старт на 35h1gYH7rNMT
+Oct 03 01:54:22 claude-nl python[3279625]: 2026-10-03 01:54:22,167 INFO полоса: конец на 35h1gYH7rNMT -- sent
+Oct 03 01:54:35 claude-nl python[3279625]: 2026-10-03 01:54:35,560 INFO полоса: старт на 4Bvm7myRvHU3
+Oct 03 01:54:35 claude-nl python[3279625]: 2026-10-03 01:54:35,571 INFO полоса: конец на 4Bvm7myRvHU3 -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 01:55:44 claude-nl python[3279625]: 2026-10-03 01:55:44,670 INFO полоса: старт на BsRjRfpRQ2k8
+Oct 03 01:55:44 claude-nl python[3279625]: 2026-10-03 01:55:44,720 INFO полоса: конец на BsRjRfpRQ2k8 -- sent
+Oct 03 01:55:47 claude-nl python[3279625]: 2026-10-03 01:55:47,692 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 01:56:04 claude-nl python[3279625]: 2026-10-03 01:56:04,900 INFO полоса: старт на 5M7hYZaHMZT4
+Oct 03 01:56:04 claude-nl python[3279625]: 2026-10-03 01:56:04,936 INFO полоса: конец на 5M7hYZaHMZT4 -- sent
+Oct 03 01:56:11 claude-nl python[3279625]: 2026-10-03 01:56:11,472 INFO полоса: старт на TxthmCVHznUY
+Oct 03 01:56:11 claude-nl python[3279625]: 2026-10-03 01:56:11,481 INFO полоса: конец на TxthmCVHznUY -- build шаблон: у источника инструкция b75d992818e6c297, не swap
+Oct 03 01:56:43 claude-nl python[3279625]: 2026-10-03 01:56:43,036 INFO полоса: старт на 214JC68BghGZ
+Oct 03 01:56:43 claude-nl python[3279625]: 2026-10-03 01:56:43,090 INFO полоса: конец на 214JC68BghGZ -- sent
+Oct 03 01:57:01 claude-nl python[3279625]: 2026-10-03 01:57:01,907 INFO полоса: старт на 2ePL316K5wde
+Oct 03 01:57:01 claude-nl python[3279625]: 2026-10-03 01:57:01,955 INFO полоса: конец на 2ePL316K5wde -- sent
+Oct 03 01:57:30 claude-nl python[3279625]: 2026-10-03 01:57:30,559 INFO полоса: старт на 1zVLTadFhut4
+Oct 03 01:57:30 claude-nl python[3279625]: 2026-10-03 01:57:30,567 INFO полоса: конец на 1zVLTadFhut4 -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 01:57:48 claude-nl python[3279625]: 2026-10-03 01:57:48,425 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 01:58:01 claude-nl python[3279625]: 2026-10-03 01:58:01,164 INFO полоса: старт на 4Yr7ZHBEP6qk
+Oct 03 01:58:01 claude-nl python[3279625]: 2026-10-03 01:58:01,197 INFO полоса: конец на 4Yr7ZHBEP6qk -- sent
+Oct 03 02:00:37 claude-nl python[3279625]: 2026-10-03 02:00:37,910 INFO полоса: старт на 3ddQQQWoxcZW
+Oct 03 02:00:37 claude-nl python[3279625]: 2026-10-03 02:00:37,920 INFO полоса: конец на 3ddQQQWoxcZW -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:00:49 claude-nl python[3279625]: 2026-10-03 02:00:49,550 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 02:01:45 claude-nl python[3279625]: 2026-10-03 02:01:45,646 INFO полоса: старт на 4KNVEXHkLXX1
+Oct 03 02:01:45 claude-nl python[3279625]: 2026-10-03 02:01:45,655 INFO полоса: конец на 4KNVEXHkLXX1 -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:01:49 claude-nl python[3279625]: 2026-10-03 02:01:49,898 INFO таблицы адресов догружены: 2, в очереди осталось 0
+Oct 03 02:02:10 claude-nl python[3279625]: 2026-10-03 02:02:10,771 INFO полоса: старт на 21ayaifRKpXk
+Oct 03 02:02:10 claude-nl python[3279625]: 2026-10-03 02:02:10,782 INFO полоса: конец на 21ayaifRKpXk -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:02:50 claude-nl python[3279625]: 2026-10-03 02:02:50,277 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 02:03:15 claude-nl python[3279625]: 2026-10-03 02:03:15,146 INFO полоса: старт на 4jvGja38ggfA
+Oct 03 02:03:15 claude-nl python[3279625]: 2026-10-03 02:03:15,153 INFO полоса: конец на 4jvGja38ggfA -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:04:33 claude-nl python[3279625]: 2026-10-03 02:04:33,074 INFO полоса: старт на 26TxgE9VFgFc
+Oct 03 02:04:33 claude-nl python[3279625]: 2026-10-03 02:04:33,087 INFO полоса: конец на 26TxgE9VFgFc -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:05:51 claude-nl python[3279625]: 2026-10-03 02:05:51,929 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 02:06:52 claude-nl python[3279625]: 2026-10-03 02:06:52,288 INFO таблицы адресов догружены: 7, в очереди осталось 0
+Oct 03 02:07:52 claude-nl python[3279625]: 2026-10-03 02:07:52,651 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Oct 03 02:08:12 claude-nl python[3279625]: 2026-10-03 02:08:12,556 INFO полоса: старт на nA1857PoPk8C
+Oct 03 02:08:12 claude-nl python[3279625]: 2026-10-03 02:08:12,563 INFO полоса: конец на nA1857PoPk8C -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:08:38 claude-nl python[3279625]: 2026-10-03 02:08:38,867 INFO полоса: старт на RbR9wFaRdsNA
+Oct 03 02:08:38 claude-nl python[3279625]: 2026-10-03 02:08:38,874 INFO полоса: конец на RbR9wFaRdsNA -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:08:47 claude-nl python[3279625]: 2026-10-03 02:08:47,669 INFO полоса: старт на 4T7xQiL6g3Fq
+Oct 03 02:08:47 claude-nl python[3279625]: 2026-10-03 02:08:47,678 INFO полоса: конец на 4T7xQiL6g3Fq -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:11:44 claude-nl python[3279625]: 2026-10-03 02:11:44,970 INFO полоса: старт на GRdGArymitDn
+Oct 03 02:11:44 claude-nl python[3279625]: 2026-10-03 02:11:44,980 INFO полоса: конец на GRdGArymitDn -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:11:54 claude-nl python[3279625]: 2026-10-03 02:11:54,193 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Oct 03 02:12:31 claude-nl python[3279625]: 2026-10-03 02:12:31,181 INFO полоса: старт на 5peDzj1YsW34
+Oct 03 02:12:34 claude-nl python[3279625]: 2026-10-03 02:12:34,501 INFO полоса: конец на 5peDzj1YsW34 -- sent
+Oct 03 02:15:01 claude-nl python[3279625]: 2026-10-03 02:15:01,669 INFO полоса: старт на 66ziSfaNQWns
+Oct 03 02:15:04 claude-nl python[3279625]: 2026-10-03 02:15:04,935 INFO полоса: конец на 66ziSfaNQWns -- sent
+Oct 03 02:15:56 claude-nl python[3279625]: 2026-10-03 02:15:56,390 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 02:16:40 claude-nl python[3279625]: 2026-10-03 02:16:40,963 INFO полоса: старт на cu3D9RWf3c7b
+Oct 03 02:16:41 claude-nl python[3279625]: 2026-10-03 02:16:41,021 INFO полоса: конец на cu3D9RWf3c7b -- sent
+Oct 03 02:16:56 claude-nl python[3279625]: 2026-10-03 02:16:56,734 INFO таблицы адресов догружены: 4, в очереди осталось 0
+Oct 03 02:17:25 claude-nl python[3279625]: 2026-10-03 02:17:25,816 INFO полоса: старт на 53gHvghiiwWr
+Oct 03 02:17:29 claude-nl python[3279625]: 2026-10-03 02:17:29,089 INFO полоса: конец на 53gHvghiiwWr -- sent
+Oct 03 02:18:15 claude-nl python[3279625]: 2026-10-03 02:18:15,890 INFO полоса: старт на 33UBfxjTxfG8
+Oct 03 02:18:19 claude-nl python[3279625]: 2026-10-03 02:18:19,163 INFO полоса: конец на 33UBfxjTxfG8 -- sent
+Oct 03 02:20:00 claude-nl python[3279625]: 2026-10-03 02:20:00,686 INFO шаги корзин DLMM прочитаны: 1 из 1 запрошенных
+Oct 03 02:20:58 claude-nl python[3279625]: 2026-10-03 02:20:58,588 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 02:21:58 claude-nl python[3279625]: 2026-10-03 02:21:58,963 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 02:22:59 claude-nl python[3279625]: 2026-10-03 02:22:59,324 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 02:23:31 claude-nl python[3279625]: 2026-10-03 02:23:31,629 INFO полоса: старт на 4X5f8YdPLjPk
+Oct 03 02:23:31 claude-nl python[3279625]: 2026-10-03 02:23:31,638 INFO полоса: конец на 4X5f8YdPLjPk -- build пул: неоднозначная котировка: 3 встречных счетов (EPjFWd)
+Oct 03 02:23:59 claude-nl python[3279625]: 2026-10-03 02:23:59,712 INFO таблицы адресов догружены: 1, в очереди осталось 0
+Oct 03 02:24:07 claude-nl python[3279625]: 2026-10-03 02:24:07,477 INFO полоса: старт на 29ZZeAhRT4X1
+Oct 03 02:24:07 claude-nl python[3279625]: 2026-10-03 02:24:07,488 INFO полоса: конец на 29ZZeAhRT4X1 -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:24:58 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
+Oct 03 02:24:58 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
+Oct 03 02:24:58 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Oct 03 02:24:58 claude-nl systemd[1]: bloom-detector.service: Consumed 7min 49.233s CPU time, 351.9M memory peak, 0B memory swap peak.
+Oct 03 02:24:58 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Oct 03 02:24:58 claude-nl python[3368261]: 2026-10-03 02:24:58,638 INFO исполнитель подключён, режим live
+Oct 03 02:24:58 claude-nl python[3368261]: 2026-10-03 02:24:58,813 INFO прогрев соединения к Bloom: раз в 20 с
+Oct 03 02:24:58 claude-nl python[3368261]: 2026-10-03 02:24:58,815 INFO команды Telegram: слушаю
+Oct 03 02:24:58 claude-nl python[3368261]: 2026-10-03 02:24:58,817 INFO источников: 633 (BATCH-3, BATCH-5, TEST, batch5, cand1, cand1_03, cand1_05, cand2, cand3, kandidaty, lane_s0, log_only, off, sniper_src), откуда: DBot живьём + групп источников: 613 + тестовых источников из окружения: 2
+Oct 03 02:24:58 claude-nl python[3368261]: 2026-10-03 02:24:58,823 INFO таблицы адресов прогреты: 18 из 18 запрошенных
+Oct 03 02:24:58 claude-nl python[3368261]: 2026-10-03 02:24:58,948 INFO ставки CLMM из файла: 9 конфигов
+Oct 03 02:24:58 claude-nl python[3368261]: 2026-10-03 02:24:58,948 INFO шаги корзин DLMM из файла: 11 пулов
+Oct 03 02:24:59 claude-nl python[3368261]: 2026-10-03 02:24:59,031 INFO slotSubscribe подтверждён (подписка 3291141)
+Oct 03 02:24:59 claude-nl python[3368261]: 2026-10-03 02:24:59,044 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 76
+Oct 03 02:25:59 claude-nl python[3368261]: 2026-10-03 02:25:59,322 INFO таблицы адресов догружены: 19, в очереди осталось 0
+Oct 03 02:26:59 claude-nl python[3368261]: 2026-10-03 02:26:59,486 INFO таблицы адресов догружены: 8, в очереди осталось 0
+Oct 03 02:27:59 claude-nl python[3368261]: 2026-10-03 02:27:59,660 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Oct 03 02:28:07 claude-nl python[3368261]: 2026-10-03 02:28:07,270 INFO полоса: старт на zCXNh73KS7fE
+Oct 03 02:28:07 claude-nl python[3368261]: 2026-10-03 02:28:07,285 INFO полоса: конец на zCXNh73KS7fE -- build шаблон: счетов 28, ожидалось 27
+Oct 03 02:28:56 claude-nl python[3368261]: 2026-10-03 02:28:56,538 INFO полоса: старт на 3k8ZidJNUNsf
+Oct 03 02:28:59 claude-nl python[3368261]: 2026-10-03 02:28:59,832 INFO таблицы адресов догружены: 3, в очереди осталось 0
+Oct 03 02:29:00 claude-nl python[3368261]: 2026-10-03 02:29:00,237 INFO полоса: конец на 3k8ZidJNUNsf -- sent
+Oct 03 02:30:00 claude-nl python[3368261]: 2026-10-03 02:30:00,060 INFO таблицы адресов догружены: 26, в очереди осталось 0
+Oct 03 02:30:01 claude-nl python[3368261]: 2026-10-03 02:30:01,596 INFO полоса: старт на 2wV9QTkDqsXN
+Oct 03 02:30:04 claude-nl python[3368261]: 2026-10-03 02:30:04,482 INFO полоса: старт на 2raxQZVEdg8u
+Oct 03 02:30:04 claude-nl python[3368261]: 2026-10-03 02:30:04,528 INFO полоса: конец на 2raxQZVEdg8u -- two_step_build котировка пула не SOL -- полоса только одношаговая
+Oct 03 02:30:04 claude-nl python[3368261]: 2026-10-03 02:30:04,861 INFO полоса: конец на 2wV9QTkDqsXN -- sent
+Oct 03 02:31:00 claude-nl python[3368261]: 2026-10-03 02:31:00,220 INFO таблицы адресов догружены: 21, в очереди осталось 0
+Oct 03 02:32:00 claude-nl python[3368261]: 2026-10-03 02:32:00,371 INFO таблицы адресов догружены: 5, в очереди осталось 0
+Oct 03 02:33:00 claude-nl python[3368261]: 2026-10-03 02:33:00,757 INFO таблицы адресов догружены: 9, в очереди осталось 0
+Oct 03 02:33:52 claude-nl systemd[1]: Stopping bloom-detector.service - Bloom signal detector (journal only, no buying code present)...
+Oct 03 02:33:52 claude-nl systemd[1]: bloom-detector.service: Deactivated successfully.
+Oct 03 02:33:52 claude-nl systemd[1]: Stopped bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Oct 03 02:33:52 claude-nl systemd[1]: bloom-detector.service: Consumed 11.846s CPU time, 199.9M memory peak, 0B memory swap peak.
+Oct 03 02:33:52 claude-nl systemd[1]: Started bloom-detector.service - Bloom signal detector (journal only, no buying code present).
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,373 INFO исполнитель подключён, режим live
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,526 INFO прогрев соединения к Bloom: раз в 20 с
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,527 INFO команды Telegram: слушаю
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,527 INFO источников: 633 (BATCH-3, BATCH-5, TEST, batch5, cand1, cand1_03, cand1_05, cand2, cand3, kandidaty, lane_s0, log_only, off, sniper_src), откуда: DBot живьём + групп источников: 613 + тестовых источников из окружения: 2
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,538 INFO таблицы адресов прогреты: 18 из 18 запрошенных
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,636 INFO ставки CLMM из файла: 9 конфигов
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,638 INFO шаги корзин DLMM из файла: 11 пулов
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,745 INFO slotSubscribe подтверждён (подписка 3538796)
+Oct 03 02:33:52 claude-nl python[3379682]: 2026-10-03 02:33:52,752 INFO РАБОТАЕТ transactionSubscribe (хост atlas), источников 76
+Oct 03 02:34:53 claude-nl python[3379682]: 2026-10-03 02:34:53,001 INFO таблицы адресов догружены: 20, в очереди осталось 0
