@@ -436,10 +436,82 @@ def zapisat(реш: dict, *, kat: str | Path | None = None,
     return из_
 
 
+# --------------------------------------------- сверка правки перед применением
+
+WHY_PRAVKA_NE_JSON = "правка не разобралась как JSON"
+WHY_PRAVKA_PUSTA = "в правке нет списка pravki"
+WHY_PRAVKA_NE_DOBAVLENIE = "в правке есть операция, которая НЕ добавление"
+WHY_PRAVKA_USTARELA = "адрес правки за это время появился в группах"
+
+
+def sverit_pravku(put_pravki: str | Path, *, gruppy_put: str | None = None) -> dict:
+    """ГОДНА ЛИ ПРАВКА ПРЯМО СЕЙЧАС. Прогонять ПЕРЕД pravka_grupp.py.
+
+    ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ. Безопасность правки держится на одном: КАЖДЫЙ её
+    адрес лежит в файле групп нигде, и тогда perenesti -- чистое добавление. Но
+    файл групп живой: между тем, как правка записана, и тем, как Code-1 её
+    применил, адрес мог попасть в группу (своим прогоном, правкой владельца,
+    чем угодно). Тогда та же операция perenesti СНИМЕТ его оттуда -- ровно то,
+    что запрещено. Сверка перечитывает файл групп и говорит, годна ли правка
+    СЕЙЧАС; не годна -- применять нельзя, надо прогнать применитель заново.
+
+    Проверяется и вид правки: ни одной операции, кроме добавления в konveyer.
+    """
+    iz = {"ok": False, "why_not": None, "pravok": None, "godnyh": None,
+          "ustarelo": None, "chuzhie_operacii": None, "fajl": str(put_pravki)}
+    п = Path(put_pravki)
+    if not п.exists():
+        iz["why_not"] = f"{WHY_NET_FAJLA}: {п}"
+        return iz
+    try:
+        д = json.loads(п.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as сбой:
+        iz["why_not"] = f"{WHY_PRAVKA_NE_JSON}: {type(сбой).__name__}"
+        return iz
+    правки = д.get("pravki") if isinstance(д, dict) else None
+    if not isinstance(правки, list) or not правки:
+        iz["why_not"] = f"{WHY_PRAVKA_PUSTA}: {п.name}"
+        return iz
+    iz["pravok"] = len(правки)
+    чужие = [о for о in правки
+             if not isinstance(о, dict)
+             or set(о) != {"perenesti", "v", "pometka"}
+             or о.get("v") != ГРУППА or not о.get("perenesti")]
+    iz["chuzhie_operacii"] = чужие
+    if чужие:
+        iz["why_not"] = f"{WHY_PRAVKA_NE_DOBAVLENIE}: {len(чужие)} из {len(правки)}"
+        return iz
+    гр = gruppy(gruppy_put)
+    if not гр.get("ok"):
+        iz["why_not"] = гр.get("why_not") or WHY_NET_GRUPP
+        return iz
+    if not гр.get("est_konveyer"):
+        iz["why_not"] = WHY_NET_GRUPPY
+        return iz
+    устарело = []
+    for о in правки:
+        адрес = str(о["perenesti"])
+        где = гр["po_adresu"].get(адрес)
+        контейнер = (гр.get("po_kontejneram") or {}).get(адрес)
+        if где or контейнер:
+            устарело.append({"адрес": адрес, "группа": где,
+                             "контейнер": (f"{контейнер[0]}.{контейнер[1]}"
+                                           if контейнер else None)})
+    iz["ustarelo"] = устарело
+    iz["godnyh"] = len(правки) - len(устарело)
+    if устарело:
+        iz["why_not"] = (f"{WHY_PRAVKA_USTARELA}: {len(устарело)} из "
+                         f"{len(правки)} -- применять нельзя, прогнать "
+                         f"применитель заново")
+        return iz
+    iz["ok"] = True
+    return iz
+
+
 # ------------------------------------------------------------- самопроверка
 
 # Число проверок объявлено заранее: меньше -- значит что-то пропущено молча.
-ZHDEM_PROVEROK = 51
+ZHDEM_PROVEROK = 55
 # АДРЕСА САМОПРОВЕРКИ -- ВЫДУМАННЫЕ, И ЭТО СКАЗАНО ВСЛУХ. Они выводятся из семени
 # числом, в цепи их нет, и ни один из них не попадает ни в один файл репозитория:
 # самопроверка работает в своём временном каталоге и убирает его за собой.
@@ -485,6 +557,7 @@ def _файл_групп(каталог: Path, *, с_конвейером: bool 
         гр[ГРУППА] = {"lane_size": 0.01, "lane_trades": True,
                       "bloom_trades": False,
                       "addresses": {_адрес(203): "уже в конвейере"}}
+    каталог.mkdir(parents=True, exist_ok=True)
     п = каталог / "gruppy.json"
     п.write_text(json.dumps({"generated_utc": "самопроверка", "groups": гр},
                             ensure_ascii=False, indent=1), encoding="utf-8")
@@ -721,8 +794,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             р_к2["otkazy"])
 
         # --------------------------------------------- 7. нет группы konveyer
-        п_без = _файл_групп(врем / "bez", с_конвейером=False) \
-            if (врем / "bez").mkdir(exist_ok=True) is None else None
+        п_без = _файл_групп(врем / "bez", с_конвейером=False)
         гр_без = gruppy(п_без)
         chk(f"нет группы {ГРУППА} -- применитель отказывает по имени",
             not гр_без["est_konveyer"], гр_без.get("why_not"))
@@ -791,6 +863,41 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
              SG.группа(_адрес(202))))
         os.environ.pop("BLOOM_SOURCE_GROUPS", None)
 
+        # ------------------- 9б. СВЕРКА ПРАВКИ ПЕРЕД ПРИМЕНЕНИЕМ
+        # Безопасность правки держится на состоянии файла групп В МОМЕНТ
+        # ПРИМЕНЕНИЯ, а не записи. Поэтому отдельный шаг, и он проверяется.
+        п_пр = врем / "pravka_dlja_sverki.json"
+        п_пр.write_text(json.dumps(пр5, ensure_ascii=False), encoding="utf-8")
+        п_чист = врем / "gruppy_chistye.json"
+        shutil.copy2(_файл_групп(врем / "chistye"), п_чист)
+        св = sverit_pravku(п_пр, gruppy_put=п_чист)
+        chk("сверка: на чистом файле групп правка годна целиком",
+            св["ok"] and св["pravok"] == 5 and св["godnyh"] == 5,
+            (св.get("why_not"), св.get("pravok"), св.get("godnyh")))
+        # А теперь тот же файл групп, КУДА ПРАВКУ УЖЕ ПРИМЕНИЛИ (или адрес попал
+        # туда иначе): сверка обязана отказать, иначе perenesti СНИМЕТ его.
+        св2 = sverit_pravku(п_пр, gruppy_put=п_копия)
+        chk("сверка: адрес уже в группе -- правка УСТАРЕЛА, применять нельзя",
+            not св2["ok"] and WHY_PRAVKA_USTARELA in (св2["why_not"] or "")
+            and len(св2["ustarelo"]) == 5, (св2.get("why_not"),
+                                            св2.get("ustarelo")))
+        # Чужая операция в правке -- отказ по имени (даже если её подложили руками)
+        п_чуж_пр = врем / "pravka_chuzhaja.json"
+        п_чуж_пр.write_text(json.dumps(
+            {"pravki": [{"otklyuchit": _адрес(1), "v": "off"}]},
+            ensure_ascii=False), encoding="utf-8")
+        св3 = sverit_pravku(п_чуж_пр, gruppy_put=п_чист)
+        chk("сверка: операция не-добавление в правке -- отказ по имени",
+            not св3["ok"]
+            and WHY_PRAVKA_NE_DOBAVLENIE in (св3["why_not"] or ""),
+            св3.get("why_not"))
+        п_пуст = врем / "pravka_pustaja.json"
+        п_пуст.write_text(json.dumps({"pravki": []}), encoding="utf-8")
+        св4 = sverit_pravku(п_пуст, gruppy_put=п_чист)
+        chk("сверка: пустая правка -- отказ по имени, а не «годна»",
+            not св4["ok"] and WHY_PRAVKA_PUSTA in (св4["why_not"] or ""),
+            св4.get("why_not"))
+
         # ------------------- 10. ничего из репозитория не тронуто
         chk("все файлы самопроверки -- во временном каталоге",
             all(str(врем) in str(x) for x in (зап["pravka"], зап["otchjot"],
@@ -817,8 +924,19 @@ def main() -> int:
     p.add_argument("--predel", type=int, default=ПРЕДЕЛ_В_СУТКИ)
     p.add_argument("--pokazat", action="store_true",
                    help="только показать решение, ничего не записывать")
+    p.add_argument("--sverit", default=None,
+                   help="проверить записанную правку перед применением")
     p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
+    if a.sverit:
+        св = sverit_pravku(a.sverit, gruppy_put=a.gruppy)
+        print(json.dumps(св, ensure_ascii=False, indent=1))
+        if not св["ok"]:
+            print(f"СТОП: {св['why_not']}", file=sys.stderr)
+            return 3
+        print(f"правка годна: {св['pravok']} добавлений, все адреса в группах "
+              f"нигде не лежат")
+        return 0
     if a.self_test or not a.vhod:
         return self_test()
     вх = prochitat_vhod(a.vhod)
