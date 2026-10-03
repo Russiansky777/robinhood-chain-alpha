@@ -1,0 +1,291 @@
+name: "Конвейер: суточный применитель + сторож учёта и файла Code-2"
+
+# ЗАЧЕМ (слово владельца 03.10 вечером, п.3). Правило 18 работает так: Code-2
+# раз в сутки (его cron 07:17Z) кладёт в claude/podbivka файл
+# data/konveyer/<дата>.json, применитель Code-3 превращает его в правку
+# "добавить адрес в konveyer", и правку применяет НАШ применитель групп, у
+# которого есть самопроверка денежного пути. Делать это руками каждое утро --
+# значит однажды не сделать.
+#
+# И ВТОРОЕ: СТОРОЖ. Расписания GitHub здесь теряются -- 03.10 учёт пропустил
+# 3.07 часа, в ночь 01->02.10 пропало пять назначенных прогонов. Поэтому у
+# этого прогона ТРИ тика (07:47, 08:33, 08:53Z): к 08:30Z нет файла Code-2 --
+# запускаем ЕГО прогон сами; копия учёта в ветке старше 1.5 ч -- запускаем
+# учёт. Оба запуска -- workflow_dispatch встроенным токеном прогона.
+#
+# ЧЕГО ЗДЕСЬ НЕТ И ПОЧЕМУ. Таймера на ХОСТЕ для этого нет: workflow_dispatch
+# требует токена с правом записи в репозиторий, а такого токена на торговой
+# машине нет и заводить его без слова владельца нельзя (так же сказано в
+# deploy/hostovye_tajmery.py). Поэтому сторож живёт в GitHub, но тремя тиками
+# вместо одного: потеря одного тика больше не стоит суток.
+#
+# ДЕНЬГИ. Применитель ТОЛЬКО ДОБАВЛЯЕТ адреса в konveyer, не больше 5 в сутки,
+# и ничего не снимает: снятие источника -- только словом владельца. Перед
+# применением правка СВЕРЯЕТСЯ с живым файлом групп (--sverit): если адрес за
+# это время где-то оказался, та же операция сняла бы его оттуда, и сверка это
+# запрещает кодом выхода 3.
+on:
+  workflow_dispatch:
+    inputs:
+      data:
+        description: "дата файла Code-2 (пусто -- сегодня по UTC)"
+        required: false
+        default: ""
+      pokazat:
+        description: "'yes' -- только показать правку, файл групп не менять"
+        required: false
+        default: "no"
+      storozh:
+        description: "'yes' -- сторож (запустить прогон Code-2 и учёт, если отстали)"
+        required: false
+        default: "yes"
+  schedule:
+    # 07:47Z -- через полчаса после cron Code-2 (07:17Z); 08:33 и 08:53 --
+    # сторож: к 08:30Z файла быть обязано.
+    - cron: "47 7 * * *"
+    - cron: "33 8 * * *"
+    - cron: "53 8 * * *"
+
+concurrency:
+  group: konveyer-sutki
+  cancel-in-progress: false
+
+env:
+  FILE: /home/bot/data/sources_2026-09-25.json
+  ENV_DIR: /etc/bloom-executor
+  VETKA: claude/nifty-sagan-r0polg
+  OUT: data/konveyer/primenitel_progon.txt
+
+jobs:
+  konveyer:
+    # СВОЙ БЕГУНОК: нужен ssh до хоста за ЖИВЫМ файлом групп и для правки.
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    env:
+      HOST: 127.0.0.1
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 0
+
+      - name: "Самопроверка применителя (63/63) до любых действий"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile analysis/c3_konveyer_primenitel.py
+          python3 analysis/c3_konveyer_primenitel.py | tail -2
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Сторож: копия учёта в ветке не старше 1.5 ч"
+        if: ${{ inputs.storozh != 'no' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          VOZRAST=$(python3 - <<'PY'
+          import json, pathlib, time, calendar
+          п = pathlib.Path("data/ledger_status.json")
+          if not п.exists():
+              print(-1); raise SystemExit
+          try:
+              т = json.loads(п.read_text(encoding="utf-8")).get("updated_utc") or ""
+              ts = calendar.timegm(time.strptime(т, "%Y-%m-%dT%H:%M:%SZ"))
+              print(int(time.time() - ts))
+          except Exception:
+              print(-1)
+          PY
+          )
+          echo "возраст копии учёта: $VOZRAST с"
+          if [ "$VOZRAST" -lt 0 ] || [ "$VOZRAST" -gt 5400 ]; then
+            echo "учёт отстал (предел 5400 с) -- запускаю ledger_hourly.yml"
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/workflows/ledger_hourly.yml/dispatches" \
+              -f ref="$VETKA" || echo "СТОРОЖ: запустить учёт не удалось"
+            echo "DOGON_UCHJOTA=da" >> "$GITHUB_ENV"
+          else
+            echo "DOGON_UCHJOTA=net" >> "$GITHUB_ENV"
+          fi
+
+      - name: "Файл Code-2 за сутки: взять из claude/podbivka"
+        id: vhod
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          D="${{ inputs.data }}"
+          [ -n "$D" ] || D=$(date -u +%Y-%m-%d)
+          echo "дата: $D"
+          echo "data=$D" >> "$GITHUB_OUTPUT"
+          git fetch -q origin claude/podbivka || true
+          mkdir -p data/konveyer
+          if git show "origin/claude/podbivka:data/konveyer/$D.json" > "data/konveyer/$D.json" 2>/dev/null; then
+            echo "est=yes" >> "$GITHUB_OUTPUT"
+            wc -c "data/konveyer/$D.json"
+          else
+            rm -f "data/konveyer/$D.json"
+            echo "est=no" >> "$GITHUB_OUTPUT"
+            CHAS=$(date -u +%H%M)
+            echo "файла Code-2 за $D нет; сейчас ${CHAS}Z"
+            if [ "${{ inputs.storozh }}" != "no" ] && [ "$CHAS" -ge "0830" ]; then
+              echo "сторож: запускаю прогон Code-2 (ветка claude/podbivka)"
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/workflows/run_podbivka2_konveyer.yml/dispatches" \
+                -f ref=claude/podbivka || echo "СТОРОЖ: запустить прогон Code-2 не удалось"
+              echo "STOROZH_PUSTIL=da" >> "$GITHUB_ENV"
+            fi
+          fi
+
+      - name: "Живой файл групп с хоста"
+        if: steps.vhod.outputs.est == 'yes'
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "cat $FILE" > /tmp/gruppy_live.json
+          python3 -c "import json;d=json.load(open('/tmp/gruppy_live.json'));print('групп:',len(d.get('groups') or {}))"
+
+      - name: "Применитель: правка, отчёт, журнал"
+        if: steps.vhod.outputs.est == 'yes'
+        run: |
+          set -e
+          set -o pipefail
+          D="${{ steps.vhod.outputs.data }}"
+          python3 analysis/c3_konveyer_primenitel.py \
+            --vhod "data/konveyer/$D.json" \
+            --gruppy /tmp/gruppy_live.json \
+            --kat data/konveyer | tee "$OUT"
+
+      - name: "СВЕРКА правки с живым файлом прямо перед применением"
+        if: steps.vhod.outputs.est == 'yes'
+        run: |
+          set -e
+          D="${{ steps.vhod.outputs.data }}"
+          P="data/konveyer/pravka_$D.json"
+          [ -f "$P" ] || { echo "правки нет: $P -- применять нечего"; exit 0; }
+          # Файл групп перечитывается с хоста ЗАНОВО: между записью правки и
+          # сверкой адрес мог куда-то попасть, и тогда perenesti снял бы его.
+          ssh -n $SSH_OPTS root@"$HOST" "cat $FILE" > /tmp/gruppy_live_sverka.json
+          python3 analysis/c3_konveyer_primenitel.py --sverit "$P" \
+            --gruppy /tmp/gruppy_live_sverka.json
+
+      - name: "Правка на хосте (pokazat=no -- применить)"
+        if: steps.vhod.outputs.est == 'yes'
+        run: |
+          set -e
+          set -o pipefail
+          D="${{ steps.vhod.outputs.data }}"
+          P="data/konveyer/pravka_$D.json"
+          if [ ! -f "$P" ]; then echo "правки нет -- хост не трогаем"; exit 0; fi
+          PRAVOK=$(python3 -c "import json;print(len((json.load(open('$P')) or {}).get('pravki') or []))")
+          echo "правок в плане: $PRAVOK"
+          if [ "$PRAVOK" = "0" ]; then echo "нечего применять"; exit 0; fi
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pravka_grupp.py" < deploy/checks/pravka_grupp.py
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konveyer_pravka.json" < "$P"
+          ARGS="--file $FILE --plan /tmp/konveyer_pravka.json"
+          if [ "${{ inputs.pokazat }}" = "yes" ]; then ARGS="$ARGS --pokazat"; fi
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            nice -n 5 python3 /tmp/pravka_grupp.py $ARGS
+            rc=\$?
+            rm -f /tmp/pravka_grupp.py /tmp/konveyer_pravka.json
+            chown bot:bot $FILE
+            chmod 644 $FILE
+            exit \$rc" | tee -a "$OUT"
+
+      - name: "Строка владельцу"
+        if: always()
+        run: |
+          set -e
+          D="${{ steps.vhod.outputs.data }}"
+          [ -n "$D" ] || D=$(date -u +%Y-%m-%d)
+          # В ТЕСТЕ -- ИЗ ЖИВОГО ФАЙЛА, А НЕ ИЗ ОТЧЁТА: отчёт применителя
+          # числа группы не хранит, а копия в ветке отстаёт на сутки.
+          ssh -n $SSH_OPTS root@"$HOST" "cat $FILE" > /tmp/gruppy_dlja_stroki.json || true
+          TEXT=$(python3 - "$D" /tmp/gruppy_dlja_stroki.json <<'PY'
+          import json, pathlib, sys
+          d = sys.argv[1]
+          put_gr = sys.argv[2] if len(sys.argv) > 2 else ""
+          vhod = pathlib.Path(f"data/konveyer/{d}.json")
+          otchjot = pathlib.Path(f"data/konveyer/primenitel_{d}.json")
+          # В ТЕСТЕ: адреса группы konveyer в живом файле групп.
+          v_teste, adresa_gruppy = None, set()
+          try:
+              gr = json.loads(pathlib.Path(put_gr).read_text(encoding="utf-8"))
+              g = ((gr.get("groups") or {}).get("konveyer") or {})
+              adresa_gruppy = set((g.get("addresses") or {}).keys())
+              v_teste = len(adresa_gruppy)
+          except Exception:
+              v_teste = None
+          if not vhod.exists():
+              print(f"конвейер {d}: файла Code-2 нет -- применитель не работал"
+                     + (f", в тесте {v_teste}" if v_teste is not None else ""))
+              raise SystemExit
+          v = json.loads(vhod.read_text(encoding="utf-8"))
+          proshli = v.get("прошли")
+          rjady = v.get("ряды") or []
+          dobavleno = []
+          if otchjot.exists():
+              o = json.loads(otchjot.read_text(encoding="utf-8"))
+              dobavleno = [str(x.get("адрес") or "")[:8]
+                            for x in (o.get("dobavleno") or [])]
+          # С >= 10 СДЕЛКАМИ -- ЧИСЛА CODE-2 (поле n) У АДРЕСОВ, ЛЕЖАЩИХ В
+          # ГРУППЕ. Это названо в строке словами: своих сделок у новичка может
+          # не быть вовсе, и выдавать n Code-2 за наши сделки нельзя.
+          s10 = None
+          try:
+              s10 = sum(1 for r in rjady if isinstance(r, dict)
+                         and str(r.get("адрес") or "") in adresa_gruppy
+                         and float(r.get("n") or 0) >= 10)
+          except Exception:
+              s10 = None
+          print(f"конвейер {d}: прошли {proshli}, добавлено {len(dobavleno)}"
+                 + (f" ({', '.join(dobavleno)})" if dobavleno else "")
+                 + (f", в тесте {v_teste}" if v_teste is not None else "")
+                 + (f", с >= 10 сделками {s10} (по числам Code-2)"
+                     if s10 is not None else ""))
+          PY
+          )
+          echo "$TEXT"
+          if [ "${DOGON_UCHJOTA:-net}" = "da" ]; then TEXT="$TEXT; сторож: учёт отставал, запустил вручную"; fi
+          if [ "${STOROZH_PUSTIL:-net}" = "da" ]; then TEXT="$TEXT; сторож: файла Code-2 к 08:30Z нет, запустил его прогон"; fi
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -a; . $ENV_DIR/env; set +a
+            if [ -z \"\$TELEGRAM_BOT_TOKEN\" ] || [ -z \"\$TELEGRAM_CHAT_ID\" ]; then
+              echo 'Telegram не настроен на хосте -- строка не ушла'; exit 0
+            fi
+            code=\$(curl -s -o /tmp/tg_konveyer.out -w '%{http_code}' \
+              -X POST \"https://api.telegram.org/bot\$TELEGRAM_BOT_TOKEN/sendMessage\" \
+              --data-urlencode chat_id=\"\$TELEGRAM_CHAT_ID\" \
+              --data-urlencode text='$TEXT')
+            echo \"telegram http \$code\"
+            rm -f /tmp/tg_konveyer.out"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/konveyer || true
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Konveyer: sutochnyj primenitel [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
