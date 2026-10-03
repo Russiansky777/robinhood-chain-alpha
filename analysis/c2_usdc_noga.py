@@ -93,6 +93,12 @@ PROG_AMMV4 = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
 PROG_DBC = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 PROG_DAMM2 = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
 PROG_DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+# RAYDIUM CPMM -- САМЫЙ ЧАСТЫЙ ТИП В ПОТОКЕ USDC (слово владельца 03.10).
+# Замер по журналу решений за жизнь ноги (02.10 00:08Z -- 03.10 10:48Z): из 118
+# USDC-сигналов 44 отвергнуто ровно за то, что CPMM не было в таблице -- 37 %
+# потока. Строитель у него уже есть и давно: им ходит двухшаговый путь, а в
+# c2_swap_build.SPECS он лежит с раскладкой "Raydium CPMM".
+PROG_CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
 
 # СПОСОБ -- ПО ФАКТУ КОДА, А НЕ ПО ЖЕЛАНИЮ. "stroitel": у типа есть свой модуль с
 # под_покупку() и инструкция_свопа() (он умеет переставить стороны, когда сделка
@@ -109,6 +115,7 @@ TYPES = {
     PROG_DBC: {"label": "Meteora DBC", "module": "c2_dbc_stroitel", "way": WAY_BUILDER},
     PROG_DAMM2: {"label": "Meteora DAMM v2", "module": None, "way": WAY_BRICKS},
     PROG_DLMM: {"label": "Meteora DLMM", "module": None, "way": WAY_BRICKS},
+    PROG_CPMM: {"label": "Raydium CPMM", "module": None, "way": WAY_BRICKS},
 }
 
 # Отказы -- ПО ИМЕНИ: полоса пишет их в выгрузку, и искать их подстрокой должно
@@ -138,6 +145,9 @@ KOTIROVSHCHIKI = {
     PROG_DBC: SPOSOB_STROITEL,
     PROG_DAMM2: SPOSOB_KIRPICHI,
     PROG_DLMM: SPOSOB_DLMM,
+    # CPMM -- ПОСТОЯННОЕ ПРОИЗВЕДЕНИЕ, и котировка по остаткам ему родная:
+    # min_out_from_reserves посчитал все 25 образцов репозитория (проверка ниже).
+    PROG_CPMM: SPOSOB_KIRPICHI,
 }
 
 WHY_OTHER_SIDE = ("своп источника шёл в другую сторону -- цену покупки "
@@ -1060,7 +1070,7 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ. Молчаливый пропуск -- это провал: если файла
 # живых образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 81
+ZHDEM_PROVEROK = 84
 
 # Живые образцы: свопы с котировкой USDC по типам пулов. Числа -- ЗАМЕР, они
 # объявлены здесь и сверяются по файлам; разошлось -- провал.
@@ -1283,11 +1293,12 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     st_bad3 = storona({"meta": {}}, programma=PROG_CLMM, pul="нетакойпул")
     chk("шаблона в сделке нет -- отказ словами",
         not st_bad3["ok"] and st_bad3["why_not"], st_bad3["why_not"])
-    chk("таблица типов -- шесть программ, у четырёх свой строитель",
-        len(TYPES) == 6
+    chk("таблица типов -- семь программ, у четырёх свой строитель, у трёх кирпичи",
+        len(TYPES) == 7
         and sum(1 for t in TYPES.values() if t["way"] == WAY_BUILDER) == 4
+        and sum(1 for t in TYPES.values() if t["way"] == WAY_BRICKS) == 3
         and set(TYPES) == {PROG_CLMM, PROG_WHIRLPOOL, PROG_AMMV4, PROG_DBC,
-                           PROG_DAMM2, PROG_DLMM},
+                           PROG_DAMM2, PROG_DLMM, PROG_CPMM},
         sorted((t["label"], t["way"]) for t in TYPES.values()))
     for prog, t in sorted(TYPES.items()):
         if t["way"] != WAY_BUILDER:
@@ -1606,13 +1617,44 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         os.environ.pop(IMYA_FLAGA_CU, None)
     else:
         os.environ[IMYA_FLAGA_CU] = sohr_cu
-    chk("котировщик назван у всех шести типов и у каждого свой способ",
+    chk("котировщик назван у ВСЕХ типов таблицы и у каждого свой способ",
         set(KOTIROVSHCHIKI) == set(TYPES)
         and KOTIROVSHCHIKI[PROG_CLMM] == KOTIROVSHCHIKI[PROG_WHIRLPOOL]
         == KOTIROVSHCHIKI[PROG_AMMV4] == KOTIROVSHCHIKI[PROG_DBC] == SPOSOB_STROITEL
-        and KOTIROVSHCHIKI[PROG_DAMM2] == SPOSOB_KIRPICHI
+        and KOTIROVSHCHIKI[PROG_DAMM2] == KOTIROVSHCHIKI[PROG_CPMM]
+        == SPOSOB_KIRPICHI
         and KOTIROVSHCHIKI[PROG_DLMM] == SPOSOB_DLMM,
         sorted(KOTIROVSHCHIKI.items()))
+    # --- CPMM В ТАБЛИЦЕ НОГИ (слово владельца 03.10, п.3). Самый частый тип в
+    # потоке USDC: 44 из 118 сигналов за жизнь ноги отвергнуто ровно за его
+    # отсутствие -- 37 % потока. Условие владельца было "если строитель CPMM уже
+    # есть": он есть и давно -- c2_swap_build.SPECS знает его раскладку, им же
+    # ходит двухшаговый путь, и котировка по остаткам ему родная (постоянное
+    # произведение). Проверяется НА ЖИВЫХ ОБРАЗЦАХ, а не утверждением о таблице.
+    chk("CPMM стоит в таблице ноги кирпичами, как DAMM v2",
+        TYPES[PROG_CPMM]["way"] == WAY_BRICKS
+        and TYPES[PROG_CPMM]["module"] is None
+        and KOTIROVSHCHIKI[PROG_CPMM] == SPOSOB_KIRPICHI, TYPES[PROG_CPMM])
+    try:
+        _C_c, _PP_c, _SB_c, _B_c = _kirpichi()
+        chk("и строитель CPMM у кирпичей ЕСТЬ -- раскладка названа",
+            _B_c.CPMM in _B_c.SPECS
+            and _B_c.SPECS[_B_c.CPMM].get("label") == "Raydium CPMM"
+            and _B_c.CPMM == PROG_CPMM, _B_c.CPMM)
+        _обр_c = _B_c.load_samples(_B_c.CPMM)
+        _кот_c = 0
+        for _s_c in _обр_c:
+            _tpl_c = _B_c.extract_template(_s_c["tx"], _B_c.CPMM, _s_c["pool_vault"])
+            if not _tpl_c.get("ok"):
+                continue
+            _mo_c = _B_c.min_out_from_reserves(_tpl_c, _s_c["tx"], 10_000_000, 0.35)
+            _кот_c += bool((_mo_c or {}).get("ok")
+                            and 0 < _mo_c["min_out"] < _mo_c["expected_out"])
+        chk(f"котировка по остаткам считает CPMM на живых образцах "
+            f"({_кот_c} из {len(_обр_c)})",
+            len(_обр_c) >= 10 and _кот_c == len(_обр_c), (_кот_c, len(_обр_c)))
+    except Exception as _exc_c:  # noqa: BLE001
+        chk("кирпичи для CPMM загрузились", False, type(_exc_c).__name__)
     kb_net = min_out_boj({"ok": False, "why_not": "нет стороны"}, {}, amount_in=1,
                          proskalzyvanie=0.35)
     chk("боевой котировщик без стороны ноги -- отказ словами, без исключения",
