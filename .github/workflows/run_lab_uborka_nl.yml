@@ -1,0 +1,258 @@
+name: "Лаборатория: уборка диска (замер, чистка названных путей, потолок кэша)"
+
+# ЗАЧЕМ (слово владельца 03.10, п.2). На lab-miami кончился диск: прогоны падали
+# с "No space left on device", zakem2 отработал 8 суток из 11, суточный не
+# стартовал вовсе. Нужно освободить >= 20 ГБ и поставить потолок, чтобы это не
+# повторилось.
+#
+# ЧИСТИМ ТОЛЬКО НАЗВАННЫЕ ПУТИ, И СНАЧАЛА ЗАМЕР. Слепое "почисти диск" на чужой
+# машине -- это способ унести чьи-то данные. Поэтому порядок жёсткий:
+#   1) df и du по подозреваемым -- ДО всякой чистки, в отчёт;
+#   2) чистка только того, что названо списком ниже, и только если dejstvovat=yes;
+#   3) df после, строкой.
+#
+# ЧТО СЧИТАЕТСЯ МУСОРОМ И ПОЧЕМУ ИМЕННО ЭТО:
+#   * _diag бегунка -- его собственные журналы запусков. Бегунок их только
+#     дописывает и сам не чистит; для работы не нужны.
+#   * _work/_temp и _work/_actions -- рабочие копии шагов. Бегунок создаёт их
+#     заново на каждом прогоне, поэтому удаление между прогонами безопасно.
+#     САМО _work НЕ УДАЛЯЕМ: там дерево репозитория, которое чекаут переиспользует.
+#   * $HOME/arhiv_pumpapi -- кэш архива pumpapi у зондов Code-2. Это кэш: он
+#     восстановим из источника, и именно он растёт без предела.
+# Ни одного пути вне этого списка прогон не трогает. Ключей кошельков на
+# лаборатории нет по построению (это сторожит run_lab_bootstrap_nl.yml).
+on:
+  workflow_dispatch:
+    inputs:
+      mashina:
+        description: "какая лаборатория: miami или ams"
+        required: false
+        default: "miami"
+      dejstvovat:
+        description: "'yes' -- чистить; по умолчанию только замер (сухой прогон)"
+        required: false
+        default: "no"
+      potolok_arhiva_gb:
+        description: "потолок кэша архива в ГБ (сверх него -- самые старые файлы удаляются)"
+        required: false
+        default: "5"
+      postavit_potolok:
+        description: "'yes' -- поставить таймер, который держит потолок сам (раз в час)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: lab-uborka
+  cancel-in-progress: false
+
+jobs:
+  uborka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Какая машина и куда отчёт"
+        run: |
+          set -e
+          case "${{ inputs.mashina }}" in
+            miami) HOST=169.128.191.158 ;;
+            ams)   HOST=216.73.157.61 ;;
+            *) echo "OTKAZ: mashina '${{ inputs.mashina }}' neizvestna -- tolko miami ili ams"; exit 1 ;;
+          esac
+          OUT="data/lab_${{ inputs.mashina }}_uborka.txt"
+          {
+            echo "HOST=$HOST"
+            echo "OUT_FILE=$OUT"
+          } >> "$GITHUB_ENV"
+          {
+            echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "mashina ${{ inputs.mashina }}, host $HOST"
+            echo "dejstvovat=${{ inputs.dejstvovat }}, potolok_arhiva_gb=${{ inputs.potolok_arhiva_gb }}, postavit_potolok=${{ inputs.postavit_potolok }}"
+          } > "$OUT"
+
+      - name: "Ключ этой лаборатории"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+          KLJUCH_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
+        run: |
+          set -e
+          case "${{ inputs.mashina }}" in
+            miami) KLJUCH="$KLJUCH_MIAMI"; IMJA=VPS_SSH_KEY_MIAMI ;;
+            ams)   KLJUCH="$KLJUCH_AMS";   IMJA=VPS_SSH_KEY_AMS ;;
+          esac
+          [ -n "$KLJUCH" ] || { echo "OTKAZ: sekreta $IMJA net"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KLJUCH" > ~/.ssh/lab_key
+          chmod 600 ~/.ssh/lab_key
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "ЗАМЕР ДО ЧИСТКИ: df и кто съел диск"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            echo '--- df ДО ---'; df -h / ; echo
+            echo '--- inode ---'; df -i / | tail -1; echo
+            echo '--- верхние каталоги / (ГБ) ---'
+            du -x -B1G -d1 / 2>/dev/null | sort -rn | head -12; echo
+            echo '--- дерево бегунка ---'
+            for D in /home/*/actions-runner; do
+              [ -d \"\$D\" ] || continue
+              printf 'бегунок %s: всего %s\n' \"\$D\" \"\$(du -sh \"\$D\" 2>/dev/null | cut -f1)\"
+              for P in _diag _work/_temp _work/_actions _work/_tool; do
+                [ -e \"\$D/\$P\" ] && printf '  %-16s %s\n' \"\$P\" \"\$(du -sh \"\$D/\$P\" 2>/dev/null | cut -f1)\"
+              done
+              [ -d \"\$D/_diag\" ] && printf '  файлов в _diag: %s\n' \"\$(ls -1 \"\$D/_diag\" 2>/dev/null | wc -l)\"
+            done; echo
+            echo '--- кэш архива pumpapi ---'
+            for H in /root /home/*; do
+              [ -d \"\$H/arhiv_pumpapi\" ] || continue
+              printf '%s/arhiv_pumpapi: %s, файлов %s\n' \"\$H\" \"\$(du -sh \"\$H/arhiv_pumpapi\" | cut -f1)\" \"\$(find \"\$H/arhiv_pumpapi\" -type f | wc -l)\"
+            done
+            echo '--- журналы systemd ---'; journalctl --disk-usage 2>/dev/null || true
+          " 2>&1 | tee -a "$OUT_FILE"
+
+      - name: "ЧИСТКА названных путей (только при dejstvovat=yes)"
+        if: ${{ inputs.dejstvovat == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ПОТОЛОК В БАЙТАХ СЧИТАЕМ ЗДЕСЬ: на хосте арифметика в shell уже
+          # внутри кавычек, и ошибка в ней была бы незаметной.
+          POTOLOK_B=$(( ${{ inputs.potolok_arhiva_gb }} * 1024 * 1024 * 1024 ))
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            echo '--- чистка ---'
+            # 1. ЖУРНАЛЫ БЕГУНКА (_diag) и его рабочие временные каталоги.
+            for D in /home/*/actions-runner; do
+              [ -d \"\$D\" ] || continue
+              if [ -d \"\$D/_diag\" ]; then
+                N=\$(ls -1 \"\$D/_diag\" | wc -l); S=\$(du -sh \"\$D/_diag\" | cut -f1)
+                rm -rf \"\$D/_diag\"/*
+                echo \"ubrano _diag: \$N fajlov, bylo \$S (\$D)\"
+              fi
+              for P in _work/_temp _work/_actions _work/_tool; do
+                if [ -d \"\$D/\$P\" ]; then
+                  S=\$(du -sh \"\$D/\$P\" | cut -f1)
+                  rm -rf \"\$D/\$P\"
+                  echo \"ubrano \$P: bylo \$S (\$D)\"
+                fi
+              done
+            done
+            # 2. КЭШ АРХИВА ДО ПОТОЛКА: удаляем САМЫЕ СТАРЫЕ файлы, пока размер
+            #    выше потолка. Не 'rm -rf каталог': свежая часть кэша полезна, и
+            #    выбрасывать её значит заставить зонд качать всё заново.
+            for H in /root /home/*; do
+              A=\"\$H/arhiv_pumpapi\"; [ -d \"\$A\" ] || continue
+              BYLO=\$(du -sb \"\$A\" | cut -f1)
+              if [ \"\$BYLO\" -gt $POTOLOK_B ]; then
+                find \"\$A\" -type f -printf '%T@ %s %p\n' | sort -n | awk -v cel=$POTOLOK_B -v cur=\"\$BYLO\" '
+                  { if (cur <= cel) exit; print \$3; cur -= \$2 }
+                ' | while IFS= read -r F; do rm -f -- \"\$F\"; done
+                find \"\$A\" -type d -empty -delete 2>/dev/null || true
+                STALO=\$(du -sb \"\$A\" 2>/dev/null | cut -f1 || echo 0)
+                echo \"arhiv \$A: bylo \$((BYLO/1024/1024/1024)) GB, stalo \$((STALO/1024/1024/1024)) GB pri potolke ${{ inputs.potolok_arhiva_gb }} GB\"
+              else
+                echo \"arhiv \$A: \$((BYLO/1024/1024/1024)) GB -- nizhe potolka, ne tronut\"
+              fi
+            done
+            # 3. ЖУРНАЛЫ SYSTEMD до 200 МБ: они растут сами и к работе не нужны.
+            journalctl --vacuum-size=200M 2>&1 | tail -2 || true
+            # 4. КЭШ ПАКЕТОВ: восстановим из сети, держать не нужно.
+            apt-get clean 2>/dev/null || true
+            command -v pip3 >/dev/null && pip3 cache purge 2>/dev/null | tail -1 || true
+          " 2>&1 | tee -a "$OUT_FILE"
+
+      - name: "ПОТОЛОК САМ СЕБЯ ДЕРЖИТ: таймер раз в час (по входу)"
+        if: ${{ inputs.postavit_potolok == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ТАЙМЕР, А НЕ ОДНА ЧИСТКА. Один раз почистить -- значит через
+          # неделю прийти к тому же "No space left on device". Потолок должна
+          # держать сама машина, без прогона и без сессии.
+          #
+          # СКРИПТ ЕДЕТ ФАЙЛОМ ИЗ РЕПОЗИТОРИЯ, а не heredoc'ом внутри этого
+          # шага: heredoc в блочном скаляре YAML уже один раз сломал весь файл
+          # (строки скрипта стоят в нулевой колонке и закрывают блок). Файлом он
+          # ещё и читается в обзоре, и у него своя самопроверка на входе.
+          POTOLOK_B=$(( ${{ inputs.potolok_arhiva_gb }} * 1024 * 1024 * 1024 ))
+          ssh $SSH_OPTS root@"$HOST" "cat > /usr/local/sbin/lab_potolok_diska.sh" < deploy/lab_potolok_diska.sh
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            chmod 755 /usr/local/sbin/lab_potolok_diska.sh
+            sh -n /usr/local/sbin/lab_potolok_diska.sh && echo 'skript razobran bez oshibok'
+            {
+              echo '[Unit]'
+              echo 'Description=Potolok diska laboratorii (kesh arhiva i zhurnaly begunka)'
+              echo ''
+              echo '[Service]'
+              echo 'Type=oneshot'
+              echo 'Environment=POTOLOK_B=$POTOLOK_B'
+              echo 'ExecStart=/usr/local/sbin/lab_potolok_diska.sh'
+              echo 'Nice=15'
+              echo 'IOSchedulingClass=idle'
+            } > /etc/systemd/system/lab-potolok-diska.service
+            {
+              echo '[Unit]'
+              echo 'Description=Tajmer potolka diska laboratorii'
+              echo ''
+              echo '[Timer]'
+              echo 'OnCalendar=*:07'
+              echo 'AccuracySec=5min'
+              echo 'Persistent=true'
+              echo 'Unit=lab-potolok-diska.service'
+              echo ''
+              echo '[Install]'
+              echo 'WantedBy=timers.target'
+            } > /etc/systemd/system/lab-potolok-diska.timer
+            systemctl daemon-reload
+            systemctl enable --now lab-potolok-diska.timer
+            echo '--- пробный запуск потолка ---'
+            systemctl start lab-potolok-diska.service || true
+            journalctl -u lab-potolok-diska.service -n 12 --no-pager -o cat || true
+            echo '--- таймер потолка ---'
+            systemctl is-enabled lab-potolok-diska.timer
+            systemctl list-timers lab-potolok-diska.timer --no-pager | head -3
+          " 2>&1 | tee -a "$OUT_FILE"
+
+      - name: "df ПОСЛЕ -- одной строкой"
+        if: always()
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            echo '--- df ПОСЛЕ ---'; df -h /
+            df -h --output=source,size,used,avail,pcent / | tail -1 \
+              | awk '{printf \"STROKA: %s vsego %s, zanjato %s, svobodno %s (%s)\n\", \$1, \$2, \$3, \$4, \$5}'
+          " 2>&1 | tee -a "$OUT_FILE"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          set -e
+          if grep -nE "PRIVATE KEY|api-key=|BEGIN OPENSSH" "$OUT_FILE"; then
+            echo "SBOY: v otchjote nashlos pohozheje na kljuch -- ne kommitim"
+            exit 1
+          fi
+          echo "kljuchej v otchjote net"
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Laboratorija: uborka diska [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

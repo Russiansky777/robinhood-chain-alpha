@@ -66,6 +66,7 @@ c2_swap_build.min_out_from_reserves калибрует один множител
 """
 from __future__ import annotations
 
+import base64
 import sys
 from pathlib import Path
 
@@ -170,8 +171,218 @@ def _множитель_комиссии(B, tpl_покупки: dict | None, tx:
     return из_
 
 
+# СОБЫТИЕ СДЕЛКИ КРИВОЙ -- РАЗБОР ПО ПУБЛИЧНОМУ IDL, А НЕ ПО ПАМЯТИ.
+# Источник: github.com/pump-fun/pump-public-docs, idl/pump.json (адрес
+# 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P), тип TradeEvent, дискриминатор
+# события bddb7fd34ee661ee. Поля идут в этом порядке и никакое не пропущено:
+#   mint 32, sol_amount 8, token_amount 8, is_buy 1, user 32, timestamp 8,
+#   virtual_sol_reserves 8, virtual_token_reserves 8, real_sol_reserves 8,
+#   real_token_reserves 8, fee_recipient 32, fee_basis_points 8, fee 8,
+#   creator 32, creator_fee_basis_points 8, creator_fee 8,        <- конец v1 (217)
+#   track_volume 1, total_unclaimed_tokens 8, total_claimed_tokens 8,
+#   current_sol_volume 8, last_update_timestamp 8, ix_name string,
+#   mayhem_mode 1, cashback_fee_basis_points 8, cashback 8,
+#   buyback_fee_basis_points 8, buyback_fee 8, shareholders vec<Shareholder>,
+#   quote_mint 32, quote_amount 8, virtual_quote_reserves 8,
+#   real_quote_reserves 8, holder_rewards_bps 8, holder_rewards 8.
+# Разбор СВЕРЕН С ЦЕПЬЮ: у всех четырёх живых sell_v2 образцов тело события
+# разобралось РОВНО до конца (367 из 367 и 401 из 401 байта) -- ни байта лишнего
+# и ни байта недостающего, то есть порядок полей именно такой.
+СОБЫТИЕ_КРИВОЙ_ДИСК = "bddb7fd34ee661ee"
+АНКОР_СОБЫТИЕ_ДИСК = "e445a52e51cb9a1d"
+ПУСТОЙ_КЛЮЧ = "11111111111111111111111111111111"
+
+
+def событие_кривой(tx: dict, минт: str | None = None) -> dict:
+    """Событие сделки кривой целиком (v1 и v2 -- один тип TradeEvent).
+
+    Событие уходит ПО CPI: внутренней инструкцией к самой программе, данные
+    которой начинаются дискриминатором Anchor e445a52e51cb9a1d, а дальше
+    дискриминатор события и тело. Берётся и из "Program data:" -- оба вида встречаются.
+
+    ВОЗВРАЩАЕТСЯ ТОЛЬКО СОБЫТИЕ, КОТОРОЕ ВОСПРОИЗВЕЛО СВОЮ СДЕЛКУ: кривая по
+    резервам ДО (они считаются из резервов ПОСЛЕ и сумм сделки) обязана дать ровно
+    sol_amount, а комиссии -- совпасть с ceil(sol * bps / 10 000). Не сошлось --
+    отказ по имени: раскладка события у программы менялась, и верить разбору на
+    слово нельзя.
+    """
+    import struct  # noqa: PLC0415
+
+    from solders.pubkey import Pubkey  # noqa: PLC0415
+
+    из_ = {"ok": False, "why_not": None, "поля": None, "длина": None,
+            "разобрано": None, "v2": False}
+    тела = []
+    for ix in _кирпичи()[1].all_instructions(tx or {}):
+        try:
+            д = _кирпичи()[1].b58decode(ix["data"])
+        except Exception:  # noqa: BLE001, S112
+            continue
+        if len(д) >= 16 and д[:8].hex() == АНКОР_СОБЫТИЕ_ДИСК \
+                and д[8:16].hex() == СОБЫТИЕ_КРИВОЙ_ДИСК:
+            тела.append(bytes(д[16:]))
+    for ln in ((tx or {}).get("meta") or {}).get("logMessages") or []:
+        if not ln.startswith("Program data: "):
+            continue
+        try:
+            сыр = base64.b64decode(ln[len("Program data: "):].strip())
+        except ValueError:
+            continue
+        if сыр[:8].hex() == СОБЫТИЕ_КРИВОЙ_ДИСК:
+            тела.append(bytes(сыр[8:]))
+    if not тела:
+        из_["why_not"] = "события сделки кривой в транзакции нет"
+        return из_
+    причины = []
+    for b in тела:
+        п = {"_длина": len(b)}
+        м = [0]
+
+        def u64(b=b, м=м):
+            v = struct.unpack_from("<Q", b, м[0])[0]
+            м[0] += 8
+            return v
+
+        def i64(b=b, м=м):
+            v = struct.unpack_from("<q", b, м[0])[0]
+            м[0] += 8
+            return v
+
+        def pk(b=b, м=м):
+            v = str(Pubkey(bytes(b[м[0]:м[0] + 32])))
+            м[0] += 32
+            return v
+
+        def b1(b=b, м=м):
+            v = b[м[0]]
+            м[0] += 1
+            return v
+
+        try:
+            п["mint"] = pk()
+            п["sol_amount"] = u64()
+            п["token_amount"] = u64()
+            п["is_buy"] = b1()
+            п["user"] = pk()
+            п["timestamp"] = i64()
+            п["virtual_sol_reserves"] = u64()
+            п["virtual_token_reserves"] = u64()
+            п["real_sol_reserves"] = u64()
+            п["real_token_reserves"] = u64()
+            п["fee_recipient"] = pk()
+            п["fee_basis_points"] = u64()
+            п["fee"] = u64()
+            п["creator"] = pk()
+            п["creator_fee_basis_points"] = u64()
+            п["creator_fee"] = u64()
+        except (struct.error, ValueError, IndexError):
+            причины.append("тело короче обязательной части v1 (217 байт)")
+            continue
+        if минт is not None and п["mint"] != минт:
+            причины.append(f"событие другого минта {п['mint'][:8]}")
+            continue
+        хвост = m2 = None  # noqa: F841
+        try:
+            п["track_volume"] = b1()
+            п["total_unclaimed_tokens"] = u64()
+            п["total_claimed_tokens"] = u64()
+            п["current_sol_volume"] = u64()
+            п["last_update_timestamp"] = i64()
+            дл = struct.unpack_from("<I", b, м[0])[0]
+            м[0] += 4
+            п["ix_name"] = b[м[0]:м[0] + дл].decode("utf-8", "replace")
+            м[0] += дл
+            п["mayhem_mode"] = b1()
+            п["cashback_fee_basis_points"] = u64()
+            п["cashback"] = u64()
+            п["buyback_fee_basis_points"] = u64()
+            п["buyback_fee"] = u64()
+            н = struct.unpack_from("<I", b, м[0])[0]
+            м[0] += 4
+            п["shareholders"] = []
+            for _ in range(н):
+                адрес = pk()
+                доля = struct.unpack_from("<H", b, м[0])[0]
+                м[0] += 2
+                п["shareholders"].append([адрес, доля])
+            п["quote_mint"] = pk()
+            п["quote_amount"] = u64()
+            п["virtual_quote_reserves"] = u64()
+            п["real_quote_reserves"] = u64()
+            п["holder_rewards_bps"] = u64()
+            п["holder_rewards"] = u64()
+            хвост = True
+        except (struct.error, ValueError, IndexError, UnicodeDecodeError):
+            хвост = False
+        п["_разобрано"] = м[0]
+        # ХВОСТ БЕРЁТСЯ ТОЛЬКО ЕСЛИ РАЗОБРАЛСЯ РОВНО ДО КОНЦА ТЕЛА. Разобралось
+        # меньше -- значит раскладка не та, и поля хвоста выбрасываются целиком,
+        # а не берутся наполовину.
+        п["v2"] = bool(хвост) and м[0] == len(b)
+        if not п["v2"]:
+            for ключ in ("track_volume", "total_unclaimed_tokens",
+                          "total_claimed_tokens", "current_sol_volume",
+                          "last_update_timestamp", "ix_name", "mayhem_mode",
+                          "cashback_fee_basis_points", "cashback",
+                          "buyback_fee_basis_points", "buyback_fee",
+                          "shareholders", "quote_mint", "quote_amount",
+                          "virtual_quote_reserves", "real_quote_reserves",
+                          "holder_rewards_bps", "holder_rewards"):
+                п.pop(ключ, None)
+        пров = _событие_воспроизвело_себя(п)
+        if not пров["ok"]:
+            причины.append(пров["why_not"])
+            continue
+        из_.update(ok=True, поля=п, длина=len(b), разобрано=п["_разобрано"],
+                   v2=п["v2"])
+        return из_
+    из_["why_not"] = ("ни одно событие не взялось: " + "; ".join(причины[:3]))
+    return из_
+
+
+def _событие_воспроизвело_себя(п: dict) -> dict:
+    """Кривая по резервам ДО обязана дать ровно sol_amount, комиссии -- сойтись."""
+    из_ = {"ok": False, "why_not": None}
+    sol, tok = int(п["sol_amount"]), int(п["token_amount"])
+    vs, vt = int(п["virtual_sol_reserves"]), int(п["virtual_token_reserves"])
+    if sol <= 0 or tok <= 0 or vs <= 0 or vt <= 0:
+        из_["why_not"] = "суммы или резервы события не положительны"
+        return из_
+    if п["is_buy"]:
+        vs0, vt0 = vs - sol, vt + tok
+        if vs0 <= 0 or vt0 <= tok:
+            из_["why_not"] = "резервы до покупки вышли не положительными"
+            return из_
+        свой = vt0 * sol // (vs0 + sol)
+        допуск = max(1, tok // 1_000_000)
+        if abs(свой - tok) > допуск:
+            из_["why_not"] = (f"событие не воспроизвело свою ПОКУПКУ: кривая дала "
+                               f"{свой}, в событии {tok}")
+            return из_
+    else:
+        vs0, vt0 = vs + sol, vt - tok
+        if vt0 <= 0 or vs0 <= sol:
+            из_["why_not"] = "резервы до продажи вышли не положительными"
+            return из_
+        свой = vs0 * tok // (vt0 + tok)
+        допуск = max(1, sol // 1_000_000)
+        if abs(свой - sol) > допуск:
+            из_["why_not"] = (f"событие не воспроизвело свою ПРОДАЖУ: кривая дала "
+                               f"{свой}, в событии {sol}")
+            return из_
+    для_ком = sol
+    if -(-для_ком * int(п["fee_basis_points"]) // 10_000) != int(п["fee"]):
+        из_["why_not"] = "комиссия программы не сошлась с ceil(sol * bps)"
+        return из_
+    if -(-для_ком * int(п["creator_fee_basis_points"]) // 10_000) != int(п["creator_fee"]):
+        из_["why_not"] = "комиссия создателя не сошлась с ceil(sol * bps)"
+        return из_
+    из_["ok"] = True
+    return из_
+
+
 def выход_кривой(*, токенов: int, вирт_sol: int, вирт_токены: int,
-                 fee_bps: int, creator_bps: int) -> dict:
+                 fee_bps: int, creator_bps: int, cashback_bps: int = 0) -> dict:
     """Сколько лампортов дадут за `токенов` на кривой pump.fun. Чистая арифметика.
 
     КРИВАЯ И КОМИССИИ -- ПО ЖИВЫМ ПРОДАЖАМ, А НЕ ПО ПАМЯТИ. На всех шести живых
@@ -188,7 +399,8 @@ def выход_кривой(*, токенов: int, вирт_sol: int, вирт_
     Возвращает {ok, why_not, с_кривой, комиссия, комиссия_создателя, выход}.
     """
     из_ = {"ok": False, "why_not": None, "с_кривой": None, "комиссия": None,
-            "комиссия_создателя": None, "выход": None}
+            "комиссия_создателя": None, "выход": None, "кэшбэк": None,
+            "выход_осторожный": None}
     т, вс, вт = int(токенов), int(вирт_sol), int(вирт_токены)
     if т <= 0 or вс <= 0 or вт <= 0:
         из_["why_not"] = (f"виртуальные резервы или количество не положительны: "
@@ -200,10 +412,21 @@ def выход_кривой(*, токенов: int, вирт_sol: int, вирт_
     net = вс * т // (вт + т)
     ком = -(-net * int(fee_bps) // 10_000)
     кс = -(-net * int(creator_bps) // 10_000)
+    кэш = -(-net * int(cashback_bps or 0) // 10_000)
     выход = net - ком - кс
-    из_.update(с_кривой=net, комиссия=ком, комиссия_создателя=кс, выход=выход)
-    if выход <= 0:
-        из_["why_not"] = f"выход после комиссий не положителен: {выход}"
+    # ОСТОРОЖНОЕ ЧИСЛО -- ТО ЖЕ МИНУС КЭШБЭК. По цепи измерено (образец gWuWGN1o,
+    # где сумма дельт сошлась с оттоком кривой до лампорта), что с кривой уходит
+    # РОВНО: комиссия программы (её часть buyback -- внутри неё, а не сверху),
+    # комиссия создателя, рента накопителя объёма при его создании и остаток
+    # пользователю. Ставка кэшбэка у всех живых образцов нулевая, поэтому на чём
+    # именно её снимают -- не проверено; пол берётся из ОСТОРОЖНОГО числа, чтобы
+    # непроверенная ставка не завысила пол.
+    осторожный = выход - кэш
+    из_.update(с_кривой=net, комиссия=ком, комиссия_создателя=кс, выход=выход,
+               кэшбэк=кэш, выход_осторожный=осторожный)
+    if выход <= 0 or осторожный <= 0:
+        из_["why_not"] = (f"выход после комиссий не положителен: {выход} "
+                           f"(осторожный {осторожный})")
         return из_
     из_["ok"] = True
     return из_
@@ -445,26 +668,62 @@ def котировка_продажи(программа: str, *, пул: str | 
             # которого продаём; ставки комиссий -- там же. Событие берётся чужой
             # проверенной функцией (c2_swap_build.pump_trade_event): она не берёт
             # событие, которое не воспроизвело собственную сделку.
+            # СОБЫТИЕ РАЗБИРАЕТСЯ ДВАЖДЫ И ДВА РАЗБОРА СВЕРЯЮТСЯ. Чужой
+            # (c2_swap_build.pump_trade_event) читает обязательную часть и не берёт
+            # событие, которое не воспроизвело свою сделку; свой (событие_кривой)
+            # читает ВЕСЬ хвост v2 по IDL -- оттуда ставка кэшбэка и признак
+            # mayhem, которых в обязательной части нет. Расхождение общих полей --
+            # отказ по имени: значит раскладка события поменялась.
             ев = B.pump_trade_event(tx_покупки or {}, база)
-            из_.update(чтений=0, путь="c2_swap_build.pump_trade_event + кривая продажи")
+            своё = событие_кривой(tx_покупки or {}, база)
+            из_.update(чтений=0, путь="событие сделки кривой (IDL) + кривая продажи",
+                       v2=своё.get("v2"))
             if not ев:
                 из_["why_not"] = "нет события сделки кривой pump.fun в логах покупки"
                 return из_
-            к = выход_кривой(токенов=int(остаток),
-                             вирт_sol=int(ев["virtual_sol_reserves"]),
-                             вирт_токены=int(ев["virtual_token_reserves"]),
-                             fee_bps=int(ев["fee_bps"]),
-                             creator_bps=int(ев["creator_fee_bps"]))
+            if not своё.get("ok"):
+                из_["why_not"] = f"событие по IDL не разобралось: {своё.get('why_not')}"
+                return из_
+            п = своё["поля"]
+            расхождения = [и for и, св in (("virtual_sol_reserves", "virtual_sol_reserves"),
+                                             ("virtual_token_reserves", "virtual_token_reserves"),
+                                             ("fee_bps", "fee_basis_points"),
+                                             ("creator_fee_bps", "creator_fee_basis_points"))
+                            if int(ев[и]) != int(п[св])]
+            if расхождения:
+                из_["why_not"] = (f"два разбора события не сошлись по полям "
+                                   f"{расхождения} -- раскладка события поменялась")
+                return из_
+            # КОТИРОВКА ПО СОСТОЯНИЮ КРИВОЙ. Резервы берутся КОТИРОВОЧНЫЕ, если
+            # событие их называет (v2): у кривой с котировкой SOL они совпадают с
+            # virtual_sol_reserves (проверено на всех четырёх живых sell_v2), а у
+            # кривой с иной котировкой разошлись бы -- и тогда считать по SOL было
+            # бы неверно.
+            вирт_к = int(п.get("virtual_quote_reserves") or п["virtual_sol_reserves"])
+            к = выход_кривой(токенов=int(остаток), вирт_sol=вирт_к,
+                             вирт_токены=int(п["virtual_token_reserves"]),
+                             fee_bps=int(п["fee_basis_points"]),
+                             creator_bps=int(п["creator_fee_basis_points"]),
+                             cashback_bps=int(п.get("cashback_fee_basis_points") or 0))
             из_.update(expected_out=к.get("выход"), с_кривой=к.get("с_кривой"),
                        комиссия=к.get("комиссия"),
                        комиссия_создателя=к.get("комиссия_создателя"),
-                       fee_bps=ев["fee_bps"], creator_bps=ев["creator_fee_bps"],
-                       вирт_резервы=[ев["virtual_sol_reserves"],
-                                      ев["virtual_token_reserves"]])
+                       кэшбэк=к.get("кэшбэк"),
+                       expected_out_осторожный=к.get("выход_осторожный"),
+                       fee_bps=п["fee_basis_points"],
+                       creator_bps=п["creator_fee_basis_points"],
+                       cashback_bps=п.get("cashback_fee_basis_points"),
+                       buyback_bps=п.get("buyback_fee_basis_points"),
+                       holder_bps=п.get("holder_rewards_bps"),
+                       mayhem=п.get("mayhem_mode"),
+                       вирт_резервы=[вирт_к, int(п["virtual_token_reserves"])])
             if not к.get("ok"):
                 из_["why_not"] = f"кривая продажи отказала: {к.get('why_not')}"
                 return из_
-            из_["min_out"] = int(int(к["выход"]) * (1.0 - float(проскальзывание)))
+            # ПОЛ -- ОТ ОСТОРОЖНОГО ЧИСЛА (см. выход_кривой): непроверенная ставка
+            # кэшбэка не должна завышать пол, иначе продажа просто не пройдёт.
+            из_["min_out"] = int(int(к["выход_осторожный"])
+                                 * (1.0 - float(проскальзывание)))
         elif сп == СПОСОБ_DAMM2:
             # ЦЕНА -- ИЗ СОБЫТИЯ СВОПА НАШЕЙ ПОКУПКИ, НУЛЬ ЧТЕНИЙ. Ликвидность,
             # цену после сделки и долю комиссии считает чужая проверенная функция
@@ -870,7 +1129,7 @@ def круг_сходится(о: dict, *, потолок_потерь: float = 
 
 # ----------------------------------------------------------- самопроверка
 
-ЖДЁМ_ПРОВЕРОК = 80
+ЖДЁМ_ПРОВЕРОК = 86
 # ЗАМЕР НА ЖИВЫХ ПОКУПКАХ ОБРАЗЦОВ РЕПОЗИТОРИЯ (data/c2_pool_samples), круг на
 # 0.01 SOL и проскальзывании 0. Числа здесь -- не желаемое, а то, что вышло; они
 # сверяются файлами при каждом прогоне, и расхождение -- провал самопроверки.
@@ -894,16 +1153,22 @@ def круг_сходится(о: dict, *, потолок_потерь: float = 
     # двигает цену сильно, и это видно числом, а не спрятано.
     "Meteora DAMM v2": {"образцов": 17, "сошлось": 17, "причина": None},
     # Кривая: 5 из 6 -- назад приходит 97.5 % входа, ровно две комиссии по
-    # 1.25 % (95 bps программе + 30 bps создателю). Шестой образец -- 27-счётная
-    # разновидность покупки, для которой карта мест продажи не проверена.
+    # 1.25 % (95 bps программе + 30 bps создателю). Шестой образец -- покупка v2 с
+    # котировкой НЕ WSOL (Global.whitelisted_quote_mints такое допускает): места
+    # продажи у неё те же, но живых продаж с иной котировкой в образцах нет, и
+    # сборка честно отказывает по имени. Это не та причина, что была до правки v2
+    # ("разновидность не 18-счётная"): разновидность теперь собирается.
     "кривая pump.fun": {"образцов": 6, "сошлось": 5,
-                         "причина": "разновидность покупки кривой не 18-счётная"},
+                         "причина": "не WSOL"},
     # LaunchLab: 32 из 32. Назад приходит 93.3...97.5 % -- две комиссии по 1.25 %
     # и ход цены по кривой (у части образцов покупка крупна против резервов).
     "LaunchLab": {"образцов": 32, "сошлось": 32, "причина": None},
 }
 КРУГ_ЛАМПОРТОВ = 10_000_000
 ЖДЁМ_DLMM_МАССИВОВ = 9
+# Живых продаж кривой, у которых событие несёт хвост v2: все шесть (тип события
+# один и тот же у sell и sell_v2 -- это и показал разбор по IDL).
+ЖДЁМ_СОБЫТИЙ_V2 = 6
 PROG_DLMM = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 
 
@@ -922,6 +1187,51 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
 
     def chk(что, ок, факт=None):
         проверки.append((что, bool(ок), факт))
+
+    # --------------------- 0. событие кривой по IDL и выход v2 на живых продажах
+    import json as _js  # noqa: PLC0415
+
+    путь_пр = Path(C.DATA) / "samples" / "prodazhi" / "krivaya_pump_fun.json"
+    chk("файл живых продаж кривой на месте", путь_пр.exists(), str(путь_пр))
+    v2_разобрано, v2_цена = 0, 0
+    if путь_пр.exists():
+        for о in (_js.loads(путь_пр.read_text(encoding="utf-8"))
+                  .get("образцы") or []):
+            соб = событие_кривой(о["tx_jsonParsed"], о["mint"])
+            if not соб.get("ok") or not соб.get("v2"):
+                continue
+            v2_разобрано += 1
+            п = соб["поля"]
+            # Тело обязано разобраться РОВНО до конца -- иначе раскладка не та.
+            if соб["разобрано"] != соб["длина"]:
+                continue
+            вк = int(п.get("virtual_quote_reserves") or п["virtual_sol_reserves"])
+            к = выход_кривой(
+                токенов=int(п["token_amount"]),
+                вирт_sol=вк + int(п["sol_amount"]),
+                вирт_токены=int(п["virtual_token_reserves"]) - int(п["token_amount"]),
+                fee_bps=int(п["fee_basis_points"]),
+                creator_bps=int(п["creator_fee_basis_points"]),
+                cashback_bps=int(п.get("cashback_fee_basis_points") or 0))
+            v2_цена += int(к["ok"] and к["с_кривой"] == int(п["sol_amount"])
+                           and к["комиссия"] == int(п["fee"])
+                           and к["комиссия_создателя"] == int(п["creator_fee"]))
+    chk(f"событие по IDL разобралось до конца у всех {ЖДЁМ_СОБЫТИЙ_V2} живых "
+        f"продаж с хвостом v2", v2_разобрано == ЖДЁМ_СОБЫТИЙ_V2, v2_разобрано)
+    chk("кривая продажи повторила каждое из этих событий ДО ЛАМПОРТА",
+        v2_цена == v2_разобрано == ЖДЁМ_СОБЫТИЙ_V2, (v2_цена, v2_разобрано))
+    chk("события в транзакции нет -- отказ по имени, а не пустые поля",
+        (lambda о: not о["ok"] and о["why_not"])(событие_кривой({})), None)
+    к_к = выход_кривой(токенов=1_000_000, вирт_sol=1_000_000_000,
+                        вирт_токены=1_000_000_000_000, fee_bps=95,
+                        creator_bps=30, cashback_bps=25)
+    chk("осторожное число ниже обычного ровно на кэшбэк",
+        к_к["выход"] - к_к["выход_осторожный"] == к_к["кэшбэк"] > 0, к_к)
+    chk("нулевая ставка кэшбэка -- осторожное число равно обычному",
+        (lambda о: о["выход"] == о["выход_осторожный"] and о["кэшбэк"] == 0)(
+            выход_кривой(токенов=1_000_000, вирт_sol=1_000_000_000,
+                          вирт_токены=1_000_000_000_000, fee_bps=95,
+                          creator_bps=30)), None)
 
     # ------------------------------------------- 1. таблица котировщиков
     chk("котировщиков в таблице 8: пять с чтениями, три по событию сделки",
