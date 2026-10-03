@@ -50,6 +50,19 @@ def подписант(тх: dict) -> str | None:
     return (кл[0].get("pubkey") if кл and isinstance(кл[0], dict) else None)
 
 
+def лампорты(тх: dict) -> dict:
+    """Дельта лампортов по адресам счётов -- нужна там, где котировка нативная (кривая pump.fun)."""
+    кл = ((тх.get("transaction") or {}).get("accountKeys") or [])
+    плоские = [k.get("pubkey") if isinstance(k, dict) else k for k in кл]
+    м = тх.get("meta") or {}
+    пре, пост = м.get("preBalances") or [], м.get("postBalances") or []
+    из_ = {}
+    for и, p in enumerate(плоские):
+        if p and и < len(пре) and и < len(пост):
+            из_[p] = из_.get(p, 0) + (пост[и] - пре[и]) / 1e9
+    return из_
+
+
 def дельты(тх: dict, минт: str) -> tuple[dict, dict]:
     м = тх.get("meta") or {}
     пре = {(b.get("accountIndex"), b.get("mint")): b for b in (м.get("preTokenBalances") or [])}
@@ -82,7 +95,7 @@ def блок_разбор(тр: list, минт: str) -> list:
         подписи = (тх.get("transaction") or {}).get("signatures") or []
         ряды.append({"и": и, "подпись": подписи[0] if подписи else None, "подписант": подписант(тх),
                      "ток": д["ток"], "квот": д["квот"], "состояние_до": д["состояние_до"],
-                     "err": (м.get("err") is not None)})
+                     "лам": лампорты(тх), "err": (м.get("err") is not None)})
     return ряды
 
 
@@ -101,11 +114,37 @@ def сторона_пула(ряды: list) -> str | None:
     return вл if n / всего >= 0.5 else None
 
 
+def нога_sol(r: dict, пул: str | None) -> float | None:
+    """SOL, вошедший в пул (покупка) или вышедший (продажа): у кривой -- лампорты пула, у AMM -- WSOL пула."""
+    if not пул:
+        return None
+    л = (r.get("лам") or {}).get(пул)
+    if л:
+        return л
+    к = (r.get("квот") or {}).get(пул)
+    return к if к else None
+
+
+def сделка_пула(r: dict, пул: str | None) -> dict | None:
+    """Чья покупка/продажа и на сколько SOL: токены -- не пула, SOL -- по ноге пула."""
+    ток = {вл: d for вл, d in (r.get("ток") or {}).items() if вл != пул and abs(d) > 0}
+    if not ток:
+        return None
+    кто = max(ток, key=lambda вл: abs(ток[вл]))
+    д = ток[кто]
+    sol = нога_sol(r, пул)
+    if sol is None:
+        return None
+    return {"кто": кто, "токенов": д, "sol": abs(sol), "покупка": д > 0,
+            "цена": (abs(sol) / d if d > 0 else None)}
+
+
 def main() -> int:
     import podbivka_run as R  # noqa: PLC0415
     import podbivka_sim as S  # noqa: PLC0415
     р = argparse.ArgumentParser()
     р.add_argument("--predel", type=int, default=0, help="сколько сделок считать (0 -- все)")
+    р.add_argument("--okno", type=int, default=10, help="сэндвич: в пределах N мест блока до и после нас")
     а = р.parse_args()
     сд = сделки()
     if а.predel:
@@ -141,42 +180,45 @@ def main() -> int:
             f_эфф = None
             if x1 and y1 and билет and наши_токены and y1 > наши_токены:
                 f_эфф = наши_токены * x1 / (билет * (y1 - наши_токены))
-            # сэндвич: тот же подписант купил до нас и продал после
-            до = [x for x in ряды[:наш["и"]] if x and not x["err"]]
-            после = [x for x in ряды[наш["и"] + 1:] if x and not x["err"]]
+            # наша цена: SOL по ноге пула на наши токены
+            наша_нога = сделка_пула(наш, пул)
+            наша_цена = (наша_нога or {}).get("цена")
+            # сэндвич: тот же подписант купил ДО нас и продал ПОСЛЕ нас, тот же пул, в окне ОКНО по индексу
+            до = [x for x in ряды[:наш["и"]] if x and not x["err"] and наш["и"] - x["и"] <= а.okno]
+            после = [x for x in ряды[наш["и"] + 1:] if x and not x["err"] and x["и"] - наш["и"] <= а.okno]
             сэнд = []
             for a_ in до:
                 s = a_["подписант"]
                 if not s or s in НАШИ or s == наш["подписант"]:
                     continue
-                купил = sum(d for вл, d in a_["ток"].items() if вл != пул and d > 0)
-                if купил <= 0:
+                сд_а = сделка_пула(a_, пул)
+                if not (сд_а and сд_а["покупка"] and сд_а["кто"] == s):
                     continue
                 for b_ in после:
                     if b_["подписант"] != s:
                         continue
-                    продал = sum(d for вл, d in b_["ток"].items() if вл != пул and d < 0)
-                    if продал >= 0:
+                    сд_б = сделка_пула(b_, пул)
+                    if not (сд_б and not сд_б["покупка"]):
                         continue
-                    сол_купил = -sum(d for вл, d in a_["квот"].items() if вл != пул and d < 0)
-                    сол_продал = sum(d for вл, d in b_["квот"].items() if вл != пул and d > 0)
-                    x0 = (a_["состояние_до"].get(пул) or {}).get("квот_до") if пул else None
-                    y0 = (a_["состояние_до"].get(пул) or {}).get("ток_до") if пул else None
-                    ид = (y0 * f_эфф * билет / (x0 + f_эфф * билет)
-                          if (x0 and y0 and f_эфф and билет) else None)
-                    потеря_пп = (round((наши_токены / ид - 1) * 100, 3) if (ид and наши_токены) else None)
+                    надбавка = (round((наша_цена / сд_а["цена"] - 1) * 100, 3)
+                                if (наша_цена and сд_а.get("цена")) else None)
                     сэнд.append({"подписант": s, "индекс_до": a_["и"], "индекс_после": b_["и"],
+                                 "мест_до_нас": наш["и"] - a_["и"], "мест_после_нас": b_["и"] - наш["и"],
                                  "соседний_до": наш["и"] - a_["и"] == 1,
                                  "соседний_после": b_["и"] - наш["и"] == 1,
-                                 "его_sol_вход": round(сол_купил, 6), "его_sol_выход": round(сол_продал, 6),
-                                 "его_итог_sol": round(сол_продал - сол_купил, 6),
-                                 "наша_потеря_пп": потеря_пп,
-                                 "наша_потеря_sol": (round(билет * потеря_пп / 100, 6)
-                                                     if потеря_пп is not None else None)})
+                                 "его_sol_вход": round(сд_а["sol"], 6), "его_sol_выход": round(сд_б["sol"], 6),
+                                 "его_итог_sol": round(сд_б["sol"] - сд_а["sol"], 6),
+                                 "его_токенов_вход": сд_а["токенов"], "его_токенов_выход": сд_б["токенов"],
+                                 "наша_цена": наша_цена, "его_цена": сд_а.get("цена"),
+                                 "наша_надбавка_пп": надбавка,
+                                 "наша_потеря_sol": (round(билет * надбавка / 100 / (1 + надбавка / 100), 6)
+                                                     if (надбавка and билет) else None)})
             из_.append({"cid": r["cid"], "utc": r.get("utc"), "группа": r.get("group"),
                         "билет": r.get("size_sol"), "sol_in": билет, "слот": сл, "минт": r["mint"],
                         "наш_индекс": наш["и"], "в_блоке": len(тр), "пул": пул, "наш_кошелёк": наш_кош,
                         "наши_токены": наши_токены, "f_эфф": round(f_эфф, 6) if f_эфф else None,
+                        "наша_цена": наша_цена, "наш_sol_в_пул": (наша_нога or {}).get("sol"),
+                        "окно_мест": а.okno,
                         "покупок_до_нас": sum(1 for x in до if any(d > 0 for вл, d in x["ток"].items() if вл != пул)),
                         "сэндвичи": сэнд, "итог_сделки_sol": r.get("итог_po_cepi_sol")})
             del б, тр, ряды
