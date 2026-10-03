@@ -1252,6 +1252,10 @@ jobs:
                       "deploy/checks/sdelki_polosy_vygruzka.py $TAJM_DIR/deploy/checks/sdelki_polosy_vygruzka.py" \
                       "analysis/bloom_own_send.py $TAJM_DIR/analysis/bloom_own_send.py" \
                       "analysis/solana_ledger_run.py $TAJM_DIR/uchet/analysis/solana_ledger_run.py" \
+                      "analysis/close_empty_token_accounts.py $TAJM_DIR/uchet/analysis/close_empty_token_accounts.py" \
+                      "analysis/bloom_exec_state.py $TAJM_DIR/uchet/analysis/bloom_exec_state.py" \
+                      "analysis/bloom_notify.py $TAJM_DIR/uchet/analysis/bloom_notify.py" \
+                      "analysis/bloom_source_groups.py $TAJM_DIR/uchet/analysis/bloom_source_groups.py" \
                       "data/leader_regions.json $TAJM_DIR/leader_regions.json" \
                       "data/solana_dbot_realized_ledger.json $TAJM_DIR/uchet/data/solana_dbot_realized_ledger.json"; do
             OTKUDA=$(echo "$PARA" | cut -d' ' -f1)

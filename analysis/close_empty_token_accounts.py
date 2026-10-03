@@ -566,6 +566,43 @@ def self_test() -> int:
     chk("hold_slots нигде нет -- умолчание 1800 с и это сказано",
         сек0 == ВОЗРАСТ_ПО_УМОЛЧАНИЮ_S and "умолчание" in откуда0, откуда0)
 
+    # СУТОЧНЫЙ ЖУРНАЛ УБОРЩИКА И ОДНА СТРОКА ВЛАДЕЛЬЦУ (слово владельца 03.10,
+    # п.2в: "сумма -- строкой в суточный TG").
+    import tempfile as _tf  # noqa: PLC0415
+    _кат = _tf.mkdtemp()
+    _ж = str(Path(_кат) / "u.json")
+    _а = дописать_в_журнал(_ж, {"закрыто_счетов": 12, "вернулось_sol": 0.024})
+    _б = дописать_в_журнал(_ж, {"закрыто_счетов": 5, "вернулось_sol": 0.010})
+    chk("суточный журнал уборщика складывает счета и SOL за те же сутки",
+        _а["ok"] and _б["ok"] and _б["закрыто_за_сутки"] == 17
+        and abs(_б["за_сутки_sol"] - 0.034) < 1e-9, _б)
+    _послано = []
+
+    def _послать(т):
+        _послано.append(т)
+        return {"ok": True}
+
+    _с1 = послать_итог_суток(_ж, послать=_послать)
+    _с2 = послать_итог_суток(_ж, послать=_послать)
+    chk("строка суток уходит ОДИН раз и несёт оба числа",
+        _с1["ok"] and _с1["уже_послана"] is False and _с2["уже_послана"] is True
+        and len(_послано) == 1 and "17" in _послано[0] and "0.034" in _послано[0],
+        _послано)
+    _с3 = послать_итог_суток(_ж, "1999-01-01", послать=_послать)
+    chk("за сутки без уборки строки нет, и это не сбой",
+        _с3["ok"] is False and "не закрывал" in (_с3["why_not"] or ""), _с3["why_not"])
+
+    def _падает(т):
+        return {"ok": False, "why_not": "сеть"}
+
+    _ж2 = str(Path(_кат) / "u2.json")
+    дописать_в_журнал(_ж2, {"закрыто_счетов": 1, "вернулось_sol": 0.002})
+    _с4 = послать_итог_суток(_ж2, послать=_падает)
+    _с5 = послать_итог_суток(_ж2, послать=_послать)
+    chk("Telegram не принял -- признак НЕ ставится, строка уйдёт в следующий раз",
+        _с4["ok"] is False and _с5["ok"] is True and _с5["уже_послана"] is False,
+        {"первая": _с4["why_not"], "вторая": _с5})
+
     ок_ч, почему_ч = подходит_для_закрытия(чужой, кош)
     chk("чужой счёт не закрывается", ок_ч is False and "владелец" in (почему_ч or ""), почему_ч)
     chk("нечитаемый остаток -- отказ, а не ноль по умолчанию",
@@ -798,6 +835,96 @@ def self_test() -> int:
     return 0 if плохих == 0 else 1
 
 
+ЖУРНАЛ_УБОРЩИКА = "uborshchik_sutki.json"
+
+
+def _день_полосы(ts: float | None = None) -> str:
+    """Сутки полосы -- те же, что у учёта: граница 22:00Z (Europe/Madrid)."""
+    try:
+        # day_key отдаёт ПАРУ (дата, пояс_недоступен): берём дату, иначе ключом
+        # суток стала бы строка вида "('2026-10-03', False)".
+        return str(ST.day_key(ts if ts is not None else time.time())[0])
+    except Exception:  # noqa: BLE001
+        # Незнание границы суток не повод терять число: кладём по UTC и
+        # говорим это самим ключом.
+        return time.strftime("utc-%Y-%m-%d", time.gmtime(ts or time.time()))
+
+
+def дописать_в_журнал(путь: str, факт: dict, *, день: str | None = None) -> dict:
+    """Сложить возврат ренты за сутки. Падение здесь не отменяет возврата:
+    деньги уже на кошельке, поэтому причина идёт в ответ, а не в исключение."""
+    из_ = {"ok": False, "why_not": None, "день": день or _день_полосы(),
+            "за_сутки_sol": None, "закрыто_за_сутки": None}
+    try:
+        ф = Path(путь)
+        д = {}
+        if ф.exists():
+            д = json.loads(ф.read_text(encoding="utf-8")) or {}
+        дни = д.setdefault("дни", {})
+        з = дни.setdefault(из_["день"], {"закрыто": 0, "вернулось_sol": 0.0,
+                                          "прогонов": 0, "строка_послана": False})
+        з["закрыто"] = int(з.get("закрыто") or 0) + int(факт.get("закрыто_счетов") or 0)
+        з["вернулось_sol"] = round(float(з.get("вернулось_sol") or 0.0)
+                                    + float(факт.get("вернулось_sol") or 0.0), 9)
+        з["прогонов"] = int(з.get("прогонов") or 0) + 1
+        з["обновлено_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        д["обновлено_utc"] = з["обновлено_utc"]
+        ф.parent.mkdir(parents=True, exist_ok=True)
+        врем = ф.with_suffix(ф.suffix + ".tmp")
+        врем.write_text(json.dumps(д, ensure_ascii=False, indent=1), encoding="utf-8")
+        врем.replace(ф)
+        из_.update(ok=True, за_сутки_sol=з["вернулось_sol"],
+                    закрыто_за_сутки=з["закрыто"])
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+    return из_
+
+
+def строка_суток(день: str, з: dict) -> str:
+    """Одна строка владельцу: сколько ренты вернули за сутки."""
+    return (f"уборщик ренты за {день}: закрыто счетов {int(з.get('закрыто') or 0)}, "
+            f"вернулось {float(з.get('вернулось_sol') or 0.0):.9f} SOL, "
+            f"прогонов {int(з.get('прогонов') or 0)}")
+
+
+def послать_итог_суток(путь: str, день: str | None = None, *,
+                        послать=None) -> dict:
+    """Строка в Telegram раз в сутки. Дважды за те же сутки не посылаем:
+    признак строка_послана лежит в том же файле, что и сумма."""
+    из_ = {"ok": False, "why_not": None, "текст": None, "уже_послана": False}
+    д_ = день or _день_полосы()
+    try:
+        ф = Path(путь)
+        if not ф.exists():
+            из_["why_not"] = f"журнала уборщика нет: {путь}"
+            return из_
+        д = json.loads(ф.read_text(encoding="utf-8")) or {}
+        з = (д.get("дни") or {}).get(д_)
+        if not з:
+            из_["why_not"] = f"за {д_} уборщик не закрывал ничего"
+            return из_
+        if з.get("строка_послана"):
+            из_.update(ok=True, уже_послана=True, текст=строка_суток(д_, з))
+            return из_
+        текст = строка_суток(д_, з)
+        из_["текст"] = текст
+        if послать is None:
+            import bloom_notify as NT  # noqa: PLC0415
+            послать = NT.Notifier(в_фоне=False).отправить
+        ответ = послать(текст) or {}
+        if not ответ.get("ok"):
+            из_["why_not"] = f"Telegram не принял: {str(ответ.get('why_not'))[:120]}"
+            return из_
+        з["строка_послана"] = True
+        врем = ф.with_suffix(ф.suffix + ".tmp")
+        врем.write_text(json.dumps(д, ensure_ascii=False, indent=1), encoding="utf-8")
+        врем.replace(ф)
+        из_["ok"] = True
+    except Exception as exc:  # noqa: BLE001
+        из_["why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+    return из_
+
+
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--self-test", action="store_true")
@@ -813,12 +940,26 @@ def main() -> int:
                    help="сколько пакетов закрывать за прогон (1 -- по умолчанию, осторожно)")
     р.add_argument("--first-one", action="store_true",
                    help="первый прогон: закрыть РОВНО ОДИН счёт и сверить возврат")
+    р.add_argument("--zhurnal", default="",
+                   help="файл суточного итога уборщика (пусто -- рядом с --result)")
+    р.add_argument("--tg-itog", default="",
+                   help="послать строку за сутки и выйти: 'segodnja' или ключ суток")
     р.add_argument("--min-age-s", type=float, default=0.0,
                    help="окно молодости в секундах (0 -- считать по политикам групп: "
                         "max(hold_slots) * 0.4 с + запас 600 с)")
     а = р.parse_args()
     if а.self_test:
         return self_test()
+
+    путь_журнала = а.zhurnal or str(Path(а.result).parent / ЖУРНАЛ_УБОРЩИКА)
+    if а.tg_itog:
+        д_ = None if а.tg_itog.strip().lower() in ("segodnja", "сегодня", "yes") else а.tg_itog
+        итог = послать_итог_суток(путь_журнала, д_)
+        print(json.dumps(итог, ensure_ascii=False))
+        # СТРОКИ НЕТ -- ЭТО НЕ СБОЙ ТАЙМЕРА: за сутки могло не открыться ни
+        # одного окна, и закрывать было нечего. Падать на этом значило бы
+        # учить не читать настоящие падения.
+        return 0
 
     кошелёк = а.wallet
     адреса = None
@@ -919,6 +1060,7 @@ def main() -> int:
                 факт["sluzhebnye_podpisi_zapisany"] += 1
     except Exception as exc:  # noqa: BLE001
         факт["sluzhebnye_podpisi_why_not"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+    факт["sutki"] = дописать_в_журнал(путь_журнала, факт)
     Path(а.result).write_text(json.dumps(факт, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(факт, ensure_ascii=False, indent=1))
     return 0 if факт.get("ok") else 5
