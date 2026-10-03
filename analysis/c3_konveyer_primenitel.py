@@ -789,7 +789,7 @@ def sverit_pravku(put_pravki: str | Path, *,  # noqa: C901, PLR0911, PLR0912
 # ------------------------------------------------------------- самопроверка
 
 # Число проверок объявлено заранее: меньше -- значит что-то пропущено молча.
-ZHDEM_PROVEROK = 86
+ZHDEM_PROVEROK = 89
 # АДРЕСА САМОПРОВЕРКИ -- ВЫДУМАННЫЕ, И ЭТО СКАЗАНО ВСЛУХ. Они выводятся из семени
 # числом, в цепи их нет, и ни один из них не попадает ни в один файл репозитория:
 # самопроверка работает в своём временном каталоге и убирает его за собой.
@@ -797,7 +797,12 @@ ZHDEM_PROVEROK = 86
 # ЖИВОЙ ФАЙЛ CODE-2 -- ПЕРВЫЙ, И ОН ПРОВЕРЯЕТСЯ ЦЕЛИКОМ. Числа -- замер по
 # файлу, скопированному байт в байт из ветки claude/podbivka.
 FAJL_ZHIVOJ = "2026-10-03.json"
-FAJL_GRUPP_REPO = "sources_2026-09-25.json"
+# ФАЙЛ ГРУПП -- ЖИВАЯ ВЫГРУЗКА. 03.10 Code-1 переименовал прежний
+# sources_2026-09-25.json в ..._USTAREL_2809.json и положил рядом выгрузку с
+# хоста: умолчанием читается она. Группа konveyer в ней УЖЕ ЕСТЬ -- с двумя
+# адресами, и один из них выдан этим применителем.
+FAJL_GRUPP_REPO = "sources_live.json"
+ZHDEM_ZHIVYH_GRUPP = {"adresov_v_konveyere": 2, "vid": "словарь"}
 ZHDEM_ZHIVOGO = {"рядов": 48, "добавлено": 1, "не_тот_razdel": 47,
                  "добавить": ["ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy"],
                  # КУСТ У ВСЕХ 48 РЯДОВ -- null (кустов_убрано 0 у Code-2). Это
@@ -1226,13 +1231,45 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             chk("и «разделы» Code-2 сошлись с полем «раздел» у рядов",
                 вж.get("dobavit_po_razdelam") == ZHDEM_ZHIVOGO["добавить"],
                 вж.get("dobavit_po_razdelam"))
-            # Файл групп -- КОПИЯ живого плюс группа konveyer: у Code-1 она в
-            # бою уже есть, в репозитории её ещё нет.
-            д_жг = json.loads((КОРЕНЬ / "data" / FAJL_GRUPP_REPO)
-                              .read_text(encoding="utf-8"))
-            д_жг["groups"][ГРУППА] = {"lane_size": 0.01, "lane_trades": True,
-                                      "bloom_trades": False, "addresses": {}}
-            п_жг = врем / "gruppy_s_konveyerom.json"
+            # ЖИВОЙ ФАЙЛ ГРУПП, КАК ОН ЕСТЬ -- БЕЗ ПОДМЕН. Группа konveyer в
+            # нём уже боевая: два адреса, и второй из них выдан ЭТИМ
+            # применителем (03.10, п.4). Значит на том же файле Code-2 он
+            # обязан теперь ОТКАЗАТЬ по имени, а не выдать тот же адрес второй
+            # раз -- и это проверяется живыми данными, а не фикстурой.
+            п_жг_бой = КОРЕНЬ / "data" / FAJL_GRUPP_REPO
+            гр_бой = gruppy(п_жг_бой)
+            chk("живой файл групп читается, konveyer в нём боевая: "
+                f"{ZHDEM_ZHIVYH_GRUPP['adresov_v_konveyere']} адреса "
+                f"{ZHDEM_ZHIVYH_GRUPP['vid']}ом",
+                гр_бой["ok"] and гр_бой["est_konveyer"]
+                and гр_бой["vid_addresses"] == ZHDEM_ZHIVYH_GRUPP["vid"]
+                and гр_бой["adresov_v_konveyere"]
+                == ZHDEM_ZHIVYH_GRUPP["adresov_v_konveyere"],
+                (гр_бой.get("why_not"), гр_бой.get("vid_addresses"),
+                 гр_бой.get("adresov_v_konveyere")))
+            chk("у боевой konveyer полоса торгует и спора размера нет "
+                "(lane_size == lane_sol)",
+                гр_бой.get("konveyer_lane_torguet")
+                and not гр_бой.get("konveyer_spor_razmera"),
+                (гр_бой.get("konveyer_lane_torguet"),
+                 гр_бой.get("konveyer_spor_razmera"),
+                 гр_бой.get("konveyer_lane_size")))
+            рж_бой = прим(vhod=вж, gr=гр_бой, zh={"выдано": {}})
+            chk("на ЖИВОМ файле групп применитель отказывает: адрес уже в "
+                "konveyer -- повтор выдачи невозможен даже с пустым журналом",
+                рж_бой["ok"] and not рж_бой["dobavleno"]
+                and sum(1 for о in рж_бой["otkazy"]
+                        if WHY_UZHE_V_KONVEYERE in о["почему"]) == 1,
+                (len(рж_бой.get("dobavleno") or []),
+                 [о["почему"] for о in (рж_бой.get("otkazy") or [])
+                  if WHY_NE_RAZDEL not in о["почему"]]))
+            # А ТЕПЕРЬ КОПИЯ ТОГО ЖЕ ФАЙЛА С ПУСТОЙ konveyer: так выглядел
+            # прогон до того, как Code-1 применил правку, и число должно быть
+            # ровно то же, что он применил руками.
+            д_жг = json.loads(п_жг_бой.read_text(encoding="utf-8"))
+            д_жг["groups"][ГРУППА] = dict(д_жг["groups"][ГРУППА],
+                                          addresses={})
+            п_жг = врем / "gruppy_konveyer_pustaja.json"
             п_жг.write_text(json.dumps(д_жг, ensure_ascii=False),
                             encoding="utf-8")
             рж = прим(vhod=вж, gr=gruppy(п_жг), zh={"выдано": {}})

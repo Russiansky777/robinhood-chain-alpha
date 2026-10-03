@@ -23,6 +23,14 @@ on:
         description: "ПРИНЯТЬ уже созданную таблицу по адресу (перечитать по цепи и отдать службе; денег не тратит)"
         required: false
         default: ""
+      rasshirit:
+        description: "РАСШИРИТЬ уже созданную таблицу по адресу: долить то, чего в ней нет (по умолчанию только показать, чего не хватает и сколько доплата)"
+        required: false
+        default: ""
+      rasshirit_zhivjom:
+        description: "расширение ЖИВЬЁМ -- ровно слово RASSHIRIT (это рента с кошелька полосы, ~0.0002 SOL за адрес)"
+        required: false
+        default: ""
       s_chaevymi:
         description: "'yes' -- положить в таблицу и белый список чаевых (рента вдвое: 0.0158 против 0.0089 SOL)"
         required: false
@@ -96,6 +104,15 @@ jobs:
             echo "VNIMANIE: sozdanie tablicy -- eto renta s koshel'ka polosy"
           else
             echo "rezhim pokaza: nichego ne tratim (sozdat: slovo SOZDAT v pole sozdat)"
+          fi
+          if [ -n "${{ inputs.rasshirit }}" ]; then
+            FLAGI="--rasshirit ${{ inputs.rasshirit }} --katalog $STATE_DIR"
+            if [ "${{ inputs.rasshirit_zhivjom }}" = "RASSHIRIT" ]; then
+              FLAGI="$FLAGI --zhivjom"
+              echo "VNIMANIE: rasshirenie ZHIVJOM -- eto renta s koshel'ka polosy"
+            else
+              echo "rezhim pokaza rasshirenija: nichego ne tratim (zhivjom -- slovo RASSHIRIT)"
+            fi
           fi
           if [ -n "${{ inputs.prinjat }}" ]; then
             FLAGI="--prinjat ${{ inputs.prinjat }} --katalog $STATE_DIR"

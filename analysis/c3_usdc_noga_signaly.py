@@ -268,7 +268,11 @@ WHY_KOTIROVKA_SOBYTIYA = ("минт котировки в событии кри�
 # здесь только читается из файла: ни одного вызова сети.
 FAJL_TABLICY = "usdc_noga_alt.json"
 TABLICA_ADRESOV = "B1LxDr9ib1ezCSebbxnF73hCSAsVsy23U5fEwrqkfzXY"
-ADRESOV_V_TABLICE = 34
+# 42, А НЕ 34: 03.10 Code-1 ДОЛИЛ в ту же таблицу восемь адресов кривой живьём
+# (таблица умеет расширяться -- доливается разница, а не весь список). Число
+# стоит проверкой, а не догадкой: вырастет таблица ещё -- самопроверка скажет
+# ЧИСЛОМ, а не промолчит, потому что от него зависят ВСЕ замеры размера.
+ADRESOV_V_TABLICE = 42
 
 
 class OshibkaNogi(Exception):
@@ -311,7 +315,13 @@ def tablica_polosy(fajl: str | None = None) -> dict:
         return iz
     d = json.loads(put_.read_text(encoding="utf-8"))
     a = ((d.get("адреса") or {}).get("адреса")) or []
-    klyuch = (((d.get("принятие") or {}).get("состояние") or {}).get("адрес"))
+    # КЛЮЧ ТАБЛИЦЫ ЛЕЖИТ ДВУМЯ ВИДАМИ, И ЧИТАЮТСЯ ОБА. 03.10 Code-1 научил
+    # таблицу РАСШИРЯТЬСЯ (доливается разница, а не весь список) -- и ключ
+    # переехал из "принятие.состояние.адрес" в "расширение.адрес". Третьего вида
+    # не изобретаю, но и падать на смене вида файла нечем: тогда замер встал бы
+    # целиком из-за одного ключа.
+    klyuch = ((((d.get("принятие") or {}).get("состояние") or {}).get("адрес"))
+              or ((d.get("расширение") or {}).get("адрес")))
     if not a or not klyuch:
         iz["why_not"] = "в файле таблицы нет ни адресов, ни ключа"
         return iz
@@ -1163,7 +1173,8 @@ def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
                         chaevye_spiskom: list | None = None,
                         chaevye_adres: str | None = None,
                         nons: tuple | None = None,
-                        zakryvat_schet_tokena: bool = True) -> dict:
+                        zakryvat_schet_tokena: bool | None = None,
+                        ostatok_usdc: int | None = None) -> dict:
     """СПИСОК инструкций продажи токен -> USDC -> SOL. Без компиляции и подписи.
 
     Первая нога -- зеркало НАШЕЙ покупки токена (c3_prodavec_sborka: шаблон из
@@ -1249,9 +1260,25 @@ def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
         if not sh2.get("ok"):
             iz["why_not"] = f"шаблон продажи второй ноги: {sh2.get('why_not')}"
             return iz
-        # ВХОД ВТОРОЙ НОГИ -- МИНИМУМ ПЕРВОЙ, ровно как у покупки: больше, чем
-        # принесла первая, вторая потратить не может.
-        iz["noga_2_amount_in"] = mo1
+        # ВХОД ВТОРОЙ НОГИ -- МИНИМУМ ПЕРВОЙ ПЛЮС УЖЕ ЛЕЖАЩИЙ НА СЧЁТЕ USDC
+        # (добавка MRKL, слово владельца 03.10). Прежде входом был РОВНО
+        # минимум первой ноги -- "больше, чем принесла первая, вторая потратить
+        # не может", и это верно про саму продажу. Но у покупки первая нога
+        # берёт SOL -> USDC с проскальзыванием и отдаёт в пул токена ровно свой
+        # min_out: разница между полученным USDC и этим минимумом остаётся на
+        # нашем счёте USDC и не уходит НИКОГДА -- копится монетой, которой в
+        # учёте полосы нет вовсе. Теперь продажа может забрать и её.
+        # ЧИСЛО ПРИХОДИТ СНАРУЖИ: остаток живёт на цепи, а этот модуль сети не
+        # читает вовсе. Не передали -- ведём себя как прежде и говорим это полем,
+        # а не молча.
+        _нога2_вход = int(mo1) + int(ostatok_usdc or 0)
+        iz["noga_2_ostatok_usdc"] = (None if ostatok_usdc is None
+                                     else int(ostatok_usdc))
+        iz["noga_2_ostatok_why_not"] = (
+            None if ostatok_usdc is not None
+            else "остаток USDC не передан -- вторая нога идёт только минимумом "
+                 "первой, остаток останется на счёте")
+        iz["noga_2_amount_in"] = int(_нога2_вход)
         if not (isinstance(min_out_nogi_2, int) and min_out_nogi_2 > 0):
             iz["why_not"] = WHY_NOGA2_NET_MIN
             return iz
@@ -1271,12 +1298,19 @@ def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
                 S.инструкция_продажи(sh1, наш_кошелёк=nash_koshelek,
                                      база_в=int(ostatok), минимум_выхода=mo1),
                 instrukciya_nogi_2_prodazhi(sh2, nash_koshelek=nash_koshelek,
-                                            kotirovki_v=mo1,
+                                            kotirovki_v=int(_нога2_вход),
                                             min_out=int(min_out_nogi_2))]
         # ЗАКРЫТИЕ СЧЕТОВ -- ТОЙ ЖЕ ТРАНЗАКЦИЕЙ, как у зеркальной продажи полосы:
         # токеновый счёт закрывается только когда продан весь остаток, а счёт
         # WSOL закрывается всегда -- иначе SOL остался бы завёрнутым.
-        if zakryvat_schet_tokena and sh1.get("минт_базы"):
+        # УМОЛЧАНИЕ -- ПО ТИПУ. None значит "как решает тип" (п.1б владельца);
+        # явный True или False по-прежнему сильнее таблицы: замер и круг должны
+        # уметь мерить оба режима.
+        _закрывать = (zakryvat_schet_tokena if zakryvat_schet_tokena is not None
+                      else zakryvat_schet_tokena_po_tipu(programma))
+        iz["zakryvaem_schet_tokena"] = bool(_закрывать)
+        iz["zakryvaem_po_tipu"] = zakryvat_schet_tokena is None
+        if _закрывать and sh1.get("минт_базы"):
             schet_bazy = B.ata(nash_koshelek, sh1["минт_базы"],
                                sh1.get("программа_базы") or B.TOKEN_PROGRAM)
             ixs.append(S.инструкция_закрытия(
@@ -1367,7 +1401,12 @@ def prodazha_sobrat(*, luts_gotovye: list | None = None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: молчаливый пропуск -- это провал. Если файла
 # образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 182
+# 202, А НЕ 186: Code-1 правил ЭТОТ файл от моей копии на 166 проверок (его
+# двадцать) -- слияние сложило его двадцать и мои шестнадцать (получатели и
+# сверка порядка резервов). Число проверок от содержимого таблицы НЕ зависит:
+# сверено прогоном одного и того же кода на таблице из 34 и из 42 адресов --
+# 202 и там и там, расходятся только ЧИСЛА в именах.
+ZHDEM_PROVEROK = 202
 
 # ЗАМЕР ПО ТИПАМ НА ЖИВЫХ СДЕЛКАХ С КОТИРОВОЧНЫМ ТОКЕНОМ (не WSOL). Образцы --
 # data/c2_pool_samples/<программа>.json плюс разновидности кривой
@@ -1424,19 +1463,37 @@ ZHDEM_RAZMEROV = {
                      "nons": (1081, 1113), "nons_i_chaevyj": (1130, 1162)},
     PROG_PUMP_AMM: {"chaevyj_nash": (1024, 1056), "chaevyj_chuzhoj": (1056, 1088),
                     "nons": (1081, 1113), "nons_i_chaevyj": (1130, 1162)},
-    # КРИВАЯ -- ПОСЛЕ ФИКСАЦИИ ПОЛУЧАТЕЛЕЙ (слово владельца 03.10): наши два
-    # получателя уже лежат в таблице полосы, и пакет стал на 32...64 байта
-    # меньше, чем с получателями источника. В лёгком режиме влезают все три
-    # образца, в боевом -- ни один.
-    PROG_KRIVAYA: {"chaevyj_nash": (1186, 1217), "chaevyj_chuzhoj": (1218, 1249),
-                   "nons": (1243, 1274), "nons_i_chaevyj": (1292, 1323)},
+    # КРИВАЯ -- ПОСЛЕ ФИКСАЦИИ ПОЛУЧАТЕЛЕЙ И ПОСЛЕ ДОЛИВКИ ТАБЛИЦЫ. Два шага,
+    # и оба замерены: (1) слово владельца 03.10 -- всегда наши получатели, и
+    # пакет стал на 32...64 байта меньше, чем с получателями источника; (2)
+    # Code-1 ДОЛИЛ в таблицу полосы восемь адресов живьём (подпись
+    # 5nHwzF8yUsccTgX3mEPTobyjYaZHy23oDMaL4x32LzE8V3FT9XnVYbWy6bLVpadRV4uLjpKZrMK8wbVnFLmsppy7,
+    # было 34 адреса -- стало 42). После этого КРИВАЯ ВЛЕЗАЕТ В БОЕВОМ РЕЖИМЕ:
+    # 1168...1199 при пределе 1232, все три образца. До доливки не влезал ни один.
+    PROG_KRIVAYA: {"chaevyj_nash": (1062, 1093), "chaevyj_chuzhoj": (1094, 1125),
+                   "nons": (1119, 1150), "nons_i_chaevyj": (1168, 1199)},
 }
 # Сколько живых сделок каждого типа влезает в 1232 в САМОМ ТЯЖЁЛОМ режиме.
+# КРИВАЯ -- 3 из 3 ПОСЛЕ ДОЛИВКИ ТАБЛИЦЫ (было 0 из 3 при таблице в 34 адреса).
 ZHDEM_VLEZLO_TYAZHELYJ = {PROG_CPMM: 43, PROG_LAUNCHLAB: 35, PROG_PUMP_AMM: 2,
-                          PROG_KRIVAYA: 0}
-# КРИВАЯ НЕ ВЛЕЗАЕТ В БОЕВОМ РЕЖИМЕ НИ ОДНИМ ОБРАЗЦОМ, И ЛЕКАРСТВО ИЗМЕРЕНО
-# ЛЕСТНИЦЕЙ -- на образце OBRAZEC_KRIVOJ, с нашими получателями и нашими местами
-# продажи. Считаются ТОЛЬКО адреса, которых в таблице полосы ещё нет:
+                          PROG_KRIVAYA: 3}
+# ЛЕСТНИЦА ДОБАВОК -- ЗАНОВО ПО ЖИВОЙ ТАБЛИЦЕ (42 адреса). Четыре постоянные
+# программы кривой Code-1 уже долил, поэтому «+4» теперь РАВНО «+0»: добавлять
+# нечего, они в таблице. Остаток лестницы говорит, что ещё стоит долить:
+#   +6 -- ATA наших двух получателей ДЛЯ USDC. На этом образце размер не меняется
+#         (его котировка -- не USDC, и в транзакции стоят ATA для ЕГО минта), но
+#         в НАСТОЯЩЕЙ сделке с котировкой USDC эти два адреса в транзакции есть,
+#         и каждый из них -- 31 байт;
+#   +8 -- наш накопитель объёма (PDA кошелька) и его ATA для USDC. PDA в
+#         транзакции стоит ВСЕГДА, и он даёт замеренные 1199 -> 1168.
+# То есть 1199 -- ВЕРХНЯЯ ГРАНИЦА: в сделке с котировкой USDC по долитой таблице
+# размер будет не больше, а меньше.
+#
+# Прежний замер (таблица 34 адреса) для памяти: покупка 1323, продажа 1331,
+# продажа без закрытия 1293 -- не влезало ничто.
+KRIVAYA_DOLITO_PODPIS = ("5nHwzF8yUsccTgX3mEPTobyjYaZHy23oDMaL4x32LzE8V3FT9Xn"
+                         "VYbWy6bLVpadRV4uLjpKZrMK8wbVnFLmsppy7")
+# Считаются ТОЛЬКО адреса, которых в таблице полосы ещё нет:
 #   4  -- постоянные программы кривой: global, global_volume_accumulator,
 #         fee_config, event_authority (места 0, 19, 22, 25);
 #   +2 -- ATA НАШИХ получателей для USDC (их ATA для WSOL уже в таблице:
@@ -1446,16 +1503,22 @@ ZHDEM_VLEZLO_TYAZHELYJ = {PROG_CPMM: 43, PROG_LAUNCHLAB: 35, PROG_PUMP_AMM: 2,
 # закрытия токенового счёта.
 KRIVAYA_MESTA_POSTOYANNYH = (0, 19, 22, 25)
 ZHDEM_KRIVAYA_LESTNICA = {
-    0: {"pokupka": 1323, "prodazha": 1331, "prodazha_bez_zakrytiya": 1293},
-    4: {"pokupka": 1199, "prodazha": 1238, "prodazha_bez_zakrytiya": 1200},
-    6: {"pokupka": 1199, "prodazha": 1238, "prodazha_bez_zakrytiya": 1200},
-    8: {"pokupka": 1168, "prodazha": 1207, "prodazha_bez_zakrytiya": 1169},
+    0: {"pokupka": 1199, "prodazha": 1200, "prodazha_bez_zakrytiya": 1200},
+    4: {"pokupka": 1199, "prodazha": 1200, "prodazha_bez_zakrytiya": 1200},
+    6: {"pokupka": 1199, "prodazha": 1200, "prodazha_bez_zakrytiya": 1200},
+    8: {"pokupka": 1168, "prodazha": 1169, "prodazha_bez_zakrytiya": 1169},
 }
 # НАБОР, КОТОРЫЙ УХОДИТ CODE-1 (восемь адресов плюс три на mayhem). Точные
 # адреса выводятся числом в nabor_adresov_dlya_tablicy() -- в коде их нет,
 # кроме получателей: они из публичных списков программы.
-ZHDEM_NABORA = {"vsego": 18, "uzhe_v_tablice": 7, "dobavit": 11,
-                "dobavit_bez_mayhem": 8, "adresov_v_tablice_stanet": 45}
+# ПОСЛЕ ДОЛИВКИ 03.10: из восемнадцати в таблице уже одиннадцать, долить
+# осталось семь -- четыре без mayhem (ATA двух наших получателей для USDC, наш
+# накопитель объёма и его ATA для USDC) и три на mayhem. Накопитель и его ATA
+# выводятся из КОШЕЛЬКА, и в этом замере кошелёк проверочный: для боя их обязан
+# посчитать Code-1 от боевого кошелька (функция nabor_adresov_dlya_tablicy
+# принимает его параметром).
+ZHDEM_NABORA = {"vsego": 18, "uzhe_v_tablice": 11, "dobavit": 7,
+                "dobavit_bez_mayhem": 4, "adresov_v_tablice_stanet": 49}
 # ПОЧЕМУ НЕ ДВУХШАГОВЫМ ПУТЁМ -- ЧИСЛОМ, А НЕ РАССУЖДЕНИЕМ. bloom_lane_two_step
 # вторую ногу этих типов СОБИРАЕТ (кирпичи те же), но отправить её не может: у
 # него нет НАШЕЙ таблицы адресов, и пакет выходит за 1232 байта на ВСЕХ живых
@@ -1477,10 +1540,12 @@ ZHDEM_PRODAZHI = {
     PROG_CPMM: {"chaevyj_nash": (1021, 1052), "nons_i_chaevyj": (1127, 1158)},
     PROG_LAUNCHLAB: {"chaevyj_nash": (1130, 1161), "nons_i_chaevyj": (1236, 1267)},
     PROG_PUMP_AMM: {"chaevyj_nash": (1128, 1159), "nons_i_chaevyj": (1234, 1265)},
-    # КРИВАЯ -- с НАШИМИ местами продажи и НАШИМИ получателями (слово владельца
-    # 03.10). Было 1352...1384 и 1458...1490, когда места и получатели приходили
-    # из ЧУЖОЙ покупки -- то есть и продажа ушла бы чужими счетами.
-    PROG_KRIVAYA: {"chaevyj_nash": (1225, 1225), "nons_i_chaevyj": (1331, 1331)},
+    # КРИВАЯ -- с НАШИМИ местами продажи, НАШИМИ получателями и по ДОЛИТОЙ
+    # таблице. Было 1352...1384 и 1458...1490, когда места и получатели
+    # приходили из ЧУЖОЙ покупки (то есть и продажа ушла бы чужими счетами), и
+    # 1225/1331 при таблице в 34 адреса. С ЗАКРЫТИЕМ счёта токена 1238 всё ещё
+    # НЕ влезает -- влезает умолчание по типу (без закрытия, 1200).
+    PROG_KRIVAYA: {"chaevyj_nash": (1132, 1132), "nons_i_chaevyj": (1238, 1238)},
 }
 # ПРОДАЖА В РЕЖИМЕ НОНСА НЕ ВЛЕЗАЕТ У LAUNCHLAB И PUMP AMM -- перебор 4...35
 # байт, -- и лечится тем же, чем у кривой: не закрывать токеновый счёт той же
@@ -1489,7 +1554,7 @@ ZHDEM_PRODAZHI = {
 # БЕЗ закрытия: влезает всё, кроме кривой.
 ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA = {
     PROG_CPMM: (1088, 1119), PROG_LAUNCHLAB: (1197, 1228),
-    PROG_PUMP_AMM: (1195, 1226), PROG_KRIVAYA: (1293, 1293),
+    PROG_PUMP_AMM: (1195, 1226), PROG_KRIVAYA: (1200, 1200),
 }
 ZHDEM_VLEZLO_PRODAZHA_TYAZHELYJ = {PROG_CPMM: 43, PROG_LAUNCHLAB: 0,
                                    PROG_PUMP_AMM: 0, PROG_KRIVAYA: 0}
@@ -1500,6 +1565,33 @@ ZHDEM_PRODAZH_KRIVOJ = 2
 # ПРОДАЖА КРИВОЙ: ВЫБОР НЕ МОЙ, И ОБА ЧИСЛА ЗАМЕРЕНЫ. В лёгком режиме (чаевые
 # на наш кошелёк) хватало четырёх адресов без закрытия счёта; в САМОМ ТЯЖЁЛОМ
 # (нонс + чужой чаевый) влезает только «десять адресов И без закрытия» -- 1202.
+ZHDEM_PRODAZHA_KRIVOJ = {"4_zakryvaem": 1259, "10_zakryvaem": 1166,
+                         "4_bez_zakrytiya": 1189, "10_bez_zakrytiya": 1096}
+ZHDEM_PRODAZHA_KRIVOJ_TYAZHELYJ = {"4_zakryvaem": 1365, "10_zakryvaem": 1272,
+                                   "4_bez_zakrytiya": 1295,
+                                   "10_bez_zakrytiya": 1202}
+# ЗАКРЫВАТЬ ЛИ ТОКЕНОВЫЙ СЧЁТ ТОЙ ЖЕ ТРАНЗАКЦИЕЙ -- РЕШАЕТ ТИП, А НЕ ВЫЗЫВАЮЩИЙ
+# (слово владельца 03.10, п.1б). Прежде умолчание было "закрывать всегда", и в
+# боевом режиме (нонс + чужой чаевый) продажа LaunchHub и Pump AMM НЕ ВЛЕЗАЛА:
+# 1236...1267 и 1234...1265 байт при пределе 1232, перебор 4...35 байт. Без
+# закрытия -- 1197...1228 и 1195...1226, влезает. Рента остаётся на счёте и
+# забирается уборщиком (bloom_close_on_sell), как полоса и делала до 02.10.
+# CPMM закрывает счёт по-прежнему: у него и с закрытием 1127...1158.
+# Кривая не влезает ни так, ни иначе (1388...1420 без закрытия) -- ей нужны ещё
+# и десять адресов в таблице, и это отдельное решение владельца.
+ZAKRYVAT_SCHET_TOKENA_PO_TIPU = {
+    PROG_CPMM: True,
+    PROG_LAUNCHLAB: False,
+    PROG_PUMP_AMM: False,
+    PROG_KRIVAYA: False,
+}
+
+
+def zakryvat_schet_tokena_po_tipu(programma: str | None) -> bool:
+    """Закрывать ли счёт у ЭТОГО типа. Незнакомый тип -- закрываем, как прежде."""
+    return bool(ZAKRYVAT_SCHET_TOKENA_PO_TIPU.get(programma or "", True))
+
+
 KOSHELEK_PROVERKI = "D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph"
 DRUGOJ_KOSHELEK = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
 # Живой образец кривой с котировочным минтом -- тот, на котором измерены места и
@@ -2129,12 +2221,17 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 ZHDEM_KRIVAYA_LESTNICA[8]["pokupka"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
                 and ZHDEM_KRIVAYA_LESTNICA[8]["prodazha"]
                 <= TS.ПРЕДЕЛ_РАЗМЕРА_TX, ZHDEM_KRIVAYA_LESTNICA[8])
-            chk("четырёх -- только покупке и продаже БЕЗ закрытия счёта",
-                ZHDEM_KRIVAYA_LESTNICA[4]["pokupka"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
-                and ZHDEM_KRIVAYA_LESTNICA[4]["prodazha"]
-                > TS.ПРЕДЕЛ_РАЗМЕРА_TX
-                and ZHDEM_KRIVAYA_LESTNICA[4]["prodazha_bez_zakrytiya"]
-                <= TS.ПРЕДЕЛ_РАЗМЕРА_TX, ZHDEM_KRIVAYA_LESTNICA[4])
+            # ПОСЛЕ ДОЛИВКИ ТАБЛИЦЫ ХВАТАЕТ И НУЛЯ ДОБАВОК: четыре постоянные
+            # программы кривой уже в ней, поэтому «+4» равно «+0» и обе
+            # транзакции влезают. Остаток лестницы (+6, +8) -- не «чтобы
+            # влезло», а запас: он снимает ещё 31 байт и нужен настоящей
+            # сделке с котировкой USDC (её ATA получателей в таблице нет).
+            chk("по ДОЛИТОЙ таблице влезают и покупка, и продажа БЕЗ добавок",
+                ZHDEM_KRIVAYA_LESTNICA[0]["pokupka"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
+                and ZHDEM_KRIVAYA_LESTNICA[0]["prodazha"]
+                <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
+                and ZHDEM_KRIVAYA_LESTNICA[4] == ZHDEM_KRIVAYA_LESTNICA[0],
+                (ZHDEM_KRIVAYA_LESTNICA[0], ZHDEM_KRIVAYA_LESTNICA[4]))
     finally:
         for k, v in сохр.items():
             if v is None:
@@ -2195,9 +2292,11 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     try:
         for p, ждём in ZHDEM_PRODAZHI.items():
             метка = TIPY[p]["label"]
-            ряды = {"chaevyj_nash": [], "nons_i_chaevyj": [], "bez_zakrytiya": []}
+            ряды = {"chaevyj_nash": [], "nons_i_chaevyj": [], "bez_zakrytiya": [],
+                    "po_tipu": []}
             порядок, суммы = 0, 0
             без_мин = 0
+            по_типу_ок = 0
             for о in образцы_по_типам.get(p) or []:
                 кэш = SB.LegCache({}, None)
                 кэш.entries[о["quote"]] = зап2
@@ -2209,7 +2308,12 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 без = prodazha_instrukcii(**общие)
                 if not без["ok"] and WHY_NOGA2_NET_MIN in (без["why_not"] or ""):
                     без_мин += 1
-                рез = prodazha_instrukcii(**общие, min_out_nogi_2=1)
+                # ПОРЯДОК МЕРИТСЯ В РЕЖИМЕ С ЗАКРЫТИЕМ СЧЁТА, чтобы проверка
+                # осталась про ПОРЯДОК, а не про число закрытий: закрывать ли
+                # счёт -- это теперь решение по типу (п.1б владельца), и оно
+                # проверяется отдельно ниже.
+                рез = prodazha_instrukcii(**общие, min_out_nogi_2=1,
+                                          zakryvat_schet_tokena=True)
                 if not рез["ok"]:
                     continue
                 ixs = рез["ixs"]
@@ -2221,6 +2325,17 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                         and bytes(ixs[6].data)[:1] == b"\x09" \
                         and bytes(ixs[7].data)[:1] == b"\x09":
                     порядок += 1
+                # ПО ТИПУ: у кого счёт не закрываем -- закрытие РОВНО одно (WSOL).
+                _по_типу = prodazha_instrukcii(**общие, min_out_nogi_2=1)
+                if _по_типу.get("ok"):
+                    _закр = sum(1 for i in _по_типу["ixs"]
+                                if bytes(i.data)[:1] == b"\x09")
+                    _ждём_закр = 2 if zakryvat_schet_tokena_po_tipu(p) else 1
+                    if (_закр == _ждём_закр
+                            and _по_типу.get("zakryvaem_po_tipu") is True
+                            and _по_типу.get("zakryvaem_schet_tokena")
+                            is zakryvat_schet_tokena_po_tipu(p)):
+                        по_типу_ок += 1
                 if рез["noga_2_amount_in"] == рез["min_out_nogi_1"]:
                     суммы += 1
                 нашлось = B.ata(KOSHELEK_PROVERKI, о["quote"], о["quote_program"])
@@ -2229,11 +2344,19 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                        "chaevye_lamporty": 1_000_000,
                        "nons": (NONS_DLYA_ZAMERA, KOSHELEK_PROVERKI)}
                 for имя, кв in (
+                        # ПРЕЖНИЕ ДВА РЕЖИМА -- С ЗАКРЫТИЕМ СЧЁТА ЯВНО: их числа
+                        # остаются под проверкой, иначе правка умолчания скрыла
+                        # бы их, а не проверила.
                         ("chaevyj_nash", {"chaevye_adres": KOSHELEK_PROVERKI,
-                                          "chaevye_lamporty": 1_000_000}),
-                        ("nons_i_chaevyj", тяж),
+                                          "chaevye_lamporty": 1_000_000,
+                                          "zakryvat_schet_tokena": True}),
+                        ("nons_i_chaevyj", dict(тяж,
+                                                zakryvat_schet_tokena=True)),
                         ("bez_zakrytiya", dict(тяж,
-                                               zakryvat_schet_tokena=False))):
+                                               zakryvat_schet_tokena=False)),
+                        # НОВОЕ УМОЛЧАНИЕ -- БЕЗ ФЛАГА ВОВСЕ: ровно то, что
+                        # поедет в бой.
+                        ("po_tipu", тяж)):
                     сб = prodazha_sobrat(**общие, min_out_nogi_2=1,
                                          luts_gotovye=[L], **кв)
                     if isinstance(сб.get("size"), int):
@@ -2263,19 +2386,63 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 f"{len(ряды['nons_i_chaevyj'])}",
                 len(влезли) == ZHDEM_VLEZLO_PRODAZHA_TYAZHELYJ[p],
                 (len(влезли), len(ряды["nons_i_chaevyj"])))
+            # ОСТАТОК USDC ВО ВТОРОЙ НОГЕ (добавка MRKL): передали число --
+            # вход второй ноги на него больше, не передали -- как прежде, и
+            # причина названа полем. Проверяется на тех же живых сделках.
+            _ост = 12_345
+            _с_ост = prodazha_instrukcii(**общие, min_out_nogi_2=1,
+                                         ostatok_usdc=_ост)
+            _без_ост = prodazha_instrukcii(**общие, min_out_nogi_2=1)
+            if _с_ост.get("ok") and _без_ост.get("ok"):
+                chk(f"{метка}: остаток USDC добавлен во вход второй ноги",
+                    _с_ост["noga_2_amount_in"]
+                    == _без_ост["noga_2_amount_in"] + _ост
+                    and _с_ост["noga_2_ostatok_usdc"] == _ост,
+                    (_без_ост["noga_2_amount_in"], _с_ост["noga_2_amount_in"]))
+                chk(f"{метка}: без остатка -- вход РОВНО минимум первой ноги, "
+                    "и причина названа",
+                    _без_ост["noga_2_amount_in"] == _без_ост["min_out_nogi_1"]
+                    and _без_ост["noga_2_ostatok_usdc"] is None
+                    and "остаток USDC не передан"
+                    in (_без_ост["noga_2_ostatok_why_not"] or ""),
+                    _без_ост.get("noga_2_ostatok_why_not"))
+
+            # ЗАКРЫТИЕ СЧЁТА -- ПО ТИПУ, И ЭТО ПРОВЕРЯЕТСЯ ЧИСЛОМ ЗАКРЫТИЙ, а
+            # не только размером: у кого не закрываем -- закрытие РОВНО одно
+            # (WSOL), и признак zakryvaem_po_tipu в ответе стоит.
+            chk(f"{метка}: закрытие счёта по типу "
+                f"({'закрываем' if zakryvat_schet_tokena_po_tipu(p) else 'НЕ закрываем'}) "
+                f"на {ждём_сделок} сделках",
+                по_типу_ок == ждём_сделок and по_типу_ок > 0,
+                (по_типу_ок, ждём_сделок))
+            # УМОЛЧАНИЕ В ТЯЖЁЛОМ РЕЖИМЕ -- ТО, ЧТО ПОЕДЕТ В БОЙ. У CPMM оно
+            # равно режиму с закрытием, у остальных трёх -- режиму без него.
+            _ждём_умолч = (ZHDEM_PRODAZHI[p]["nons_i_chaevyj"]
+                           if zakryvat_schet_tokena_po_tipu(p)
+                           else ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA[p])
+            _ряд_у = ряды["po_tipu"]
+            chk(f"{метка}: умолчание (тяжёлый режим) {_ждём_умолч[0]}..."
+                f"{_ждём_умолч[1]} байт",
+                _ряд_у and (min(_ряд_у), max(_ряд_у)) == tuple(_ждём_умолч),
+                (min(_ряд_у), max(_ряд_у)) if _ряд_у else None)
+            _влезло_у = [x for x in _ряд_у if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
+            # ОСОБОГО СЛУЧАЯ У КРИВОЙ БОЛЬШЕ НЕТ. Пока таблица была 34 адреса,
+            # её умолчание не влезало ни одной сделкой; после доливки восьми
+            # адресов (03.10, Code-1) влезают ВСЕ четыре типа, и проверка у всех
+            # одна. Если таблица когда-нибудь уменьшится, это место покраснеет
+            # числом, а не промолчит.
+            chk(f"{метка}: умолчанием влезает {len(_влезло_у)} из {len(_ряд_у)}",
+                len(_влезло_у) == len(_ряд_у) and bool(_влезло_у),
+                (len(_влезло_у), len(_ряд_у)))
             мин_б, макс_б = ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA[p]
             ряд_б = ряды["bez_zakrytiya"]
             chk(f"{метка}: продажа без закрытия счёта токена {мин_б}...{макс_б}",
                 ряд_б and min(ряд_б) == мин_б and max(ряд_б) == макс_б,
                 (min(ряд_б), max(ряд_б)) if ряд_б else None)
             влезли_б = [x for x in ряд_б if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
-            if p == PROG_KRIVAYA:
-                chk("кривая v2: продажа без закрытия всё равно не влезает",
-                    not влезли_б, ряд_б)
-            else:
-                chk(f"{метка}: продажа без закрытия влезает на всех сделках",
-                    len(влезли_б) == len(ряд_б) and влезли_б,
-                    (len(влезли_б), len(ряд_б)))
+            chk(f"{метка}: продажа без закрытия влезает на всех сделках",
+                len(влезли_б) == len(ряд_б) and bool(влезли_б),
+                (len(влезли_б), len(ряд_б)))
         # ЛЕСТНИЦА ДОБАВОК ДЛЯ КРИВОЙ СТОИТ В РАЗДЕЛЕ ПОКУПКИ: она считает
         # покупку и продажу ОДНИМ набором адресов, и повторять её здесь незачем.
     finally:
@@ -2456,18 +2623,23 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             for p_ in (PROG_CPMM, PROG_PUMP_AMM) if p_ in порядки),
         {TIPY[p_]["label"]: порядки[p_] for p_ in (PROG_CPMM, PROG_PUMP_AMM)
          if p_ in порядки})
-    # LAUNCHLAB -- ЕДИНСТВЕННЫЙ ОБРАТНЫЙ, И ЭТО ДИФ №5.
+    # LAUNCHLAB -- БЫЛ ЕДИНСТВЕННЫМ ОБРАТНЫМ (диф №5), И ДИФ ВЗЯТ 03.10.
+    # Теперь проверка стоит НА ПРАВИЛЬНОМ порядке: разойдётся снова -- скажет.
     ев_лл = B.launchlab_event((образцы_по_типам.get(PROG_LAUNCHLAB) or [{}])[0]
                               .get("tx") or {}) or {}
     база_лл = int(ев_лл.get("virtual_base", 0)) - int(ев_лл.get("real_base_after", 0))
     кот_лл = int(ев_лл.get("virtual_quote", 0)) + int(ев_лл.get("real_quote_after", 0))
-    chk("LaunchLab: virtual_reserves_after -- [БАЗА, котировка], то есть ОБРАТНЫЙ",
+    chk("LaunchLab после дифа №5: virtual_reserves_after -- [КОТИРОВКА, база], "
+        "как у двух соседей",
         (порядки.get(PROG_LAUNCHLAB, {}).get("пара") or [None, None])
-        == [база_лл, кот_лл],
+        == [кот_лл, база_лл],
         порядки.get(PROG_LAUNCHLAB, {}).get("пара"))
-    chk("и правило тонкого пула видит из-за этого резерв базы вместо котировки "
-        "(замер: 5 527 021 SOL-экв. против 4.18 при пороге 30)",
-        база_лл > кот_лл * 1000, (база_лл, кот_лл))
+    chk("и правило тонкого пула видит теперь КОТИРОВКУ: 4.18 SOL-экв. при "
+        "пороге 30 -- пул тонкий, наценка срабатывает (было 5 527 021 и не "
+        "срабатывала НИКОГДА)",
+        база_лл > кот_лл * 1000
+        and (порядки.get(PROG_LAUNCHLAB, {}).get("пара") or [None])[0] == кот_лл,
+        (база_лл, кот_лл, порядки.get(PROG_LAUNCHLAB, {}).get("пара")))
     # КРИВАЯ -- [КОТИРОВКА (SOL), база]. Берётся сделка с НАТИВНОЙ котировкой:
     # у токеновой котировки чужой котировщик отказывает вовсе (обязательная часть
     # события пуста по SOL -- см. диф в разделе 10), и порядок там не проверить.

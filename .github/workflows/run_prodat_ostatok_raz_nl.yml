@@ -79,6 +79,10 @@ on:
         description: "КНИЖЕНИЕ: 'yes' -- записать (по умолчанию только показать, что записалось бы)"
         required: false
         default: "no"
+      knizhit_na_likvidnyj:
+        description: "КНИЖЕНИЕ: 'yes' -- переписать уже книженную позицию ЛИКВИДНОЙ условностью (без ренты, как остальные позиции тех суток); сутки и итог берутся из записи"
+        required: false
+        default: "no"
 
 concurrency:
   group: prodat-ostatok-raz
@@ -281,6 +285,7 @@ jobs:
             su bot -s /bin/sh -c \"cd $CODE_DIR && env BLOOM_STATE_DIR='\$BLOOM_STATE_DIR' \
               BLOOM_CODE_DIR='$CODE_DIR' $ZHIVYOM PYTHONPATH=$CODE_DIR \
               $PY_HOSTA $RABOTA/knizhit.py \
+                ${{ inputs.knizhit_na_likvidnyj == 'yes' && '--na-likvidnyj' || '' }} \
                 --cid '${{ inputs.knizhit_cid }}' \
                 --sutki '${{ inputs.knizhit_sutki }}' \
                 --ts-prodazhi '${{ inputs.knizhit_ts_prodazhi }}' \

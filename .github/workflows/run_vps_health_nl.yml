@@ -214,7 +214,17 @@ jobs:
           # ledger_status.json в ветке пишет прогон ledger_hourly.yml; затирать
           # его копией хоста нельзя -- это два разных счёта, и молча подменять
           # один другим значит потерять расхождение между ними.
+          # ЖИВЫЕ ПОЛИТИКИ ГРУПП -- ПОД СВОИМ ИМЕНЕМ sources_live.json (слово
+          # владельца 03.10, добавка п.4). ЗАЧЕМ. В ветке лежала копия
+          # sources_2026-09-25.json, сделанная 28.09: в ней пять групп и нет ни
+          # cand*, ни krug_001, ни konveyer -- то есть любой разбор по ней читал
+          # вчерашний стенд и не знал об этом. Копия переименована в
+          # sources_2026-09-25_USTAREL_2809.json, а живой файл забирается здесь
+          # и зовётся live. Секретов в нём нет по построению: адреса источников и
+          # числа политики, ключей кошельков там не бывает -- и шаг "ключей в
+          # отчёте быть не должно" проверяет это у всего, что прогон коммитит.
           for PARA in "$TAJM_DIR/zhivuchest/zhivuchest.json data/zhivuchest_hosta.json" \
+                      "/home/bot/data/sources_2026-09-25.json data/sources_live.json" \
                       "$TAJM_DIR/uchet/data/ledger_status.json data/ledger_status_hosta.json"; do
             OTKUDA=$(echo "$PARA" | cut -d' ' -f1)
             KUDA=$(echo "$PARA" | cut -d' ' -f2)
@@ -449,7 +459,8 @@ jobs:
           # заводить его без слова владельца нельзя), поэтому его файлы
           # коммитятся отсюда. Суточные выгрузки берутся по образцу, а не
           # поимённо: их имя содержит дату.
-          for F in data/zhivuchest_hosta.json data/ledger_status_hosta.json; do
+          for F in data/zhivuchest_hosta.json data/ledger_status_hosta.json \
+                   data/sources_live.json; do
             [ -f "$F" ] && git add "$F"
           done
           git add data/sdelki_polosy_*.json 2>/dev/null || true
