@@ -248,7 +248,15 @@ jobs:
           # строители -- CLMM/Whirlpool/AMM v4/DBC, два c2_dlmm -- DLMM,
           # c2_nalog_2022 -- минтам с налогом. Они и раньше приезжали деплоем
           # детектора в тот же каталог; теперь продавец не зависит от его порядка.
-          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_own_send.py bloom_lane_two_step.py bloom_lane_sell.py bloom_vtoroe_mnenie.py c2_itog_po_cepi.py c2_swap_build.py c2_shadow_build.py c3_bilet_ot_rezerva.py vtoroe_mnenie_reestr.py c3_kotirovka_prodazhi.py c3_prodavec_sborka.py c2_common.py c2_pool_programs.py c2_cl_quote.py c2_clmm_stroitel.py c2_whirlpool_stroitel.py c2_ammv4_stroitel.py c2_dbc_stroitel.py c2_dlmm_bez_chteniy.py c2_dlmm_odno_chtenie.py c2_nalog_2022.py; do
+          # bloom_source_groups.py И c2_usdc_noga.py В СПИСКЕ С 03.10. Их здесь
+          # не было, а сторож читает ПОЛЕ ГРУППЫ (sell_own_first -- своим путём
+          # до Jupiter) через bloom_own_send, который нормализует политику ровно
+          # этим модулем. Живой счёт того же дня: поле легло в файл групп,
+          # сторож с правкой уехал на хост -- а нормализатор остался прежним и
+          # поле отбрасывал, то есть признак был МЁРТВЫМ, и обкатка круга
+          # молча не начиналась бы. c2_usdc_noga.py по той же причине: его
+          # импортирует own_send, который этот деплой возит.
+          for f in bloom_notify.py bloom_jupiter_sell.py dbot_rescue.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py solana_rpc_client.py bloom_close_on_sell.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_own_send.py bloom_lane_two_step.py bloom_lane_sell.py bloom_vtoroe_mnenie.py c2_itog_po_cepi.py c2_swap_build.py c2_shadow_build.py c3_bilet_ot_rezerva.py vtoroe_mnenie_reestr.py c3_kotirovka_prodazhi.py c3_prodavec_sborka.py bloom_source_groups.py c2_usdc_noga.py c2_common.py c2_pool_programs.py c2_cl_quote.py c2_clmm_stroitel.py c2_whirlpool_stroitel.py c2_ammv4_stroitel.py c2_dbc_stroitel.py c2_dlmm_bez_chteniy.py c2_dlmm_odno_chtenie.py c2_nalog_2022.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # БЕЗ -n: -n подменяет stdin на /dev/null и перекрывает < файл,
