@@ -93,7 +93,9 @@ jobs:
           # недоступен -- прогон падал трижды с ModuleNotFoundError (видно в
           # data/konveyer/primenitel_selftest.txt). Тот же venv, которым
           # работают службы, доступен ПО SSH как bot -- так самопроверку гонят
-          # и все прогоны деплоя.
+          # и все прогоны деплоя. PYTHONPATH -- каталог кода службы: модуль
+          # зовёт bloom_source_groups (тот же, что у полосы), и без него
+          # самопроверка падала ModuleNotFoundError уже на нём.
           python3 -m py_compile analysis/c3_konveyer_primenitel.py
           ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim"
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/c3_konveyer_primenitel.py" < analysis/c3_konveyer_primenitel.py
@@ -105,7 +107,8 @@ jobs:
           set +e
           ssh -n $SSH_OPTS root@"$HOST" "
             cd /tmp/konvprim
-            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python \
+            sudo -n -u bot env PYTHONPATH=/home/bot/bloom_executor:/tmp/konvprim \
+              /home/bot/robinhood-chain-alpha/venv/bin/python \
               c3_konveyer_primenitel.py" > data/konveyer/primenitel_selftest.txt 2>&1
           rc=$?
           set -e
