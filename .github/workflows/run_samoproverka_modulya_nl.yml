@@ -1,0 +1,73 @@
+name: "Самопроверка любого модуля на бегунке, полным выводом (только чтение)"
+
+# ЗАЧЕМ (03.10, пункт 3 владельца: поставить трекер капитала). Гейт прогона
+# трекера отказался ставить службу: модуль Code-3 на бегунке дал "проверок 62,
+# ждали 61, не прошло 2". В МОЕЙ среде тот же коммит даёт 61/61 и ноль
+# непрошедших -- значит расходится СРЕДА бегунка, а не код. Узнать, какие именно
+# две проверки упали, по журналу их прогона нельзя: там вывод самопроверки
+# пропущен через "| tail -3", и остаётся одна итоговая строка без имён.
+#
+# ЭТОТ ПРОГОН НИЧЕГО НЕ СТАВИТ И НИКУДА НЕ ХОДИТ. Ни ssh, ни хоста, ни
+# секретов, ни установки: только checkout нужной ветки и запуск самопроверки
+# модуля ПОЛНЫМ выводом, плюс версия питона и то, видно ли сеть. Нужен он ровно
+# для случая "на бегунке падает, у меня нет" -- и для любого модуля, не только
+# этого.
+#
+# ПОЧЕМУ ВЕТКА ВХОДОМ. Модули живут в разных ветках (Code-2 в claude/podbivka,
+# Code-3 в claude/stroiteli), и чинить чужую ветку, чтобы увидеть её вывод,
+# нельзя -- значит ветка берётся входом, а файл прогона остаётся моим.
+on:
+  workflow_dispatch:
+    inputs:
+      vetka:
+        description: "ветка с модулем (например claude/stroiteli)"
+        required: true
+        default: "claude/stroiteli"
+      modul:
+        description: "путь к модулю от корня ветки"
+        required: true
+        default: "analysis/c3_kapital_trekker.py"
+
+concurrency:
+  group: samoproverka-modulya
+  cancel-in-progress: false
+
+jobs:
+  proverka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.vetka }}
+
+      - name: "Чем именно считаем: версия питона и видна ли сеть"
+        run: |
+          set -e
+          python3 -VV
+          echo "pip-модули, которые могут менять поведение:"
+          python3 -m pip list 2>/dev/null | grep -iE "solders|solana|requests|urllib3|base58" || echo "ни одного из них нет"
+          echo "коммит ветки:"
+          git log -1 --format='%H %ad %s' --date=iso-strict
+
+      - name: "Разбор модуля"
+        run: python3 -m py_compile "${{ inputs.modul }}"
+
+      - name: "Самопроверка ПОЛНЫМ выводом -- без tail, иначе имён не видно"
+        run: |
+          set -o pipefail
+          # Код возврата сохраняем, но шаг НЕ роняем: цель -- увидеть имена, а
+          # не покрасить прогон. Итог печатается последней строкой явно.
+          set +e
+          python3 "${{ inputs.modul }}" --self-test > /tmp/vyvod.txt 2>&1
+          RC=$?
+          set -e
+          echo "--- строки, которые НЕ прошли ---"
+          grep -nE "ПЛОХО|\[нет|\[ПЛОХО|FAIL" /tmp/vyvod.txt || echo "ни одной строки с отказом"
+          echo "--- итоговые строки ---"
+          tail -5 /tmp/vyvod.txt
+          echo "--- весь вывод ---"
+          cat /tmp/vyvod.txt
+          echo "код возврата самопроверки: $RC"
