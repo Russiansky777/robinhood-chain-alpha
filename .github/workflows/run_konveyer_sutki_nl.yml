@@ -99,6 +99,10 @@ jobs:
           python3 -m py_compile analysis/c3_konveyer_primenitel.py
           ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim"
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/c3_konveyer_primenitel.py" < analysis/c3_konveyer_primenitel.py
+          # САМОПРОВЕРКА ПРИМЕНИТЕЛЯ ЗОВЁТ И НАШ ПРИМЕНИТЕЛЬ ГРУПП: она сверяет
+          # вид правки с тем, что pravka_grupp реально делает. Значит рядом
+          # должен лежать и он.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/pravka_grupp.py" < deploy/checks/pravka_grupp.py
           ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim/data/konveyer"
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/konveyer/$(date -u +%Y-%m-%d).json" < "data/konveyer/$(date -u +%Y-%m-%d).json" 2>/dev/null || echo "живого файла Code-2 за сегодня в ветке нет -- самопроверка скажет это сама"
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_2026-09-25_USTAREL_2809.json" < data/sources_2026-09-25_USTAREL_2809.json
