@@ -304,9 +304,28 @@ def продажи_кошелька(rpc_call, *, кошелёк: str, минт: 
                                   else "покупка" if д is not None else "—"),
                         "sol_spent": r6(квота.get("sol"))})
     продажи = [с for с in строки if с.get("side") == "продажа"]
+    # ЧЕРЕЗ СКОЛЬКО СЕКУНД ИСТОЧНИК ПРОДАЛ ПОСЛЕ СВОЕЙ ПОКУПКИ. Вопрос
+    # владельца 04.10. Считается по blockTime цепи, а не по нашим часам:
+    # blockTime -- это время блока, а не время, когда мы о нём узнали.
+    # Разрешение blockTime -- секунда, поэтому дробных долей тут нет и быть
+    # не может, и округлять нечего.
+    время_покупки = (покупка or {}).get("blockTime")
+    первая = продажи[0] if продажи else None
+    время_первой = (первая or {}).get("block_time")
+    через_с = None
+    if время_покупки is not None and время_первой is not None:
+        через_с = int(время_первой) - int(время_покупки)
     return {"ok": True, "vault": хран, "n_signatures": len(подписи),
             "rows": строки, "n_sells": len(продажи),
-            "first_sell_slot": (продажи[0].get("slot") if продажи else None)}
+            "first_sell_slot": (первая.get("slot") if первая else None),
+            "pokupka_block_time": время_покупки,
+            "first_sell_block_time": время_первой,
+            "istochnik_prodal_cherez_s": через_с,
+            "istochnik_prodal_why_not": (
+                None if через_с is not None
+                else "продаж источника после его покупки в 100 подписях счёта "
+                     "не найдено" if not продажи
+                else "нет blockTime у покупки или у первой продажи")}
 
 
 # ------------------------------------------------------------- самопроверка
@@ -420,7 +439,8 @@ def self_test() -> int:
             return покупка_тx
         if method == "getSignaturesForAddress":
             assert params[1].get("until") == "BUY", params
-            return [{"signature": "S1" + "y" * 80, "slot": 15, "err": None}]
+            return [{"signature": "S1" + "y" * 80, "slot": 15,
+                      "blockTime": 140, "err": None}]
         return продажа
 
     прод = продажи_кошелька(rpc_кошелёк, кошелёк=ТРЕЙДЕР, минт=МИНТ,
@@ -430,6 +450,29 @@ def self_test() -> int:
         and ("getSignaturesForAddress", ВАУЛТ) in спрошено, (прод, спрошено))
     chk("продажа кошелька распознана по знаку дельты",
         прод["n_sells"] == 1 and прод["rows"][0]["side"] == "продажа", прод)
+    # Число, которое читает владелец: через сколько секунд источник продал.
+    # Считается по blockTime цепи: 140 - 99 = 41.
+    chk("через сколько источник продал -- по blockTime цепи, а не по нашим часам",
+        прод["istochnik_prodal_cherez_s"] == 41
+        and прод["pokupka_block_time"] == 99
+        and прод["first_sell_block_time"] == 140
+        and прод["istochnik_prodal_why_not"] is None, прод)
+
+    # Молчание обязано быть названо словами, а не нулём: ноль секунд и
+    # "продаж не нашли" -- это разные ответы, и путать их нельзя.
+    def rpc_bez_prodazh(method, params):
+        if method == "getTransaction" and params[0] == "BUY":
+            return покупка_тx
+        if method == "getSignaturesForAddress":
+            return []
+        return продажа
+
+    пусто = продажи_кошелька(rpc_bez_prodazh, кошелёк=ТРЕЙДЕР, минт=МИНТ,
+                              подпись_покупки="BUY")
+    chk("продаж источника нет -- это сказано словами, а не нулём секунд",
+        пусто["ok"] and пусто["n_sells"] == 0
+        and пусто["istochnik_prodal_cherez_s"] is None
+        and "не найдено" in (пусто["istochnik_prodal_why_not"] or ""), пусто)
 
     без = разобрать(None, минт=МИНТ, пул=ПУЛ, подпись_источника="SRC", слот_источника=1)
     chk("без rpc_call -- честный отказ, а не пустая таблица",
@@ -479,8 +522,21 @@ def main() -> int:
     a = p.parse_args()
     if a.self_test:
         return self_test()
-    if not (a.mint and a.pool and a.source_signature and a.source_slot):
-        print("нужны --mint --pool --source-signature --source-slot")
+    # БЕЗ ПУЛА -- ТОЛЬКО ПРОДАЖА ИСТОЧНИКА, И ЭТО ЧАСТО ЕДИНСТВЕННОЕ, ЧТО
+    # МОЖНО СПРОСИТЬ. Вопрос владельца 04.10: через сколько секунд источник
+    # продал после своей покупки. У сделок на кривой pump.fun адреса пула нет
+    # вовсе -- в записи позиции pool = null, а program = кривая. Раньше здесь
+    # стоял отказ "нужен --pool", и на такие сделки ответить было нельзя,
+    # хотя `продажи_кошелька` пула не требует: ей нужны кошелёк, минт и
+    # подпись покупки, и стоит она 2-3 кредита. Слот источника тоже не нужен:
+    # окно задаётся самой подписью покупки через `until`.
+    только_источник = bool(a.source_wallet and a.mint and a.source_signature
+                            and not a.pool)
+    if not только_источник and not (a.mint and a.pool and a.source_signature
+                                     and a.source_slot):
+        print("нужны --mint --pool --source-signature --source-slot; "
+              "либо --mint --source-signature --source-wallet без --pool -- "
+              "тогда считается ТОЛЬКО продажа источника")
         return 2
     from night_leader_stonkfun import BudgetedRpc  # noqa: PLC0415
     import c2_common as C2m  # noqa: PLC0415
@@ -491,11 +547,17 @@ def main() -> int:
         известные[a.our_wallet] = "мы"
     if a.source_wallet:
         известные[a.source_wallet] = "источник"
-    из_ = разобрать(rpc, минт=a.mint, пул=a.pool,
-                     подпись_источника=a.source_signature,
-                     слот_источника=a.source_slot,
-                     известные=известные, окно_слотов=a.window_slots,
-                     max_tx=a.max_tx, max_pages=a.max_pages)
+    if только_источник:
+        из_ = {"ok": True, "rows": [], "mint": a.mint, "pool": None,
+               "только_продажа_источника": True,
+               "почему": "адреса пула нет (сделка на кривой или pool=null в "
+                          "записи позиции) -- таблица по пулу не считалась"}
+    else:
+        из_ = разобрать(rpc, минт=a.mint, пул=a.pool,
+                         подпись_источника=a.source_signature,
+                         слот_источника=a.source_slot,
+                         известные=известные, окно_слотов=a.window_slots,
+                         max_tx=a.max_tx, max_pages=a.max_pages)
     # АДРЕСНО: продавал ли источник свой же токен в этом окне. В выборке по
     # пулу его может не быть просто потому, что в окне тысячи транзакций.
     if a.source_wallet:
