@@ -110,12 +110,7 @@ jobs:
                 head -c 300 \"\$F\"; echo; exit 1
               fi
             done
-            python3 -c 'import json,sys
-            d = json.load(open(\"$STATE_DIR/detector_status.json\"))
-            o = int(d.get(\"open_positions\") or 0)
-            z = int(d.get(\"stuck_positions\") or 0)
-            print(\"открытых %d, зависших %d\" % (o, z))
-            sys.exit(0 if (o == 0 and z == 0) else 1)'" | tee -a "$OUT"
+            python3 -c \"import json,sys; d=json.load(open('$STATE_DIR/detector_status.json')); o=int(d.get('open_positions') or 0); z=int(d.get('stuck_positions') or 0); print('открытых', o, 'зависших', z); sys.exit(0 if (o == 0 and z == 0) else 1)\"" | tee -a "$OUT"
 
       - name: "Поставить ОБЩИЙ рубильник и завести сторожа на 150 с"
         id: stavim
