@@ -778,11 +778,18 @@ jobs:
             exit 1
           fi
           echo "признак жизни новее перезапуска на $((HEARTBEAT_TS - RESTART_TS)) с"
+          # ПЕЧАТАЮТСЯ ИМЕННО ПОЛЯ ПРОВЕРКИ, А НЕ ПРИЗНАК ЦЕЛИКОМ. Здесь стоял
+          # `cat` всего признака жизни с `tail -40` на конце, а признак длиннее
+          # сорока строк: наружу выходил его ХВОСТ, и поля, которыми деплой и
+          # подтверждается -- svoj_prodavec (довезён ли продавец на все типы) и
+          # krug_001 (какие пути обкатаны и где лежит отметка), -- обрезались
+          # ВСЕГДА. Отчёт деплоя не содержал ни одного числа о том, что деплой
+          # привёз. Поля названы списком, хвост поднят до 120 строк.
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             set -a; . $ENV_DIR/env; set +a
-            cat $STATE_DIR/seller_heartbeat.json
+            python3 -c 'import json,sys; d=json.load(open(sys.argv[1],encoding=\"utf-8\")); print(json.dumps({k: d.get(k) for k in (\"updated_utc\",\"mode\",\"vtoroe_mnenie\",\"svoj_prodavec\",\"krug_001\",\"max_attempts\")}, ensure_ascii=False, indent=1))' $STATE_DIR/seller_heartbeat.json
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_seller.py --check-only
-          " 2>&1 | tail -40 | tee -a data/bloom_seller_deploy.txt
+          " 2>&1 | tail -120 | tee -a data/bloom_seller_deploy.txt
 
       - name: "Коммит отчёта"
         if: always()

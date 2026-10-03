@@ -55,6 +55,10 @@ on:
         description: "ФАНТОМ: 'yes' -- записать (по умолчанию только показать запись)"
         required: false
         default: "no"
+      zakryt_zapis_dopisat:
+        description: "ФАНТОМ: 'yes' -- ДОПИСАТЬ итог по цепи в УЖЕ ЗАКРЫТУЮ запись (state, ts_closed и суточное число не трогаются)"
+        required: false
+        default: "no"
 
 concurrency:
   group: prodat-ostatok-raz
@@ -203,6 +207,12 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "$PY_HOSTA $RABOTA/zakryt_fantom.py --self-test | tail -3"
           ZHIVYOM=""
           if [ "${{ inputs.zakryt_zapis_zhivjom }}" = "yes" ]; then ZHIVYOM="ZAKRYT_FANTOM_LIVE=1"; fi
+          # ДОПИСКА -- ДРУГОЕ ДЕЛО, ЧЕМ ЗАКРЫТИЕ. Закрытие ставит state=closed и
+          # суточное число; дописка кладёт подпись и итог в уже закрытую запись и
+          # ни state, ни ts_closed, ни closed_sol_net не трогает (сутки 01.10
+          # давно доложены, переписывать их задним числом нельзя).
+          DOPISAT=""
+          if [ "${{ inputs.zakryt_zapis_dopisat }}" = "yes" ]; then DOPISAT="--dopisat"; fi
           # ЗАПИСЬ ИДЁТ ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ: журнал позиций принадлежит ему,
           # и файл, записанный root, служба потом не перепишет.
           ssh -n $SSH_OPTS root@$TARGET_HOST "
@@ -216,6 +226,7 @@ jobs:
                 --podpis '${{ inputs.zakryt_zapis_podpis }}' \
                 --mint '${{ inputs.mint }}' --koshelek '\$OWN_SEND_WALLET' \
                 --itog-sol '${{ inputs.zakryt_zapis_itog_sol }}' \
+                $DOPISAT \
                 --out $RABOTA/out/fantom.json\"
           " 2>&1 | tail -40 || echo "FANTOM_NE_OK=1" >> "$GITHUB_ENV"
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out/fantom.json 2>/dev/null || true" > /tmp/fantom.json || true

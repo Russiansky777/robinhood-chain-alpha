@@ -1,0 +1,67 @@
+progon 9, 2026-10-03T11:41:45Z
+mashina miami, host 169.128.191.158
+dejstvovat=yes, potolok_arhiva_gb=110, postavit_potolok=yes
+Warning: Permanently added '169.128.191.158' (ED25519) to the list of known hosts.
+--- df ДО ---
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1       145G  130G   15G  90% /
+
+--- inode ---
+/dev/vda1      19529728 135873 19393855    1% /
+
+--- верхние каталоги / (ГБ) ---
+130	/
+128	/home
+2	/usr
+1	/var
+1	/tmp
+1	/srv
+1	/snap
+1	/sbin.usr-is-merged
+1	/root
+1	/opt
+1	/mnt
+1	/media
+
+--- дерево бегунка ---
+бегунок /home/ghrunner/actions-runner: всего 700M
+  _diag            1.8M
+  _work/_temp      36K
+  _work/_actions   2.3M
+  _work/_tool      4.0K
+  файлов в _diag: 12
+
+--- кэш архива pumpapi ---
+/home/ghrunner/arhiv_pumpapi: 127G, файлов 243
+  по месяцам (ГБ, по времени изменения файла):
+    2026-10    126.3 GB   243 fajlov
+  самый старый и самый свежий файл:
+    2026-10-01 /home/ghrunner/arhiv_pumpapi/2026/09/21/00.jsonl.zst
+    2026-10-03 /home/ghrunner/arhiv_pumpapi/2026/10/01/17.jsonl.zst.59027.part
+--- журналы systemd ---
+Archived and active journals take up 40.9M in the file system.
+--- чистка ---
+ubrano _diag: 12 fajlov, bylo 1.8M (/home/ghrunner/actions-runner)
+ubrano _work/_temp: bylo 36K (/home/ghrunner/actions-runner)
+ubrano _work/_actions: bylo 2.3M (/home/ghrunner/actions-runner)
+ubrano _work/_tool: bylo 4.0K (/home/ghrunner/actions-runner)
+arhiv /home/ghrunner/arhiv_pumpapi: bylo 126 GB, stalo 109 GB pri potolke 110 GB
+Vacuuming done, freed 0B of archived journals from /var/log/journal.
+Vacuuming done, freed 0B of archived journals from /run/log/journal.
+Files removed: 48
+skript razobran bez oshibok
+Created symlink /etc/systemd/system/timers.target.wants/lab-potolok-diska.timer → /etc/systemd/system/lab-potolok-diska.timer.
+--- пробный запуск потолка ---
+Starting lab-potolok-diska.service - Potolok diska laboratorii (kesh arhiva i zhurnaly begunka)...
+potolok diska: gotovo, svobodno 32G
+lab-potolok-diska.service: Deactivated successfully.
+Finished lab-potolok-diska.service - Potolok diska laboratorii (kesh arhiva i zhurnaly begunka).
+--- таймер потолка ---
+enabled
+NEXT                         LEFT LAST PASSED UNIT                    ACTIVATES
+Sat 2026-10-03 08:07:00 EDT 25min -         - lab-potolok-diska.timer lab-potolok-diska.service
+
+--- df ПОСЛЕ ---
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1       145G  113G   32G  79% /
+STROKA: /dev/vda1 vsego 145G, zanjato 113G, svobodno 32G (79%)

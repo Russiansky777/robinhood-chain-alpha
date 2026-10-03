@@ -1,35 +1,52 @@
-прогон таймеров строк: 2026-10-01T18:54:02Z
+прогон таймеров строк: 2026-10-03T01:47:40Z
 включение таймеров: yes
-пробная отправка: yes
+пробная отправка: no
 минуты балансов: 14,44; минута самопроверки: 10
 --- пробный прогон ---
 --- polchasa ---
 {
- "время": "18:53Z",
- "строка": "стоп снят, балансы 0 / 2.985376911, позиций 0",
+ "время": "01:47Z",
+ "строка": "балансы 0 / 4.36818658, позиций 0",
  "числа": {
-  "метка": "2026-10-01T18:53:39Z",
+  "метка": "2026-10-03T01:47:23Z",
   "стоп": false,
   "X": 0.0,
-  "Y": 2.985376911,
+  "Y": 4.36818658,
   "кошелёк_полосы": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+ },
+ "стопы_групп": {
+  "ok": true,
+  "почему_нет": "Правило 16: дневных стопов групп нет -- вместо них стоп «авария»; стоять нечему",
+  "сутки": "20261003",
+  "как_сутки": "Europe/Madrid",
+  "группы": {},
+  "стоят": [],
+  "нечего_считать": true
  },
  "позиций": {
   "n": 0,
-  "why_not": null
- },
- "страховка": {
-  "нужен_общий_kill": false,
-  "сумма": 2.985376911,
-  "порог": 0.6,
-  "почему": "сумма 2.985376911 выше 0.6"
- },
- "возраст_признака_с": 18.4,
- "why_not": null
-}
+  "позиции": {
+   "lane-own-2mPm8P27g6Q2FsrMvushNS7QWd9xgpAYU3FmGY2R": {
+    "schema_version": 2,
+    "client_order_id": "lane-own-2mPm8P27g6Q2FsrMvushNS7QWd9xgpAYU3FmGY2R",
+    "ts_update": 1790991061.5448852,
+    "ts_update_utc": "2026-10-03T01:31:01Z",
+    "jup_amount_raw": 497409866807,
+    "jup_any_quote": false,
+    "jup_any_quote_vtoroe": false,
+    "jup_attempts": 2219,
+    "jup_reached_network": false,
+    "jup_floor": null,
+    "jup_api": "swap-v2",
+    "jup_api_used": null,
+    "jup_api_tried": [
+     "swap-v2",
+     "ultra"
+    ],
+    "jup_why_not": "заказ не дал ни один путь: swap-v2: в ответе нет transaction/requestId: {\"swapType\": \"aggregator\", \"inAmount\": \"497409866807\", \"outAmount\": \"13729401\", \"otherAmountThreshold\": \"9610580\", \"swapMode\": \"ExactIn\", \"slippageBps\": 3000, \"priceImpactPct\": \"-0.008239225822041958\", \"routePlan\": [{\"percent\": 100, \"bps\": 10000, \"usdValue\": 1.6252481207063258, \"swapInfo\": {\"ammKey\"; ultra: в ответе нет transaction/requestId: {\"swapType\": \"aggregator\", \"inAmount\": \"497409866807\", \"outAmount\": \"13729401\", \"otherAmountThreshold\": \"9610580\", \"swapMode\": \"ExactIn\", \"slippageBps\": 3000, \"priceImpactPct\": \"-0.008239225822041958\", \"routePlan\": [{\"percent\": 100, \"bps\": 10000, \"usdValue\": 1.6252481207063258, \"swapInfo\": {\"ammKey\"",
 --- chas ---
 {
- "время": "18:53Z",
+ "время": "01:47Z",
  "плохо": [],
  "службы": [
   {
@@ -66,13 +83,17 @@
  "признаки": [
   {
    "файл": "detector_status.json",
-   "возраст_с": 18.6,
+   "возраст_с": 17.3,
    "why_not": null
 enabled
 enabled
-NEXT                          LEFT LAST PASSED UNIT                          ACTIVATES
-Thu 2026-10-01 21:10:00 CEST 15min -         - bloom-samoproverka-chas.timer bloom-samoproverka-chas.service
-Thu 2026-10-01 21:14:00 CEST 19min -         - bloom-stroka-balansov.timer   bloom-stroka-balansov.service
+NEXT                             LEFT LAST                               PASSED UNIT                          ACTIVATES
+Sat 2026-10-03 03:53:00 CEST     5min Sat 2026-10-03 02:53:01 CEST    54min ago bloom-uborshchik-chas.timer   bloom-uborshchik-chas.service
+Sat 2026-10-03 04:10:00 CEST    22min Sat 2026-10-03 03:10:01 CEST    37min ago bloom-samoproverka-chas.timer bloom-samoproverka-chas.service
+Sat 2026-10-03 04:14:00 CEST    26min Sat 2026-10-03 03:44:00 CEST 3min 40s ago bloom-stroka-balansov.timer   bloom-stroka-balansov.service
+Sat 2026-10-03 04:23:00 CEST    35min Sat 2026-10-03 03:23:01 CEST    24min ago bloom-uchet-chas.timer        bloom-uchet-chas.service
+Sat 2026-10-03 04:38:00 CEST    50min Sat 2026-10-03 03:38:01 CEST     9min ago bloom-zhivuchest-chas.timer   bloom-zhivuchest-chas.service
+Sat 2026-10-03 08:00:00 CEST 4h 12min -                                       - bloom-vygruzka-sutki.timer    bloom-vygruzka-sutki.service
 
-2 timers listed.
+6 timers listed.
 Pass --all to see loaded but inactive timers, too.

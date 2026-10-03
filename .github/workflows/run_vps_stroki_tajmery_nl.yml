@@ -9,8 +9,19 @@ name: "NL-хост: получасовая строка и часовая сам
 # ДЕНЕЖНОГО ПУТИ НЕТ. Юниты зовут один модуль (bloom_host_stroki.py), который
 # читает файлы состояния, спрашивает systemctl и journalctl и посылает текст в
 # Telegram. Ни покупки, ни продажи, ни подписи в нём нет -- это проверяет его
-# же самопроверка, и она же падает, если денежный вызов появится. ReadWritePaths
-# юнитам не дан вовсе: писать им некуда.
+# же самопроверка, и она же падает, если денежный вызов появится.
+#
+# ПИСАТЬ ИМ ПОЧТИ НЕКУДА -- ОДИН ФАЙЛ У ЧАСОВОГО ЮНИТА. Слово владельца 03.10,
+# п.4: «самопроверка раз в час -- фразой в 🧾; в чат только строки TG и
+# тревоги». Самопроверку считает ХОСТ, а 🧾 собирает детектор -- другой
+# процесс, и общей правдой у них может быть только файл
+# $STATE_DIR/samoproverka_hosta.json. При ProtectSystem=strict и пустом
+# ReadWritePaths запись в него молча не доходила: 03.10 в 01:45Z живучесть
+# показала «samoproverka_hosta.json: нет или пуст», то есть фразы в 🧾 не было
+# бы никогда. Поэтому часовому юниту (и только ему) открыт РОВНО ЭТОТ ОДИН
+# ФАЙЛ, а не каталог состояния. Получасовой юнит остаётся без права писать.
+# Путь с ведущим минусом: пропавший файл не валит строку владельцу, он лишь
+# убирает фразу (и виден в живучести как «нет или пуст»).
 #
 # ЧЕГО ЭТИ ЮНИТЫ НЕ ДЕЛАЮТ. Рубильник по страховке (X + Y <= 0.60 SOL) они НЕ
 # ставят: файл /etc/bloom-executor/KILL пишется от root, а таймеру отчётов root
@@ -99,7 +110,7 @@ jobs:
               $VENV/python $CODE_DIR/bloom_host_stroki.py --self-test | tail -5
           "
 
-      - name: "Юниты и таймеры (oneshot, без права писать)"
+      - name: "Юниты и таймеры (oneshot; писать -- только часовому и только в один файл)"
         run: |
           set -e
           MB='${{ inputs.minuty_balansov }}'
@@ -130,6 +141,11 @@ jobs:
               echo 'PrivateTmp=true'
               echo 'ProtectSystem=strict'
               echo 'ProtectHome=read-only'
+              # РОВНО ОДИН ФАЙЛ И ТОЛЬКО ЧАСОВОМУ: вердикт самопроверки, который
+              # читает 🧾. Каталог состояния остаётся закрыт на запись обоим.
+              if [ "$REZHIM" = "chas" ]; then
+                echo "ReadWritePaths=-$STATE_DIR/samoproverka_hosta.json"
+              fi
               echo 'ProtectKernelTunables=true'
               echo 'ProtectControlGroups=true'
               echo 'RestrictSUIDSGID=true'
@@ -154,6 +170,19 @@ jobs:
               echo 'WantedBy=timers.target'
             } | ssh $SSH_OPTS root@$TARGET_HOST "cat > /etc/systemd/system/$IMJA.timer"
           done
+          # ФАЙЛ СОЗДАЁМ ЗАРАНЕЕ: ReadWritePaths открывает существующий путь, а
+          # не создаёт его. Создаёт root и отдаёт пользователю службы; если файл
+          # уже есть -- не трогаем, вердикт в нём свежее нашего.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            F=$STATE_DIR/samoproverka_hosta.json
+            if [ ! -s \"\$F\" ]; then
+              printf '%s\n' '{}' > \"\$F\"
+              chown bot:bot \"\$F\"; chmod 644 \"\$F\"
+              echo \"sozdan \$F\"
+            else
+              echo \"uzhe jest: \$(ls -l \$F)\"
+            fi
+          "
           ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl daemon-reload && echo 'junity i tajmery zapisany'"
 
       - name: "Пробный прогон БЕЗ отправки: видно обе строки"
