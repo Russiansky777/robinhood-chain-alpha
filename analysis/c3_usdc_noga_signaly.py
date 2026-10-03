@@ -134,6 +134,12 @@ PROG_CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
 PROG_LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
 PROG_PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 PROG_KRIVAYA = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+# ТИПЫ НЕ НАШЕЙ ТАБЛИЦЫ -- ТОЛЬКО ДЛЯ СВЕРКИ ПОРЯДКА РЕЗЕРВОВ (раздел 8а
+# самопроверки): их котировщики живут в чужих модулях, и читатели у них общие.
+PROG_CLMM_ = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
+PROG_DLMM_ = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+PROG_DAMM2_ = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+PROG_DBC_ = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 
 # СПОСОБ КОТИРОВКИ -- ПО ФАКТУ ТОГО, ЧЕМ СЧИТАЕТСЯ ЦЕНА, а не по типу пула:
 #   rezervy   -- остатки хранилищ после сделки источника (x*y=k), нуль чтений;
@@ -174,6 +180,68 @@ KRIVAYA_V2_MESTA = {"user": 13, "ata_bazy": 14, "ata_kotirovki": 15,
                     "mint_bazy": 1, "mint_kotirovki": 2,
                     "prog_bazy": 3, "prog_kotirovki": 4}
 SEMYA_UVA = b"user_volume_accumulator"
+
+# ПОЛУЧАТЕЛИ КОМИССИЙ КРИВОЙ -- СПИСКИ ИЗ ПУБЛИЧНЫХ ДОКУМЕНТОВ ПРОГРАММЫ, НЕ ИЗ
+# ПАМЯТИ. Источник: pump-fun/pump-public-docs, docs/FEE_RECIPIENTS.md («There are
+# 24 fee recipient addresses in total: 8 normal ... 8 reserved ... 8 buyback»).
+# Раскладка счёта Global в IDL это подтверждает числом: fee_recipient + 
+# fee_recipients[7] = 8, reserved_fee_recipient + reserved_fee_recipients[7] = 8,
+# buyback_fee_recipients[8].
+#
+# ОГРАНИЧЕНИЕ НА СЧЁТЕ -- НЕ ВЫВОД АДРЕСА, А ПРИНАДЛЕЖНОСТЬ СПИСКУ. В IDL у счёта
+# fee_recipient (место 6) НЕТ ни pda, ни relations -- только writable; значит
+# адрес не выводится семенами и проверяется ВНУТРИ программы по Global. Ошибки
+# программы это называют: 6057 BuybackFeeRecipientNotAuthorized, 6029
+# UnsortedNotUniqueFeeRecipients, 6061 «buyback fee recipients require exactly 8
+# remaining accounts». А вот их ATA (места 7 и 9) в IDL pda-выводимые:
+# seeds = [получатель, quote_token_program, quote_mint] под ATA-программой.
+# ЗАМЕР ПОДТВЕРЖДАЕТ, ЧТО ПРИНИМАЕТСЯ ЛЮБОЙ ИЗ СПИСКА: на шести живых v2-покупках
+# на месте 6 стояли ТРИ разных обычных получателя, на месте 8 -- ЧЕТЫРЕ разных
+# buyback, и все шесть сделок сели.
+POLUCHATELI_OBYCHNYE = (
+    "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+    "7VtfL8fvgNfhz17qKRMjzQEXgbdpnHHHQRh54R9jP2RJ",
+    "7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX",
+    "9rPYyANsfQZw3DnDmKE3YCQF5E8oD89UXoHn9JFEhJUz",
+    "AVmoTthdrX6tKt4nDjco2D775W2YK3sDhxPcMmzUAmTY",
+    "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM",
+    "FWsW1xNtWscwNmKv6wVsU1iTzRN6wmmk3MjxRP5tT7hz",
+    "G5UZAVbAf46s7cKWoyKu8kYTip9DGTpbLZ2qa9Aq69dP",
+)
+POLUCHATELI_MAYHEM = (
+    "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS",
+    "4budycTjhs9fD6xw62VBducVTNgMgJJ5BgtKq7mAZwn6",
+    "8SBKzEQU4nLSzcwF4a74F2iaUDQyTfjGndn6qUWBnrpR",
+    "4UQeTP1T39KZ9Sfxzo3WR5skgsaP6NZa87BAkuazLEKH",
+    "8sNeir4QsLsJdYpc9RZacohhK1Y5FLU3nC5LXgYB4aa6",
+    "Fh9HmeLNUMVCvejxCtCL2DbYaRyBFVJ5xrWkLnMH6fdk",
+    "463MEnMeGyJekNZFQSTUABBEbLnvMTALbT6ZmsxAbAdq",
+    "6AUH3WEHucYZyC61hqpqYUWVto5qA5hjHuNQ32GNnNxA",
+)
+POLUCHATELI_BUYBACK = (
+    "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD",
+    "9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7",
+    "GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL",
+    "3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR",
+    "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+    "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+    "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD",
+    "A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW",
+)
+# НАШ ВЫБОР -- ОДИН И ВСЕГДА (слово владельца 03.10). Выбраны не наугад: оба уже
+# ЛЕЖАТ в таблице адресов полосы (data/usdc_noga_alt.json) как счета ноги
+# SOL -> USDC, то есть на размер пакета сами по себе не добавляют ни байта, и
+# оба ВИДЕНЫ ЖИВЫМИ на цепи в этих ролях. Для mayhem-монет обычный получатель не
+# годится (нужен из reserved), и там взят первый из списка: живой сделки с
+# mayhem у нас нет ни одной -- так и сказано.
+POLUCHATEL_NASH = "7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX"
+BUYBACK_NASH = "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD"
+POLUCHATEL_NASH_MAYHEM = POLUCHATELI_MAYHEM[0]
+KRIVAYA_V2_MESTA_POLUCHATELEJ = {"poluchatel": 6, "ata_poluchatelya": 7,
+                                 "buyback": 8, "ata_buyback": 9}
+WHY_POLUCHATEL_NE_V_SPISKE = ("получатель комиссии не из списка программы "
+                              "(docs/FEE_RECIPIENTS.md) -- программа такой "
+                              "счёт не примет")
 # ТИПЫ, КОТОРЫЕ ЕСТЬ И У c2_usdc_noga. 03.10 Code-1 добавил туда CPMM, и это
 # названное пересечение, а не случай: покупку CPMM берёт его путь (врезка зовёт
 # его первым), здесь CPMM нужен ради переворота сторон и ради продажи.
@@ -200,7 +268,15 @@ WHY_KOTIROVKA_SOBYTIYA = ("минт котировки в событии кри�
 # здесь только читается из файла: ни одного вызова сети.
 FAJL_TABLICY = "usdc_noga_alt.json"
 TABLICA_ADRESOV = "B1LxDr9ib1ezCSebbxnF73hCSAsVsy23U5fEwrqkfzXY"
-ADRESOV_V_TABLICE = 34
+# 42, А НЕ 34: 03.10 Code-1 ДОЛИЛ в ту же таблицу восемь адресов кривой живьём
+# (таблица умеет расширяться -- доливается разница, а не весь список). Число
+# стоит проверкой, а не догадкой: вырастет таблица ещё -- самопроверка скажет
+# ЧИСЛОМ, а не промолчит, потому что от него зависят ВСЕ замеры размера.
+# ЧИСЛО ЖИВОЕ, А НЕ ПАМЯТНОЕ. 03.10 в 17:24Z таблица расширена живьём по
+# набору Code-3: было 42, долито 5 (ATA получателя и buyback по USDC,
+# получатель mayhem и две его ATA), подпись 2ADKYh1T..., рента по цепи
+# 0.0008178 SOL. Стало 47.
+ADRESOV_V_TABLICE = 47
 
 
 class OshibkaNogi(Exception):
@@ -243,7 +319,13 @@ def tablica_polosy(fajl: str | None = None) -> dict:
         return iz
     d = json.loads(put_.read_text(encoding="utf-8"))
     a = ((d.get("адреса") or {}).get("адреса")) or []
-    klyuch = (((d.get("принятие") or {}).get("состояние") or {}).get("адрес"))
+    # КЛЮЧ ТАБЛИЦЫ ЛЕЖИТ ДВУМЯ ВИДАМИ, И ЧИТАЮТСЯ ОБА. 03.10 Code-1 научил
+    # таблицу РАСШИРЯТЬСЯ (доливается разница, а не весь список) -- и ключ
+    # переехал из "принятие.состояние.адрес" в "расширение.адрес". Третьего вида
+    # не изобретаю, но и падать на смене вида файла нечем: тогда замер встал бы
+    # целиком из-за одного ключа.
+    klyuch = ((((d.get("принятие") or {}).get("состояние") or {}).get("адрес"))
+              or ((d.get("расширение") or {}).get("адрес")))
     if not a or not klyuch:
         iz["why_not"] = "в файле таблицы нет ни адресов, ни ключа"
         return iz
@@ -353,7 +435,9 @@ def storona(tx_istochnika: dict, *, programma: str, pul: str | None = None,
 
 # --------------------------------------------- места второй ноги у кривой v2
 
-def mesta_krivoj_v2(scheta: list, *, nash_koshelek: str) -> dict:
+def mesta_krivoj_v2(scheta: list, *, nash_koshelek: str,
+                    nashi_poluchateli: bool = False,
+                    mayhem: bool = False) -> dict:
     """{место: адрес} для НАШИХ счетов buy_exact_quote_in_v2. Нуль чтений.
 
     Связанный накопитель (место 21) здесь ВЫВОДИТСЯ, а не берётся из состояния:
@@ -385,10 +469,27 @@ def mesta_krivoj_v2(scheta: list, *, nash_koshelek: str) -> dict:
              M["ata_kotirovki"]: B.ata(nash_koshelek, mint_q, prog_q),
              M["uva"]: uva,
              M["assoc_uva"]: B.ata(uva, mint_q, prog_q)}
+    # ПОЛУЧАТЕЛИ КОМИССИЙ -- НАШИ И ВСЕГДА ОДНИ (слово владельца 03.10), но
+    # ТОЛЬКО в НАШЕЙ сборке. При пересборке сделки источника они остаются его:
+    # иначе самопроверка «восстанови его инструкцию точно» стала бы ложной.
+    if nashi_poluchateli:
+        P = KRIVAYA_V2_MESTA_POLUCHATELEJ
+        пол = POLUCHATEL_NASH_MAYHEM if mayhem else POLUCHATEL_NASH
+        список = POLUCHATELI_MAYHEM if mayhem else POLUCHATELI_OBYCHNYE
+        if пол not in список or BUYBACK_NASH not in POLUCHATELI_BUYBACK:
+            iz["why_not"] = (f"{WHY_POLUCHATEL_NE_V_SPISKE}: "
+                             f"{пол[:8]} / {BUYBACK_NASH[:8]}")
+            return iz
+        mesta[P["poluchatel"]] = пол
+        mesta[P["ata_poluchatelya"]] = B.ata(пол, mint_q, prog_q)
+        mesta[P["buyback"]] = BUYBACK_NASH
+        mesta[P["ata_buyback"]] = B.ata(BUYBACK_NASH, mint_q, prog_q)
+        iz["nashi_poluchateli"] = {"poluchatel": пол, "buyback": BUYBACK_NASH,
+                                   "mayhem": bool(mayhem)}
     iz["mesta"] = mesta
     # ПЕРЕСБОРКА СДЕЛКИ ИСТОЧНИКА -- ЭТО И ЕСТЬ ПРОВЕРКА ВЫВОДА. Когда кошелёк тот
     # же, все пять мест обязаны совпасть с его счетами; расхождение -- отказ.
-    if scheta[M["user"]] == nash_koshelek:
+    if scheta[M["user"]] == nash_koshelek and not nashi_poluchateli:
         plohie = [i for i, a in mesta.items() if scheta[i] != a]
         iz.update(soshlos=len(mesta) - len(plohie), provereno=len(mesta),
                   plohie=plohie)
@@ -402,7 +503,7 @@ def mesta_krivoj_v2(scheta: list, *, nash_koshelek: str) -> dict:
 
 def instrukciya_nogi(storona_nogi: dict, *, user: str, amount_in: int, min_out: int,
                      tx_istochnika: dict | None = None,
-                     kak_u_istochnika: bool = False):
+                     kak_u_istochnika: bool = False, mayhem: bool = False):
     """Инструкция свопа второй ноги. У кривой v2 -- своими местами, у остальных --
     кирпич c2_swap_build.swap_instruction (его же зовёт c2_usdc_noga).
 
@@ -419,7 +520,9 @@ def instrukciya_nogi(storona_nogi: dict, *, user: str, amount_in: int, min_out: 
                                    kak_u_istochnika=kak_u_istochnika)
     from solders.instruction import AccountMeta, Instruction  # noqa: PLC0415
     from solders.pubkey import Pubkey  # noqa: PLC0415
-    pr = mesta_krivoj_v2(tpl["accounts"], nash_koshelek=user)
+    pr = mesta_krivoj_v2(tpl["accounts"], nash_koshelek=user,
+                         nashi_poluchateli=not kak_u_istochnika,
+                         mayhem=bool(mayhem))
     if not pr["ok"]:
         raise OshibkaNogi(pr["why_not"])
     subs = pr["mesta"]
@@ -550,6 +653,102 @@ def min_out_boj(storona_nogi: dict, tx_istochnika: dict, *, amount_in: int,
 def summy_nog(**kw) -> dict:
     """Связка сумм двух ног -- числами c2_usdc_noga (а те -- двухшагового пути)."""
     return _moduli()[2].summy_nog(**kw)
+
+
+# ------------------------------------------------------------------ тень
+
+def ten(*, tx_istochnika: dict, istochnik: str, mint: str, lamporty: int,
+        kesh_nog, proskalzyvanie: float = 0.35, gruppa: str | None = None,
+        nalog_kotirovki_bps=None, mint_kotirovki: str = USDC) -> dict:
+    """ЧИСЛА ноги без транзакции и без сети: годилось бы или нет, и почему.
+
+    Вид ответа -- РОВНО как у c2_usdc_noga.ten, чтобы поля журнала решений у двух
+    таблиц типов совпадали и врезка была одна на обе. Решений не принимает:
+    транзакции здесь нет вовсе, и в тени полоса ничего не отправляет.
+
+    ОТЛИЧИЕ ОДНО, И ОНО В ПОЛЬЗУ ТЕНИ: min_out считает КОТИРОВЩИК ТИПА (нуль
+    чтений), а не цена события. У цены события наш объём не учтён, и выход она
+    завышает; у котировщика цена из состояния ПОСЛЕ сделки источника -- то есть
+    то самое число, с которым пошла бы боевая сборка. Поэтому тень здесь
+    отвечает на вопрос «сколько бы дали», а не «сколько обещает чужая сделка».
+    """
+    C, _B, UN, TS, SB, _K = _moduli()
+    iz = {"ok": False, "why_not": None, "route": ROUTE, "rezhim": rezhim(gruppa),
+          "pool_program": None, "label": None, "way": None,
+          "quote_mint": mint_kotirovki, "leg1_pool_program": None,
+          "leg1_template_age_s": None, "leg1_min_out": None,
+          "leg2_amount_in": None, "leg2_to_pool": None, "quote_fee_bps": None,
+          "min_out": None, "expected_out": None, "min_out_from": None,
+          "razvernut": None, "chtenij": 0, "kotirovshchik": None,
+          # ЦЕНА СОБЫТИЯ ИСТОЧНИКА -- ТЕМИ ЖЕ ИМЕНАМИ, ЧТО У c2_usdc_noga.ten.
+          # Числа не для отправки (наш объём в них не входит), а для журнала:
+          # по ним видно, по какой цене прошёл САМ источник.
+          "usdc_v_pul_istochnika": None, "token_iz_pula_istochnika": None}
+    if rezhim(gruppa) == UN.MODE_OFF:
+        iz["why_not"] = UN.WHY_OFF
+        return iz
+    try:
+        pul = C.identify_pool(tx_istochnika, istochnik, mint)
+        if not pul.get("ok"):
+            iz["why_not"] = f"пул источника: {pul.get('why_not')}"
+            return iz
+        prog = UN.programma_pula(tx_istochnika, pul["pool_vault"])
+        iz["pool_program"] = prog
+        st = storona(tx_istochnika, programma=prog, hranilishche=pul["pool_vault"],
+                     mint_kotirovki=mint_kotirovki)
+        iz.update(label=st.get("label"), way=st.get("way"),
+                  razvernut=st.get("razvernut"),
+                  kotirovshchik=st.get("kotirovshchik"))
+        if not st.get("ok"):
+            iz["why_not"] = st.get("why_not")
+            return iz
+        if kesh_nog is None:
+            iz["why_not"] = ("кэша шаблонов первой ноги нет -- билет в котировку "
+                             "не посчитать")
+            return iz
+        e, vozrast = kesh_nog.get(mint_kotirovki)
+        if e is None:
+            iz["why_not"] = f"шаблона SOL -> {mint_kotirovki[:8]} в кэше нет"
+            return iz
+        iz["leg1_pool_program"] = e.get("program")
+        iz["leg1_template_age_s"] = (round(vozrast, 1) if vozrast is not None
+                                     else None)
+        s = summy_nog(lamporty=lamporty, price_sol=e.get("price_sol"),
+                      q_dec=e.get("q_dec"),
+                      quote_program=(e.get("mv") or {}).get("base_program"),
+                      nalog_bps=nalog_kotirovki_bps)
+        iz.update(quote_fee_bps=s.get("quote_fee_bps"),
+                  leg1_min_out=s.get("leg1_min_out"),
+                  leg2_amount_in=s.get("leg2_amount_in"),
+                  leg2_to_pool=s.get("leg2_to_pool"))
+        if not s.get("ok"):
+            iz["why_not"] = s.get("why_not")
+            return iz
+        try:
+            c = UN.cena_sobytiya(tx_istochnika, st["tpl"],
+                                 base_mint=st["base_mint"],
+                                 quote_mint=mint_kotirovki)
+            iz.update(usdc_v_pul_istochnika=c.get("usdc_v_pul"),
+                      token_iz_pula_istochnika=c.get("token_iz_pula"))
+        except Exception as exc:  # noqa: BLE001
+            iz["cena_sobytiya_why_not"] = f"{type(exc).__name__}"
+        kb = min_out_boj(st, tx_istochnika, amount_in=int(s["leg2_to_pool"]),
+                         proskalzyvanie=proskalzyvanie,
+                         mint_kotirovki=mint_kotirovki)
+        iz.update(min_out=kb.get("min_out"), expected_out=kb.get("expected_out"),
+                  min_out_from=kb.get("put"), fee_share=kb.get("fee_share"))
+        if not kb.get("ok"):
+            iz["why_not"] = kb.get("why_not")
+            return iz
+        if vozrast is not None and vozrast > SB.LEG_MAX_AGE_S:
+            iz["why_not"] = (f"шаблон первой ноги старше {SB.LEG_MAX_AGE_S} с "
+                             f"({vozrast:.0f} с)")
+            return iz
+    except Exception as exc:  # noqa: BLE001
+        iz["why_not"] = f"тень USDC-ноги сигнальных типов: {UN._sled(exc)}"
+        return iz
+    iz["ok"] = True
+    return iz
 
 
 # ------------------------------------------------- список инструкций и сборка
@@ -816,6 +1015,155 @@ def instrukciya_nogi_2_prodazhi(shab: dict, *, nash_koshelek: str, kotirovki_v: 
     return Instruction(Pubkey.from_string(shab["program"]), data, metas)
 
 
+# МЕСТА ПРОДАЖИ КРИВОЙ v2 -- ВСЕ НАШИ, А НЕ ТЕ, ЧТО ПРИШЛИ С ШАБЛОНОМ. Карта
+# sell_v2 из IDL (её же проверяет c3_prodavec_sborka.места_кривая_v2): 13 user,
+# 14 ATA базы, 15 ATA котировки, 19 накопитель объёма, 20 его ATA, 6/7 получатель
+# комиссии и его ATA, 8/9 buyback и его ATA. ВСЕ ОНИ writable по IDL.
+#
+# ЗАЧЕМ ПОДСТАВЛЯТЬ, ЕСЛИ ШАБЛОН И ТАК ИЗ НАШЕЙ ПОКУПКИ. Потому что «и так» --
+# это договорённость, а не проверка: шаблон приходит аргументом, и если в него
+# попадёт ЧУЖАЯ покупка (своя же покупка не найдена, перепутан аргумент), то
+# инструкция продажи уйдёт с ЧУЖИМИ счетами -- то есть попытается продать чужой
+# остаток чужим кошельком. Подстановка делает это невозможным, а заодно ставит
+# НАШИХ получателей комиссий (слово владельца 03.10: всегда один свой из Global).
+KRIVAYA_V2_MESTA_PRODAZHI = {"user": 13, "ata_bazy": 14, "ata_kotirovki": 15,
+                             "uva": 19, "assoc_uva": 20, "poluchatel": 6,
+                             "ata_poluchatelya": 7, "buyback": 8,
+                             "ata_buyback": 9, "mint_bazy": 1,
+                             "mint_kotirovki": 2, "prog_bazy": 3,
+                             "prog_kotirovki": 4}
+
+
+def nabor_adresov_dlya_tablicy(scheta_pokupki_v2: list, *, nash_koshelek: str,
+                               fajl_tablicy: str | None = None) -> dict:
+    """НАБОР ПОСТОЯННЫХ АДРЕСОВ КРИВОЙ v2 для таблицы полосы -- точным списком.
+
+    Что сюда входит и почему именно это постоянно:
+      * НАШИ получатели комиссий (обычный и buyback) -- по слову владельца они
+        всегда одни, и программа принимает любого из своих списков;
+      * их ATA для WSOL и для USDC -- места 7 и 9 выводятся семенами IDL
+        [получатель, программа котировки, минт котировки], то есть для каждой
+        котировки свой, но для НАШЕГО получателя -- постоянный;
+      * получатель для mayhem-монет (из reserved) и его два ATA -- отдельно: без
+        mayhem они не нужны вовсе;
+      * постоянные счета программы: global, global_volume_accumulator,
+        fee_config, event_authority -- одни и те же у ЛЮБОГО пула кривой;
+      * НАШ накопитель объёма и его ATA для USDC -- постоянны для кошелька;
+      * программы (pfee, системная, сама кривая) -- для полноты списка; они в
+        таблице уже лежат.
+    Чего здесь НЕТ: счётов пула (кривая, её хранилища, минт базы) и счетов
+    создателя -- они у каждой монеты свои, и в постоянной таблице им места нет.
+
+    Состояние каждого адреса ("уже в таблице" / "добавить") считается по
+    data/usdc_noga_alt.json -- то есть по той таблице, что создана и сверена по
+    цепи, а не по памяти.
+    """
+    _C, B, _UN, _TS, _SB, _K = _moduli()
+    iz = {"ok": False, "why_not": None, "nabor": None, "svod": None,
+          "postojannye": None, "ata_usdc_poluchatelej": None,
+          "nash_nakopitel": None, "mayhem": None}
+    if len(scheta_pokupki_v2) != KRIVAYA_V2_SCHETOV:
+        iz["why_not"] = (f"счетов {len(scheta_pokupki_v2)}, а у "
+                         f"buy_exact_quote_in_v2 их {KRIVAYA_V2_SCHETOV}")
+        return iz
+    т = tablica_polosy(fajl_tablicy)
+    if not т["ok"]:
+        iz["why_not"] = т["why_not"]
+        return iz
+    в_таблице = set(т["adresa"])
+    # ПРОГРАММА ТОКЕНА У WSOL И USDC -- КЛАССИЧЕСКАЯ SPL Token. Это не догадка:
+    # у WSOL она такая по природе (её же берёт нога SOL -> USDC, см. шаблон
+    # data/nogi_shablony.json), у USDC -- измерена на живой USDC-сделке Pump AMM
+    # (место программы котировки = Tokenkeg...). Token-2022 бывает у ИНЫХ
+    # котировок, и для них ATA получателя будет другим -- поэтому в наборе
+    # названы ровно две котировки, а не «все».
+    ТОКЕН = B.TOKEN_PROGRAM
+    uva = B.pda([SEMYA_UVA, "USER"], nash_koshelek, PROG_KRIVAYA)
+    ряды = []
+
+    def _добавить(адрес, что):
+        ряды.append({"адрес": адрес, "что": что,
+                     "состояние": ("уже в таблице" if адрес in в_таблице
+                                   else "добавить")})
+
+    _добавить(POLUCHATEL_NASH, "получатель комиссии (обычный)")
+    _добавить(BUYBACK_NASH, "buyback-получатель")
+    _добавить(B.ata(POLUCHATEL_NASH, WSOL, ТОКЕН), "ATA получателя для WSOL")
+    _добавить(B.ata(POLUCHATEL_NASH, USDC, ТОКЕН), "ATA получателя для USDC")
+    _добавить(B.ata(BUYBACK_NASH, WSOL, ТОКЕН), "ATA buyback для WSOL")
+    _добавить(B.ata(BUYBACK_NASH, USDC, ТОКЕН), "ATA buyback для USDC")
+    _добавить(uva, "наш накопитель объёма (PDA)")
+    _добавить(B.ata(uva, USDC, ТОКЕН), "ATA накопителя для USDC")
+    for место, имя in ((0, "global"), (19, "global_volume_accumulator"),
+                       (22, "fee_config"), (25, "event_authority"),
+                       (23, "программа комиссий (fee_program)"),
+                       (24, "системная программа"), (26, "программа кривой")):
+        _добавить(scheta_pokupki_v2[место], f"место {место}: {имя}")
+    майхем = []
+    for адрес, что in ((POLUCHATEL_NASH_MAYHEM, "получатель для mayhem (reserved)"),
+                       (B.ata(POLUCHATEL_NASH_MAYHEM, WSOL, ТОКЕН),
+                        "ATA mayhem-получателя для WSOL"),
+                       (B.ata(POLUCHATEL_NASH_MAYHEM, USDC, ТОКЕН),
+                        "ATA mayhem-получателя для USDC")):
+        _добавить(адрес, что)
+        if адрес not in в_таблице:
+            майхем.append(адрес)
+    добавить = [р["адрес"] for р in ряды if р["состояние"] == "добавить"]
+    iz.update(ok=True, nabor=ряды, mayhem=майхем,
+              postojannye=[scheta_pokupki_v2[i] for i in KRIVAYA_MESTA_POSTOYANNYH],
+              ata_usdc_poluchatelej=[B.ata(POLUCHATEL_NASH, USDC, ТОКЕН),
+                                     B.ata(BUYBACK_NASH, USDC, ТОКЕН)],
+              nash_nakopitel=[uva, B.ata(uva, USDC, ТОКЕН)],
+              svod={"vsego": len(ряды),
+                    "uzhe_v_tablice": sum(1 for р in ряды
+                                          if р["состояние"] == "уже в таблице"),
+                    "dobavit": len(добавить),
+                    "dobavit_bez_mayhem": len([а for а in добавить
+                                               if а not in майхем]),
+                    "adresov_v_tablice_stanet": len(в_таблице | set(добавить))})
+    return iz
+
+
+def nashi_mesta_prodazhi_v2(shablon: dict, *, nash_koshelek: str,
+                            mayhem: bool = False) -> dict:
+    """Шаблон продажи кривой v2 с НАШИМИ местами и НАШИМИ получателями."""
+    _C, B, _UN, _TS, _SB, _K = _moduli()
+    M = KRIVAYA_V2_MESTA_PRODAZHI
+    iz = {"ok": False, "why_not": None, "shablon": None, "podstavleno": None}
+    сч = list((shablon or {}).get("accounts") or [])
+    if len(сч) != 26:
+        iz["why_not"] = f"счетов продажи {len(сч)}, а у sell_v2 их 26"
+        return iz
+    мб, мк = сч[M["mint_bazy"]], сч[M["mint_kotirovki"]]
+    пб, пк = сч[M["prog_bazy"]], сч[M["prog_kotirovki"]]
+    пол = POLUCHATEL_NASH_MAYHEM if mayhem else POLUCHATEL_NASH
+    список = POLUCHATELI_MAYHEM if mayhem else POLUCHATELI_OBYCHNYE
+    if пол not in список or BUYBACK_NASH not in POLUCHATELI_BUYBACK:
+        iz["why_not"] = f"{WHY_POLUCHATEL_NE_V_SPISKE}: {пол[:8]}"
+        return iz
+    uva = B.pda([SEMYA_UVA, "USER"], nash_koshelek, PROG_KRIVAYA)
+    наши = {M["user"]: nash_koshelek,
+            M["ata_bazy"]: B.ata(nash_koshelek, мб, пб),
+            M["ata_kotirovki"]: B.ata(nash_koshelek, мк, пк),
+            M["uva"]: uva,
+            M["assoc_uva"]: B.ata(uva, мк, пк),
+            M["poluchatel"]: пол,
+            M["ata_poluchatelya"]: B.ata(пол, мк, пк),
+            M["buyback"]: BUYBACK_NASH,
+            M["ata_buyback"]: B.ata(BUYBACK_NASH, мк, пк)}
+    новые = list(сч)
+    права = dict(shablon.get("writable") or {})
+    for место, адрес in наши.items():
+        новые[место] = адрес
+        # ПРИЗНАК ЗАПИСИ -- ПО IDL, А НЕ ПО КАРТЕ АДРЕСОВ. Карта в шаблоне
+        # ключуется АДРЕСОМ: подставив свой, мы потеряли бы её значение и
+        # получили writable=False на счёте, который программа пишет.
+        права[адрес] = True
+    iz.update(ok=True, podstavleno=наши,
+              shablon=dict(shablon, accounts=новые, writable=права))
+    return iz
+
+
 def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
                         ostatok: int, kesh_nog, mint_bazy: str | None = None,
                         hranilishche: str | None = None,
@@ -878,6 +1226,13 @@ def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
             return iz
         iz["zhivaya_prodazha_s_etoj_kotirovkoj"] = sh1.get(
             "живая_продажа_с_этой_котировкой")
+        if programma == PROG_KRIVAYA:
+            нм = nashi_mesta_prodazhi_v2(sh1, nash_koshelek=nash_koshelek)
+            iz["nashi_mesta_prodazhi"] = нм.get("podstavleno")
+            if not нм["ok"]:
+                iz["why_not"] = f"места продажи кривой: {нм['why_not']}"
+                return iz
+            sh1 = нм["shablon"]
         if isinstance(min_out_nogi_1, int) and min_out_nogi_1 > 0:
             mo1, iz["min_out_1_otkuda"] = int(min_out_nogi_1), "передан полосой"
         else:
@@ -1050,7 +1405,12 @@ def prodazha_sobrat(*, luts_gotovye: list | None = None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: молчаливый пропуск -- это провал. Если файла
 # образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 186
+# 202, А НЕ 186: Code-1 правил ЭТОТ файл от моей копии на 166 проверок (его
+# двадцать) -- слияние сложило его двадцать и мои шестнадцать (получатели и
+# сверка порядка резервов). Число проверок от содержимого таблицы НЕ зависит:
+# сверено прогоном одного и того же кода на таблице из 34 и из 42 адресов --
+# 202 и там и там, расходятся только ЧИСЛА в именах.
+ZHDEM_PROVEROK = 202
 
 # ЗАМЕР ПО ТИПАМ НА ЖИВЫХ СДЕЛКАХ С КОТИРОВОЧНЫМ ТОКЕНОМ (не WSOL). Образцы --
 # data/c2_pool_samples/<программа>.json плюс разновидности кривой
@@ -1107,21 +1467,64 @@ ZHDEM_RAZMEROV = {
                      "nons": (1081, 1113), "nons_i_chaevyj": (1130, 1162)},
     PROG_PUMP_AMM: {"chaevyj_nash": (1024, 1056), "chaevyj_chuzhoj": (1056, 1088),
                     "nons": (1081, 1113), "nons_i_chaevyj": (1130, 1162)},
-    PROG_KRIVAYA: {"chaevyj_nash": (1218, 1281), "chaevyj_chuzhoj": (1250, 1313),
-                   "nons": (1275, 1338), "nons_i_chaevyj": (1324, 1387)},
+    # КРИВАЯ -- ПОСЛЕ ФИКСАЦИИ ПОЛУЧАТЕЛЕЙ И ПОСЛЕ ДОЛИВКИ ТАБЛИЦЫ. Два шага,
+    # и оба замерены: (1) слово владельца 03.10 -- всегда наши получатели, и
+    # пакет стал на 32...64 байта меньше, чем с получателями источника; (2)
+    # Code-1 ДОЛИЛ в таблицу полосы восемь адресов живьём (подпись
+    # 5nHwzF8yUsccTgX3mEPTobyjYaZHy23oDMaL4x32LzE8V3FT9XnVYbWy6bLVpadRV4uLjpKZrMK8wbVnFLmsppy7,
+    # было 34 адреса -- стало 42). После этого КРИВАЯ ВЛЕЗАЕТ В БОЕВОМ РЕЖИМЕ:
+    # 1168...1199 при пределе 1232, все три образца. До доливки не влезал ни один.
+    PROG_KRIVAYA: {"chaevyj_nash": (1062, 1093), "chaevyj_chuzhoj": (1094, 1125),
+                   "nons": (1119, 1150), "nons_i_chaevyj": (1168, 1199)},
 }
 # Сколько живых сделок каждого типа влезает в 1232 в САМОМ ТЯЖЁЛОМ режиме.
+# КРИВАЯ -- 3 из 3 ПОСЛЕ ДОЛИВКИ ТАБЛИЦЫ (было 0 из 3 при таблице в 34 адреса).
 ZHDEM_VLEZLO_TYAZHELYJ = {PROG_CPMM: 43, PROG_LAUNCHLAB: 35, PROG_PUMP_AMM: 2,
-                          PROG_KRIVAYA: 0}
-# КРИВАЯ НЕ ВЛЕЗАЕТ НИ В ОДНОМ РЕЖИМЕ, И ЭТО ЧИСЛО, А НЕ МНЕНИЕ. Лекарство
-# измерено на образце OBRAZEC_KRIVOJ: четыре ПОСТОЯННЫХ адреса программы кривой
-# (global, global_volume_accumulator, fee_config, event_authority) в таблице
-# полосы -- и в самом тяжёлом режиме пакет 1231 байт, то есть запас ОДИН байт.
-# Поэтому четырёх мало на деле: шесть дают 1169, десять -- 1076. В лёгком режиме
-# те же добавки давали 1125 / 1063 / 970.
+                          PROG_KRIVAYA: 3}
+# ЛЕСТНИЦА ДОБАВОК -- ЗАНОВО ПО ЖИВОЙ ТАБЛИЦЕ (42 адреса). Четыре постоянные
+# программы кривой Code-1 уже долил, поэтому «+4» теперь РАВНО «+0»: добавлять
+# нечего, они в таблице. Остаток лестницы говорит, что ещё стоит долить:
+#   +6 -- ATA наших двух получателей ДЛЯ USDC. На этом образце размер не меняется
+#         (его котировка -- не USDC, и в транзакции стоят ATA для ЕГО минта), но
+#         в НАСТОЯЩЕЙ сделке с котировкой USDC эти два адреса в транзакции есть,
+#         и каждый из них -- 31 байт;
+#   +8 -- наш накопитель объёма (PDA кошелька) и его ATA для USDC. PDA в
+#         транзакции стоит ВСЕГДА, и он даёт замеренные 1199 -> 1168.
+# То есть 1199 -- ВЕРХНЯЯ ГРАНИЦА: в сделке с котировкой USDC по долитой таблице
+# размер будет не больше, а меньше.
+#
+# Прежний замер (таблица 34 адреса) для памяти: покупка 1323, продажа 1331,
+# продажа без закрытия 1293 -- не влезало ничто.
+KRIVAYA_DOLITO_PODPIS = ("5nHwzF8yUsccTgX3mEPTobyjYaZHy23oDMaL4x32LzE8V3FT9Xn"
+                         "VYbWy6bLVpadRV4uLjpKZrMK8wbVnFLmsppy7")
+# Считаются ТОЛЬКО адреса, которых в таблице полосы ещё нет:
+#   4  -- постоянные программы кривой: global, global_volume_accumulator,
+#         fee_config, event_authority (места 0, 19, 22, 25);
+#   +2 -- ATA НАШИХ получателей для USDC (их ATA для WSOL уже в таблице:
+#         те же получатели обслуживают пул первой ноги);
+#   +2 -- НАШ накопитель объёма и его ATA для USDC (постоянны для кошелька).
+# Восьми хватает и покупке, и продаже; на четырёх продажа влезает только без
+# закрытия токенового счёта.
 KRIVAYA_MESTA_POSTOYANNYH = (0, 19, 22, 25)
-ZHDEM_KRIVAYA_S_DOBAVKOJ = {4: 1125, 6: 1063, 10: 970}
-ZHDEM_KRIVAYA_S_DOBAVKOJ_TYAZHELYJ = {4: 1231, 6: 1169, 10: 1076}
+ZHDEM_KRIVAYA_LESTNICA = {
+    0: {"pokupka": 1199, "prodazha": 1200, "prodazha_bez_zakrytiya": 1200},
+    4: {"pokupka": 1199, "prodazha": 1200, "prodazha_bez_zakrytiya": 1200},
+    6: {"pokupka": 1199, "prodazha": 1200, "prodazha_bez_zakrytiya": 1200},
+    8: {"pokupka": 1168, "prodazha": 1169, "prodazha_bez_zakrytiya": 1169},
+}
+# НАБОР, КОТОРЫЙ УХОДИТ CODE-1 (восемь адресов плюс три на mayhem). Точные
+# адреса выводятся числом в nabor_adresov_dlya_tablicy() -- в коде их нет,
+# кроме получателей: они из публичных списков программы.
+# ПОСЛЕ ДОЛИВКИ 03.10: из восемнадцати в таблице уже одиннадцать, долить
+# осталось семь -- четыре без mayhem (ATA двух наших получателей для USDC, наш
+# накопитель объёма и его ATA для USDC) и три на mayhem. Накопитель и его ATA
+# выводятся из КОШЕЛЬКА, и в этом замере кошелёк проверочный: для боя их обязан
+# посчитать Code-1 от боевого кошелька (функция nabor_adresov_dlya_tablicy
+# принимает его параметром).
+# ТО ЖЕ ПОСЛЕ ЖИВОГО РАСШИРЕНИЯ 17:24Z: из 18 адресов набора в таблице уже 16,
+# доливать осталось 2. Числа Code-3 (11 / 7 / 4) мерили таблицу ДО расширения.
+ZHDEM_NABORA = {"vsego": 18, "uzhe_v_tablice": 16, "dobavit": 2,
+                "dobavit_bez_mayhem": 2, "adresov_v_tablice_stanet": 49}
 # ПОЧЕМУ НЕ ДВУХШАГОВЫМ ПУТЁМ -- ЧИСЛОМ, А НЕ РАССУЖДЕНИЕМ. bloom_lane_two_step
 # вторую ногу этих типов СОБИРАЕТ (кирпичи те же), но отправить её не может: у
 # него нет НАШЕЙ таблицы адресов, и пакет выходит за 1232 байта на ВСЕХ живых
@@ -1143,7 +1546,12 @@ ZHDEM_PRODAZHI = {
     PROG_CPMM: {"chaevyj_nash": (1021, 1052), "nons_i_chaevyj": (1127, 1158)},
     PROG_LAUNCHLAB: {"chaevyj_nash": (1130, 1161), "nons_i_chaevyj": (1236, 1267)},
     PROG_PUMP_AMM: {"chaevyj_nash": (1128, 1159), "nons_i_chaevyj": (1234, 1265)},
-    PROG_KRIVAYA: {"chaevyj_nash": (1352, 1384), "nons_i_chaevyj": (1458, 1490)},
+    # КРИВАЯ -- с НАШИМИ местами продажи, НАШИМИ получателями и по ДОЛИТОЙ
+    # таблице. Было 1352...1384 и 1458...1490, когда места и получатели
+    # приходили из ЧУЖОЙ покупки (то есть и продажа ушла бы чужими счетами), и
+    # 1225/1331 при таблице в 34 адреса. С ЗАКРЫТИЕМ счёта токена 1238 всё ещё
+    # НЕ влезает -- влезает умолчание по типу (без закрытия, 1200).
+    PROG_KRIVAYA: {"chaevyj_nash": (1132, 1132), "nons_i_chaevyj": (1238, 1238)},
 }
 # ПРОДАЖА В РЕЖИМЕ НОНСА НЕ ВЛЕЗАЕТ У LAUNCHLAB И PUMP AMM -- перебор 4...35
 # байт, -- и лечится тем же, чем у кривой: не закрывать токеновый счёт той же
@@ -1152,7 +1560,7 @@ ZHDEM_PRODAZHI = {
 # БЕЗ закрытия: влезает всё, кроме кривой.
 ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA = {
     PROG_CPMM: (1088, 1119), PROG_LAUNCHLAB: (1197, 1228),
-    PROG_PUMP_AMM: (1195, 1226), PROG_KRIVAYA: (1388, 1420),
+    PROG_PUMP_AMM: (1195, 1226), PROG_KRIVAYA: (1200, 1200),
 }
 ZHDEM_VLEZLO_PRODAZHA_TYAZHELYJ = {PROG_CPMM: 43, PROG_LAUNCHLAB: 0,
                                    PROG_PUMP_AMM: 0, PROG_KRIVAYA: 0}
@@ -1762,41 +2170,74 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             ст = storona(о["tx"], programma=PROG_KRIVAYA, hranilishche=о["vault"],
                          mint_kotirovki=о["quote"])
             сч = ст["tpl"]["accounts"]
-            мест = mesta_krivoj_v2(сч, nash_koshelek=KOSHELEK_PROVERKI)["mesta"]
             как_usdc = [о["quote"],
                         B.ata(KOSHELEK_PROVERKI, о["quote"], о["quote_program"]),
                         о["quote_program"]]
-            наборы = {
-                4: [сч[i] for i in KRIVAYA_MESTA_POSTOYANNYH],
-                6: [сч[i] for i in KRIVAYA_MESTA_POSTOYANNYH]
-                + [мест[20], мест[21]],
-                10: [сч[i] for i in KRIVAYA_MESTA_POSTOYANNYH]
-                + [мест[20], мест[21]] + [сч[i] for i in (6, 7, 8, 9)],
+            наб = nabor_adresov_dlya_tablicy(сч, nash_koshelek=KOSHELEK_PROVERKI)
+            chk(f"набор для таблицы: {ZHDEM_NABORA['vsego']} адресов, из них "
+                f"{ZHDEM_NABORA['uzhe_v_tablice']} уже в ней",
+                наб["ok"] and len(наб["nabor"]) == ZHDEM_NABORA["vsego"]
+                and наб["svod"]["uzhe_v_tablice"] == ZHDEM_NABORA["uzhe_v_tablice"]
+                and наб["svod"]["dobavit"] == ZHDEM_NABORA["dobavit"],
+                наб.get("svod"))
+            chk("оба НАШИХ получателя и их ATA для WSOL -- уже в таблице полосы",
+                all(р["состояние"] == "уже в таблице" for р in наб["nabor"]
+                    if р["что"].startswith(("получатель комиссии",
+                                            "buyback-получатель",
+                                            "ATA получателя для WSOL",
+                                            "ATA buyback для WSOL"))),
+                [р for р in наб["nabor"] if р["состояние"] != "уже в таблице"][:3])
+            # ЛЕСТНИЦА: сколько адресов добавить, чтобы влезли покупка и продажа
+            добавить = {
+                0: [],
+                4: наб["postojannye"],
+                6: наб["postojannye"] + наб["ata_usdc_poluchatelej"],
+                8: наб["postojannye"] + наб["ata_usdc_poluchatelej"]
+                + наб["nash_nakopitel"],
             }
-            for сколько, добавка in наборы.items():
+            for сколько, добавка in добавить.items():
                 L, _n = _lut_s_dobavkoj(как_usdc + добавка)
                 общее = {"tx_istochnika": о["tx"], "istochnik": ист,
                          "mint": о["mint"], "nash_koshelek": KOSHELEK_PROVERKI,
                          "lamporty": 10_000_000, "kesh_nog": кэш,
                          "proskalzyvanie": 0.35, "min_out_vneshnij": 1,
                          "mint_kotirovki": о["quote"], "luts_gotovye": [L]}
-                лёг = sobrat(**общее, chaevye_lamporty=1_000_000,
-                             chaevye_adres=KOSHELEK_PROVERKI)
-                тяж = sobrat(**общее, chaevye_lamporty=1_000_000,
-                             chaevye_adres=TIP_DLYA_ZAMERA,
-                             nons=(NONS_DLYA_ZAMERA, KOSHELEK_PROVERKI))
-                chk(f"кривая v2: +{сколько} адресов -> "
-                    f"{ZHDEM_KRIVAYA_S_DOBAVKOJ[сколько]} байт (лёгкий режим)",
-                    лёг.get("size") == ZHDEM_KRIVAYA_S_DOBAVKOJ[сколько],
-                    лёг.get("size"))
-                chk(f"кривая v2: +{сколько} адресов -> "
-                    f"{ZHDEM_KRIVAYA_S_DOBAVKOJ_TYAZHELYJ[сколько]} байт (тяжёлый)",
-                    тяж.get("size")
-                    == ZHDEM_KRIVAYA_S_DOBAVKOJ_TYAZHELYJ[сколько],
-                    тяж.get("size"))
-                chk(f"кривая v2: с +{сколько} адресами влезает и в тяжёлом режиме",
-                    isinstance(тяж.get("size"), int)
-                    and тяж["size"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX, тяж.get("size"))
+                тяж = {"chaevye_lamporty": 1_000_000,
+                       "chaevye_adres": TIP_DLYA_ZAMERA,
+                       "nons": (NONS_DLYA_ZAMERA, KOSHELEK_PROVERKI)}
+                пк = sobrat(**общее, **тяж)
+                пр_общее = {"tx_pokupki": о["tx"], "programma": PROG_KRIVAYA,
+                            "nash_koshelek": KOSHELEK_PROVERKI,
+                            "ostatok": 1_000_000_000, "kesh_nog": кэш,
+                            "mint_bazy": о["mint"], "hranilishche": о["vault"],
+                            "mint_kotirovki": о["quote"], "min_out_nogi_2": 1,
+                            "luts_gotovye": [L]}
+                пр = prodazha_sobrat(**пр_общее, **тяж)
+                пр_б = prodazha_sobrat(**пр_общее, **тяж,
+                                       zakryvat_schet_tokena=False)
+                ждём = ZHDEM_KRIVAYA_LESTNICA[сколько]
+                chk(f"кривая v2 (бой): +{сколько} адресов -> покупка "
+                    f"{ждём['pokupka']}, продажа {ждём['prodazha']}, продажа "
+                    f"без закрытия {ждём['prodazha_bez_zakrytiya']}",
+                    (пк.get("size") == ждём["pokupka"]
+                     and пр.get("size") == ждём["prodazha"]
+                     and пр_б.get("size") == ждём["prodazha_bez_zakrytiya"]),
+                    (пк.get("size"), пр.get("size"), пр_б.get("size")))
+            chk("восьми адресов хватает И покупке, И продаже в боевом режиме",
+                ZHDEM_KRIVAYA_LESTNICA[8]["pokupka"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
+                and ZHDEM_KRIVAYA_LESTNICA[8]["prodazha"]
+                <= TS.ПРЕДЕЛ_РАЗМЕРА_TX, ZHDEM_KRIVAYA_LESTNICA[8])
+            # ПОСЛЕ ДОЛИВКИ ТАБЛИЦЫ ХВАТАЕТ И НУЛЯ ДОБАВОК: четыре постоянные
+            # программы кривой уже в ней, поэтому «+4» равно «+0» и обе
+            # транзакции влезают. Остаток лестницы (+6, +8) -- не «чтобы
+            # влезло», а запас: он снимает ещё 31 байт и нужен настоящей
+            # сделке с котировкой USDC (её ATA получателей в таблице нет).
+            chk("по ДОЛИТОЙ таблице влезают и покупка, и продажа БЕЗ добавок",
+                ZHDEM_KRIVAYA_LESTNICA[0]["pokupka"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
+                and ZHDEM_KRIVAYA_LESTNICA[0]["prodazha"]
+                <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
+                and ZHDEM_KRIVAYA_LESTNICA[4] == ZHDEM_KRIVAYA_LESTNICA[0],
+                (ZHDEM_KRIVAYA_LESTNICA[0], ZHDEM_KRIVAYA_LESTNICA[4]))
     finally:
         for k, v in сохр.items():
             if v is None:
@@ -1991,11 +2432,13 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 _ряд_у and (min(_ряд_у), max(_ряд_у)) == tuple(_ждём_умолч),
                 (min(_ряд_у), max(_ряд_у)) if _ряд_у else None)
             _влезло_у = [x for x in _ряд_у if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
-            chk(f"{метка}: умолчанием влезает {len(_влезло_у)} из {len(_ряд_у)}"
-                + (" (кривой нужны ещё десять адресов)"
-                   if p == PROG_KRIVAYA else ""),
-                (len(_влезло_у) == len(_ряд_у) if p != PROG_KRIVAYA
-                 else len(_влезло_у) == 0),
+            # ОСОБОГО СЛУЧАЯ У КРИВОЙ БОЛЬШЕ НЕТ. Пока таблица была 34 адреса,
+            # её умолчание не влезало ни одной сделкой; после доливки восьми
+            # адресов (03.10, Code-1) влезают ВСЕ четыре типа, и проверка у всех
+            # одна. Если таблица когда-нибудь уменьшится, это место покраснеет
+            # числом, а не промолчит.
+            chk(f"{метка}: умолчанием влезает {len(_влезло_у)} из {len(_ряд_у)}",
+                len(_влезло_у) == len(_ряд_у) and bool(_влезло_у),
                 (len(_влезло_у), len(_ряд_у)))
             мин_б, макс_б = ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA[p]
             ряд_б = ряды["bez_zakrytiya"]
@@ -2003,48 +2446,11 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 ряд_б and min(ряд_б) == мин_б and max(ряд_б) == макс_б,
                 (min(ряд_б), max(ряд_б)) if ряд_б else None)
             влезли_б = [x for x in ряд_б if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
-            if p == PROG_KRIVAYA:
-                chk("кривая v2: продажа без закрытия всё равно не влезает",
-                    not влезли_б, ряд_б)
-            else:
-                chk(f"{метка}: продажа без закрытия влезает на всех сделках",
-                    len(влезли_б) == len(ряд_б) and влезли_б,
-                    (len(влезли_б), len(ряд_б)))
-        # ЛЕКАРСТВО ПРОДАЖИ КРИВОЙ -- ЧИСЛАМИ, И ВЫБОР НЕ МОЙ
-        if кр:
-            о = кр[0]
-            кэш = SB.LegCache({}, None)
-            кэш.entries[о["quote"]] = зап2
-            ст = storona(о["tx"], programma=PROG_KRIVAYA, hranilishche=о["vault"],
-                         mint_kotirovki=о["quote"])
-            сч = ст["tpl"]["accounts"]
-            мест = mesta_krivoj_v2(сч, nash_koshelek=KOSHELEK_PROVERKI)["mesta"]
-            как_usdc = [о["quote"],
-                        B.ata(KOSHELEK_PROVERKI, о["quote"], о["quote_program"]),
-                        о["quote_program"]]
-            п4 = [сч[i] for i in KRIVAYA_MESTA_POSTOYANNYH]
-            п10 = п4 + [мест[20], мест[21]] + [сч[i] for i in (6, 7, 8, 9)]
-            for имя, добавка, закрывать in (("4_zakryvaem", п4, True),
-                                            ("10_zakryvaem", п10, True),
-                                            ("4_bez_zakrytiya", п4, False),
-                                            ("10_bez_zakrytiya", п10, False)):
-                L, _n = _lut_s_dobavkoj(как_usdc + добавка)
-                сб = prodazha_sobrat(
-                    tx_pokupki=о["tx"], programma=PROG_KRIVAYA,
-                    nash_koshelek=KOSHELEK_PROVERKI, ostatok=1_000_000_000,
-                    kesh_nog=кэш, mint_bazy=о["mint"], hranilishche=о["vault"],
-                    mint_kotirovki=о["quote"], min_out_nogi_2=1,
-                    zakryvat_schet_tokena=закрывать, luts_gotovye=[L],
-                    chaevye_lamporty=1_000_000, chaevye_adres=KOSHELEK_PROVERKI)
-                ждём_б = ZHDEM_PRODAZHA_KRIVOJ[имя]
-                chk(f"кривая v2: продажа ({имя}) {ждём_б} байт",
-                    сб.get("size") == ждём_б, сб.get("size"))
-            chk("кривая v2: продажа влезает либо с десятью адресами, либо без "
-                "закрытия токенового счёта",
-                ZHDEM_PRODAZHA_KRIVOJ["10_zakryvaem"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
-                and ZHDEM_PRODAZHA_KRIVOJ["4_bez_zakrytiya"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX
-                and ZHDEM_PRODAZHA_KRIVOJ["4_zakryvaem"] > TS.ПРЕДЕЛ_РАЗМЕРА_TX,
-                ZHDEM_PRODAZHA_KRIVOJ)
+            chk(f"{метка}: продажа без закрытия влезает на всех сделках",
+                len(влезли_б) == len(ряд_б) and bool(влезли_б),
+                (len(влезли_б), len(ряд_б)))
+        # ЛЕСТНИЦА ДОБАВОК ДЛЯ КРИВОЙ СТОИТ В РАЗДЕЛЕ ПОКУПКИ: она считает
+        # покупку и продажу ОДНИМ набором адресов, и повторять её здесь незачем.
     finally:
         for k, v in сохр.items():
             if v is None:
@@ -2078,6 +2484,254 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 f"-- без нашей таблицы",
                 ряд and (min(ряд), max(ряд)) == ждём["razmer"],
                 (min(ряд), max(ряд)) if ряд else None)
+
+    # ------------------- 7г. ПОЛУЧАТЕЛИ КОМИССИЙ: СПИСКИ, ВЫБОР, ПОДСТАНОВКА
+    chk("три списка получателей -- по восемь, без дублей и без пересечений",
+        len(POLUCHATELI_OBYCHNYE) == len(POLUCHATELI_MAYHEM)
+        == len(POLUCHATELI_BUYBACK) == 8
+        and len(set(POLUCHATELI_OBYCHNYE) | set(POLUCHATELI_MAYHEM)
+                | set(POLUCHATELI_BUYBACK)) == 24,
+        (len(POLUCHATELI_OBYCHNYE), len(POLUCHATELI_MAYHEM),
+         len(POLUCHATELI_BUYBACK)))
+    chk("наш выбор -- из списков программы",
+        POLUCHATEL_NASH in POLUCHATELI_OBYCHNYE
+        and BUYBACK_NASH in POLUCHATELI_BUYBACK
+        and POLUCHATEL_NASH_MAYHEM in POLUCHATELI_MAYHEM, None)
+    # СПИСКИ ИЗ ДОКУМЕНТОВ ПРОТИВ ЦЕПИ. Каждый получатель, стоявший на живых
+    # v2-сделках, обязан быть в списке: иначе списки устарели, и выбирать по
+    # ним нельзя. Сюда же идут НАША СОБСТВЕННАЯ покупка кривой
+    # (data/krivaya_27_mesta.json) и живые продажи -- у них свои получатели.
+    живые_об, живые_бб = set(), set()
+    for о in все_кр:
+        сч_о = о["tpl"]["accounts"]
+        живые_об.add(сч_о[KRIVAYA_V2_MESTA_POLUCHATELEJ["poluchatel"]])
+        живые_бб.add(сч_о[KRIVAYA_V2_MESTA_POLUCHATELEJ["buyback"]])
+    п_пара = Path(C.DATA) / "krivaya_27_mesta.json"
+    if п_пара.exists():
+        д_п = json.loads(п_пара.read_text(encoding="utf-8"))
+        for часть in ("покупка", "продажа"):
+            сч_п = ((д_п.get(часть) or {}).get("accounts")
+                    or (д_п.get(часть) or {}).get("счета") or [])
+            if len(сч_п) == KRIVAYA_V2_SCHETOV:
+                живые_об.add(сч_п[6])
+                живые_бб.add(сч_п[8])
+            elif len(сч_п) == 26:   # sell_v2: места те же 6 и 8
+                живые_об.add(сч_п[6])
+                живые_бб.add(сч_п[8])
+    chk(f"все живые получатели комиссий ({len(живые_об)}) -- из списка обычных",
+        живые_об and живые_об <= set(POLUCHATELI_OBYCHNYE),
+        sorted(живые_об - set(POLUCHATELI_OBYCHNYE)))
+    chk(f"все живые buyback-получатели ({len(живые_бб)}) -- из списка buyback",
+        живые_бб and живые_бб <= set(POLUCHATELI_BUYBACK),
+        sorted(живые_бб - set(POLUCHATELI_BUYBACK)))
+    chk("их больше одного -- значит программа принимает ЛЮБОГО из списка, "
+        "а не один фиксированный счёт",
+        len(живые_об) >= 3 and len(живые_бб) >= 3,
+        (len(живые_об), len(живые_бб)))
+    if кр:
+        о = кр[0]
+        ст = storona(о["tx"], programma=PROG_KRIVAYA, hranilishche=о["vault"],
+                     mint_kotirovki=о["quote"])
+        сч = ст["tpl"]["accounts"]
+        # НАША СБОРКА -- НАШИ ПОЛУЧАТЕЛИ; ПЕРЕСБОРКА ИСТОЧНИКА -- ЕГО.
+        наш_ix = instrukciya_nogi(ст, user=KOSHELEK_PROVERKI, amount_in=1000,
+                                  min_out=1, tx_istochnika=о["tx"])
+        наши_сч = [str(м.pubkey) for м in наш_ix.accounts]
+        P = KRIVAYA_V2_MESTA_POLUCHATELEJ
+        chk("в НАШЕЙ покупке кривой стоят НАШИ получатели и их ATA",
+            наши_сч[P["poluchatel"]] == POLUCHATEL_NASH
+            and наши_сч[P["buyback"]] == BUYBACK_NASH
+            and наши_сч[P["ata_poluchatelya"]]
+            == B.ata(POLUCHATEL_NASH, сч[2], сч[4])
+            and наши_сч[P["ata_buyback"]] == B.ata(BUYBACK_NASH, сч[2], сч[4]),
+            [наши_сч[P[к]] for к in ("poluchatel", "ata_poluchatelya",
+                                     "buyback", "ata_buyback")])
+        u_ист = polzovatel_istochnika(ст, о["tx"])
+        его_ix = instrukciya_nogi(ст, user=u_ист, amount_in=1000, min_out=1,
+                                  tx_istochnika=о["tx"], kak_u_istochnika=True)
+        его_сч = [str(м.pubkey) for м in его_ix.accounts]
+        chk("а в ПЕРЕСБОРКЕ сделки источника -- его получатели (байт в байт цел)",
+            его_сч == list(сч), [и for и, (x, y) in enumerate(zip(сч, его_сч))
+                                 if x != y])
+        # ПРОДАЖА: НАШИ МЕСТА И НАШИ ПОЛУЧАТЕЛИ
+        import c3_prodavec_sborka as S_  # noqa: PLC0415
+        ш_пр = S_.шаблон_продажи(о["tx"], программа=PROG_KRIVAYA,
+                                 минт_базы=о["mint"],
+                                 минт_котировки=о["quote"],
+                                 хранилище=о["vault"])
+        нм = nashi_mesta_prodazhi_v2(ш_пр, nash_koshelek=KOSHELEK_PROVERKI)
+        chk("в продаже кривой подставлены ВСЕ девять наших мест",
+            нм["ok"] and len(нм["podstavleno"]) == 9, нм.get("why_not"))
+        if нм["ok"]:
+            М = KRIVAYA_V2_MESTA_PRODAZHI
+            нсч = нм["shablon"]["accounts"]
+            chk("и это наш кошелёк, наши ATA, наш накопитель и наши получатели",
+                нсч[М["user"]] == KOSHELEK_PROVERKI
+                and нсч[М["poluchatel"]] == POLUCHATEL_NASH
+                and нсч[М["buyback"]] == BUYBACK_NASH
+                and нсч[М["uva"]] == B.pda([SEMYA_UVA, "USER"],
+                                           KOSHELEK_PROVERKI, PROG_KRIVAYA),
+                [нсч[М[к]] for к in ("user", "poluchatel", "buyback", "uva")])
+            chk("у всех подставленных мест признак записи ВЫСТАВЛЕН (по IDL)",
+                all(нм["shablon"]["writable"].get(а) for а
+                    in нм["podstavleno"].values()),
+                [а for а in нм["podstavleno"].values()
+                 if not нм["shablon"]["writable"].get(а)])
+            chk("места продажи сошлись с выводом по семенам IDL (чужой проверкой)",
+                (S_.места_кривая_v2(нсч, минт_базы=о["mint"],
+                                    наш_кошелёк=KOSHELEK_PROVERKI)
+                 or {}).get("ok"),
+                S_.места_кривая_v2(нсч, минт_базы=о["mint"],
+                                   наш_кошелёк=KOSHELEK_PROVERKI).get("why_not"))
+        # ПОЛУЧАТЕЛЬ ВНЕ СПИСКА -- ОТКАЗ ПО ИМЕНИ. Свой выбор подменяется на
+        # время через модуль (не через global: объявление global после чтения
+        # имени -- синтаксическая ошибка, и это ловится ещё при импорте).
+        мод = sys.modules[__name__]
+        сохр_пол = мод.POLUCHATEL_NASH
+        try:
+            мод.POLUCHATEL_NASH = DRUGOJ_KOSHELEK
+            пл = mesta_krivoj_v2(сч, nash_koshelek=KOSHELEK_PROVERKI,
+                                 nashi_poluchateli=True)
+            chk("получатель вне списка программы -- отказ по имени, а не сборка",
+                not пл["ok"]
+                and WHY_POLUCHATEL_NE_V_SPISKE in (пл["why_not"] or ""),
+                пл.get("why_not"))
+        finally:
+            мод.POLUCHATEL_NASH = сохр_пол
+
+    # ------------------- 8а. СВЕРКА ПОРЯДКА РЕЗЕРВОВ ПО ВСЕМ КОТИРОВЩИКАМ
+    # ЗАЧЕМ ЗАМЕР, А НЕ ЧТЕНИЕ КОДА. Все читатели резервов -- правило тонкого
+    # пула (bloom_lane_two_step: thin pool и pool_reserve_quote_raw), наценка и
+    # нижний предел резерва одношагового пути (bloom_own_send: pool_reserve_sol,
+    # min_pool_sol_reserve) и мой c3_bilet_ot_rezerva -- берут ЭЛЕМЕНТ [0] КАК
+    # КОТИРОВКУ. Значит порядок у каждого котировщика -- это денежное условие, и
+    # он проверяется ЧИСЛАМИ на живых сделках: сравнением с остатками хранилищ
+    # (какое из них котировочное, говорит mints_and_vaults).
+    порядки = {}
+    for p_, обр_ in образцы_по_типам.items():
+        if not обр_:
+            continue
+        о_ = обр_[0]
+        мо_ = B.min_out_from_reserves(о_["tpl"], о_["tx"], 1_000_000, 0.35)
+        мо_ = мо_ if isinstance(мо_, dict) else {}
+        пара = мо_.get("reserves_after") or мо_.get("virtual_reserves_after")
+        мв_ = B.mints_and_vaults(о_["tpl"], о_["tx"]) or {}
+        стр_ = {x["account"]: x for x in C.token_rows(о_["tx"]).values()}
+        кот_ = стр_.get(мв_.get("quote_vault"), {}).get("post")
+        баз_ = стр_.get(мв_.get("base_vault"), {}).get("post")
+        порядки[p_] = {"пара": пара, "кот": кот_, "база": баз_,
+                       "ключ": ("reserves_after" if мо_.get("reserves_after")
+                                else "virtual_reserves_after"
+                                if мо_.get("virtual_reserves_after") else None)}
+    chk("CPMM и Pump AMM: reserves_after -- [КОТИРОВКА, база], как и ждут читатели",
+        all(порядки[p_]["пара"] and порядки[p_]["пара"][0] == порядки[p_]["кот"]
+            and порядки[p_]["пара"][1] == порядки[p_]["база"]
+            for p_ in (PROG_CPMM, PROG_PUMP_AMM) if p_ in порядки),
+        {TIPY[p_]["label"]: порядки[p_] for p_ in (PROG_CPMM, PROG_PUMP_AMM)
+         if p_ in порядки})
+    # LAUNCHLAB -- БЫЛ ЕДИНСТВЕННЫМ ОБРАТНЫМ (диф №5), И ДИФ ВЗЯТ 03.10.
+    # Теперь проверка стоит НА ПРАВИЛЬНОМ порядке: разойдётся снова -- скажет.
+    ев_лл = B.launchlab_event((образцы_по_типам.get(PROG_LAUNCHLAB) or [{}])[0]
+                              .get("tx") or {}) or {}
+    база_лл = int(ев_лл.get("virtual_base", 0)) - int(ев_лл.get("real_base_after", 0))
+    кот_лл = int(ев_лл.get("virtual_quote", 0)) + int(ев_лл.get("real_quote_after", 0))
+    chk("LaunchLab после дифа №5: virtual_reserves_after -- [КОТИРОВКА, база], "
+        "как у двух соседей",
+        (порядки.get(PROG_LAUNCHLAB, {}).get("пара") or [None, None])
+        == [кот_лл, база_лл],
+        порядки.get(PROG_LAUNCHLAB, {}).get("пара"))
+    chk("и правило тонкого пула видит теперь КОТИРОВКУ: 4.18 SOL-экв. при "
+        "пороге 30 -- пул тонкий, наценка срабатывает (было 5 527 021 и не "
+        "срабатывала НИКОГДА)",
+        база_лл > кот_лл * 1000
+        and (порядки.get(PROG_LAUNCHLAB, {}).get("пара") or [None])[0] == кот_лл,
+        (база_лл, кот_лл, порядки.get(PROG_LAUNCHLAB, {}).get("пара")))
+    # КРИВАЯ -- [КОТИРОВКА (SOL), база]. Берётся сделка с НАТИВНОЙ котировкой:
+    # у токеновой котировки чужой котировщик отказывает вовсе (обязательная часть
+    # события пуста по SOL -- см. диф в разделе 10), и порядок там не проверить.
+    пара_кр = None
+    for r_ in B.load_samples(PROG_KRIVAYA):
+        t_ = B.extract_template(r_["tx"], PROG_KRIVAYA, r_.get("pool_vault"))
+        if not t_.get("ok"):
+            continue
+        м_ = B.min_out_from_reserves(t_, r_["tx"], 1_000_000, 0.35)
+        if not isinstance(м_, dict) or not м_.get("ok"):
+            continue
+        ев_ = B.pump_trade_event(r_["tx"], r_.get("mint")) or {}
+        пара_кр = (м_.get("virtual_reserves_after"),
+                   [int(ев_.get("virtual_sol_reserves", -1)),
+                    int(ев_.get("virtual_token_reserves", -1))])
+        break
+    chk("кривая pump.fun: virtual_reserves_after -- [КОТИРОВКА (SOL), база]",
+        пара_кр and list(пара_кр[0] or []) == пара_кр[1], пара_кр)
+    # ТИПЫ, КОТОРЫЕ РЕЗЕРВОВ НЕ ОТДАЮТ ВОВСЕ -- тоже замер, а не чтение: читатели
+    # уходят в названную ветку «резерв неизвестен -- наценка обычная».
+    B.загрузить_ставки_clmm()
+    B.загрузить_ступени_dlmm()
+    без_резервов = {}
+    for p_, метка_ in ((PROG_CLMM_, "Raydium CLMM"), (PROG_DLMM_, "Meteora DLMM"),
+                       (PROG_DAMM2_, "Meteora DAMM v2"), (PROG_DBC_, "Meteora DBC")):
+        for r_ in B.load_samples(p_):
+            t_ = B.extract_template(r_["tx"], p_, r_.get("pool_vault"))
+            if not t_.get("ok"):
+                continue
+            м_ = B.min_out_from_reserves(t_, r_["tx"], 1_000_000, 0.35)
+            if not isinstance(м_, dict) or not м_.get("ok"):
+                continue
+            без_резервов[метка_] = sorted(k for k in м_ if "reserves" in k)
+            break
+    chk("CLMM, DLMM, DAMM v2 и DBC резервов не отдают ВОВСЕ -- читатель уходит "
+        "в ветку «резерв неизвестен»",
+        len(без_резервов) == 4 and all(not v for v in без_резервов.values()),
+        без_резервов)
+
+    # ------------------------------------------------- 8б. тень
+    # ТЕНЬ -- ЭТО ЧИСЛА БЕЗ ТРАНЗАКЦИИ, и вид ответа у неё обязан совпадать с
+    # c2_usdc_noga.ten: врезка в полосу одна на две таблицы типов, и поля
+    # журнала решений она берёт по именам.
+    ключи_un = set(UN.ten(tx_istochnika={}, istochnik="", mint="", lamporty=1,
+                          kesh_nog=None))
+    os.environ[UN.FLAG] = UN.MODE_SHADOW
+    os.environ.pop(UN.FLAG_GROUPS, None)
+    тени = {}
+    for p, обр in образцы_по_типам.items():
+        if not обр:
+            continue
+        о = обр[0]
+        кэш = SB.LegCache({}, None)
+        кэш.entries[о["quote"]] = зап
+        ист = о["source"] or (sorted(C.signers(о["tx"]))[0]
+                              if C.signers(о["tx"]) else None)
+        тени[p] = ten(tx_istochnika=о["tx"], istochnik=ист, mint=о["mint"],
+                      lamporty=10_000_000, kesh_nog=кэш, proskalzyvanie=0.35,
+                      mint_kotirovki=о["quote"])
+    chk("тень даёт числа по всем четырём типам",
+        len(тени) == 4 and all(т["ok"] and т["min_out"] > 0
+                               for т in тени.values()),
+        {TIPY[p]["label"]: (т["ok"], т.get("why_not")) for p, т in тени.items()})
+    chk("и говорит, КАКОЙ котировщик дал число",
+        {т["min_out_from"] for т in тени.values()}
+        == {SPOSOB_REZERVY, SPOSOB_LAUNCHLAB, SPOSOB_KRIVAYA_V2},
+        {TIPY[p]["label"]: т["min_out_from"] for p, т in тени.items()})
+    chk("в тени нет ни транзакции, ни чтений сети",
+        all("tx_base64" not in т and т["chtenij"] == 0 for т in тени.values()),
+        None)
+    нет_полей = sorted(ключи_un - set(next(iter(тени.values()))))
+    chk("поля тени покрывают все поля c2_usdc_noga.ten -- врезка одна на две таблицы",
+        not нет_полей, нет_полей)
+    os.environ[UN.FLAG] = UN.MODE_OFF
+    try:
+        т_выкл = ten(tx_istochnika={}, istochnik="x", mint="y", lamporty=1,
+                     kesh_nog=None)
+        chk("флаг выключен -- тень тоже молчит и называет причину",
+            not т_выкл["ok"] and т_выкл["why_not"] == UN.WHY_OFF,
+            т_выкл.get("why_not"))
+    finally:
+        for k, v in сохр.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
     # ------------------------------------------------- 9. режимы
     os.environ[UN.FLAG] = UN.MODE_OFF
@@ -2133,7 +2787,8 @@ def main() -> int:
             "байт_в_байт_всего": ZHDEM_BAJT_VSEGO,
             "продажа_токен_USDC_SOL": {
                 TIPY[p_]["label"]: ZHDEM_PRODAZHI[p_] for p_ in TIPY},
-            "продажа_кривой_выбор": ZHDEM_PRODAZHA_KRIVOJ,
+            "кривая_лестница_добавок": ZHDEM_KRIVAYA_LESTNICA,
+            "кривая_набор_для_таблицы": ZHDEM_NABORA,
             "продажа_ноги_2": {
                 "как": "зеркало нашей покупки первой ноги без мест 19 и 20",
                 "счетов": 23,
@@ -2141,7 +2796,7 @@ def main() -> int:
                 "запрошено_у_Code2": "6+ живых продаж Pump AMM с 23 счетами"},
             "таблица_адресов": {"ключ": TABLICA_ADRESOV, "адресов": ADRESOV_V_TABLICE,
                                 "кривой_не_хватает": "1249 байт при пределе 1232",
-                                "лекарство": ZHDEM_KRIVAYA_S_DOBAVKOJ},
+                                "лекарство": ZHDEM_KRIVAYA_LESTNICA},
             "образец_кривой": OBRAZEC_KRIVOJ,
             "двухшаговым_путём_сейчас": {TIPY[p_]["label"]: ZHDEM_DVUHSHAGOVYJ[p_]
                                          for p_ in TIPY},
