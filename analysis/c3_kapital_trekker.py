@@ -98,6 +98,13 @@ WSOL = "So11111111111111111111111111111111111111112"
 # чем раз в СЧЕТА_НЕ_СТАРШЕ_СЕК -- последнее на случай, если подписи мы
 # пропустили (узел молчал, окно подписей упёрлось в предел).
 СЧЕТА_НЕ_СТАРШЕ_СЕК = int(os.environ.get("BLOOM_TREKKER_SCHETA_SEK", "300") or 300)
+# ЗАПАС ПЕРЕД ОБРЕЗКОЙ -- ЧТОБЫ НЕ ПЕРЕПИСЫВАТЬ ФАЙЛ КАЖДЫЙ ТИК. Без запаса,
+# как только ряд дорастёт до ДЕРЖИМ_СУТОК, каждая новая строка делала бы
+# старейшую просроченной, и файл переписывался бы ЦЕЛИКОМ раз в 20 секунд:
+# на трёх сутках ряда это десятки гигабайт записи в сутки, а диск на
+# lab-miami уже кончался однажды. С запасом в час переписывание идёт
+# примерно раз в час, а файл держит ДЕРЖИМ_СУТОК плюс этот запас.
+ЗАПАС_ОБРЕЗКИ_СЕК = 3600
 ФАЙЛ_РЯДОВ = "rjady.jsonl"
 ФАЙЛ_СОСТОЯНИЯ = "sostojanie.json"
 ФАЙЛ_ВЫГРУЗКИ = "kapital.json"
@@ -118,7 +125,34 @@ WSOL = "So11111111111111111111111111111111111111112"
 ВИД_СВОП = "своп"
 ВИД_ПЕРЕВОД = "перевод"
 ВИД_ЗАКРЫТИЕ = "закрытие счёта"
+ВИД_РАСХОД = "расход"
 ВИД_ИНОЕ = "иное"
+
+# МЕЛКИЙ УХОД SOL СИСТЕМНОЙ ПРОГРАММОЙ -- ЭТО РАСХОД ТОРГОВЛИ, А НЕ ВЫВОД
+# КАПИТАЛА, И ПОРОГ ВЗЯТ ИЗ ЧИСЕЛ ПОЛОСЫ, А НЕ ИЗ ВКУСА. Отдельная транзакция
+# «системный перевод на чужой адрес» -- это чаевые (bloom_own_send.py:1255
+# чаевые_лампорты = 1_000_000, то есть 0.001 SOL; слово владельца 25.09:
+# «суммарные чаевые <= 0.005 SOL») или рента чужого счёта (03.10 Code-1 платил
+# 0.0008178 SOL за расширение таблицы адресов). Если такую убыль считать
+# ВЫВОДОМ, она выйдет из изменения за период, и график покажет заработок там,
+# где деньги просто ушли. Порог 0.01 SOL -- вдвое выше собственного предела
+# чаевых владельца и в двенадцать раз выше той ренты; всё, что НИЖЕ, честно
+# уменьшает капитал, всё, что ВЫШЕ, считается выводом и отметкой.
+ПОРОГ_ВЫВОДА_ЛАМПОРТОВ = 10_000_000
+# ПОДПИСИ, КОТОРЫЕ УЖЕ РАЗОБРАНЫ, ПОМНЯТСЯ: узел при протухшей
+# `poslednjaja_sig` отдаёт то же окно второй раз, и без этой памяти одна
+# покупка легла бы в позицию ДВАЖДЫ (вход вдвое, капитал врёт вверх). 600
+# подписей -- это около двух суток полосы (171 сделка в сутки 02.10).
+ПОМНИМ_ПОДПИСЕЙ = 600
+# СТРАНИЦ ПОДПИСЕЙ ЗА ОБЫЧНЫЙ ТИК. 2 страницы -- 2000 подписей; при опросе раз
+# в 20 с этого хватает с огромным запасом, но предел ОБЪЯВЛЕН и его достижение
+# видно полем `upjorlis_v_predel`, а не молчанием.
+СТРАНИЦ_НА_ТИК = 2
+# СКОЛЬКО ТИКОВ ЖДЁМ ТРАНЗАКЦИЮ, КОТОРУЮ УЗЕЛ НЕ ОТДАЁТ. Пока ждём -- ряд не
+# едет дальше этой подписи (иначе она потерялась бы молча). После предела
+# подпись НАЗЫВАЕТСЯ пропущенной навсегда и ряд едет: одна недоступная
+# транзакция не имеет права остановить трекер насовсем.
+ПРЕДЕЛ_ЗАСТРЕВАНИЯ = 5
 
 WHY_NET_UZLA = "узел не задан -- читать нечем"
 WHY_UZEL_MOLCHIT = "узел не ответил"
@@ -259,7 +293,8 @@ def razbor_tranzakcii(tx: dict, koshelek: str = КОШЕЛЕК) -> dict:  # noqa
     из_ = {"ok": False, "why_not": None, "sig": None, "slot": None,
             "utc": None, "oshibka_cepi": None, "sol_delta": 0,
             "renta_delta": 0, "potracheno": 0, "polucheno": 0,
-            "tokeny": {}, "vid": ВИД_ИНОЕ, "pochemu": None, "fee": 0}
+            "tokeny": {}, "vid": ВИД_ИНОЕ, "pochemu": None, "fee": 0,
+            "zakryto_schetov": 0}
     if not isinstance(tx, dict) or not tx:
         из_["why_not"] = "транзакции нет"
         return из_
@@ -280,8 +315,15 @@ def razbor_tranzakcii(tx: dict, koshelek: str = КОШЕЛЕК) -> dict:  # noqa
     из_["sol_delta"] = delta_lamportov(tx, и_к)
     наши = nashi_scheta_tranzakcii(tx, koshelek)
     рента_дельта = 0
+    до_л = (мета.get("preBalances") or [])
+    после_л = (мета.get("postBalances") or [])
     for и in наши["indeksy"]:
         рента_дельта += delta_lamportov(tx, и)
+        # ЗАКРЫТЫЕ СЧЕТА СЧИТАЮТСЯ СЧЕТАМИ, А НЕ ТРАНЗАКЦИЯМИ: в одной
+        # транзакции уборки их бывает десяток, и «закрыто 1» было бы ложью.
+        if (и < len(до_л) and и < len(после_л)
+                and int(до_л[и]) > 0 and int(после_л[и]) == 0):
+            из_["zakryto_schetov"] += 1
     из_["renta_delta"] = рента_дельта
     # ИЗМЕНЕНИЕ ТОКЕНОВЫХ ОСТАТКОВ -- ПО МИНТАМ, а не по счетам: счёт мог быть
     # создан и закрыт в одной транзакции.
@@ -316,10 +358,23 @@ def razbor_tranzakcii(tx: dict, koshelek: str = КОШЕЛЕК) -> dict:  # noqa
                           f"а у кошелька прибыли на {из_['sol_delta']}")
     elif рента_дельта == 0 and программы and all(
             п in ПРОГРАММЫ_ПЕРЕВОДА for п in программы):
-        из_["vid"] = ВИД_ПЕРЕВОД
-        из_["pochemu"] = ("токеновых изменений нет, лампорты наших счетов не "
-                          "двигались, и программы только системные -- это ввод "
-                          "или вывод SOL")
+        мелкая_убыль = (из_["sol_delta"] < 0
+                        and -из_["sol_delta"] < ПОРОГ_ВЫВОДА_ЛАМПОРТОВ)
+        if мелкая_убыль:
+            # РАСХОД, А НЕ ВЫВОД (см. ПОРОГ_ВЫВОДА_ЛАМПОРТОВ). Чаевые и рента
+            # чужого счёта уходят системной программой и выглядят как вывод;
+            # если их вычесть из изменения за период, убыток превратится в
+            # ноль. Поэтому они остаются в изменении и названы расходом.
+            из_["vid"] = ВИД_РАСХОД
+            из_["pochemu"] = (f"системный уход {-из_['sol_delta']} лампортов "
+                              f"ниже порога вывода {ПОРОГ_ВЫВОДА_ЛАМПОРТОВ} -- "
+                              f"это расход торговли (чаевые, рента чужого "
+                              f"счёта), и он ЧЕСТНО уменьшает капитал")
+        else:
+            из_["vid"] = ВИД_ПЕРЕВОД
+            из_["pochemu"] = ("токеновых изменений нет, лампорты наших счетов "
+                              "не двигались, и программы только системные -- "
+                              "это ввод или вывод SOL")
     else:
         из_["vid"] = ВИД_ИНОЕ
         из_["pochemu"] = (f"ни своп, ни перевод: токеновых изменений нет, "
@@ -356,16 +411,31 @@ def uzel_iz_okruzheniya() -> str:
 
 
 def zateret(строка) -> str:
-    """Спрятать секрет в строке: из URL остаётся только хост.
+    """Спрятать секрет в строке: остаётся СХЕМА и ХОСТ, дальше «/…».
 
     Любая строка, которая уйдёт в вывод, файл или журнал, проходит через это.
+
+    ТРИ УТЕЧКИ, ЗАКРЫТЫЕ ЗДЕСЬ ПОИМЁННО (нашёл встречный разбор):
+      * ключ после «?» БЕЗ «/»: у `https://uzel?api-key=СЕКРЕТ` хвост резался
+        только по «/», и ключ уходил в вывод ЦЕЛИКОМ;
+      * то же с «#»;
+      * `логин:пароль@хост` -- пароль уходил ВСЕГДА, при любом виде ссылки.
+    Поэтому хвост режется по ПЕРВОМУ из «/», «?», «#», а всё до «@»
+    выбрасывается. Проверено четырьмя случаями в самопроверке.
     """
     т = str(строка or "")
     if "://" not in т:
         return т
     голова, хвост = т.split("://", 1)
-    хост = хвост.split("/", 1)[0]
-    путь = ("/…" if "/" in хвост and хвост.split("/", 1)[1] else "")
+    граница = len(хвост)
+    for знак in ("/", "?", "#"):
+        и = хвост.find(знак)
+        if и >= 0:
+            граница = min(граница, и)
+    хост = хвост[:граница]
+    if "@" in хост:
+        хост = хост.split("@", 1)[1]
+    путь = ("/…" if граница < len(хвост) else "")
     return f"{голова}://{хост}{путь}"
 
 
@@ -554,7 +624,17 @@ def pustoe_sostojanie(koshelek: str = КОШЕЛЕК) -> dict:
     return {"koshelek": koshelek, "obnovleno_utc": None, "poslednjaja_sig": None,
             "pervaja_sig_istorii": None, "pozicii": {}, "sdelki": [],
             "metki": [], "vvod_vyvod_lamports": 0, "zakryto_schetov": 0,
-            "neopoznannyh": 0, "kredity": {}, "podpisej_razobrano": 0}
+            "neopoznannyh": 0, "kredity": {}, "podpisej_razobrano": 0,
+            # Память разобранных подписей -- против двойного счёта (см.
+            # ПОМНИМ_ПОДПИСЕЙ), выручка продаж без известного входа -- вне
+            # итога за период, расходы -- числом, застревание -- поимённо.
+            "razobrannye_sig": [], "vyruchka_bez_vhoda_lamports": 0,
+            "rashodov": 0, "rashodov_lamports": 0, "povtorov_podpisi": 0,
+            "zastrjali": None, "propushcheno_navsegda": [],
+            "upjorlis_v_predel": False, "sbros_sostojanija_utc": None,
+            # СДВИГИ НАКОПИТЕЛЬНЫХ СЧЁТЧИКОВ -- против призрачного скачка при
+            # потере состояния (см. progon): ряд живёт дольше состояния.
+            "sdvigi": {}}
 
 
 def prinjat_tranzakciju(sostojanie: dict, tx: dict,
@@ -571,9 +651,24 @@ def prinjat_tranzakciju(sostojanie: dict, tx: dict,
     р = razbor_tranzakcii(tx, кош)
     из_ = {"vid": р.get("vid"), "pochemu": р.get("pochemu"),
             "sig": р.get("sig"), "ok": bool(р.get("ok")),
-            "otkryto": [], "zakryto": [], "metka": None}
+            "otkryto": [], "zakryto": [], "metka": None, "povtor": False}
     if not р["ok"]:
         return из_
+    # --- ОДНА ПОДПИСЬ -- ОДИН РАЗ. Узел при протухшей `poslednjaja_sig`
+    # отдаёт то же окно снова, и без этой памяти покупка легла бы в позицию
+    # дважды: вход вдвое, капитал врёт ВВЕРХ на целый билет.
+    сиг = р.get("sig")
+    виденные = sostojanie.setdefault("razobrannye_sig", [])
+    if сиг and сиг in виденные:
+        sostojanie["povtorov_podpisi"] = int(
+            sostojanie.get("povtorov_podpisi") or 0) + 1
+        из_["povtor"] = True
+        из_["pochemu"] = "эта подпись уже разобрана -- второй раз не считается"
+        return из_
+    if сиг:
+        виденные.append(сиг)
+        if len(виденные) > ПОМНИМ_ПОДПИСЕЙ:
+            del виденные[:len(виденные) - ПОМНИМ_ПОДПИСЕЙ]
     sostojanie["podpisej_razobrano"] = int(
         sostojanie.get("podpisej_razobrano") or 0) + 1
     if р["vid"] == ВИД_ПЕРЕВОД:
@@ -587,26 +682,68 @@ def prinjat_tranzakciju(sostojanie: dict, tx: dict,
                 sostojanie.get("vvod_vyvod_lamports") or 0) + дельта
             из_["metka"] = метка
         return из_
+    if р["vid"] == ВИД_РАСХОД:
+        # РАСХОД НИЧЕГО НЕ ИСКЛЮЧАЕТ ИЗ ИЗМЕНЕНИЯ, его дело -- быть названным
+        # числом: «за период ушло столько-то на чаевые и ренту чужих счетов».
+        sostojanie["rashodov"] = int(sostojanie.get("rashodov") or 0) + 1
+        sostojanie["rashodov_lamports"] = int(
+            sostojanie.get("rashodov_lamports") or 0) - int(р.get("sol_delta") or 0)
+        return из_
     if р["vid"] == ВИД_ЗАКРЫТИЕ:
         sostojanie["zakryto_schetov"] = int(
-            sostojanie.get("zakryto_schetov") or 0) + 1
+            sostojanie.get("zakryto_schetov") or 0) + int(
+                р.get("zakryto_schetov") or 1)
         return из_
     if р["vid"] != ВИД_СВОП:
         sostojanie["neopoznannyh"] = int(
             sostojanie.get("neopoznannyh") or 0) + 1
         return из_
+    # СВОП ПРИ УБОРКЕ ТОЖЕ ЗАКРЫВАЕТ СЧЕТА -- и они считаются счетами.
+    if int(р.get("zakryto_schetov") or 0):
+        sostojanie["zakryto_schetov"] = int(
+            sostojanie.get("zakryto_schetov") or 0) + int(р["zakryto_schetov"])
     куплено = [(м, д) for м, д in (р["tokeny"] or {}).items()
                if д > 0 and м != WSOL]
     продано = [(м, д) for м, д in (р["tokeny"] or {}).items()
                if д < 0 and м != WSOL]
+    # --- ТОКЕН В ТОКЕН ОДНОЙ ТРАНЗАКЦИЕЙ НЕ РАСКЛАДЫВАЕТСЯ, И ДЕЛИТЬ НАУГАД
+    # НА ДЕНЬГАХ НЕЛЬЗЯ. У транзакции ОДНО число `polucheno` (чистый поток
+    # SOL), а здесь две стороны сразу: продажа A и покупка B. Посчитать итог
+    # продажи как `polucheno - вход_A` -- значит записать выдуманный убыток на
+    # всю цену входа A (SOL с кошелька не уходил: он ушёл в покупку B).
+    # Поэтому такая транзакция называется непонятной и позиций НЕ ТРОГАЕТ --
+    # ровно как уже сделано для двух РОСТОВ сразу. На живых данных этого
+    # кошелька случай не встречался ни раз (полоса покупает и продаёт разными
+    # транзакциями), но «не встречалось» -- не защита.
+    if куплено and продано:
+        sostojanie["neopoznannyh"] = int(
+            sostojanie.get("neopoznannyh") or 0) + 1
+        из_["pochemu"] = (f"в одной транзакции продано {len(продано)} и куплено "
+                          f"{len(куплено)} минтов -- одно `polucheno` на две "
+                          f"стороны делить нечем, позиции не тронуты")
+        return из_
     позиции = sostojanie.setdefault("pozicii", {})
     # --- ПРОДАЖА ПЕРВОЙ: в одной транзакции может быть и то и другое.
     for минт, дельта in продано:
         п = позиции.get(минт)
         ушло = -дельта
         if not п:
+            # ПРОДАЖА БЕЗ ИЗВЕСТНОГО ВХОДА -- ЭТО НЕ ЗАРАБОТОК. Вход был до
+            # начала ряда, в капитале он не стоял (позиция шла нулём, см.
+            # `bez_vhoda`), поэтому выручка -- деньги, ПРИШЕДШИЕ в измеряемую
+            # систему извне. Если её не исключить, изменение за период
+            # покажет прибыль на всю выручку, которой не было.
             sostojanie["neopoznannyh"] = int(
                 sostojanie.get("neopoznannyh") or 0) + 1
+            sostojanie["vyruchka_bez_vhoda_lamports"] = int(
+                sostojanie.get("vyruchka_bez_vhoda_lamports") or 0) + int(
+                    р.get("polucheno") or 0)
+            if int(р.get("polucheno") or 0):
+                метка = {"utc": р.get("utc"), "sig": р.get("sig"),
+                          "vid": "продажа без входа", "mint": минт,
+                          "lamports": int(р.get("polucheno") or 0)}
+                sostojanie["metki"] = (sostojanie.get("metki") or []) + [метка]
+                из_["metka"] = метка
             continue
         было = int(п.get("ostatok") or 0)
         доля = (min(1.0, ушло / было) if было > 0 else 1.0)
@@ -685,6 +822,9 @@ def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = 
             # капитал, значит капитал ЗАНИЖЕН на его вход, и прятать это нельзя.
             без_входа.append(минт)
     к = kapital(б["lamports"], счета, позиции_вход)
+    # НАКОПИТЕЛЬНЫЕ ЧИСЛА ИДУТ СО СДВИГОМ: ряд живёт дольше состояния, и после
+    # потери состояния счётчик обязан продолжить ряд, а не начаться с нуля.
+    сдв = сост.get("sdvigi") or {}
     из_ = {"utc": int(sejchas if sejchas else time.time()),
             "slot": б.get("slot"),
             "sol": к["sol"], "wsol": к["wsol"], "renta": к["renta"],
@@ -692,7 +832,15 @@ def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = 
             "pozicij": к["pozicij"], "schetov": к["schetov"],
             "schetov_pustyh": к["schetov_pustyh"],
             "bez_vhoda": len(без_входа),
-            "vvod_vyvod": int(сост.get("vvod_vyvod_lamports") or 0),
+            "vvod_vyvod": (int(сост.get("vvod_vyvod_lamports") or 0)
+                           + int(сдв.get("vvod_vyvod") or 0)),
+            "vyruchka_bez_vhoda": (
+                int(сост.get("vyruchka_bez_vhoda_lamports") or 0)
+                + int(сдв.get("vyruchka_bez_vhoda") or 0)),
+            "rashodov_lamports": (int(сост.get("rashodov_lamports") or 0)
+                                  + int(сдв.get("rashodov_lamports") or 0)),
+            "rashodov": int(сост.get("rashodov") or 0),
+            "upjorlis": bool(сост.get("upjorlis_v_predel")),
             "sdelok": len(сост.get("sdelki") or []),
             "zakrytyj_itog": sum(int(с.get("itog") or 0)
                                  for с in (сост.get("sdelki") or [])),
@@ -716,16 +864,24 @@ def dognat_cep(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict,
     """
     из_ = {"ok": False, "why_not": None, "podpisej": 0, "razobrano": 0,
             "propushcheno_staryh": 0, "upjorlis_v_predel": False,
+            "net_tranzakcii": 0, "povtorov": 0, "stranic": 0,
             "pervyj_progon": not bool(sostojanie.get("poslednjaja_sig"))}
     сейчас = float(sejchas if sejchas else time.time())
     порог = сейчас - float(sutok) * 86400.0
+    # ПРЕДЕЛ СЧИТАЕТСЯ ПО ТОМУ, СКОЛЬКО СТРАНИЦ ВЗЯЛИ, А НЕ ПО ЧУЖОМУ ЧИСЛУ.
+    # Раньше сравнение шло с predel_podpisej (3000), а обычный тик брал 2
+    # страницы, то есть максимум 2000 подписей: признак не поднимался НИКОГДА,
+    # и всё, что сверх 2000, терялось МОЛЧА. Теперь предел -- стр * 1000.
+    стр = (max(1, int(predel_podpisej // 1000)) if из_["pervyj_progon"]
+           else СТРАНИЦ_НА_ТИК)
+    из_["stranic"] = стр
     подписи = podpisi_koshelka(
         rpc_call, koshelek, do_sig=sostojanie.get("poslednjaja_sig"),
-        schjotchik=schjotchik,
-        stranic=(max(1, int(predel_podpisej // 1000)) if из_["pervyj_progon"] else 2))
+        schjotchik=schjotchik, stranic=стр)
     из_["podpisej"] = len(подписи)
-    if len(подписи) >= predel_podpisej:
+    if len(подписи) >= стр * 1000:
         из_["upjorlis_v_predel"] = True
+    sostojanie["upjorlis_v_predel"] = bool(из_["upjorlis_v_predel"])
     # Новые идут первыми -- переворачиваем и отбрасываем то, что старше окна.
     годные = []
     for з in reversed(подписи):
@@ -737,9 +893,37 @@ def dognat_cep(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict,
     for з in годные:
         tx = tranzakciya(rpc_call, з["signature"], schjotchik=schjotchik)
         if not tx:
-            continue
-        prinjat_tranzakciju(sostojanie, tx, koshelek)
+            # УЗЕЛ НЕ ОТДАЛ ТРАНЗАКЦИЮ -- И РЯД НЕ ЕДЕТ ДАЛЬШЕ ЭТОЙ ПОДПИСИ.
+            # Раньше здесь стоял `continue`, а `poslednjaja_sig` шла вперёд на
+            # следующей удачной: подпись терялась НАВСЕГДА и молча -- а это
+            # могла быть покупка, то есть позиция без цены входа и капитал,
+            # занижённый на целый билет.
+            из_["net_tranzakcii"] += 1
+            з_было = sostojanie.get("zastrjali") or {}
+            застряли = ({"sig": з["signature"],
+                          "tikov": int(з_было.get("tikov") or 0) + 1}
+                        if з_было.get("sig") == з["signature"]
+                        else {"sig": з["signature"], "tikov": 1})
+            sostojanie["zastrjali"] = застряли
+            if застряли["tikov"] >= ПРЕДЕЛ_ЗАСТРЕВАНИЯ:
+                # После предела подпись НАЗЫВАЕТСЯ пропущенной навсегда (и
+                # лежит в состоянии списком), а ряд едет: одна недоступная
+                # транзакция не имеет права остановить трекер насовсем.
+                sostojanie["propushcheno_navsegda"] = (
+                    (sostojanie.get("propushcheno_navsegda") or [])
+                    + [з["signature"]])[-50:]
+                sostojanie["poslednjaja_sig"] = з["signature"]
+                sostojanie["zastrjali"] = None
+                continue
+            из_["why_not"] = (f"узел не отдал транзакцию {з['signature'][:12]}… "
+                              f"(тик {застряли['tikov']} из "
+                              f"{ПРЕДЕЛ_ЗАСТРЕВАНИЯ}) -- ряд не двинут дальше "
+                              f"неё, следующий тик спросит снова")
+            break
+        п = prinjat_tranzakciju(sostojanie, tx, koshelek)
+        из_["povtorov"] += bool(п.get("povtor"))
         из_["razobrano"] += 1
+        sostojanie["zastrjali"] = None
         sostojanie["poslednjaja_sig"] = з["signature"]
         if not sostojanie.get("pervaja_sig_istorii"):
             sostojanie["pervaja_sig_istorii"] = з["signature"]
@@ -915,6 +1099,35 @@ def prochitat_rjady(put_: str | Path) -> list:
     return sorted(из_, key=lambda р: р["utc"])
 
 
+def poslednij_rjad(put_: str | Path) -> dict:
+    """Последняя строка ряда, БЕЗ чтения всего файла.
+
+    Нужна одному месту -- сшивке счётчиков после потери состояния (см. progon),
+    и читать для этого трое суток ряда было бы расточительно.
+    """
+    п = Path(put_)
+    if not п.exists():
+        return {}
+    try:
+        размер = п.stat().st_size
+        with п.open("rb") as ф:
+            ф.seek(max(0, размер - 8192))
+            хвост = ф.read().decode("utf-8", "replace")
+    except OSError:
+        return {}
+    for строка in reversed(хвост.splitlines()):
+        строка = строка.strip()
+        if not строка:
+            continue
+        try:
+            р = json.loads(строка)
+        except ValueError:
+            continue
+        if isinstance(р, dict) and isinstance(р.get("utc"), int):
+            return р
+    return {}
+
+
 def dopisat_rjad(put_: str | Path, р: dict, *, derzhim_sutok: int = ДЕРЖИМ_СУТОК,
                  sejchas: float | None = None) -> dict:
     """Дописать ряд и ОБРЕЗАТЬ старое. Диск на лаборатории уже кончался раз.
@@ -930,16 +1143,44 @@ def dopisat_rjad(put_: str | Path, р: dict, *, derzhim_sutok: int = ДЕРЖИ�
     строка = json.dumps(р, ensure_ascii=False, separators=(",", ":"))
     with п.open("a", encoding="utf-8") as ф:
         ф.write(строка + "\n")
-    # Обрезка -- переписыванием, и только когда есть что отрезать.
+    # ОБРЕЗКА -- ПО ПЕРВОЙ СТРОКЕ, А НЕ ПО ВСЕМУ ФАЙЛУ. Раньше здесь каждый тик
+    # читался весь ряд (трое суток, мегабайты) И переписывался целиком, как
+    # только появлялось что отрезать: это была запись в десятки гигабайт в
+    # сутки на машине, где диск уже кончался. Теперь читается ОДНА первая
+    # строка, и переписывание идёт только когда она старше порога на
+    # ЗАПАС_ОБРЕЗКИ_СЕК -- то есть примерно раз в час.
+    голова = None
+    try:
+        with п.open("r", encoding="utf-8", errors="replace") as ф:
+            for первая in ф:
+                первая = первая.strip()
+                if not первая:
+                    continue
+                try:
+                    г = json.loads(первая)
+                except ValueError:
+                    break      # битая голова -- переписать и почистить
+                if isinstance(г, dict) and isinstance(г.get("utc"), int):
+                    голова = int(г["utc"])
+                break
+    except OSError:
+        голова = None
+    из_ = {"otrezano": 0, "perepisali": False,
+            "bajt": (п.stat().st_size if п.exists() else 0)}
+    if голова is not None and голова >= порог - ЗАПАС_ОБРЕЗКИ_СЕК:
+        из_["rjadov"] = None     # не считали нарочно: это был бы полный чит
+        return из_
     ряды = prochitat_rjady(п)
     свежие = [x for x in ряды if float(x.get("utc") or 0) >= порог]
-    отрезано = len(ряды) - len(свежие)
-    if отрезано > 0:
+    из_["otrezano"] = len(ряды) - len(свежие)
+    if из_["otrezano"] > 0 or голова is None:
         п.write_text("".join(json.dumps(x, ensure_ascii=False,
                                         separators=(",", ":")) + "\n"
                              for x in свежие), encoding="utf-8")
-    return {"rjadov": len(свежие), "otrezano": отрезано,
-            "bajt": п.stat().st_size if п.exists() else 0}
+        из_["perepisali"] = True
+        из_["bajt"] = п.stat().st_size if п.exists() else 0
+    из_["rjadov"] = len(свежие)
+    return из_
 
 
 def okno_svodka(rjady: list, sostojanie: dict, окно: dict,
@@ -959,22 +1200,48 @@ def okno_svodka(rjady: list, sostojanie: dict, окно: dict,
     из_["min_lamports"], из_["max_lamports"] = п["min"], п["max"]
     из_["posledniaja_x"] = (п["x"][-1] if п["x"] else None)
     из_["posledniaja_y"] = (п["y"][-1] if п["y"] else None)
+    # ОДНА ШКАЛА ДЛЯ ВСЕГО, ЧТО РИСУЕТСЯ. Кривая считается здесь по времени
+    # первой и последней точки, а страница рисовала отметки по ОКНУ (сейчас
+    # минус окно_сек), а крест -- по НОМЕРУ точки: три разные шкалы на одной
+    # картинке, и отметка ввода стояла не там, где ступенька. Теперь шкала
+    # отдаётся числами, и страница только подставляет их.
+    из_["tochki_x"], из_["tochki_y"] = п["x"], п["y"]
+    из_["shkala"] = {"t0": (int(к["tochki"][0]["utc"]) if к["tochki"] else None),
+                      "t1": (int(к["tochki"][-1]["utc"]) if к["tochki"] else None),
+                      "x0": п["x"][0] if п["x"] else None,
+                      "x1": п["x"][-1] if п["x"] else None}
     из_.pop("putь", None)
     if в_окне:
         начало, конец = в_окне[0], в_окне[-1]
         дельта_кап = int(конец.get("kapital") or 0) - int(начало.get("kapital") or 0)
         дельта_вв = int(конец.get("vvod_vyvod") or 0) - int(начало.get("vvod_vyvod") or 0)
+        # ВЫРУЧКА ПРОДАЖИ БЕЗ ИЗВЕСТНОГО ВХОДА -- ТОЖЕ ВНЕ ИТОГА. Вход был до
+        # начала ряда и в капитале не стоял (позиция шла нулём), поэтому такая
+        # выручка -- деньги, пришедшие в измеряемую систему извне, ровно как
+        # ввод. Без этого изменение показало бы прибыль на всю выручку.
+        дельта_бв = (int(конец.get("vyruchka_bez_vhoda") or 0)
+                     - int(начало.get("vyruchka_bez_vhoda") or 0))
         # ИЗМЕНЕНИЕ -- БЕЗ ВВОДОВ И ВЫВОДОВ (слово владельца). Ввод не заработан,
         # вывод не потерян; складывать их в изменение -- врать себе.
-        из_["izmenenie_lamports"] = дельта_кап - дельта_вв
+        из_["izmenenie_lamports"] = дельта_кап - дельта_вв - дельта_бв
         из_["vvod_vyvod_lamports"] = дельта_вв
+        из_["vyruchka_bez_vhoda_lamports"] = дельта_бв
+        # РАСХОДЫ (чаевые, рента чужих счетов) ИЗ ИЗМЕНЕНИЯ НЕ ВЫЧИТАЮТСЯ --
+        # они его часть. Числом они стоят здесь, чтобы было видно, сколько
+        # съедено мимо сделок.
+        из_["rashodov_lamports"] = (int(конец.get("rashodov_lamports") or 0)
+                                    - int(начало.get("rashodov_lamports") or 0))
+        из_["rashodov"] = (int(конец.get("rashodov") or 0)
+                           - int(начало.get("rashodov") or 0))
         основа = int(начало.get("kapital") or 0)
         из_["izmenenie_pct"] = (round(из_["izmenenie_lamports"] / основа * 100.0, 4)
                                 if основа else None)
         из_["kapital_nachala"] = основа
     else:
         из_.update(izmenenie_lamports=None, vvod_vyvod_lamports=None,
-                   izmenenie_pct=None, kapital_nachala=None)
+                   izmenenie_pct=None, kapital_nachala=None,
+                   vyruchka_bez_vhoda_lamports=None, rashodov_lamports=None,
+                   rashodov=None)
     сделки = [с for с in (sostojanie.get("sdelki") or [])
               if isinstance(с.get("zakryta_utc"), int)
               and float(с["zakryta_utc"]) >= порог]
@@ -1020,6 +1287,17 @@ def vygruzka(rjady: list, sostojanie: dict, *, sejchas: float | None = None) -> 
     из_["sdelok_vsego"] = len(sostojanie.get("sdelki") or [])
     из_["zakryto_schetov"] = int(sostojanie.get("zakryto_schetov") or 0)
     из_["podpisej_razobrano"] = int(sostojanie.get("podpisej_razobrano") or 0)
+    # ЧЕГО ТРЕКЕР НЕ ЗНАЕТ ИЛИ ЧТО ПРОПУСТИЛ -- ЧИСЛАМИ В ВЫГРУЗКЕ, А НЕ ТОЛЬКО
+    # В ЖУРНАЛЕ: страница показывает это строкой «ЧЕГО НЕ ЗНАЕМ».
+    из_["povtorov_podpisi"] = int(sostojanie.get("povtorov_podpisi") or 0)
+    из_["propushcheno_navsegda"] = len(
+        sostojanie.get("propushcheno_navsegda") or [])
+    из_["upjorlis_v_predel"] = bool(sostojanie.get("upjorlis_v_predel"))
+    из_["zastrjali_na_sig"] = ((sostojanie.get("zastrjali") or {}).get("sig")
+                               or None)
+    из_["sbros_sostojanija_utc"] = sostojanie.get("sbros_sostojanija_utc")
+    из_["rashodov"] = int(sostojanie.get("rashodov") or 0)
+    из_["rashodov_lamports"] = int(sostojanie.get("rashodov_lamports") or 0)
     из_["kredity_sutki"] = dict(sostojanie.get("kredity") or {})
     из_["okna"] = {о["имя"]: okno_svodka(rjady, sostojanie, о, sejchas=сейчас)
                     for о in ОКНА}
@@ -1393,12 +1671,22 @@ function нарисовать() {
      не читалась как заработок. */
   var gm = document.getElementById("metki");
   gm.innerHTML = "";
-  var окноСек = о.okno_sek || 86400;
-  var сейчас = данные.obnovleno_utc || (Date.now() / 1000);
+  /* ОТМЕТКА СТОИТ ТАМ, ГДЕ СТУПЕНЬКА, А НЕ РЯДОМ. Шкала берётся ОДНА -- та
+     самая, по которой посчитана кривая (о.shkala): раньше отметки считались
+     по окну (сейчас минус окно_сек), кривая -- по времени первой и последней
+     точки, а крест -- по номеру точки. Три шкалы на одной картинке означали,
+     что отметка ввода стояла не там, где капитал шагнул. */
+  var шк = о.shkala || {};
+  function вX(utc) {
+    if (шк.t0 === null || шк.t0 === undefined || шк.x0 === null) { return null; }
+    var промежуток = (шк.t1 - шк.t0) || 1;
+    var доля = (utc - шк.t0) / промежуток;
+    if (доля < 0 || доля > 1) { return null; }
+    return шк.x0 + (шк.x1 - шк.x0) * доля;
+  }
   (о.metki || []).forEach(function (м) {
-    var доля = 1 - (сейчас - м.utc) / окноСек;
-    if (доля < 0 || доля > 1) { return; }
-    var x = 8 + 984 * доля;
+    var x = вX(м.utc);
+    if (x === null) { return; }
     var л = document.createElementNS("http://www.w3.org/2000/svg", "line");
     л.setAttribute("x1", x); л.setAttribute("x2", x);
     л.setAttribute("y1", 8); л.setAttribute("y2", 312);
@@ -1431,6 +1719,15 @@ function нарисовать() {
       (о.zakrytyj_itog_lamports === undefined || о.zakrytyj_itog_lamports === null)
         ? "—" : ((о.zakrytyj_itog_lamports > 0 ? "+" : "")
                  + sol(о.zakrytyj_itog_lamports, 4) + " SOL"));
+  if (о.rashodov_lamports) {
+    ряд("расходов за " + окноТек + " (чаевые, рента чужих счетов)",
+        "−" + sol(Math.abs(о.rashodov_lamports), 4) + " SOL"
+        + " · " + (о.rashodov || 0) + " шт");
+  }
+  if (о.vyruchka_bez_vhoda_lamports) {
+    ряд("выручка продаж без известного входа (вне итога)",
+        sol(о.vyruchka_bez_vhoda_lamports, 4) + " SOL");
+  }
   ряд("позиций открыто сейчас", String(данные.pozicij === undefined ? "—" : данные.pozicij));
   ряд("токен-счетов (из них пустых)",
       (данные.schetov === undefined ? "—" : данные.schetov)
@@ -1443,7 +1740,8 @@ function нарисовать() {
     (о.metki || []).slice().reverse().forEach(function (м) {
       var li = document.createElement("li");
       var a = document.createElement("span");
-      текст(a, (м.vid === "ввод" ? "ввод " : "вывод ") + sol(м.lamports, 4) + " SOL");
+      текст(a, (м.vid || "перевод") + " " + sol(м.lamports, 4) + " SOL"
+            + (м.mint ? " (" + м.mint.slice(0, 4) + "…)" : ""));
       var b = document.createElement("span"); текст(b, датаВремя(м.utc));
       li.appendChild(a); li.appendChild(b); сп.appendChild(li);
     });
@@ -1458,6 +1756,24 @@ function нарисовать() {
   }
   if (данные.neopoznannyh) {
     сл.push("непонятных транзакций: " + данные.neopoznannyh);
+  }
+  if (данные.upjorlis_v_predel) {
+    сл.push("окно подписей упёрлось в предел -- часть транзакций могла не "
+            + "попасть в разбор");
+  }
+  if (данные.propushcheno_navsegda) {
+    сл.push("подписей узел не отдал совсем: " + данные.propushcheno_navsegda);
+  }
+  if (данные.zastrjali_na_sig) {
+    сл.push("ждём транзакцию " + String(данные.zastrjali_na_sig).slice(0, 8)
+            + "… -- разбор стоит на ней");
+  }
+  if (данные.povtorov_podpisi) {
+    сл.push("повторов подписи отброшено: " + данные.povtorov_podpisi);
+  }
+  if (данные.sbros_sostojanija_utc) {
+    сл.push("состояние начато заново " + датаВремя(данные.sbros_sostojanija_utc)
+            + " -- накопительные числа сшиты с рядом");
   }
   // ПРОПУСКИ СЧИТАЮТСЯ, ТОЛЬКО ЕСЛИ РЯД ВООБЩЕ ЕСТЬ: на пустом ряде «пропусков
   // 145» -- это шум поверх честного «ряда ещё нет».
@@ -1500,8 +1816,19 @@ function нарисовать() {
     var п = граф.getBoundingClientRect();
     var x = e.clientX - п.left;
     var доля = Math.max(0, Math.min(1, x / п.width));
-    var и = Math.round(доля * (точки.length - 1));
-    var вx = 8 + 984 * (и / (точки.length - 1));
+    /* КРЕСТ ВСТАЁТ НА ТОЧКУ КРИВОЙ, А НЕ НА РОВНУЮ ДОЛЮ. Точки по времени
+       НЕ равномерны (пустые корзины не заполняются -- пропуск сборщика не
+       прячется), поэтому номер точки и её место на картинке -- разные вещи.
+       Ищется ближайшая по готовой шкале о.tochki_x. */
+    var тx = о.tochki_x || [];
+    var цель = (тx.length ? (тx[0] + (тx[тx.length - 1] - тx[0]) * доля)
+                          : 1000 * доля);
+    var и = 0;
+    for (var k = 1; k < тx.length; k++) {
+      if (Math.abs(тx[k] - цель) < Math.abs(тx[и] - цель)) { и = k; }
+    }
+    if (!тx.length) { и = Math.round(доля * (точки.length - 1)); }
+    var вx = (тx.length ? тx[и] : 8 + 984 * (и / (точки.length - 1)));
     крест.setAttribute("x1", вx); крест.setAttribute("x2", вx);
     крест.style.display = "";
     окно.innerHTML = "";
@@ -1514,15 +1841,14 @@ function нарисовать() {
     var левое = Math.max(4, Math.min(п.width - 130, x - 60));
     окно.style.left = левое + "px";
     // ПОДСКАЗКА СТАНОВИТСЯ НАД ТОЧКОЙ, А НЕ ПОВЕРХ ЛИНИИ В УГЛУ: так видно и
-    // число, и то место кривой, о котором оно говорит.
-    var вy = (точки.length > 1)
-      ? (о.tochki_y ? о.tochki_y[и] : null) : null;
+    // число, и то место кривой, о котором оно говорит. Y берётся ГОТОВЫМ из
+    // выгрузки (о.tochki_y) -- тем же, по которому нарисована кривая, а не
+    // пересчитывается здесь второй формулой.
+    var вy = ((о.tochki_y || [])[и]);
     var верх = 6;
-    if (о.posledniaja_y !== null && о.posledniaja_y !== undefined) {
-      var доля_y = (точки[и][1] - (о.min_lamports || 0))
-        / (((о.max_lamports || 0) - (о.min_lamports || 0)) || 1);
+    if (вy !== undefined && вy !== null) {
       верх = Math.max(2, Math.min(п.height - 54,
-        (1 - доля_y) * (п.height - 16) + 8 - 52));
+        (вy / 320) * п.height - 52));
     }
     окно.style.top = верх + "px";
     окно.style.opacity = 1;
@@ -1564,9 +1890,25 @@ function нарисовать() {
 
 /* ОБНОВЛЕНИЕ РАЗ В 30 с. Пока данные едут, прежняя картинка остаётся на месте
    приглушённой: мигать пустотой на телефоне -- худшее, что можно сделать. */
+/* БАЗА ДЛЯ ВЫГРУЗКИ -- ИЗ САМОГО ПУТИ, А НЕ ОТНОСИТЕЛЬНЫМ ИМЕНЕМ. Ссылка с
+   секретом приходит и БЕЗ косой черты на конце (/СЕКРЕТ), и тогда
+   относительное "kapital.json" браузер сложит в /kapital.json -- мимо
+   секрета: 404, и страница навсегда пустая. Это ровно то, что и случилось
+   бы у владельца при первом открытии ссылки без черты. */
+var БАЗА = (function () {
+  var п = location.pathname || "/";
+  var и = п.lastIndexOf("/");
+  var хвост = п.slice(и + 1);
+  /* Три вида ссылки, и все три обязаны работать: /СЕКРЕТ, /СЕКРЕТ/ и
+     /СЕКРЕТ/kapital.html. Имя файла отбрасывается ТОЛЬКО по .html -- в
+     секрете может быть точка, и резать по ней было бы глупостью. */
+  if (/\.html?$/.test(хвост)) { return п.slice(0, и + 1); }
+  return (хвост === "") ? п : (п + "/");
+})();
+
 function обновить() {
   document.getElementById("karta").classList.add("ustarelo");
-  fetch("kapital.json?t=" + Date.now(), { cache: "no-store" })
+  fetch(БАЗА + "kapital.json?t=" + Date.now(), { cache: "no-store" })
     .then(function (о) { return о.json(); })
     .then(function (д) { данные = д; нарисовать(); })
     .catch(function () {
@@ -1599,7 +1941,8 @@ def stranica() -> str:
 def progon(kat: str | Path | None = None, *, rpc_call=None,
            koshelek: str = КОШЕЛЕК, sutok: float = 3.0,
            sejchas: float | None = None, pisat_stranicu: bool = True,
-           derzhim_sutok: int = ДЕРЖИМ_СУТОК) -> dict:
+           derzhim_sutok: int = ДЕРЖИМ_СУТОК,
+           rjady_kesh: list | None = None) -> dict:
     """ОДИН ТИК СБОРЩИКА: догнать цепь, посчитать ряд, записать всё.
 
     Вызывается раз в 15--30 с бегунком или циклом; состояние и ряд лежат на
@@ -1612,17 +1955,28 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
     п_сост = к / ФАЙЛ_СОСТОЯНИЯ
     из_ = {"ok": False, "why_not": None, "kat": str(к)}
     сост = pustoe_sostojanie(koshelek)
+    прочлось = False
     if п_сост.exists():
         try:
             прежнее = json.loads(п_сост.read_text(encoding="utf-8"))
             if isinstance(прежнее, dict) and прежнее.get("koshelek") == koshelek:
                 сост = прежнее
+                прочлось = True
             else:
                 из_["why_not_sostojanie"] = ("состояние не того кошелька -- "
                                              "начато заново")
         except (ValueError, OSError) as сбой:
             из_["why_not_sostojanie"] = (f"состояние не прочиталось: "
                                           f"{type(сбой).__name__} -- начато заново")
+    # РЯД ЖИВЁТ ДОЛЬШЕ СОСТОЯНИЯ, И ЭТО НЕ РЕДКОСТЬ: состояние можно потерять
+    # диском, кривой записью или чужим кошельком в файле. Накопительные числа
+    # (ввод-вывод, выручка без входа, расходы) при этом начались бы С НУЛЯ, а
+    # окно считает их РАЗНОСТЬЮ по ряду -- и первая же разность дала бы
+    # призрачные плюс-минус несколько SOL в изменении за период. Поэтому после
+    # потери состояния счётчики СШИВАЮТСЯ с последней строкой ряда: сдвиг
+    # считается ПОСЛЕ восстановления истории (оно само накопит часть заново).
+    сшить = (not прочлось) and (к / ФАЙЛ_РЯДОВ).exists()
+    хвост_ряда = poslednij_rjad(к / ФАЙЛ_РЯДОВ) if сшить else {}
     счётчик = Schjotchik(сост.get("kredity"))
     if rpc_call is None:
         url = uzel_iz_okruzheniya()
@@ -1635,6 +1989,17 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
         из_["dognali"] = dognat_cep(rpc_call, koshelek=koshelek, sostojanie=сост,
                                      sutok=sutok, schjotchik=счётчик,
                                      sejchas=сейчас)
+        if сшить and хвост_ряда:
+            сдвиги = {}
+            for поле, накопитель in (
+                    ("vvod_vyvod", "vvod_vyvod_lamports"),
+                    ("vyruchka_bez_vhoda", "vyruchka_bez_vhoda_lamports"),
+                    ("rashodov_lamports", "rashodov_lamports")):
+                сдвиги[поле] = (int(хвост_ряда.get(поле) or 0)
+                                - int(сост.get(накопитель) or 0))
+            сост["sdvigi"] = сдвиги
+            сост["sbros_sostojanija_utc"] = int(сейчас)
+            из_["sshito"] = сдвиги
         кэш = сост.get("scheta_snimok") or {}
         возраст = сейчас - float(кэш.get("utc") or 0)
         читать_счета = bool(
@@ -1658,7 +2023,24 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
                       encoding="utf-8")
     из_["zapis"] = dopisat_rjad(к / ФАЙЛ_РЯДОВ, р, derzhim_sutok=derzhim_sutok,
                                  sejchas=сейчас)
-    ряды = prochitat_rjady(к / ФАЙЛ_РЯДОВ)
+    # РЯД ДЛЯ ВЫГРУЗКИ -- ИЗ ПАМЯТИ, ЕСЛИ ЕСТЬ КТО ЕГО ДЕРЖИТ. Служба держит
+    # (см. sluzhba), и тогда трое суток ряда не перечитываются с диска каждые
+    # 20 секунд: это было второе место, где трекер молотил диск впустую.
+    if rjady_kesh is None:
+        ряды = prochitat_rjady(к / ФАЙЛ_РЯДОВ)
+    else:
+        if not rjady_kesh or из_["zapis"].get("perepisali"):
+            rjady_kesh[:] = prochitat_rjady(к / ФАЙЛ_РЯДОВ)
+        else:
+            rjady_kesh.append(р)
+        порог_кэша = сейчас - derzhim_sutok * 86400.0
+        пока = 0
+        while пока < len(rjady_kesh) and float(
+                rjady_kesh[пока].get("utc") or 0) < порог_кэша:
+            пока += 1
+        if пока:
+            del rjady_kesh[:пока]
+        ряды = rjady_kesh
     в = vygruzka(ряды, сост, sejchas=сейчас)
     (к / ФАЙЛ_ВЫГРУЗКИ).write_text(json.dumps(в, ensure_ascii=False, indent=1)
                                    + "\n", encoding="utf-8")
@@ -1691,10 +2073,14 @@ def servis(kat: str | Path | None = None, *, sekret: str | None = None,
     ЧТО ЗДЕСЬ СДЕЛАНО РАДИ СЕКРЕТА, А НЕ РАДИ УДОБСТВА:
       * секрет берётся из окружения (см. выше) и сравнивается постоянным по
         времени сравнением -- чтобы по времени ответа его нельзя было угадать
-        побайтово;
-      * ПУТЬ НЕ ПОПАДАЕТ В ЖУРНАЛ НИКОГДА: log_message переписан и печатает
-        только метод и код. Обычный http.server пишет путь целиком, то есть
-        положил бы секрет в лог прогона и в терминал;
+        побайтово; сравнение идёт БАЙТАМИ, а не строками: hmac.compare_digest
+        на строках требует ASCII и на пути с кириллицей ПАДАЕТ, а падение
+        обработчика -- это строка запроса в журнале, то есть секрет;
+      * ПУТЬ НЕ ПОПАДАЕТ В ЖУРНАЛ НИКОГДА, И ЭТО ТРИ РАЗНЫХ МЕСТА, А НЕ ОДНО:
+        log_message (путь запроса), log_error (его зовёт send_error, и при
+        битой строке запроса в неё попадает САМА строка) и ТЕЛО ошибки
+        (штатный send_error вставляет строку запроса в html и отдаёт её
+        обратно). Переписаны все три;
       * неверный секрет и неверный путь отвечают ОДИНАКОВО (404 и одна строка):
         иначе ответ подсказывал бы, что секрет угадан.
     """
@@ -1708,23 +2094,40 @@ def servis(kat: str | Path | None = None, *, sekret: str | None = None,
             "секрет пути не задан или короче 16 знаков: задайте окружением "
             "BLOOM_TREKKER_SEKRET (ключа командной строки для него нет нарочно)")
 
+    с_байты = с.encode("utf-8")
+
     class Ruchka(BaseHTTPRequestHandler):
         server_version = "kapital"
         sys_version = ""
+        kod = None
 
         def log_message(self, format, *args):  # noqa: A002, ARG002
-            # ПУТИ ЗДЕСЬ НЕТ. Только метод и код -- остальное секрет.
-            sys.stderr.write(f"{self.command} -> {args[1] if len(args) > 1 else '?'}\n")
+            # НИ ПУТИ, НИ СТРОКИ ЗАПРОСА, НИ ОДНОГО АРГУМЕНТА. Раньше здесь
+            # печатался args[1]: для обычного запроса это код ответа, а для
+            # log_error -- ТЕКСТ ОШИБКИ, в который http.server кладёт строку
+            # запроса целиком. Поэтому из аргументов не печатается ничего.
+            sys.stderr.write(f"{self.command or '?'} -> otvet {self.kod or '?'}\n")
 
-        def _otkaz(self):
+        def log_error(self, format, *args):  # noqa: A002, ARG002
+            sys.stderr.write("oshibka zaprosa (put i stroka zaprosa ne pechatajutsja)\n")
+
+        def send_error(self, code, message=None, explain=None):  # noqa: ARG002
+            # ТЕЛО ОШИБКИ -- СВОЁ. Штатное тело вставляет в html строку
+            # запроса, а в ней секрет пути: 400 от http.server на битом
+            # запросе ОТДАВАЛ СЕКРЕТ ОБРАТНО тому, кто его прислал.
+            self._otkaz(код=int(code))
+
+        def _otkaz(self, код: int = 404):
             тело = b"not found\n"
-            self.send_response(404)
+            self.kod = код
+            self.send_response(код)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.send_header("Content-Length", str(len(тело)))
             self.end_headers()
             self.wfile.write(тело)
 
         def _otdat(self, тело: bytes, тип: str):
+            self.kod = 200
             self.send_response(200)
             self.send_header("Content-Type", тип)
             self.send_header("Content-Length", str(len(тело)))
@@ -1737,7 +2140,13 @@ def servis(kat: str | Path | None = None, *, sekret: str | None = None,
         def do_GET(self):  # noqa: N802
             путь = (self.path or "/").split("?", 1)[0]
             части = [ч for ч in путь.split("/") if ч]
-            if not части or not hmac.compare_digest(части[0], с):
+            # СРАВНЕНИЕ БАЙТАМИ. http.server отдаёт путь, раскодированный
+            # latin-1 из сырых байтов, поэтому latin-1 возвращает ровно те
+            # байты, что пришли по сети. На строках compare_digest требует
+            # ASCII и на пути с кириллицей бросает TypeError -- то есть
+            # обработчик падает и штатный 500 печатает запрос в журнал.
+            дано = (части[0] if части else "").encode("latin-1", "replace")
+            if not части or not hmac.compare_digest(дано, с_байты):
                 self._otkaz()
                 return
             хвост = "/".join(части[1:])
@@ -1794,13 +2203,15 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
     поток.start()
     из_ = {"port": сервер.server_address[1], "adres": adres, "tikov": 0,
             "sboev": 0, "kat": str(к)}
+    кэш_ряда: list = []
     print(json.dumps({"служба": "поднята", "порт": из_["port"],
                       "адрес": adres, "каталог": str(к),
                       "узел": zateret(uzel_iz_okruzheniya()),
                       "пауза_сек": pauza}, ensure_ascii=False), flush=True)
     try:
         while True:
-            р = progon(к, koshelek=koshelek, sutok=sutok)
+            р = progon(к, koshelek=koshelek, sutok=sutok,
+                       rjady_kesh=кэш_ряда)
             из_["tikov"] += 1
             из_["sboev"] += (not р.get("ok"))
             # ТИХИМ СБОЙ НЕ БЫВАЕТ: каждая неудача тика печатается строкой, её
@@ -1824,7 +2235,7 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
 
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: меньше -- значит что-то пропущено молча, и
 # это считается провалом, а не мелочью.
-ZHDEM_PROVEROK = 61
+ZHDEM_PROVEROK = 84
 # СУТОЧНЫЕ ИТОГИ УЧЁТА ПОЛОСЫ -- ЗАМЕР ПО ФАЙЛУ data/sdelki_polosy_vse_s_2709.json
 # (снят 03.10T17:07Z, 578 рядов), поле «итог_po_cepi_sol» КИРИЛЛИЦЕЙ. Числа
 # объявлены, чтобы смена файла была видна числом, а не молчанием.
@@ -1849,7 +2260,20 @@ ZHDEM_PROVEROK = 61
 ФАЙЛ_ЖИВОЙ_TX = "bloom_tx_raw.json"
 ЖДЁМ_ЖИВОЙ_TX = {"sig": "3wDEDSUUFhv7PP11", "vse_sol": -0.065084518,
                  "renta": 1513840, "vid": "своп"}
-ЖДЁМ_СВЕРКИ_С_ЧУЖОЙ = 138
+# ЖИВЫХ ТРАНЗАКЦИЙ ДЛЯ СВЕРКИ -- 150: все фикстуры пулов (11 файлов
+# data/c2_pool_samples) плюс живые разновидности кривой, по одной на подпись.
+# Раньше было 138 -- через load_samples чужого модуля, который тянет solders.
+ЖДЁМ_СВЕРКИ_С_ЧУЖОЙ = 150
+# СКВОЗНАЯ СВЕРКА: ЧИСЛО, ПОСЧИТАННОЕ КОДОМ ТРЕКЕРА, ПРОТИВ «итог_po_cepi_sol».
+# Владелец просил сверить КАПИТАЛ ПО РЯДУ с суточными итогами учёта, а не файл
+# учёта с самим собой. Для этого мадридские сутки 02.10 проигрываются через
+# ВЕСЬ путь трекера: по каждой сделке строятся две транзакции с теми самыми
+# числами из «итог_po_cepi_chasti» (покупка и продажа, все_sol по всем нашим
+# счетам), они едут через razbor_tranzakcii -> prinjat_tranzakciju -> kapital
+# -> okno_svodka, и на выходе обязаны дать РОВНО сумму «итог_po_cepi_sol» за
+# эти сутки. Числа замерены по data/sdelki_polosy_2026-10-02_sutki-madrid-02-10
+# .json: 166 сделок с двумя частями, сумма +0.657385977 SOL.
+ЖДЁМ_СКВОЗНОЙ_СВЕРКИ = {"sdelok": 166, "lamports": 657_385_977}
 
 
 def _tx(*, kljuchi: list, do: list, posle: list, token_do=None,
@@ -1907,11 +2331,13 @@ def _poddelnyj_uzel(*, sol: int, scheta: list, podpisi=None, tranzakcii=None):
 
 
 def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
+    import inspect  # noqa: PLC0415
     import shutil  # noqa: PLC0415
     import tempfile  # noqa: PLC0415
     import threading  # noqa: PLC0415
 
     было, плохо = 0, 0
+    упавшие: list = []
 
     def chk(имя, усл, факт=None):
         nonlocal было, плохо
@@ -1920,6 +2346,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             print(f"  ok   {имя}")
         else:
             плохо += 1
+            упавшие.append(имя)
             print(f" ПЛОХО {имя} -- {факт!r}")
 
     print("c3_kapital_trekker: самопроверка")
@@ -2023,36 +2450,63 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         # ---------------------------------- 3. СВЕРКА С ЧУЖОЙ ФОРМУЛОЙ
         # Мой разбор обязан совпасть с c2_itog_po_cepi.дельта_транзакции НА
         # ЖИВЫХ транзакциях: это чужой модуль и каноническое число учёта.
+        #
+        # НИ ОДНОЙ СТОРОННЕЙ БИБЛИОТЕКИ НА ЭТОМ ПУТИ. Раньше здесь шёл импорт
+        # c2_swap_build ради load_samples, а он тянет solders -- и на облачном
+        # бегунке, где solders нет, сверка шла по НУЛЮ транзакций из нуля,
+        # писала ДВЕ проверки вместо одной (62 против объявленных 61) и валила
+        # гейт прогона у Code-1 (его доклад 04.10). Фикстуры читаются json-ом
+        # прямо из data/c2_pool_samples, подписанты -- из accountKeys, а
+        # c2_itog_po_cepi -- чистая стандартная библиотека. Трекеру на
+        # лаборатории solders не нужен вовсе: он не строит транзакций.
         сверено = сошлось = 0
+        сбой_сверки = None
         try:
-            import c2_common as C  # noqa: PLC0415
             import c2_itog_po_cepi as IC  # noqa: PLC0415
-            import c2_swap_build as B  # noqa: PLC0415
-            for имя in ("CPMM", "PUMP_AMM", "LAUNCHLAB", "BONDING", "DLMM", "CLMM"):
-                прог = getattr(B, имя, None)
-                if not прог:
+            кат_ф = КОРЕНЬ / "data" / "c2_pool_samples"
+            фикстуры = sorted(кат_ф.glob("*.json")) if кат_ф.exists() else []
+            вариант = КОРЕНЬ / "data" / "c2_curve_variant_samples.json"
+            живые = []
+            for ф in фикстуры:
+                for x in json.loads(ф.read_text(encoding="utf-8")):
+                    if isinstance(x, dict) and isinstance(x.get("tx"), dict):
+                        живые.append(x["tx"])
+            if вариант.exists():
+                for _, лист in json.loads(
+                        вариант.read_text(encoding="utf-8")).items():
+                    for x in (лист or []):
+                        if isinstance(x, dict) and isinstance(x.get("tx"), dict):
+                            живые.append(x["tx"])
+            видели = set()
+            for tx in живые:
+                сиг_ = ((tx.get("transaction") or {}).get("signatures")
+                        or [None])[0]
+                if сиг_ in видели:
                     continue
-                for r in B.load_samples(прог)[:25]:
-                    tx = r.get("tx")
-                    if not isinstance(tx, dict):
-                        continue
-                    подписанты = sorted(C.signers(tx) or [])
-                    if not подписанты:
-                        continue
-                    их = IC.дельта_транзакции(tx, подписанты[0])
-                    мой = razbor_tranzakcii(tx, подписанты[0])
-                    if not их.get("ok") or not мой.get("ok"):
-                        continue
-                    сверено += 1
-                    чистое = (мой["sol_delta"] + мой["renta_delta"]) / ЛАМПОРТОВ_В_SOL
-                    сошлось += (round(чистое, 9) == их["все_sol"])
+                видели.add(сиг_)
+                ключи = (((tx.get("transaction") or {}).get("message") or {})
+                         .get("accountKeys") or [])
+                подписанты = sorted(
+                    к.get("pubkey") for к in ключи
+                    if isinstance(к, dict) and к.get("signer") and к.get("pubkey"))
+                if not подписанты:
+                    continue
+                их = IC.дельта_транзакции(tx, подписанты[0])
+                мой = razbor_tranzakcii(tx, подписанты[0])
+                if not их.get("ok") or not мой.get("ok"):
+                    continue
+                сверено += 1
+                чистое = (мой["sol_delta"] + мой["renta_delta"]) / ЛАМПОРТОВ_В_SOL
+                сошлось += (round(чистое, 9) == их["все_sol"])
         except Exception as сбой:  # noqa: BLE001
-            chk("сверка с чужой формулой прошла без исключения", False,
-                f"{type(сбой).__name__}: {сбой}")
+            # ОДНА ПРОВЕРКА, А НЕ ДВЕ: причина сбоя едет фактом ТОЙ ЖЕ
+            # проверки, иначе число проверок зависит от среды.
+            сбой_сверки = f"{type(сбой).__name__}: {сбой}"
         chk(f"моя арифметика сошлась с c2_itog_po_cepi.дельта_транзакции на "
             f"{ЖДЁМ_СВЕРКИ_С_ЧУЖОЙ} живых транзакциях",
-            сверено == ЖДЁМ_СВЕРКИ_С_ЧУЖОЙ and сошлось == сверено,
-            (сверено, сошлось))
+            сбой_сверки is None and сверено == ЖДЁМ_СВЕРКИ_С_ЧУЖОЙ
+            and сошлось == сверено,
+            (сверено, сошлось, сбой_сверки))
         п_жив = КОРЕНЬ / "data" / ФАЙЛ_ЖИВОЙ_TX
         chk(f"живая транзакция нашего кошелька на месте: data/{ФАЙЛ_ЖИВОЙ_TX}",
             п_жив.exists(), str(п_жив))
@@ -2105,13 +2559,22 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         chk("продажа без известной покупки: сделка НЕ выдумывается, растёт "
             "число непонятных",
             not сост3["sdelki"] and сост3["neopoznannyh"] == 1, сост3)
+        # И ЕЁ ВЫРУЧКА -- ВНЕ ИТОГА ЗА ПЕРИОД, ОТДЕЛЬНОЙ ОТМЕТКОЙ. Вход был до
+        # начала ряда и в капитале не стоял; без исключения изменение показало
+        # бы прибыль на всю выручку, которой не было.
+        chk("выручка продажи без входа названа отметкой и сложена отдельно -- "
+            "в изменение за период она не войдёт",
+            сост3["vyruchka_bez_vhoda_lamports"] == пришло - РЕНТА
+            and len(сост3["metki"]) == 1
+            and сост3["metki"][0]["vid"] == "продажа без входа",
+            (сост3["vyruchka_bez_vhoda_lamports"], сост3["metki"]))
         # ДВА МИНТА В ОДНОЙ ПОКУПКЕ -- ДЕЛИТЬ ПОТРАЧЕННОЕ НЕЧЕМ
         tx_два = _tx(kljuchi=[КОШ, АТА, "ata2"],
                       do=[SOL0, 0, 0],
                       posle=[SOL0 - БИЛЕТ, РЕНТА, РЕНТА],
                       token_do=[],
                       token_posle=[(1, КОШ, МИНТ, 1000),
-                                   (2, КОШ, "Minт2222222222222222222222222222222222222222", 5)],
+                                   (2, КОШ, "Mint2222222222222222222222222222222222222222", 5)],
                       programmy=["Pump1111111111111111111111111111111111111111"],
                       sig="two")
         сост4 = pustoe_sostojanie(КОШ)
@@ -2371,8 +2834,8 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                             sejchas=основа)
         chk("ряд дописывается строкой, а старое ОБРЕЗАЕТСЯ той же записью: "
             "диск на лаборатории уже кончался раз",
-            зап1["otrezano"] == 1 and зап1["rjadov"] == 0
-            and зап2["rjadov"] == 1 and зап2["otrezano"] == 0
+            зап1["otrezano"] == 1 and зап1["perepisali"] is True
+            and зап2["otrezano"] == 0 and зап2["perepisali"] is False
             and len(prochitat_rjady(п_ряда)) == 1, (зап1, зап2))
 
         # ---------------------------------- 11. ПРОГОН ЦЕЛИКОМ, БЕЗ СЕТИ
@@ -2519,9 +2982,326 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             chk("латинское «itog_po_cepi_sol» -- НЕ итог, а выручка продажи: "
                 f"его сумма {лат:+.2f} против {кир:+.2f} у кириллического",
                 лат > кир * 10, (round(лат, 2), round(кир, 2)))
+
+        # ------------------------- 13. СКВОЗНАЯ СВЕРКА С ИТОГОМ УЧЁТА ПОЛОСЫ
+        # ЧИСЛО СЧИТАЕТ КОД ТРЕКЕРА, А НЕ ФАЙЛ УЧЁТА СЕБЯ САМ. Встречный
+        # разбор был прав: раздел 12 сверял учёт с учётом, и ни одно число,
+        # посчитанное трекером, с «итог_po_cepi_sol» не сравнивалось. Здесь
+        # мадридские сутки 02.10 едут через ВЕСЬ путь: разбор транзакции ->
+        # состояние -> капитал -> свод окна.
+        п_м2 = КОРЕНЬ / "data" / ФАЙЛ_СУТОК_МАДРИД
+        if п_м2.exists():
+            ряды_м = (json.loads(п_м2.read_text(encoding="utf-8")).get("ряды")
+                      or [])
+            КОШ_С = "KoshelekSutok11111111111111111111111111111"
+            АТА_С = "AtaSutok111111111111111111111111111111111"
+            лам = lambda х: int(round(float(х) * ЛАМПОРТОВ_В_SOL))  # noqa: E731
+            пары = []
+            for и_, р_ in enumerate(ряды_м):
+                ч_ = р_.get("итог_po_cepi_chasti") or {}
+                пок = (ч_.get("покупка") or {}).get("все_sol")
+                про = (ч_.get("продажа") or {}).get("все_sol")
+                ито = р_.get("итог_po_cepi_sol")
+                if not all(isinstance(х, (int, float))
+                           for х in (пок, про, ито)):
+                    continue
+                пары.append((р_.get("mint") or f"mint{и_}", лам(пок),
+                             лам(про), лам(ито)))
+            сост_с = pustoe_sostojanie(КОШ_С)
+            sol_с = sol_нач = 50 * ЛАМПОРТОВ_В_SOL
+            утк = 1_759_356_000
+            for н_, (минт_, пок_, про_, _и) in enumerate(пары):
+                tx_б = _tx(kljuchi=[КОШ_С, АТА_С, "pool"],
+                           do=[sol_с, 0, 0],
+                           posle=[sol_с + пок_ - РЕНТА, РЕНТА, 0],
+                           token_do=[], token_posle=[(1, КОШ_С, минт_, 1000)],
+                           programmy=["Pump1111111111111111111111111111111111111111"],
+                           utc=утк + н_ * 40, sig=f"sutki-buy-{н_}")
+                sol_с += пок_ - РЕНТА
+                prinjat_tranzakciju(сост_с, tx_б, КОШ_С)
+                tx_п = _tx(kljuchi=[КОШ_С, АТА_С, "pool"],
+                           do=[sol_с, РЕНТА, 0],
+                           posle=[sol_с + про_ + РЕНТА, 0, 0],
+                           token_do=[(1, КОШ_С, минт_, 1000)],
+                           token_posle=[(1, КОШ_С, минт_, 0)],
+                           programmy=["Pump1111111111111111111111111111111111111111"],
+                           utc=утк + н_ * 40 + 20, sig=f"sutki-sell-{н_}")
+                sol_с += про_ + РЕНТА
+                prinjat_tranzakciju(сост_с, tx_п, КОШ_С)
+            мой_итог = sum(int(с_.get("itog") or 0)
+                           for с_ in (сост_с.get("sdelki") or []))
+            учёт_итог = sum(п_[3] for п_ in пары)
+            chk(f"СКВОЗНАЯ СВЕРКА: {ЖДЁМ_СКВОЗНОЙ_СВЕРКИ['sdelok']} сделок "
+                f"мадридских суток 02.10, проигранных через разбор, состояние "
+                f"и капитал, дают РОВНО сумму «итог_po_cepi_sol» "
+                f"({ЖДЁМ_СКВОЗНОЙ_СВЕРКИ['lamports']} лампортов, "
+                f"+{ЖДЁМ_СКВОЗНОЙ_СВЕРКИ['lamports'] / ЛАМПОРТОВ_В_SOL:.9f} SOL)",
+                len(пары) == ЖДЁМ_СКВОЗНОЙ_СВЕРКИ["sdelok"]
+                and мой_итог == учёт_итог == ЖДЁМ_СКВОЗНОЙ_СВЕРКИ["lamports"]
+                and len(сост_с["sdelki"]) == ЖДЁМ_СКВОЗНОЙ_СВЕРКИ["sdelok"],
+                (len(пары), мой_итог, учёт_итог, len(сост_с["sdelki"])))
+            chk("и SOL кошелька за те же сутки сдвинулся на ТО ЖЕ число: "
+                "покупки капитал не двигали, рента вернулась вся",
+                sol_с - sol_нач == ЖДЁМ_СКВОЗНОЙ_СВЕРКИ["lamports"]
+                and not сост_с["pozicii"] and сост_с["neopoznannyh"] == 0,
+                (sol_с - sol_нач, len(сост_с["pozicii"]),
+                 сост_с["neopoznannyh"]))
+            # А ТЕПЕРЬ ТО ЖЕ ЧИСЛО -- ЧЕРЕЗ РЯД И СВОД ОКНА, то есть через то,
+            # что видит владелец на странице.
+            узел_н = _poddelnyj_uzel(sol=sol_нач, scheta=[])
+            узел_к = _poddelnyj_uzel(sol=sol_с, scheta=[])
+            р_нач = rjad(узел_н, koshelek=КОШ_С,
+                         sostojanie=pustoe_sostojanie(КОШ_С), sejchas=утк - 10)
+            р_кон = rjad(узел_к, koshelek=КОШ_С, sostojanie=сост_с,
+                         sejchas=утк + 20)
+            о_сутки = okno_svodka([р_нач, р_кон], сост_с, ОКНА[0],
+                                  sejchas=утк + 20)
+            chk("и СТРАНИЦА показала бы то же: изменение за окно по ряду равно "
+                "сумме «итог_po_cepi_sol» за мадридские сутки, до лампорта",
+                о_сутки["izmenenie_lamports"] == ЖДЁМ_СКВОЗНОЙ_СВЕРКИ["lamports"]
+                and о_сутки["vvod_vyvod_lamports"] == 0
+                and о_сутки["vyruchka_bez_vhoda_lamports"] == 0,
+                (о_сутки["izmenenie_lamports"],
+                 о_сутки["vvod_vyvod_lamports"],
+                 о_сутки["vyruchka_bez_vhoda_lamports"]))
+        else:
+            chk("хостовая выгрузка за мадридские сутки нужна и для СКВОЗНОЙ "
+                f"сверки: data/{ФАЙЛ_СУТОК_МАДРИД}", False, str(п_м2))
+
+        # ------------------------- 14. НАХОДКИ ВСТРЕЧНОГО РАЗБОРА ЗАКРЫТЫ ЧИСЛОМ
+        # СЕКРЕТЫ. Затирание режет хвост по первому из «/», «?», «#», а
+        # «логин:пароль@» выбрасывает всегда.
+        хвосты = {
+            "https://uzel.example/?api-key=SEKRET": "https://uzel.example/…",
+            "https://uzel.example?api-key=SEKRET": "https://uzel.example/…",
+            "https://uzel.example#api-key=SEKRET": "https://uzel.example/…",
+            "https://uzel.example": "https://uzel.example",
+            "http://uzel.example/put/dalshe": "http://uzel.example/…",
+        }
+        плохие_х = {к: zateret(к) for к, в in хвосты.items() if zateret(к) != в}
+        chk("затирание режет хвост по ПЕРВОМУ из «/», «?», «#»: ключ после "
+            "«?» без косой черты уходил в вывод целиком",
+            not плохие_х, плохие_х)
+        chk("«логин:пароль@» из адреса не уходит в вывод НИКОГДА",
+            zateret("https://login:parol@uzel.example/put") == "https://uzel.example/…"
+            and zateret("https://login:parol@uzel.example") == "https://uzel.example"
+            and "parol" not in zateret("https://login:parol@uzel.example?k=1"),
+            (zateret("https://login:parol@uzel.example/put"),
+             zateret("https://login:parol@uzel.example")))
+        ист_служба = inspect.getsource(servis)
+        chk("журнал службы переписан В ТРЁХ МЕСТАХ: log_message, log_error и "
+            "ТЕЛО ошибки (штатный send_error отдаёт строку запроса обратно)",
+            "def log_message" in ист_служба and "def log_error" in ист_служба
+            and "def send_error" in ист_служба
+            and "self._otkaz(код=int(code))" in ист_служба, None)
+        # ПУТЬ С КИРИЛЛИЦЕЙ И БИТЫЙ ЗАПРОС -- ЖИВЫМ СЕРВЕРОМ, СЫРЫМ СОКЕТОМ.
+        import socket  # noqa: PLC0415
+        кат_с2 = врем / "otdacha2"
+        кат_с2.mkdir(parents=True, exist_ok=True)
+        СЕКРЕТ2 = "sekret-proverki-9876543210"
+        сервер2 = servis(кат_с2, sekret=СЕКРЕТ2, port=0, ne_sluzhit=True)
+        порт2 = сервер2.server_address[1]
+        поток2 = threading.Thread(
+            target=lambda: [сервер2.handle_request() for _ in range(2)],
+            daemon=True)
+        поток2.start()
+
+        def _сыро(байты: bytes) -> bytes:
+            с_ = socket.create_connection(("127.0.0.1", порт2), timeout=5)
+            try:
+                с_.sendall(байты)
+                ответ = b""
+                while True:
+                    кусок = с_.recv(4096)
+                    if not кусок:
+                        break
+                    ответ += кусок
+                return ответ
+            finally:
+                с_.close()
+        отв_кир = _сыро("GET /путь-кириллицей HTTP/1.1\r\nHost: x\r\n"
+                        "Connection: close\r\n\r\n".encode())
+        отв_бит = _сыро((f"GET /{СЕКРЕТ2}/ HTTP/1.1 lishnee\r\nHost: x\r\n"
+                         "Connection: close\r\n\r\n").encode())
+        сервер2.server_close()
+        chk("путь с кириллицей -- честный 404, а НЕ падение обработчика: "
+            "hmac.compare_digest на строках требует ASCII, и падение вынесло "
+            "бы строку запроса в журнал",
+            b" 404 " in отв_кир.split(b"\r\n")[0] + b" ",
+            отв_кир.split(b"\r\n")[0])
+        chk("битый запрос НЕ получает секрет обратно: штатное тело ошибки "
+            "http.server вставляет в html строку запроса целиком",
+            СЕКРЕТ2.encode() not in отв_бит and b"not found" in отв_бит,
+            отв_бит[:120])
+
+        # ДЕНЬГИ. Повтор подписи не считается дважды.
+        сост_п = pustoe_sostojanie(КОШ)
+        prinjat_tranzakciju(сост_п, tx_покупки, КОШ)
+        п_повтор = prinjat_tranzakciju(сост_п, tx_покупки, КОШ)
+        chk("ОДНА ПОДПИСЬ -- ОДИН РАЗ: повтор от узла не кладёт покупку в "
+            "позицию дважды, и повтор назван числом",
+            п_повтор["povtor"] is True
+            and (сост_п["pozicii"].get(МИНТ) or {}).get("vhod") == БИЛЕТ - РЕНТА
+            and сост_п["povtorov_podpisi"] == 1
+            and сост_п["podpisej_razobrano"] == 1,
+            (сост_п["pozicii"], сост_п["povtorov_podpisi"]))
+        # ТОКЕН В ТОКЕН ОДНОЙ ТРАНЗАКЦИЕЙ -- НЕПОНЯТНАЯ, ПОЗИЦИИ ЦЕЛЫ.
+        МИНТ_Б = "MintBProverki1111111111111111111111111111111"
+        сост_тт = pustoe_sostojanie(КОШ)
+        prinjat_tranzakciju(сост_тт, tx_покупки, КОШ)
+        tx_тт = _tx(kljuchi=[КОШ, АТА, "ata-b"],
+                    do=[SOL0 - БИЛЕТ, РЕНТА, 0],
+                    posle=[SOL0 - БИЛЕТ - 5000, РЕНТА, РЕНТА],
+                    token_do=[(1, КОШ, МИНТ, 1000)],
+                    token_posle=[(1, КОШ, МИНТ, 0), (2, КОШ, МИНТ_Б, 777)],
+                    programmy=["Pump1111111111111111111111111111111111111111"],
+                    sig="token-v-token")
+        п_тт = prinjat_tranzakciju(сост_тт, tx_тт, КОШ)
+        chk("СВОП ТОКЕН В ТОКЕН ОДНОЙ ТРАНЗАКЦИЕЙ: позиции НЕ тронуты, итог "
+            "НЕ выдуман -- одно `polucheno` на две стороны делить нечем",
+            not сост_тт["sdelki"] and сост_тт["neopoznannyh"] == 1
+            and (сост_тт["pozicii"].get(МИНТ) or {}).get("vhod") == БИЛЕТ - РЕНТА
+            and МИНТ_Б not in сост_тт["pozicii"]
+            and "делить нечем" in (п_тт.get("pochemu") or ""),
+            (сост_тт["sdelki"], сост_тт["pozicii"], п_тт.get("pochemu")))
+        # ЧАЕВЫЕ -- РАСХОД, А НЕ ВЫВОД; КРУПНЫЙ УХОД -- ВЫВОД.
+        def _сист(ушло, sig):
+            return _tx(kljuchi=[КОШ, "chuzhoj"], do=[SOL0, 0],
+                       posle=[SOL0 - ушло, ушло - 5000],
+                       programmy=[ПРОГ_СИСТЕМЫ, ПРОГ_БЮДЖЕТА], sig=sig)
+        р_чаевые = razbor_tranzakcii(_сист(1_005_000, "tip"), КОШ)
+        р_вывод = razbor_tranzakcii(_сист(2 * ЛАМПОРТОВ_В_SOL, "out"), КОШ)
+        chk("мелкий системный уход (чаевые 0.001 SOL, рента чужого счёта) -- "
+            "РАСХОД: он остаётся в изменении за период и честно его уменьшает",
+            р_чаевые["vid"] == ВИД_РАСХОД and р_вывод["vid"] == ВИД_ПЕРЕВОД,
+            (р_чаевые["vid"], р_вывод["vid"]))
+        сост_р = pustoe_sostojanie(КОШ)
+        prinjat_tranzakciju(сост_р, _сист(1_005_000, "tip"), КОШ)
+        chk("расход назван числом и отметкой НЕ становится: вывода не было",
+            сост_р["rashodov"] == 1
+            and сост_р["rashodov_lamports"] == 1_005_000
+            and not сост_р["metki"] and сост_р["vvod_vyvod_lamports"] == 0,
+            сост_р)
+        # ЗАКРЫТЫЕ СЧЕТА СЧИТАЮТСЯ СЧЕТАМИ.
+        tx_уборка = _tx(kljuchi=[КОШ, "a1", "a2", "a3"],
+                        do=[SOL0, РЕНТА, РЕНТА, РЕНТА],
+                        posle=[SOL0 + 3 * РЕНТА - 5000, 0, 0, 0],
+                        token_do=[(1, КОШ, МИНТ, 0), (2, КОШ, МИНТ_Б, 0),
+                                  (3, КОШ, "Mint3Proverki111111111111111111111111111111", 0)],
+                        token_posle=[],
+                        programmy=[ПРОГ_ТОКЕНА], sig="uborka")
+        сост_у = pustoe_sostojanie(КОШ)
+        prinjat_tranzakciju(сост_у, tx_уборка, КОШ)
+        chk("уборка трёх пустых счетов одной транзакцией -- это ТРИ закрытых "
+            "счёта, а не один: «закрыто 1» было бы ложью",
+            сост_у["zakryto_schetov"] == 3, сост_у["zakryto_schetov"])
+        # ТРАНЗАКЦИЯ, КОТОРУЮ УЗЕЛ НЕ ОТДАЛ, НЕ ТЕРЯЕТСЯ.
+        узел_нет = _poddelnyj_uzel(
+            sol=SOL0, scheta=[],
+            podpisi=[{"signature": "net-takoj", "blockTime": 1_700_000_000}],
+            tranzakcii={})
+        сост_н = pustoe_sostojanie(КОШ)
+        д1 = dognat_cep(узел_нет, koshelek=КОШ, sostojanie=сост_н, sutok=3,
+                        sejchas=1_700_000_100)
+        chk("узел не отдал транзакцию -- ряд НЕ едет дальше этой подписи: "
+            "раньше она терялась навсегда и молча",
+            сост_н["poslednjaja_sig"] is None and д1["net_tranzakcii"] == 1
+            and "не отдал транзакцию" in (д1.get("why_not") or ""),
+            (сост_н["poslednjaja_sig"], д1))
+        for _ in range(ПРЕДЕЛ_ЗАСТРЕВАНИЯ - 1):     # первый тик уже прошёл
+            dognat_cep(узел_нет, koshelek=КОШ, sostojanie=сост_н, sutok=3,
+                       sejchas=1_700_000_100)
+        chk(f"после {ПРЕДЕЛ_ЗАСТРЕВАНИЯ} тиков ожидания подпись НАЗЫВАЕТСЯ "
+            "пропущенной навсегда и ряд едет: одна недоступная транзакция не "
+            "останавливает трекер насовсем",
+            сост_н["poslednjaja_sig"] == "net-takoj"
+            and сост_н["propushcheno_navsegda"] == ["net-takoj"]
+            and сост_н["zastrjali"] is None, сост_н)
+        # ПРЕДЕЛ ОКНА ПОДПИСЕЙ СЧИТАЕТСЯ ПО СТРАНИЦАМ, А НЕ ПО ЧУЖОМУ ЧИСЛУ.
+        много = [{"signature": f"s{и}", "blockTime": 1_700_000_000}
+                 for и in range(1000)]
+        узел_мн = _poddelnyj_uzel(sol=SOL0, scheta=[], podpisi=много,
+                                  tranzakcii={})
+        сост_мн = pustoe_sostojanie(КОШ)
+        сост_мн["poslednjaja_sig"] = "staraja"      # не первый прогон: 2 страницы
+        д_мн = dognat_cep(узел_мн, koshelek=КОШ, sostojanie=сост_мн, sutok=3,
+                          sejchas=1_700_000_100)
+        chk("окно подписей упёрлось в предел -- и это ВИДНО признаком: предел "
+            f"считается по взятым страницам ({СТРАНИЦ_НА_ТИК} по 1000), а не по "
+            "чужому числу 3000, при котором признак не поднимался НИКОГДА",
+            д_мн["upjorlis_v_predel"] is True and д_мн["stranic"] == СТРАНИЦ_НА_ТИК
+            and д_мн["podpisej"] == СТРАНИЦ_НА_ТИК * 1000
+            and сост_мн["upjorlis_v_predel"] is True, д_мн)
+        # ПОТЕРЯ СОСТОЯНИЯ НЕ ДАЁТ ПРИЗРАЧНОГО СКАЧКА В ИЗМЕНЕНИИ.
+        кат_сш = врем / "sshivka"
+        кат_сш.mkdir(parents=True, exist_ok=True)
+        (кат_сш / ФАЙЛ_РЯДОВ).write_text(json.dumps(
+            {"utc": 1_700_000_000, "kapital": 10 * ЛАМПОРТОВ_В_SOL,
+             "sol": 10 * ЛАМПОРТОВ_В_SOL, "wsol": 0, "renta": 0, "pozicii": 0,
+             "vvod_vyvod": 7 * ЛАМПОРТОВ_В_SOL, "vyruchka_bez_vhoda": 0,
+             "rashodov_lamports": 0}, ensure_ascii=False) + "\n",
+            encoding="utf-8")
+        узел_сш = _poddelnyj_uzel(sol=10 * ЛАМПОРТОВ_В_SOL, scheta=[],
+                                  podpisi=[], tranzakcii={})
+        р_сш = progon(кат_сш, rpc_call=узел_сш, koshelek=КОШ,
+                      sejchas=1_700_000_050)
+        chk("СОСТОЯНИЕ ПОТЕРЯНО, А РЯД ЖИВ: накопительные числа сшиты с рядом, "
+            "и в изменении за период нет призрачных плюс-минус семи SOL",
+            р_сш["ok"] and р_сш.get("sshito", {}).get("vvod_vyvod")
+            == 7 * ЛАМПОРТОВ_В_SOL
+            and р_сш["rjad"]["vvod_vyvod"] == 7 * ЛАМПОРТОВ_В_SOL,
+            (р_сш.get("sshito"), р_сш.get("rjad", {}).get("vvod_vyvod")))
+        # ДИСК. Переписывание файла -- не каждый тик.
+        п_ряда2 = врем / "rjady2" / ФАЙЛ_РЯДОВ
+        зап_а = dopisat_rjad(п_ряда2, {"utc": int(основа - 4 * 86400),
+                                        "kapital": 1}, sejchas=основа)
+        зап_б = dopisat_rjad(п_ряда2, {"utc": int(основа), "kapital": 2},
+                             sejchas=основа)
+        зап_в = dopisat_rjad(п_ряда2, {"utc": int(основа + 1), "kapital": 3},
+                             sejchas=основа + 86400 * 2)
+        chk("файл ряда переписывается ТОЛЬКО когда первая строка старше порога "
+            f"на запас ({ЗАПАС_ОБРЕЗКИ_СЕК} с), а не каждый тик: это были "
+            "десятки гигабайт записи в сутки на машине, где диск уже кончался",
+            зап_а["perepisali"] is False and зап_б["perepisali"] is False
+            and зап_в["perepisali"] is True and зап_в["otrezano"] == 1,
+            (зап_а, зап_б, зап_в))
+        # КЭШ РЯДА: ВЫГРУЗКА СЧИТАЕТСЯ ПО ПАМЯТИ, А НЕ ПО ДИСКУ КАЖДЫЙ ТИК.
+        кат_к = врем / "kesh_rjada"
+        кэш: list = []
+        progon(кат_к, rpc_call=узел_сш, koshelek=КОШ, sejchas=1_700_000_300,
+               rjady_kesh=кэш)
+        progon(кат_к, rpc_call=узел_сш, koshelek=КОШ, sejchas=1_700_000_320,
+               rjady_kesh=кэш)
+        на_диске = prochitat_rjady(кат_к / ФАЙЛ_РЯДОВ)
+        chk("ряд для выгрузки берётся из памяти и совпадает с диском до строки",
+            len(кэш) == 2 and len(на_диске) == 2
+            and [х["utc"] for х in кэш] == [х["utc"] for х in на_диске],
+            (len(кэш), len(на_диске)))
+        # КАРТИНКА. Одна шкала на кривую, крест и отметки.
+        о_шк = в["okna"]["1Ч"]
+        chk("шкала картинки отдаётся ЧИСЛАМИ, и отметки с крестом считаются по "
+            "ней же, а не по трём разным формулам",
+            о_шк["shkala"]["t0"] == о_шк["tochki"][0][0]
+            and о_шк["shkala"]["x0"] == о_шк["tochki_x"][0]
+            and о_шк["shkala"]["x1"] == о_шк["tochki_x"][-1]
+            and len(о_шк["tochki_x"]) == len(о_шк["tochki"])
+            and len(о_шк["tochki_y"]) == len(о_шк["tochki"]), о_шк["shkala"])
+        chk("страница рисует отметки и крест по готовой шкале выгрузки",
+            "о.shkala" in html and "о.tochki_x" in html
+            and "о.tochki_y" in html, None)
+        chk("ссылка БЕЗ косой черты на конце не оставляет страницу пустой: "
+            "выгрузка берётся от самого пути, а не относительным именем",
+            "var БАЗА" in html and "location.pathname" in html
+            and 'fetch(БАЗА + "kapital.json' in html, None)
+
     finally:
         shutil.rmtree(врем, ignore_errors=True)
 
+    # ИМЕНА УПАВШИХ ПРОВЕРОК -- В ПОСЛЕДНИХ СТРОКАХ ВЫВОДА. Code-1 04.10:
+    # его гейт показывает `| tail -3`, и имена падений приходилось снимать
+    # отдельным прогоном. Теперь они стоят ровно перед итоговой строкой.
+    if упавшие:
+        print("УПАЛИ: " + "; ".join(упавшие))
     print(f"\nпроверок {было}, ждали {ZHDEM_PROVEROK}, не прошло {плохо}")
     if было != ZHDEM_PROVEROK:
         print(" ПЛОХО число проверок разошлось с объявленным -- "
