@@ -63,7 +63,18 @@ jobs:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
           set -e
-          pip install -q requests
+          # REQUESTS: НА СВОЁМ БЕГУНКЕ pip ПАДАЕТ. Python на хосте помечен
+          # externally-managed (PEP 668), и `pip install requests` выходит с
+          # кодом 1 -- прогон 15 (03.10 01:14Z) упал ровно на этом, уже ПОСЛЕ
+          # того, как чтение кошелька переехало с облака на nl-host. Сначала
+          # смотрим, есть ли requests вообще, и только потом ставим -- и ставим
+          # так, как разрешает этот python.
+          if ! python3 -c "import requests" 2>/dev/null; then
+            pip install -q --break-system-packages requests \
+              || pip install -q --user requests \
+              || pip install -q requests
+          fi
+          python3 -c "import requests; print('requests', requests.__version__)"
           ARGS="--hours ${{ inputs.hours }} --limit ${{ inputs.limit }}"
           if [ -n "${{ inputs.wallet }}" ]; then ARGS="$ARGS --wallet ${{ inputs.wallet }}"; fi
           if [ -n "${{ inputs.sigs }}" ]; then
