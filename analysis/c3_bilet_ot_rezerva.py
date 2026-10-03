@@ -153,6 +153,165 @@ def bilet(potolok_sol, rezerv_sol, dolya, *, pol_sol=None) -> dict:
     return iz
 
 
+# ----------------------------------- ГИБКИЙ БИЛЕТ: ступени и сочетание (п.4)
+#
+# ЗАГОТОВКА ЗА ФЛАГОМ, И ЧИСЛА В НЕЙ НЕ ВЫДУМАНЫ. Слово владельца 03.10 (п.4)
+# называет три варианта гибкого билета: (1) билет <= k % резерва пула с потолком
+# группы -- это `bilet()` выше, он уже в полосе за флагом BLOOM_BILET_DOLYA;
+# (2) СТУПЕНИ по размеру покупки источника -- границы 2--5 / 5--15 / >= 15
+# SOL-экв.; (3) СОЧЕТАНИЕ первого и второго. Постановка п.4 лежит дословно в
+# докстринге analysis/podbivka_nedelya_bilet.py (ветка claude/podbivka) -- оттуда
+# взяты ГРАНИЦЫ, и только они.
+#
+# ЧЕГО ЗДЕСЬ НЕТ НАРОЧНО: самих билетов по ступеням. Какой билет на какой
+# ступени -- это итог недельного разбора Code-2 и решение владельца, а не моя
+# догадка. Поэтому ступени ПУСТЫ по умолчанию, и пустые ступени = правило
+# выключено: билет равен потолку, то есть врезка без слова владельца не меняет
+# НИЧЕГО.
+IMYA_FLAGA_STUPENEJ = "BLOOM_BILET_STUPENI"
+GRANICY_STUPENEJ_P4 = (2.0, 5.0, 15.0)
+PRICHINA_STUPENI_VYKL = ("ступени выключены: BLOOM_BILET_STUPENI пуст -- билет "
+                         "равен потолку")
+PRICHINA_STUPENI_KRIVYE = ("ступени не разобрались: вид «порог:билет,порог:билет» "
+                           "-- билет равен потолку, и это сказано, а не молча")
+PRICHINA_NET_RAZMERA = ("размер покупки источника не назван числом -- ступень "
+                        "выбрать нечем, билет равен потолку")
+
+
+def stupeni(syroe=None) -> dict:
+    """Ступени из окружения: «2:0.1,5:0.3,15:0.5» -> [(порог, билет), ...].
+
+    Порог -- размер покупки ИСТОЧНИКА в SOL-экв., билет -- НАШ размер в SOL.
+    Разбор строгий: одна кривая пара -- и правило выключено целиком со словами.
+    Молча взять половину ступеней было бы хуже, чем не взять ничего: билет
+    поехал бы не туда, где его проверяли.
+    """
+    iz = {"ok": False, "stupeni": [], "why_not": None, "syroe": None}
+    t = (syroe if syroe is not None
+         else os.environ.get(IMYA_FLAGA_STUPENEJ) or "").strip()
+    iz["syroe"] = t or None
+    if not t:
+        iz["why_not"] = PRICHINA_STUPENI_VYKL
+        return iz
+    pары = []
+    for kусok in t.replace(";", ",").split(","):
+        kусok = kусok.strip()
+        if not kусok:
+            continue
+        if ":" not in kусok:
+            iz["why_not"] = f"{PRICHINA_STUPENI_KRIVYE}: «{kусok}»"
+            return iz
+        л, п = kусok.split(":", 1)
+        try:
+            порог = float(л.strip().replace(",", "."))
+            билет = float(п.strip().replace(",", "."))
+        except ValueError:
+            iz["why_not"] = f"{PRICHINA_STUPENI_KRIVYE}: «{kусok}»"
+            return iz
+        if порог < 0 or not билет > 0:
+            iz["why_not"] = (f"{PRICHINA_STUPENI_KRIVYE}: порог {порог}, билет "
+                             f"{билет}")
+            return iz
+        pары.append((порог, билет))
+    if not pары:
+        iz["why_not"] = PRICHINA_STUPENI_VYKL
+        return iz
+    pары.sort(key=lambda x: x[0])
+    iz.update(ok=True, stupeni=pары)
+    return iz
+
+
+def bilet_po_stupenjam(potolok_sol, razmer_istochnika_sol, stupeni_spisok,
+                       *, pol_sol=None) -> dict:
+    """ВАРИАНТ 2: билет по ступени размера покупки источника. Чистая функция.
+
+    Берётся ПОСЛЕДНЯЯ ступень, чей порог не выше размера источника. Размер ниже
+    первого порога -- ступени не применяются (билет равен потолку): мелкие
+    покупки источника -- это не сигнал на наш другой размер, а отсутствие
+    ступени.
+    """
+    iz = {"ok": False, "bilet_sol": None, "bilet_lamporty": None,
+          "potolok_sol": None, "stupen": None, "porog": None,
+          "razmer_istochnika_sol": None, "ot_stupeni": False,
+          "nizhe_pola": None, "pochemu": None}
+    if isinstance(potolok_sol, bool) or not isinstance(potolok_sol, (int, float)) \
+            or not float(potolok_sol) > 0:
+        iz["pochemu"] = f"потолок группы не положительное число: {potolok_sol!r}"
+        return iz
+    potolok = float(potolok_sol)
+    iz.update(ok=True, potolok_sol=potolok, bilet_sol=potolok,
+              bilet_lamporty=int(D(str(potolok)) * LAMPORTOV_V_SOL))
+    if not stupeni_spisok:
+        iz["pochemu"] = PRICHINA_STUPENI_VYKL
+        return iz
+    if isinstance(razmer_istochnika_sol, bool) \
+            or not isinstance(razmer_istochnika_sol, (int, float)) \
+            or not float(razmer_istochnika_sol) > 0:
+        iz["pochemu"] = PRICHINA_NET_RAZMERA
+        return iz
+    razmer = float(razmer_istochnika_sol)
+    iz["razmer_istochnika_sol"] = razmer
+    выбрана = None
+    for порог, билет in sorted(stupeni_spisok, key=lambda x: x[0]):
+        if razmer >= порог:
+            выбрана = (порог, билет)
+    if выбрана is None:
+        iz["pochemu"] = (f"размер источника {razmer} SOL-экв. ниже первого "
+                         f"порога {sorted(stupeni_spisok)[0][0]} -- билет равен "
+                         f"потолку")
+        return iz
+    порог, билет = выбрана
+    # ПОТОЛОК ГРУППЫ ВЫШЕ СТУПЕНИ НЕ ПУСКАЕТ: он -- слово владельца о группе, и
+    # ступень не может его перебить.
+    итог = min(билет, potolok)
+    iz.update(stupen=билет, porog=порог, bilet_sol=итог,
+              bilet_lamporty=int(D(str(итог)) * LAMPORTOV_V_SOL),
+              ot_stupeni=bool(итог < potolok),
+              pochemu=(f"размер источника {razmer} SOL-экв. попал на ступень "
+                       f">= {порог}: билет {билет}"
+                       + (f", но потолок группы {potolok} ниже" if билет > potolok
+                          else "")))
+    if isinstance(pol_sol, (int, float)) and not isinstance(pol_sol, bool):
+        iz["nizhe_pola"] = bool(итог < float(pol_sol))
+    return iz
+
+
+def bilet_sochetanie(potolok_sol, rezerv_sol, dolya_zn, razmer_istochnika_sol,
+                     stupeni_spisok, *, pol_sol=None) -> dict:
+    """ВАРИАНТ 3: сочетание -- берётся САМОЕ СТРОГОЕ из включённых правил.
+
+    Почему самое строгое, а не среднее: оба правила ограничивают риск, и
+    ослаблять одно другим -- значит не соблюсти ни одного. В ответе стоит поле
+    `chem_ogranichen`: потолок, доля или ступень -- чтобы по выгрузке было видно,
+    какое правило сработало, а не только итоговое число.
+    """
+    д = bilet(potolok_sol, rezerv_sol, dolya_zn, pol_sol=pol_sol)
+    с = bilet_po_stupenjam(potolok_sol, razmer_istochnika_sol, stupeni_spisok,
+                           pol_sol=pol_sol)
+    iz = {"ok": bool(д.get("ok") and с.get("ok")), "bilet_sol": None,
+          "bilet_lamporty": None, "chem_ogranichen": None,
+          "ot_doli": dict(д), "ot_stupeni": dict(с), "pochemu": None,
+          "nizhe_pola": None}
+    if not iz["ok"]:
+        iz["pochemu"] = д.get("pochemu") or с.get("pochemu")
+        return iz
+    potolok = float(д["potolok_sol"])
+    канд = [("потолок", potolok)]
+    if д.get("ot_rezerva"):
+        канд.append(("доля резерва", float(д["bilet_sol"])))
+    if с.get("ot_stupeni"):
+        канд.append(("ступень", float(с["bilet_sol"])))
+    имя, итог = min(канд, key=lambda x: x[1])
+    iz.update(bilet_sol=итог,
+              bilet_lamporty=int(D(str(итог)) * LAMPORTOV_V_SOL),
+              chem_ogranichen=имя,
+              pochemu=(f"самое строгое из включённых: {имя} -> {итог} SOL "
+                       f"(доля: {д.get('pochemu')}; ступени: {с.get('pochemu')})"))
+    if isinstance(pol_sol, (int, float)) and not isinstance(pol_sol, bool):
+        iz["nizhe_pola"] = bool(итог < float(pol_sol))
+    return iz
+
+
 def dolya() -> float:
     """Доля резерва -- вход окружения. По умолчанию 0: врезка ничего не меняет."""
     syroe = (os.environ.get(IMYA_FLAGA_DOLI) or "").strip().replace(",", ".")
@@ -626,7 +785,7 @@ def bilet_dlya_signala(*, potolok_sol, zapis=None, tx_istochnika=None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО: если образцов не станет или тип перестанет
 # разбираться, проверок будет МЕНЬШЕ, и самопроверка упадёт на несовпадении
 # числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 57
+ZHDEM_PROVEROK = 70
 # Живые образцы пулов репозитория: у скольких котировка WSOL и мой резерв совпал
 # с числом полосы (c2_swap_build.min_out_from_reserves -> reserves_after[0]).
 FAJLY_OBRAZCOV = {
@@ -887,6 +1046,71 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     chk("дверь без доли (умолчание окружения) -- билет потолок",
         bilet_dlya_signala(potolok_sol=0.5,
                            zapis={"pool_reserve_sol": 1.0})["bilet_sol"] == 0.5)
+
+    # ------------------- ГИБКИЙ БИЛЕТ: СТУПЕНИ И СОЧЕТАНИЕ (п.4, за флагом)
+    st_off = stupeni("")
+    chk("ступени по умолчанию ВЫКЛЮЧЕНЫ и это сказано словами",
+        not st_off["ok"] and PRICHINA_STUPENI_VYKL in (st_off["why_not"] or ""),
+        st_off.get("why_not"))
+    st = stupeni("2:0.1,5:0.3,15:0.5")
+    chk("ступени разбираются и сортируются по порогу; границы -- те, что в "
+        "постановке п.4 (2 / 5 / 15 SOL-экв.)",
+        st["ok"] and [п for п, _ in st["stupeni"]] == list(GRANICY_STUPENEJ_P4)
+        and [б for _, б in st["stupeni"]] == [0.1, 0.3, 0.5], st)
+    плохие_ст = []
+    for кривое in ("2", "a:b", "2:-1", "-1:0.1", "2:0.1,5", ":"):
+        р = stupeni(кривое)
+        if р["ok"] or not р["why_not"]:
+            плохие_ст.append((кривое, р))
+    chk("любая кривая пара выключает ступени ЦЕЛИКОМ и со словами -- половину "
+        "ступеней молча не берём",
+        not плохие_ст, плохие_ст)
+    б_мало = bilet_po_stupenjam(0.5, 1.0, st["stupeni"])
+    chk("размер источника ниже первого порога -- билет РАВЕН потолку, и это "
+        "названо",
+        б_мало["ok"] and б_мало["bilet_sol"] == 0.5
+        and not б_мало["ot_stupeni"] and "ниже первого порога" in б_мало["pochemu"],
+        б_мало)
+    for размер, ждём, порог in ((3.0, 0.1, 2.0), (7.0, 0.3, 5.0), (100.0, 0.5, 15.0)):
+        б = bilet_po_stupenjam(1.0, размер, st["stupeni"])
+        chk(f"размер источника {размер} SOL-экв. -> ступень {порог} -> билет {ждём}",
+            б["ok"] and б["bilet_sol"] == ждём and б["porog"] == порог
+            and б["ot_stupeni"], б)
+    б_пот = bilet_po_stupenjam(0.2, 100.0, st["stupeni"])
+    chk("потолок группы ступень НЕ перебивает: 0.2 ниже ступени 0.5",
+        б_пот["bilet_sol"] == 0.2 and "потолок группы 0.2 ниже" in б_пот["pochemu"],
+        б_пот)
+    б_без = bilet_po_stupenjam(0.5, None, st["stupeni"])
+    chk("размер источника не назван -- билет потолок, причина названа",
+        б_без["bilet_sol"] == 0.5
+        and PRICHINA_NET_RAZMERA in (б_без["pochemu"] or ""), б_без)
+    # СОЧЕТАНИЕ: самое строгое из включённых, и видно КАКОЕ
+    с_оба = bilet_sochetanie(1.0, 20.0, 0.01, 100.0, st["stupeni"])
+    chk("сочетание: доля даёт 0.2, ступень 0.5 -- берётся доля, и это названо",
+        с_оба["ok"] and с_оба["bilet_sol"] == 0.2
+        and с_оба["chem_ogranichen"] == "доля резерва", с_оба)
+    с_ступ = bilet_sochetanie(1.0, 200.0, 0.01, 3.0, st["stupeni"])
+    chk("сочетание: доля даёт 2.0 (выше потолка), ступень 0.1 -- берётся ступень",
+        с_ступ["bilet_sol"] == 0.1 and с_ступ["chem_ogranichen"] == "ступень",
+        с_ступ)
+    с_ничего = bilet_sochetanie(0.3, None, 0, None, [])
+    chk("сочетание без обоих правил -- билет потолок, ограничил потолок",
+        с_ничего["bilet_sol"] == 0.3
+        and с_ничего["chem_ogranichen"] == "потолок", с_ничего)
+    было_ст = os.environ.pop(IMYA_FLAGA_STUPENEJ, None)
+    было_д = os.environ.pop(IMYA_FLAGA_DOLI, None)
+    try:
+        с_умолч = bilet_sochetanie(0.3, 20.0, dolya(), 100.0,
+                                   stupeni()["stupeni"])
+    finally:
+        if было_ст is not None:
+            os.environ[IMYA_FLAGA_STUPENEJ] = было_ст
+        if было_д is not None:
+            os.environ[IMYA_FLAGA_DOLI] = было_д
+    chk("БЕЗ СЛОВА ВЛАДЕЛЬЦА НЕ МЕНЯЕТСЯ НИЧЕГО: оба флага пусты -- билет "
+        "равен потолку группы",
+        с_умолч["bilet_sol"] == 0.3
+        and с_умолч["chem_ogranichen"] == "потолок", с_умолч)
 
     plohih = [p for p in proverki if not p[1]]
     for chto, ok, fakt in proverki:
