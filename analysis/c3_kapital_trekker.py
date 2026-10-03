@@ -1012,143 +1012,191 @@ def vygruzka(rjady: list, sostojanie: dict, *, sejchas: float | None = None) -> 
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Капитал полосы</title>
 <style>
-/* ПАЛИТРА РОЛЯМИ, А НЕ ШЕСТНАДЦАТЕРИЧНЫМИ ЧИСЛАМИ ПО ТЕКСТУ: светлая и тёмная
-   меняются в одном месте. Тёмная объявлена ДВАЖДЫ -- под настройкой системы и
-   под переключателем темы, и переключатель бьёт систему в обе стороны. */
+/* ВИД -- КАК У ДОМАШНЕЙ ПАНЕЛИ ВЛАДЕЛЬЦА (ветка dashboard, index.html): те же
+   имена ролей, те же числа, те же цвета состояний. Своей палитры не изобретаю:
+   владелец смотрит обе страницы одними глазами, и вторая не должна выглядеть
+   чужой. Тёмная тема объявлена ТРИЖДЫ, как там же: :root, системная настройка
+   и переключатель -- и переключатель бьёт систему в обе стороны.
+   ОТЛИЧИЕ ОДНО, И ОНО НАРОЧНО: шрифты НЕ тянутся из сети. Страница живёт за
+   ссылкой с секретом, и каждый внешний адрес на ней -- это и утечка самого
+   факта, и чужой код в нашей странице. Имена семейств оставлены первыми: есть
+   на телефоне -- возьмутся, нет -- системные. */
 :root {
   color-scheme: light;
-  --plane: #f9f9f7; --surface: #fcfcfb;
-  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
-  --grid: #e1e0d9; --base: #c3c2b7; --ring: rgba(11,11,11,.10);
-  --series: #2a78d6; --good: #006300; --bad: #d03b3b;
-  --chip: rgba(11,11,11,.05);
+  --bg: #f2f4f1;
+  --surface: #ffffff; --surface-2: #eef0ec; --surface-3: #e4e7e2;
+  --ink: #131619; --ink-2: #596068; --ink-3: #8a9199;
+  --line: #e2e5e0; --line-2: #cdd2cb;
+  --shadow: 0 1px 2px rgba(19,22,25,.05), 0 10px 28px -14px rgba(19,22,25,.16);
+  --good: #0f8f2e; --good-bg: rgba(15,143,46,.11);
+  --bad: #c93a3a; --bad-bg: rgba(201,58,58,.11);
+  --accent: #2a78d6;
+  --tip-bg: #131619; --tip-ink: #f4f6f3;
+  --sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 @media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --plane: #0d0d0d; --surface: #1a1a19;
-    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
-    --grid: #2c2c2a; --base: #383835; --ring: rgba(255,255,255,.10);
-    --series: #3987e5; --good: #0ca30c; --bad: #d03b3b;
-    --chip: rgba(255,255,255,.07);
+    --bg: #0e1110;
+    --surface: #171a19; --surface-2: #1f2321; --surface-3: #292e2b;
+    --ink: #f1f3ef; --ink-2: #a3aaa3; --ink-3: #6f766f;
+    --line: #262b29; --line-2: #363c39;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 14px 34px -16px rgba(0,0,0,.6);
+    --good: #3ccb5a; --good-bg: rgba(60,203,90,.13);
+    --bad: #ef6363; --bad-bg: rgba(239,99,99,.14);
+    --accent: #3987e5;
+    --tip-bg: #f1f3ef; --tip-ink: #131619;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --plane: #0d0d0d; --surface: #1a1a19;
-  --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
-  --grid: #2c2c2a; --base: #383835; --ring: rgba(255,255,255,.10);
-  --series: #3987e5; --good: #0ca30c; --bad: #d03b3b;
-  --chip: rgba(255,255,255,.07);
+  --bg: #0e1110;
+  --surface: #171a19; --surface-2: #1f2321; --surface-3: #292e2b;
+  --ink: #f1f3ef; --ink-2: #a3aaa3; --ink-3: #6f766f;
+  --line: #262b29; --line-2: #363c39;
+  --shadow: 0 1px 2px rgba(0,0,0,.35), 0 14px 34px -16px rgba(0,0,0,.6);
+  --good: #3ccb5a; --good-bg: rgba(60,203,90,.13);
+  --bad: #ef6363; --bad-bg: rgba(239,99,99,.14);
+  --accent: #3987e5;
+  --tip-bg: #f1f3ef; --tip-ink: #131619;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  background: var(--plane); color: var(--ink);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.45 var(--sans);
   -webkit-text-size-adjust: 100%;
 }
 .obolochka { max-width: 820px; margin: 0 auto; padding: 16px 16px 32px; }
-header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
          margin: 2px 0 14px; }
-header h1 { font-size: 14px; font-weight: 600; color: var(--ink-2);
-            letter-spacing: .02em; margin: 0; }
-.koshelek { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.tema { margin-left: auto; background: var(--chip); color: var(--ink-2);
-        border: 0; border-radius: 999px; padding: 7px 12px; font-size: 13px;
-        cursor: pointer; min-height: 36px; }
-.karta { background: var(--surface); border: 1px solid var(--ring);
-         border-radius: 16px; padding: 18px 16px 10px; }
-/* ГЕРОЙ -- РОВНО ОДИН НА СТРАНИЦЕ, и цифры у него пропорциональные:
-   tabular-nums на крупном числе выглядит рыхло. */
-.geroj { font-size: 46px; line-height: 1.05; font-weight: 600; margin: 0;
-         letter-spacing: -.02em; }
-.geroj .ed { font-size: 20px; font-weight: 500; color: var(--ink-2);
-             margin-left: 6px; letter-spacing: 0; }
+.znak { width: 30px; height: 30px; border-radius: 9px; flex: none;
+  background: linear-gradient(135deg, var(--accent), #1baf7a);
+  display: grid; place-items: center; color: #fff; font-weight: 800;
+  font-size: 14px; letter-spacing: -.02em; box-shadow: var(--shadow); }
+header h1 { font-size: 14px; font-weight: 700; color: var(--ink-2);
+            letter-spacing: .01em; margin: 0; }
+.koshelek { font-size: 12px; color: var(--ink-3); font-family: var(--mono);
+            font-variant-numeric: tabular-nums; }
+.tema { margin-left: auto; background: var(--surface);
+        border: 1px solid var(--line-2); color: var(--ink-2);
+        border-radius: 10px; padding: 8px 13px; font: 700 13px/1 var(--sans);
+        cursor: pointer; min-height: 36px; box-shadow: 0 1px 0 rgba(0,0,0,.03); }
+/* КАРТА -- КАК .card ПАНЕЛИ: радиус 16, тонкая рамка, тень и полоска цвета
+   слева. Полоска -- не украшение: по ней карта узнаётся как «наша». */
+.karta { background: var(--surface); border: 1px solid var(--line);
+         border-radius: 16px; padding: 16px 16px 12px; box-shadow: var(--shadow);
+         position: relative; overflow: hidden; }
+.karta::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+                 width: 4px; background: var(--accent); }
+.metka { font-size: 12px; font-weight: 700; color: var(--ink-3);
+         letter-spacing: .04em; text-transform: uppercase; margin: 0 0 4px; }
+/* ЧИСЛА -- МОНО И ТАБЛИЧНЫЕ, как у панели: там так все балансы, и прыгающая
+   ширина цифр на обновлении раз в 30 с заметна сразу. */
+.geroj { font-family: var(--mono); font-size: 38px; line-height: 1.02;
+         font-weight: 600; margin: 0; letter-spacing: -.01em;
+         font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.geroj .ed { font-family: var(--sans); font-size: 17px; font-weight: 600;
+             color: var(--ink-2); margin-left: 7px; letter-spacing: 0; }
 .izmenenie { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-             margin: 8px 0 0; font-size: 15px; font-weight: 600; }
-.izmenenie .za { color: var(--muted); font-weight: 500; }
-.rost { color: var(--good); } .padenie { color: var(--bad); }
-.nol { color: var(--ink-2); }
-/* ОКНА -- ОДНИМ РЯДОМ НАД ГРАФИКОМ, как и положено отбору периода. */
-.okna { display: flex; gap: 6px; margin: 16px 0 6px; }
-.okna button { flex: 0 0 auto; min-width: 56px; min-height: 36px;
-  background: var(--chip); color: var(--ink-2); border: 0; border-radius: 10px;
-  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.okna button[aria-pressed="true"] { background: var(--series); color: #fff; }
-.grafik { position: relative; margin: 0 -4px;
+             margin: 9px 0 0; font-size: 14px; }
+.izmenenie .chip { display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 999px; padding: 5px 11px; font-weight: 700;
+  font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.rost { color: var(--good); background: var(--good-bg); }
+.padenie { color: var(--bad); background: var(--bad-bg); }
+.nol { color: var(--ink-2); background: var(--surface-2); }
+.izmenenie .za { color: var(--ink-3); font-weight: 600; }
+.okna { display: flex; gap: 6px; margin: 16px 0 8px; }
+.okna button { flex: 0 0 auto; min-width: 58px; min-height: 36px;
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line-2); border-radius: 10px;
+  font: 700 13px/1 var(--sans); cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0,0,0,.03); }
+.okna button[aria-pressed="true"] { background: var(--accent); color: #fff;
+  border-color: var(--accent); }
+.grafik { position: relative; margin: 0 -2px;
           -webkit-tap-highlight-color: transparent; }
-/* ОБВОДКА ПРИ ФОКУСЕ -- СВОЯ, А НЕ ОРАНЖЕВАЯ ОТ БРАУЗЕРА: с клавиатуры график
-   доступен и обязан это показывать, но показывать нашим цветом. */
 .grafik svg:focus { outline: none; }
-.grafik svg:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
-/* ВЫСОТА ГРАФИКА ЗАДАНА, А НЕ ВЫВЕДЕНА ИЗ ПРОПОРЦИЙ. viewBox 1000x320 при
-   ширине телефона 332 px дал бы 106 px высоты -- капитал на такой полоске
-   читается плохо. Растяжение неравномерное (preserveAspectRatio="none"), и
-   именно поэтому высоту можно назначить свободно: линия от этого не портится
-   (non-scaling-stroke), а точка и подписи вынесены из SVG наложением. */
+.grafik svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .grafik svg { display: block; width: 100%; height: 190px; touch-action: pan-y; }
-.liniya { fill: none; stroke: var(--series); stroke-width: 2;
+.liniya { fill: none; stroke: var(--accent); stroke-width: 3;
           stroke-linejoin: round; stroke-linecap: round;
           vector-effect: non-scaling-stroke; }
-.setka { stroke: var(--grid); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.osnova { stroke: var(--base); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.krest { stroke: var(--base); stroke-width: 1; vector-effect: non-scaling-stroke; }
-/* ТОЧКА И ПОДПИСЬ -- НАЛОЖЕНИЕМ HTML, А НЕ ВНУТРИ SVG. SVG растянут
-   неравномерно (preserveAspectRatio="none"), поэтому круг внутри него стал бы
-   сплюснутым овалом, а текст -- сжатым по горизонтали вдвое с лишним. Линию
-   это не портит (у неё non-scaling-stroke), а точку и буквы портит сразу. */
-.konec-tochka { position: absolute; width: 10px; height: 10px;
-  margin: -5px 0 0 -5px; border-radius: 50%; background: var(--series);
-  box-shadow: 0 0 0 2px var(--surface); pointer-events: none; }
-.konec-podpis { position: absolute; transform: translate(-50%, -140%);
-  font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap;
-  pointer-events: none; text-shadow: 0 0 3px var(--surface),
-  0 0 3px var(--surface), 0 0 3px var(--surface); }
-.vremya-osi { display: flex; justify-content: space-between; gap: 12px;
-  margin: 4px 2px 0; font-size: 12px; color: var(--muted);
-  font-variant-numeric: tabular-nums; }
-.metka-vvoda { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3;
+.setka { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.osnova { stroke: var(--line-2); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.krest { stroke: var(--ink-3); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.metka-vvoda { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 2 3;
                vector-effect: non-scaling-stroke; }
+/* ТОЧКА И ПОДПИСЬ -- НАЛОЖЕНИЕМ HTML, А НЕ ВНУТРИ РАСТЯНУТОГО SVG: круг в нём
+   стал бы овалом, а буквы -- сжатыми вдвое с лишним. */
+.konec-tochka { position: absolute; width: 11px; height: 11px;
+  margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 3px var(--surface); pointer-events: none; }
+.konec-podpis { position: absolute; transform: translate(-50%, -150%);
+  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none;
+  text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface),
+               0 0 3px var(--surface); }
+.vremya-osi { display: flex; justify-content: space-between; gap: 12px;
+  margin: 5px 2px 0; font-size: 11px; color: var(--ink-3);
+  font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* ПОДСКАЗКА -- ТЁМНАЯ ПЛАШКА МОНО, как .tip панели. */
 .podskazka { position: absolute; pointer-events: none; z-index: 3;
-  background: var(--surface); color: var(--ink); border: 1px solid var(--ring);
-  border-radius: 10px; padding: 7px 10px; font-size: 13px; white-space: nowrap;
-  box-shadow: 0 6px 20px rgba(0,0,0,.14); opacity: 0; transition: opacity .12s; }
-.podskazka b { font-size: 14px; }
-.podskazka .vremya { color: var(--muted); font-size: 12px; display: block; }
+  background: var(--tip-bg); color: var(--tip-ink); border-radius: 8px;
+  padding: 6px 9px; font-family: var(--mono); font-size: 12px;
+  white-space: nowrap; box-shadow: var(--shadow); opacity: 0;
+  transition: opacity .12s; font-variant-numeric: tabular-nums; }
+.podskazka b { font-size: 13px; font-weight: 600; }
+.podskazka .vremya { color: var(--ink-3); font-size: 11px; display: block; }
 .chasti { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px; margin: 14px 0 0; }
-.chasti div { background: var(--chip); border-radius: 12px; padding: 10px 12px; }
-.chasti dt { color: var(--muted); font-size: 12px; margin: 0 0 2px; }
-.chasti dd { margin: 0; font-size: 16px; font-weight: 600;
-             font-variant-numeric: tabular-nums; }
-.pod-grafikom { margin: 16px 0 0; }
+          gap: 8px; margin: 14px 0 0; }
+.chasti div { background: var(--surface-2); border-radius: 12px;
+              padding: 9px 11px; min-width: 0; }
+.chasti dt { color: var(--ink-3); font-size: 11px; font-weight: 600;
+             margin: 0 0 3px; }
+.chasti dd { margin: 0; font-family: var(--mono); font-size: 15px;
+             font-weight: 600; font-variant-numeric: tabular-nums;
+             overflow-wrap: anywhere; }
+.pod-grafikom { margin: 14px 0 0; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px;
+  box-shadow: var(--shadow); }
 .ryad { display: flex; justify-content: space-between; gap: 12px;
-        padding: 9px 0; border-top: 1px solid var(--grid); font-size: 14px; }
+        padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .ryad:first-child { border-top: 0; }
 .ryad span:first-child { color: var(--ink-2); }
-.ryad span:last-child { font-weight: 600; font-variant-numeric: tabular-nums; }
-.otmetki { margin: 10px 0 0; padding: 0; list-style: none; }
+.ryad span:last-child { font-weight: 700; font-family: var(--mono);
+                        font-variant-numeric: tabular-nums; }
+.otmetki { margin: 4px 0 8px; padding: 0; list-style: none; }
 .otmetki li { display: flex; justify-content: space-between; gap: 10px;
-  font-size: 13px; color: var(--ink-2); padding: 6px 0;
-  border-top: 1px dashed var(--grid); }
-.slovami { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+  font-size: 12px; color: var(--ink-2); padding: 7px 8px; margin: 4px 0;
+  border-radius: 8px; background: var(--surface-2); font-family: var(--mono);
+  font-variant-numeric: tabular-nums; }
+.slovami { margin: 14px 2px 0; font-size: 13px; color: var(--ink-2);
+           background: var(--bad-bg); border-radius: 10px; padding: 10px 12px; }
+.slovami:empty { display: none; }
 .slovami b { color: var(--bad); }
-footer { margin: 18px 0 0; font-size: 12px; color: var(--muted); }
+footer { margin: 16px 2px 0; font-size: 11px; color: var(--ink-3);
+         font-family: var(--mono); }
 .ustarelo { opacity: .55; transition: opacity .2s; }
 @media (min-width: 560px) {
   .chasti { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .grafik svg { height: 260px; }
+  .geroj { font-size: 46px; }
 }
 </style>
 </head>
 <body>
 <div class="obolochka">
   <header>
+    <div class="znak" aria-hidden="true">H</div>
     <h1>КАПИТАЛ ПОЛОСЫ</h1>
     <span class="koshelek" id="koshelek"></span>
     <button class="tema" id="tema" type="button">тема</button>
@@ -1276,10 +1324,10 @@ function нарисовать() {
   и.innerHTML = "";
   var пр = document.createElement("span");
   if (о.izmenenie_lamports === null || о.izmenenie_lamports === undefined) {
-    пр.className = "nol"; текст(пр, "ряда за период нет");
+    пр.className = "chip nol"; текст(пр, "ряда за период нет");
   } else {
     var в = о.izmenenie_lamports;
-    пр.className = в > 0 ? "rost" : (в < 0 ? "padenie" : "nol");
+    пр.className = "chip " + (в > 0 ? "rost" : (в < 0 ? "padenie" : "nol"));
     var стрелка = в > 0 ? "▲" : (в < 0 ? "▼" : "•");
     var проц = (о.izmenenie_pct === null || о.izmenenie_pct === undefined)
       ? "" : "  (" + (в > 0 ? "+" : "") + о.izmenenie_pct.toFixed(2) + " %)";
