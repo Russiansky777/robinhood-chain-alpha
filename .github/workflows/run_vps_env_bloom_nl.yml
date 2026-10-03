@@ -73,6 +73,21 @@ jobs:
             ls -1t --time-style=+%Y-%m-%dT%H:%M:%SZ $ENV_DIR/env.bak.* 2>/dev/null | head -8
             for b in \$(ls -1t $ENV_DIR/env.bak.* 2>/dev/null | head -8); do
               echo \"\$b par=\$(grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' \$b) bajt=\$(wc -c < \$b)\"
+            done
+            # КОГДА ИМЯ ПРОПАЛО -- ПО КОПИЯМ, ТОЛЬКО ФАКТ ЕСТЬ/НЕТ.
+            # Найдено 03.10 в 20:2xZ: детектор работал БЕЗ BLOOM_SOURCE_GROUPS,
+            # то есть читал умолчание модуля (data/sources_live.json -- имя
+            # копии в ветке, а не файла на хосте), не находил его и ставил
+            # политику off ВСЕМ адресам. Покупки встали. Чтобы не гадать, какая
+            # правка его унесла, здесь печатается ряд копий с ответом да/нет по
+            # каждому следящему имени. Значения не печатаются никогда.
+            echo '--- sledim za imenami po kopijam (est/net, bez znachenij) ---'
+            for b in $ENV_DIR/env \$(ls -1t $ENV_DIR/env.bak.* 2>/dev/null | head -8); do
+              stroka=\"\$b\"
+              for n in BLOOM_SOURCE_GROUPS BLOOM_COPIERS_FILE CLOSE_ACCOUNTS_LIVE BLOOM_CLOSE_ON_SELL BLOOM_DLMM_ODNO_CHTENIE BLOOM_USDC_NOGA LANE_DAILY_LOSS_SOL; do
+                if grep -q \"^\$n=\" \"\$b\" 2>/dev/null; then stroka=\"\$stroka \$n:est\"; else stroka=\"\$stroka \$n:NET\"; fi
+              done
+              echo \"\$stroka\"
             done" | tee -a "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
