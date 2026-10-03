@@ -110,8 +110,19 @@ def сторона_пула(ряды: list) -> str | None:
             счёт[вл] += 1
     if not счёт or not всего:
         return None
-    вл, n = счёт.most_common(1)[0]
-    return вл if n / всего >= 0.5 else None
+    # сторона пула -- кто встречается чаще всего; при равенстве тот, у кого дельты обоих знаков
+    # (пул и принимает, и отдаёт токен, а торговец обычно в одну сторону)
+    знаки: dict = {}
+    for r in ряды:
+        if not r:
+            continue
+        for вл, d in r["ток"].items():
+            знаки.setdefault(вл, set()).add(d > 0)
+    макс = max(счёт.values())
+    канд = [вл for вл, n in счёт.items() if n == макс]
+    канд.sort(key=lambda вл: (-len(знаки.get(вл) or set()), вл))
+    вл = канд[0]
+    return вл if макс / всего >= 0.5 else None
 
 
 def нога_sol(r: dict, пул: str | None) -> float | None:
@@ -136,7 +147,7 @@ def сделка_пула(r: dict, пул: str | None) -> dict | None:
     if sol is None:
         return None
     return {"кто": кто, "токенов": д, "sol": abs(sol), "покупка": д > 0,
-            "цена": (abs(sol) / d if d > 0 else None)}
+            "цена": (abs(sol) / д if д > 0 else None)}
 
 
 def main() -> int:
