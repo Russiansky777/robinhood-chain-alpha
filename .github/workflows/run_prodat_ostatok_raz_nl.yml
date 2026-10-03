@@ -39,6 +39,22 @@ on:
         description: "сколько секунд ждать подтверждения подписи"
         required: false
         default: "90"
+      zakryt_zapis_cid:
+        description: "ФАНТОМ: client_order_id позиции, которую закрыть записью «продано вне службы» (пусто -- шаг не идёт)"
+        required: false
+        default: ""
+      zakryt_zapis_podpis:
+        description: "ФАНТОМ: подпись той продажи (проверяется по цепи)"
+        required: false
+        default: ""
+      zakryt_zapis_itog_sol:
+        description: "ФАНТОМ: итог позиции по цепи, если посчитан отдельно (пусто -- нативная дельта подписи)"
+        required: false
+        default: ""
+      zakryt_zapis_zhivjom:
+        description: "ФАНТОМ: 'yes' -- записать (по умолчанию только показать запись)"
+        required: false
+        default: "no"
 
 concurrency:
   group: prodat-ostatok-raz
@@ -65,10 +81,12 @@ jobs:
 
       # У системного python3 бегунка нет solders -- здесь только разбор файла.
       # Настоящая самопроверка идёт на ХОСТЕ тем же питоном, что и прогон.
-      - name: "Модуль разбирается"
+      - name: "Модули разбираются"
         run: |
           set -e
           python3 -m py_compile deploy/checks/prodat_ostatok_raz.py
+          python3 -m py_compile deploy/checks/zakryt_fantom.py
+          python3 deploy/checks/zakryt_fantom.py --self-test | tail -2
           echo "razbor ok"
 
       - name: "SSH key"
@@ -92,6 +110,9 @@ jobs:
             cd $CODE_DIR && PYTHONPATH=$CODE_DIR $PY_HOSTA $RABOTA/prodat_ostatok_raz.py --self-test | tail -3"
 
       - name: "Продажа остатка (живой режим -- только по слову live=yes)"
+        # КОГДА ПОЗВАЛИ ТОЛЬКО ЗАКРЫТЬ ЗАПИСЬ, продавать нечего и котировку
+        # спрашивать незачем: токена на счёте уже нет.
+        if: ${{ inputs.zakryt_zapis_cid == '' }}
         run: |
           set -e
           set -o pipefail
@@ -164,13 +185,55 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/zakrytie.json 2>/dev/null || echo '{}'" > data/prodat_ostatok_zakrytie.json
           wc -c data/prodat_ostatok_zakrytie.json
 
+      # ФАНТОМ: ЗАКРЫТЬ ЗАПИСЬЮ, А НЕ ПРОДАЖЕЙ (слово владельца 03.10). Продажа
+      # уже состоялась на цепи разовым прогоном, а служба считает позицию
+      # открытой: сторож крутит по ней продажу каждый круг и отодвигает срок
+      # продажи ОСТАЛЬНЫХ (ночь 02->03.10: держание 155-188 слотов при плане
+      # 108, ровно один период круга), гейт перезапуска не пускает деплой, а
+      # суточный счёт не видит её результата. Шаг только дописывает запись:
+      # ни одной подписи, ни одной отправки. Охраны -- в самом модуле, и все
+      # по цепи: подпись подтверждена, наш кошелёк в сделке, остаток минта ноль.
+      - name: "ФАНТОМ: закрыть позицию записью «продано вне службы»"
+        if: ${{ inputs.zakryt_zapis_cid != '' && inputs.zakryt_zapis_podpis != '' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/zakryt_fantom.py" < deploy/checks/zakryt_fantom.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "$PY_HOSTA $RABOTA/zakryt_fantom.py --self-test | tail -3"
+          ZHIVYOM=""
+          if [ "${{ inputs.zakryt_zapis_zhivjom }}" = "yes" ]; then ZHIVYOM="ZAKRYT_FANTOM_LIVE=1"; fi
+          # ЗАПИСЬ ИДЁТ ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ: журнал позиций принадлежит ему,
+          # и файл, записанный root, служба потом не перепишет.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            install -d -m 777 $RABOTA/out
+            su bot -s /bin/sh -c \"cd $CODE_DIR && env HELIUS_API_KEY='\$HELIUS_API_KEY' \
+              BLOOM_STATE_DIR='\$BLOOM_STATE_DIR' BLOOM_CODE_DIR='$CODE_DIR' \
+              OWN_SEND_WALLET='\$OWN_SEND_WALLET' $ZHIVYOM PYTHONPATH=$CODE_DIR \
+              $PY_HOSTA $RABOTA/zakryt_fantom.py \
+                --cid '${{ inputs.zakryt_zapis_cid }}' \
+                --podpis '${{ inputs.zakryt_zapis_podpis }}' \
+                --mint '${{ inputs.mint }}' --koshelek '\$OWN_SEND_WALLET' \
+                --itog-sol '${{ inputs.zakryt_zapis_itog_sol }}' \
+                --out $RABOTA/out/fantom.json\"
+          " 2>&1 | tail -40 || echo "FANTOM_NE_OK=1" >> "$GITHUB_ENV"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out/fantom.json 2>/dev/null || true" > /tmp/fantom.json || true
+          if python3 -c "import json; json.load(open('/tmp/fantom.json'))" 2>/dev/null; then
+            cp /tmp/fantom.json data/zakryt_fantom.json
+            python3 -c "import json; d=json.load(open('data/zakryt_fantom.json')); print('FANTOM ok=', d.get('ok'), '| why_not=', d.get('why_not')); print('cepb:', json.dumps(d.get('цепь'), ensure_ascii=False)[:300])"
+          else
+            echo "SBOY: svodka fantoma ne sobralas"
+            exit 1
+          fi
+
       - name: "Ключей в отчёте быть не должно"
         if: always()
         run: |
           set -e
           # if, а НЕ "[ -f ] && ...": под set -e неудачная проверка последнего
           # файла валит шаг, и прогон краснеет из-за отсутствующего файла.
-          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json; do
+          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json data/zakryt_fantom.json; do
             if [ -f "$F" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$F"; fi
           done
 
@@ -184,7 +247,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json; do
+          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json data/zakryt_fantom.json; do
             if [ -f "$F" ]; then git add "$F"; fi
           done
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
