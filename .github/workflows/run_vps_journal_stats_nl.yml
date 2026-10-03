@@ -71,7 +71,20 @@ jobs:
           DAY=$(printf %s "${{ inputs.since }}" | cut -c1-10)
           [ -n "$DAY" ] || DAY=$(date -u +%Y-%m-%d)
           TODAY=$(date -u +%Y-%m-%d)
-          echo "дни отсева: $DAY и $TODAY"
+          # ВСЕ ДНИ ОТ НАЧАЛА ОКНА ДО СЕГОДНЯ, А НЕ ДВА. Раньше отсев брал
+          # ровно DAY и TODAY, и окно в 72 часа молча теряло середину: для
+          # since=30.09 строки 01.10 и 02.10 не попадали в копию вовсе, а
+          # отчёт выглядел полным. Теперь список дней строится целиком, и
+          # пропуска середины быть не может.
+          DNI="$DAY"
+          CUR="$DAY"
+          for i in $(seq 1 14); do
+            [ "$CUR" = "$TODAY" ] && break
+            CUR=$(date -u -d "$CUR + 1 day" +%Y-%m-%d) || break
+            DNI="$DNI|$CUR"
+          done
+          case "$DNI" in *"$TODAY"*) ;; *) DNI="$DNI|$TODAY" ;; esac
+          echo "дни отсева: $DNI"
           # ЧТО ОТСЕИВАЕМ. Строки сигналов (parsed_from) за сутки -- это сотни
           # мегабайт, и когда нужна только тень, тащить их незачем: при
           # only=shadow берутся лишь строки со словом shadow.
@@ -82,7 +95,7 @@ jobs:
           fi
           echo "отбор строк: $PICK"
           ssh -n $SSH_OPTS root@$HOST "wc -c < $STATE_DIR/decisions.jsonl; wc -l < $STATE_DIR/decisions.jsonl"
-          ssh -n $SSH_OPTS root@$HOST "grep -E '$PICK' $STATE_DIR/decisions.jsonl | grep -E '$DAY|$TODAY' || true" > /tmp/journal_state/decisions.jsonl
+          ssh -n $SSH_OPTS root@$HOST "grep -E '$PICK' $STATE_DIR/decisions.jsonl | grep -E '$DNI' || true" > /tmp/journal_state/decisions.jsonl
           ssh -n $SSH_OPTS root@$HOST "cat $STATE_DIR/positions.jsonl" > /tmp/journal_state/positions.jsonl
           for f in decisions.jsonl positions.jsonl; do
             echo "$f: $(wc -c < /tmp/journal_state/$f) байт, строк $(wc -l < /tmp/journal_state/$f)"
