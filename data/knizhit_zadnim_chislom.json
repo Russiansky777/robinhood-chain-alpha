@@ -1,8 +1,8 @@
 {
- "ok": false,
- "why_not": "сухой прогон: записи нет (живьём -- KNIZHIT_LIVE=1)",
+ "ok": true,
+ "why_not": null,
  "cid": "lane-own-2mPm8P27g6Q2FsrMvushNS7QWd9xgpAYU3FmGY2R",
- "живьём": false,
+ "живьём": true,
  "сутки": "2026-10-01",
  "режим": "книжение задним числом",
  "откуда_запись": "вся история журнала",
@@ -24,17 +24,22 @@
  "сутки_из_времени": "2026-10-01",
  "часовой_пояс_недоступен": false,
  "сегодня": "2026-10-03",
+ "расход_в_счёт": 0.0,
+ "расход_по_формуле": -0.023219386,
+ "отток_покупки": 0.075775614,
  "запись": {
   "closed_sol_net": 0.013722078,
   "pnl_counted": true,
   "pnl_counted_sol": -0.061544696,
-  "pnl_counted_spend_sol": -0.023219386,
+  "pnl_counted_spend_sol": 0.0,
+  "knizhit_rashod_po_formule_sol": -0.023219386,
+  "knizhit_ottok_pokupki_sol": 0.075775614,
   "knizhit_zadnim_chislom": "2026-10-01",
   "knizhit_itog_sol": -0.061544696,
   "knizhit_itog_likvidnyj_sol": -0.063058536,
   "knizhit_renta_sol": 0.00151384,
   "knizhit_ts_prodazhi": 1790891913.0,
-  "knizhit_pochemu": "книжено задним числом по слову владельца 03.10: итог по цепи в сутки продажи 2026-10-01; число с рентой, ликвидный итог рядом"
+  "knizhit_pochemu": "книжено задним числом по слову владельца 03.10: итог по цепи в сутки продажи 2026-10-01; число с рентой, ликвидный итог рядом; расход по формуле отрицателен (билет потрачен не целиком) -- в суточный счёт пошёл 0.0, оба настоящих числа в полях knizhit_*"
  },
  "счёт_до": {
   "realized_sol": 0.979954514,
@@ -43,5 +48,38 @@
   "sells": 171,
   "tz_unavailable": false,
   "updated_utc": "2026-10-01T21:27:53Z"
+ },
+ "строка_журнала": {
+  "client_order_id": "lane-own-2mPm8P27g6Q2FsrMvushNS7QWd9xgpAYU3FmGY2R",
+  "state": null,
+  "closed_sol_net": 0.013722078,
+  "pnl_counted": true,
+  "pnl_counted_sol": -0.061544696,
+  "knizhit_zadnim_chislom": "2026-10-01",
+  "ts_update_utc": "2026-10-03T15:06:32Z"
+ },
+ "счёт_после_записи": {
+  "realized_sol": 0.979954514,
+  "spent_sol": 5.770835978,
+  "buys": 0,
+  "sells": 171,
+  "tz_unavailable": false,
+  "updated_utc": "2026-10-01T21:27:53Z"
+ },
+ "счёт_после": {
+  "realized_sol": 0.918409818,
+  "spent_sol": 5.770835978,
+  "buys": 0,
+  "sells": 172,
+  "tz_unavailable": false,
+  "updated_utc": "2026-10-03T15:06:32Z"
+ },
+ "счёт_сегодня": {
+  "realized_sol": 0.714903517,
+  "spent_sol": -0.194858781,
+  "buys": 0,
+  "sells": 128,
+  "tz_unavailable": false,
+  "updated_utc": "2026-10-03T14:31:49Z"
  }
 }
