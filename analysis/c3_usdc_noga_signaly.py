@@ -89,15 +89,26 @@ Code-1 по цепи 158 733...172 545 CU на ДВЕ ноги. Точное ч�
 типам даёт его прогон deploy/checks/usdc_noga_razmer_cu.py на хосте, когда придут
 USDC-образцы.
 
+РАЗМЕР МЕРИТСЯ В ЧЕТЫРЁХ РЕЖИМАХ, И РЕШАТЬ -- ПО САМОМУ ТЯЖЁЛОМУ. Первый замер
+шёл с чаевыми на НАШ ЖЕ кошелёк, то есть по нижней границе: такой перевод нового
+счёта в пакет не добавляет вовсе (нашла проверка 03.10 -- и права). Чужой адрес
+чаевых стоит +32 байта, долговечный nonce -- ещё +2 счёта, вместе +106. В самом
+тяжёлом режиме покупка влезает у CPMM (43 из 43), LaunchLab (35 из 35) и Pump AMM
+(2 из 2) с запасом 70...100 байт, а у кривой НЕ ВЛЕЗАЕТ НИ ОДНА -- ей нужны
+адреса в таблице полосы (четыре дают 1231 байт, то есть запас один байт; шесть --
+1169, десять -- 1076).
+
 ПРОДАЖА -- ТОКЕН -> USDC -> SOL, ВОСЕМЬ ИНСТРУКЦИЙ, ЗЕРКАЛО ПОКУПКИ. Первая нога
 -- зеркало НАШЕЙ покупки токена (c3_prodavec_sborka), вторая -- зеркало НАШЕЙ
 покупки первой ноги (та же покупка без мест 19 и 20). Вход второй ноги -- РОВНО
 минимум первой. Минимум второй ноги только переданный: живые резервы пула
-SOL/USDC этот модуль не читает. Размер с нашей таблицей: CPMM 1021...1052,
-LaunchLab 1130...1161, Pump AMM 1128...1159 -- влезает; кривая 1352 -- НЕ
-влезает, и выбор назван числами (десять адресов в таблице -> 1166, либо не
-закрывать токеновый счёт -> 1189). Чего нет: живой 23-счётной продажи Pump AMM в
-образцах (раскладка снята с нашей 24-счётной), и у Code-2 запрошено 6+ таких.
+SOL/USDC этот модуль не читает. Размер в САМОМ ТЯЖЁЛОМ режиме: CPMM 1127...1158
+влезает, а LaunchLab 1236...1267 и Pump AMM 1234...1265 НЕ влезают -- перебор
+4...35 байт; лечится тем, что токеновый счёт не закрывается этой же транзакцией
+(тогда 1197...1228 и 1195...1226, влезает всё). Кривая 1458...1490 -- нужны и
+десять адресов в таблице, и отказ от закрытия (тогда 1202). Чего нет: живой
+23-счётной продажи Pump AMM в образцах (раскладка снята с нашей 24-счётной), и у
+Code-2 запрошено 6+ таких.
 
 ЧЕГО ЗДЕСЬ НЕТ. Ни одной отправки, ни одной симуляции, ни одного чтения сети на
 горячем пути, ни одной правки чужого файла. Врезка в полосу и круг 0.01 -- Code-1.
@@ -163,6 +174,10 @@ KRIVAYA_V2_MESTA = {"user": 13, "ata_bazy": 14, "ata_kotirovki": 15,
                     "mint_bazy": 1, "mint_kotirovki": 2,
                     "prog_bazy": 3, "prog_kotirovki": 4}
 SEMYA_UVA = b"user_volume_accumulator"
+# ТИПЫ, КОТОРЫЕ ЕСТЬ И У c2_usdc_noga. 03.10 Code-1 добавил туда CPMM, и это
+# названное пересечение, а не случай: покупку CPMM берёт его путь (врезка зовёт
+# его первым), здесь CPMM нужен ради переворота сторон и ради продажи.
+PERESECHENIE_S_UN = (PROG_CPMM,)
 
 WHY_TIP = "тип пула не в таблице USDC-ноги сигнальных типов"
 WHY_KRIVAYA_V1 = ("кривая pump.fun без котировочного минта (18 счетов): котировка "
@@ -1011,7 +1026,7 @@ def prodazha_sobrat(*, luts_gotovye: list | None = None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: молчаливый пропуск -- это провал. Если файла
 # образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 142
+ZHDEM_PROVEROK = 166
 
 # ЗАМЕР ПО ТИПАМ НА ЖИВЫХ СДЕЛКАХ С КОТИРОВОЧНЫМ ТОКЕНОМ (не WSOL). Образцы --
 # data/c2_pool_samples/<программа>.json плюс разновидности кривой
@@ -1040,26 +1055,49 @@ ZHDEM_PO_TIPAM = {
 }
 ZHDEM_BAJT_VSEGO = 83
 
-# РАЗМЕР ПАКЕТА -- ЗАМЕР НА ЭТИХ ЖЕ ОБРАЗЦАХ, с нашей таблицей и С ЧАЕВЫМИ.
-# "verh" -- как есть: котировочный токен образца в таблице не лежит.
-# "usdc" -- в таблицу добавлены РОВНО те три адреса, которые на USDC-котировке в
-# ней уже есть: минт котировки, наш ATA котировки, программа токена котировки.
-# Это не догадка о будущем, а арифметика по собранному пакету.
+# РАЗМЕР ПАКЕТА -- ЗАМЕР НА ЭТИХ ЖЕ ОБРАЗЦАХ, с нашей таблицей, В ЧЕТЫРЁХ
+# РЕЖИМАХ -- тех, что полоса реально кладёт в транзакцию. Во всех режимах в
+# таблицу добавлены РОВНО те три адреса, которые на USDC-котировке в ней уже
+# есть: минт котировки, наш ATA котировки, программа токена котировки (у образца
+# котировка своя, и это арифметика по собранному пакету, а не догадка).
+#
+# ПЕРВЫЙ ЗАМЕР БЫЛ НИЖНЕЙ ГРАНИЦЕЙ, И ЭТО НАШЛА ПРОВЕРКА (03.10): чаевые шли НА
+# НАШ ЖЕ КОШЕЛЁК, а такой перевод нового счёта в пакет не добавляет вовсе.
+# Настоящие случаи:
+#   chaevyj_nash    -- чаевые на наш кошелёк: нижняя граница, в бою не бывает;
+#   chaevyj_chuzhoj -- адрес из bloom_own_send.TIP_ACCOUNTS: +32 байта (адресов
+#                      чаевых в нашей таблице НЕТ -- lane_usdc_alt:
+#                      «чаевых_не_положено: 31»);
+#   nons            -- долговечный nonce без чаевых (в режиме нонса полоса
+#                      чаевые основной транзакции снимает вовсе): +2 счёта,
+#                      сам счёт нонса и Sysvar recent blockhashes;
+#   nons_i_chaevyj  -- и то и другое: САМЫЙ ТЯЖЁЛЫЙ, по нему и решать.
+# Разница между крайними режимами -- ровно 106 байт на каждом типе.
+TIP_DLYA_ZAMERA = "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE"
+NONS_DLYA_ZAMERA = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+REZHIMY_PAKETA = ("chaevyj_nash", "chaevyj_chuzhoj", "nons", "nons_i_chaevyj")
 ZHDEM_RAZMEROV = {
-    PROG_CPMM: {"verh": (977, 1009), "usdc": (915, 947)},
-    PROG_LAUNCHLAB: {"verh": (1086, 1118), "usdc": (1024, 1056)},
-    PROG_PUMP_AMM: {"verh": (1086, 1118), "usdc": (1024, 1056)},
-    PROG_KRIVAYA: {"verh": (1280, 1343), "usdc": (1218, 1281)},
+    PROG_CPMM: {"chaevyj_nash": (915, 947), "chaevyj_chuzhoj": (947, 979),
+                "nons": (972, 1004), "nons_i_chaevyj": (1021, 1053)},
+    PROG_LAUNCHLAB: {"chaevyj_nash": (1024, 1056), "chaevyj_chuzhoj": (1056, 1088),
+                     "nons": (1081, 1113), "nons_i_chaevyj": (1130, 1162)},
+    PROG_PUMP_AMM: {"chaevyj_nash": (1024, 1056), "chaevyj_chuzhoj": (1056, 1088),
+                    "nons": (1081, 1113), "nons_i_chaevyj": (1130, 1162)},
+    PROG_KRIVAYA: {"chaevyj_nash": (1218, 1281), "chaevyj_chuzhoj": (1250, 1313),
+                   "nons": (1275, 1338), "nons_i_chaevyj": (1324, 1387)},
 }
-# КРИВАЯ ВЛЕЗАЕТ НЕ ВСЕГДА, И ЭТО ЧИСЛО, А НЕ МНЕНИЕ: 1218...1281 байт при пределе
-# 1232 даже с нашей таблицей -- то есть один живой образец из трёх влезает, два
-# нет. Лекарство измерено на образце OBRAZEC_KRIVOJ: четыре ПОСТОЯННЫХ адреса
-# программы кривой (global, global_volume_accumulator, fee_config,
-# event_authority) в таблице полосы -- и пакет 1125 байт. Ещё два наших
-# (накопитель объёма и связанный накопитель) дают 1063, а четыре получателя
-# комиссий -- 970.
+# Сколько живых сделок каждого типа влезает в 1232 в САМОМ ТЯЖЁЛОМ режиме.
+ZHDEM_VLEZLO_TYAZHELYJ = {PROG_CPMM: 43, PROG_LAUNCHLAB: 35, PROG_PUMP_AMM: 2,
+                          PROG_KRIVAYA: 0}
+# КРИВАЯ НЕ ВЛЕЗАЕТ НИ В ОДНОМ РЕЖИМЕ, И ЭТО ЧИСЛО, А НЕ МНЕНИЕ. Лекарство
+# измерено на образце OBRAZEC_KRIVOJ: четыре ПОСТОЯННЫХ адреса программы кривой
+# (global, global_volume_accumulator, fee_config, event_authority) в таблице
+# полосы -- и в самом тяжёлом режиме пакет 1231 байт, то есть запас ОДИН байт.
+# Поэтому четырёх мало на деле: шесть дают 1169, десять -- 1076. В лёгком режиме
+# те же добавки давали 1125 / 1063 / 970.
 KRIVAYA_MESTA_POSTOYANNYH = (0, 19, 22, 25)
 ZHDEM_KRIVAYA_S_DOBAVKOJ = {4: 1125, 6: 1063, 10: 970}
+ZHDEM_KRIVAYA_S_DOBAVKOJ_TYAZHELYJ = {4: 1231, 6: 1169, 10: 1076}
 # ПОЧЕМУ НЕ ДВУХШАГОВЫМ ПУТЁМ -- ЧИСЛОМ, А НЕ РАССУЖДЕНИЕМ. bloom_lane_two_step
 # вторую ногу этих типов СОБИРАЕТ (кирпичи те же), но отправить её не может: у
 # него нет НАШЕЙ таблицы адресов, и пакет выходит за 1232 байта на ВСЕХ живых
@@ -1078,20 +1116,34 @@ ZHDEM_DVUHSHAGOVYJ = {
 # Восемь инструкций: cu_limit, cu_price, ata(USDC), ata(WSOL), продажа ноги 1,
 # продажа ноги 2, закрытие счёта токена, закрытие счёта WSOL (+ чаевые).
 ZHDEM_PRODAZHI = {
-    PROG_CPMM: {"verh": (1083, 1083), "usdc": (1021, 1052)},
-    PROG_LAUNCHLAB: {"verh": (1192, 1192), "usdc": (1130, 1161)},
-    PROG_PUMP_AMM: {"verh": (1190, 1190), "usdc": (1128, 1159)},
-    PROG_KRIVAYA: {"verh": (1383, 1415), "usdc": (1352, 1384)},
+    PROG_CPMM: {"chaevyj_nash": (1021, 1052), "nons_i_chaevyj": (1127, 1158)},
+    PROG_LAUNCHLAB: {"chaevyj_nash": (1130, 1161), "nons_i_chaevyj": (1236, 1267)},
+    PROG_PUMP_AMM: {"chaevyj_nash": (1128, 1159), "nons_i_chaevyj": (1234, 1265)},
+    PROG_KRIVAYA: {"chaevyj_nash": (1352, 1384), "nons_i_chaevyj": (1458, 1490)},
 }
+# ПРОДАЖА В РЕЖИМЕ НОНСА НЕ ВЛЕЗАЕТ У LAUNCHLAB И PUMP AMM -- перебор 4...35
+# байт, -- и лечится тем же, чем у кривой: не закрывать токеновый счёт той же
+# транзакцией (рента остаётся на счёте и забирается отдельно -- так полоса и
+# делала до 02.10 прогоном bloom_close_on_sell). Замер в самом тяжёлом режиме
+# БЕЗ закрытия: влезает всё, кроме кривой.
+ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA = {
+    PROG_CPMM: (1088, 1119), PROG_LAUNCHLAB: (1197, 1228),
+    PROG_PUMP_AMM: (1195, 1226), PROG_KRIVAYA: (1388, 1420),
+}
+ZHDEM_VLEZLO_PRODAZHA_TYAZHELYJ = {PROG_CPMM: 43, PROG_LAUNCHLAB: 0,
+                                   PROG_PUMP_AMM: 0, PROG_KRIVAYA: 0}
 # ПРОДАЖА КРИВОЙ СОБИРАЕТСЯ НА ДВУХ ОБРАЗЦАХ ИЗ ТРЁХ: у третьего цена продажи
 # отказывает по имени -- событие его покупки не воспроизвело себя, и котировать
 # продажу нечем.
 ZHDEM_PRODAZH_KRIVOJ = 2
-# ПРОДАЖА КРИВОЙ НЕ ВЛЕЗАЕТ ДАЖЕ С ЧЕТЫРЬМЯ ДОБАВЛЕННЫМИ АДРЕСАМИ, и выбор тут
-# не мой: либо десять адресов в таблице, либо не закрывать токеновый счёт той же
-# транзакцией (рента остаётся на счёте и забирается потом). Числа -- замер.
+# ПРОДАЖА КРИВОЙ: ВЫБОР НЕ МОЙ, И ОБА ЧИСЛА ЗАМЕРЕНЫ. В лёгком режиме (чаевые
+# на наш кошелёк) хватало четырёх адресов без закрытия счёта; в САМОМ ТЯЖЁЛОМ
+# (нонс + чужой чаевый) влезает только «десять адресов И без закрытия» -- 1202.
 ZHDEM_PRODAZHA_KRIVOJ = {"4_zakryvaem": 1259, "10_zakryvaem": 1166,
                          "4_bez_zakrytiya": 1189, "10_bez_zakrytiya": 1096}
+ZHDEM_PRODAZHA_KRIVOJ_TYAZHELYJ = {"4_zakryvaem": 1365, "10_zakryvaem": 1272,
+                                   "4_bez_zakrytiya": 1295,
+                                   "10_bez_zakrytiya": 1202}
 KOSHELEK_PROVERKI = "D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph"
 DRUGOJ_KOSHELEK = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
 # Живой образец кривой с котировочным минтом -- тот, на котором измерены места и
@@ -1286,8 +1338,19 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         all(kotirovshchik(p) for p in TIPY), [p for p in TIPY if not kotirovshchik(p)])
     chk("сумма сигналов по типам -- 114 из 118 (счёт Code-1)",
         sum(SIGNALOV_V_SUTKI.values()) == 114, sum(SIGNALOV_V_SUTKI.values()))
-    chk("ни одного типа c2_usdc_noga здесь не повторено",
-        not (set(TIPY) & set(UN.TYPES)), sorted(set(TIPY) & set(UN.TYPES)))
+    # ПЕРЕСЕЧЕНИЕ С c2_usdc_noga -- НАЗВАНО, А НЕ СЛУЧАЙНО. 03.10 Code-1 добавил
+    # CPMM в свою таблицу (37 % потока USDC), и теперь тип стоит в двух таблицах.
+    # Это не беда и не дубль на деньгах: врезка зовёт сначала его путь и берётся
+    # за мой ТОЛЬКО если тот не собрался (см. страницу врезки, диф №2). Здесь
+    # CPMM остаётся ради переворота сторон и ради ПРОДАЖИ, которых у него нет.
+    chk(f"пересечение таблиц с c2_usdc_noga -- ровно {sorted(PERESECHENIE_S_UN)}",
+        set(TIPY) & set(UN.TYPES) == set(PERESECHENIE_S_UN),
+        sorted(set(TIPY) & set(UN.TYPES)))
+    chk("и у общего типа способ котировки у обоих один -- кирпичи",
+        all(UN.KOTIROVSHCHIKI.get(p_) == UN.SPOSOB_KIRPICHI
+            and kotirovshchik(p_) == SPOSOB_REZERVY for p_ in PERESECHENIE_S_UN),
+        [(p_, UN.KOTIROVSHCHIKI.get(p_), kotirovshchik(p_))
+         for p_ in PERESECHENIE_S_UN])
     ст = storona({}, programma="НеПрограмма", pul="x")
     chk("незнакомый тип -- отказ по имени, а не исключение",
         not ст["ok"] and WHY_TIP in (ст["why_not"] or ""), ст.get("why_not"))
@@ -1457,16 +1520,19 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         chk("место 21 -- ATA(место 20, минт котировки, программа котировки), а не состояние",
             асс == сч[KRIVAYA_V2_MESTA["assoc_uva"]],
             (асс, сч[KRIVAYA_V2_MESTA["assoc_uva"]]))
-        # КИРПИЧ НАШИМ КОШЕЛЬКОМ МЕСТ НЕ ВОССТАНАВЛИВАЕТ -- ПОТОМУ И СВОИ. На
-        # кошельке САМОГО ИСТОЧНИКА он справляется: место 21 он просто переносит
-        # из его же сделки. А нашим -- идёт за ключом в состояние
-        # (c2_swap_build.assoc_uva), и для USDC такого состояния у нас нет.
-        chk("кирпич НАШИМ кошельком мест кривой v2 не восстанавливает",
-            not B.user_accounts(ст["tpl"], о["tx"], KOSHELEK_PROVERKI),
-            B.user_accounts(ст["tpl"], о["tx"], KOSHELEK_PROVERKI))
+        # КИРПИЧ ТЕПЕРЬ ВЫВОДИТ ЭТИ МЕСТА САМ -- ДИФ №3 ВЗЯТ (Code-1, 03.10).
+        # До правки c2_swap_build.user_accounts нашим кошельком отдавал пустой
+        # словарь (шёл за ключом места 21 в состояние, которого для USDC не
+        # будет никогда), и 03.10 это стоило 16 отказов «роли счетов не
+        # восстановились» на источнике cand1_03 с билетом 0.5. Теперь два
+        # независимых вывода -- его и мой -- обязаны дать РОВНО ОДНО И ТО ЖЕ;
+        # расхождение значит, что один из них сломался, и это провал.
         наши5 = mesta_krivoj_v2(сч, nash_koshelek=KOSHELEK_PROVERKI)
-        chk("а свои -- восстанавливает все пять, без состояния и без чтений",
+        кирпич5 = B.user_accounts(ст["tpl"], о["tx"], KOSHELEK_PROVERKI)
+        chk("свои места кривой v2 восстанавливаются все пять, без состояния",
             наши5["ok"] and len(наши5["mesta"]) == 5, наши5.get("why_not"))
+        chk("кирпич после дифа №3 выводит те же пять мест, значение в значение",
+            кирпич5 == наши5["mesta"], (кирпич5, наши5.get("mesta")))
         # ЦЕНА: СОБЫТИЕ ВОСПРОИЗВЕЛО СВОЮ СДЕЛКУ КОТИРОВОЧНОЙ СТОРОНОЙ
         ев = sobytie_krivoj(о["tx"], о["mint"])
         chk("событие кривой разобралось и котировка в нём токеновая",
@@ -1553,7 +1619,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     try:
         порядок_ок, аргументы_ок, размеры = 0, 0, {}
         for p, обр in образцы_по_типам.items():
-            размеры[p] = {"verh": [], "usdc": []}
+            размеры[p] = {р: [] for р in REZHIMY_PAKETA}
             for о in обр:
                 кэш = SB.LegCache({}, None)
                 # В КЭШ ПОЛОЖЕН РЕАЛЬНЫЙ ШАБЛОН НОГИ SOL -> USDC ПОД КЛЮЧОМ
@@ -1592,20 +1658,29 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                         and рез["leg2_amount_in"] == рез["leg1_min_out"]:
                     аргументы_ок += 1
                 нашлось = B.ata(KOSHELEK_PROVERKI, о["quote"], о["quote_program"])
-                for имя, добавка in (("verh", ()),
-                                     ("usdc", (о["quote"], нашлось,
-                                               о["quote_program"]))):
-                    L, _n = _lut_s_dobavkoj(добавка)
+                # ОДНА ТАБЛИЦА НА ВСЕ ЧЕТЫРЕ РЕЖИМА: добавка в неё -- те три
+                # адреса, которые на USDC-котировке в ней уже лежат. Меняется
+                # только то, что полоса кладёт в транзакцию: чаевые и нонс.
+                L, _n = _lut_s_dobavkoj((о["quote"], нашлось, о["quote_program"]))
+                for имя, кв in (
+                        ("chaevyj_nash", {"chaevye_adres": KOSHELEK_PROVERKI,
+                                          "chaevye_lamporty": 1_000_000}),
+                        ("chaevyj_chuzhoj", {"chaevye_adres": TIP_DLYA_ZAMERA,
+                                             "chaevye_lamporty": 1_000_000}),
+                        ("nons", {"chaevye_adres": None, "chaevye_lamporty": 0,
+                                  "nons": (NONS_DLYA_ZAMERA, KOSHELEK_PROVERKI)}),
+                        ("nons_i_chaevyj", {"chaevye_adres": TIP_DLYA_ZAMERA,
+                                            "chaevye_lamporty": 1_000_000,
+                                            "nons": (NONS_DLYA_ZAMERA,
+                                                     KOSHELEK_PROVERKI)})):
                     сб = sobrat(tx_istochnika=о["tx"], istochnik=ист, mint=о["mint"],
                                 nash_koshelek=KOSHELEK_PROVERKI, lamporty=10_000_000,
                                 kesh_nog=кэш, proskalzyvanie=0.35,
-                                chaevye_lamporty=1_000_000,
-                                chaevye_adres=KOSHELEK_PROVERKI,
                                 min_out_vneshnij=1, mint_kotirovki=о["quote"],
-                                luts_gotovye=[L])
+                                luts_gotovye=[L], **кв)
                     if isinstance(сб.get("size"), int):
                         размеры[p][имя].append(сб["size"])
-        собралось = sum(len(v["verh"]) for v in размеры.values())
+        собралось = sum(len(v["chaevyj_nash"]) for v in размеры.values())
         chk("порядок инструкций -- девять, место в место как у c2_usdc_noga",
             порядок_ок == собралось and собралось > 0, (порядок_ок, собралось))
         chk("суммы связаны: вход второй ноги -- это минимум первой",
@@ -1617,15 +1692,21 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 chk(f"{метка}: размер ({имя}) {мин}...{макс} байт",
                     ряд and min(ряд) == мин and max(ряд) == макс,
                     (min(ряд), max(ряд)) if ряд else None)
-            влезли = [x for x in размеры[p]["usdc"] if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
-            if p == PROG_KRIVAYA:
-                chk("кривая v2: с таблицей полосы влезает ОДИН образец из трёх",
-                    len(влезли) == 1 and len(размеры[p]["usdc"]) == 3,
-                    (len(влезли), размеры[p]["usdc"]))
-            else:
-                chk(f"{метка}: с таблицей полосы пакет влезает в 1232 целиком",
-                    len(влезли) == len(размеры[p]["usdc"]) and влезли,
-                    (len(влезли), len(размеры[p]["usdc"])))
+            # ВЕРДИКТ -- ПО САМОМУ ТЯЖЁЛОМУ РЕЖИМУ, а не по лёгкому: решать
+            # по нижней границе значило бы обещать то, чего в бою не будет.
+            влезли = [x for x in размеры[p]["nons_i_chaevyj"]
+                      if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
+            chk(f"{метка}: в самом тяжёлом режиме влезает "
+                f"{ZHDEM_VLEZLO_TYAZHELYJ[p]} из {len(размеры[p]['nons_i_chaevyj'])}",
+                len(влезли) == ZHDEM_VLEZLO_TYAZHELYJ[p],
+                (len(влезли), len(размеры[p]["nons_i_chaevyj"])))
+            chk(f"{метка}: тяжёлый режим ровно на 106 байт больше лёгкого",
+                (min(размеры[p]["nons_i_chaevyj"]) - min(размеры[p]["chaevyj_nash"])
+                 == 106
+                 and max(размеры[p]["nons_i_chaevyj"])
+                 - max(размеры[p]["chaevyj_nash"]) == 106),
+                (min(размеры[p]["nons_i_chaevyj"]) - min(размеры[p]["chaevyj_nash"]),
+                 max(размеры[p]["nons_i_chaevyj"]) - max(размеры[p]["chaevyj_nash"])))
         # ЛЕКАРСТВО КРИВОЙ -- ЧИСЛАМИ
         if кр:
             о = кр[0]
@@ -1648,18 +1729,28 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             }
             for сколько, добавка in наборы.items():
                 L, _n = _lut_s_dobavkoj(как_usdc + добавка)
-                сб = sobrat(tx_istochnika=о["tx"], istochnik=ист, mint=о["mint"],
-                            nash_koshelek=KOSHELEK_PROVERKI, lamporty=10_000_000,
-                            kesh_nog=кэш, proskalzyvanie=0.35,
-                            chaevye_lamporty=1_000_000,
-                            chaevye_adres=KOSHELEK_PROVERKI, min_out_vneshnij=1,
-                            mint_kotirovki=о["quote"], luts_gotovye=[L])
-                ждём_б = ZHDEM_KRIVAYA_S_DOBAVKOJ[сколько]
-                chk(f"кривая v2: +{сколько} адресов в таблице -> {ждём_б} байт",
-                    сб.get("size") == ждём_б, сб.get("size"))
-                chk(f"кривая v2: с +{сколько} адресами пакет влезает в 1232",
-                    isinstance(сб.get("size"), int)
-                    and сб["size"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX, сб.get("size"))
+                общее = {"tx_istochnika": о["tx"], "istochnik": ист,
+                         "mint": о["mint"], "nash_koshelek": KOSHELEK_PROVERKI,
+                         "lamporty": 10_000_000, "kesh_nog": кэш,
+                         "proskalzyvanie": 0.35, "min_out_vneshnij": 1,
+                         "mint_kotirovki": о["quote"], "luts_gotovye": [L]}
+                лёг = sobrat(**общее, chaevye_lamporty=1_000_000,
+                             chaevye_adres=KOSHELEK_PROVERKI)
+                тяж = sobrat(**общее, chaevye_lamporty=1_000_000,
+                             chaevye_adres=TIP_DLYA_ZAMERA,
+                             nons=(NONS_DLYA_ZAMERA, KOSHELEK_PROVERKI))
+                chk(f"кривая v2: +{сколько} адресов -> "
+                    f"{ZHDEM_KRIVAYA_S_DOBAVKOJ[сколько]} байт (лёгкий режим)",
+                    лёг.get("size") == ZHDEM_KRIVAYA_S_DOBAVKOJ[сколько],
+                    лёг.get("size"))
+                chk(f"кривая v2: +{сколько} адресов -> "
+                    f"{ZHDEM_KRIVAYA_S_DOBAVKOJ_TYAZHELYJ[сколько]} байт (тяжёлый)",
+                    тяж.get("size")
+                    == ZHDEM_KRIVAYA_S_DOBAVKOJ_TYAZHELYJ[сколько],
+                    тяж.get("size"))
+                chk(f"кривая v2: с +{сколько} адресами влезает и в тяжёлом режиме",
+                    isinstance(тяж.get("size"), int)
+                    and тяж["size"] <= TS.ПРЕДЕЛ_РАЗМЕРА_TX, тяж.get("size"))
     finally:
         for k, v in сохр.items():
             if v is None:
@@ -1720,7 +1811,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     try:
         for p, ждём in ZHDEM_PRODAZHI.items():
             метка = TIPY[p]["label"]
-            ряды = {"verh": [], "usdc": []}
+            ряды = {"chaevyj_nash": [], "nons_i_chaevyj": [], "bez_zakrytiya": []}
             порядок, суммы = 0, 0
             без_мин = 0
             for о in образцы_по_типам.get(p) or []:
@@ -1749,14 +1840,18 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 if рез["noga_2_amount_in"] == рез["min_out_nogi_1"]:
                     суммы += 1
                 нашлось = B.ata(KOSHELEK_PROVERKI, о["quote"], о["quote_program"])
-                for имя, добавка in (("verh", ()),
-                                     ("usdc", (о["quote"], нашлось,
-                                               о["quote_program"]))):
-                    L, _n = _lut_s_dobavkoj(добавка)
+                L, _n = _lut_s_dobavkoj((о["quote"], нашлось, о["quote_program"]))
+                тяж = {"chaevye_adres": TIP_DLYA_ZAMERA,
+                       "chaevye_lamporty": 1_000_000,
+                       "nons": (NONS_DLYA_ZAMERA, KOSHELEK_PROVERKI)}
+                for имя, кв in (
+                        ("chaevyj_nash", {"chaevye_adres": KOSHELEK_PROVERKI,
+                                          "chaevye_lamporty": 1_000_000}),
+                        ("nons_i_chaevyj", тяж),
+                        ("bez_zakrytiya", dict(тяж,
+                                               zakryvat_schet_tokena=False))):
                     сб = prodazha_sobrat(**общие, min_out_nogi_2=1,
-                                         luts_gotovye=[L],
-                                         chaevye_lamporty=1_000_000,
-                                         chaevye_adres=KOSHELEK_PROVERKI)
+                                         luts_gotovye=[L], **кв)
                     if isinstance(сб.get("size"), int):
                         ряды[имя].append(сб["size"])
             ждём_сделок = (ZHDEM_PRODAZH_KRIVOJ if p == PROG_KRIVAYA
@@ -1773,14 +1868,30 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 chk(f"{метка}: размер продажи ({имя}) {мин}...{макс} байт",
                     ряд and min(ряд) == мин and max(ряд) == макс,
                     (min(ряд), max(ряд)) if ряд else None)
-            влезли = [x for x in ряды["usdc"] if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
+            # ВЕРДИКТ ПРОДАЖИ -- ТОЖЕ ПО ТЯЖЁЛОМУ РЕЖИМУ. В режиме нонса
+            # продажа не влезает у LaunchLab и Pump AMM (перебор 4...35 байт), и
+            # лечится тем же, чем у кривой: не закрывать токеновый счёт этой же
+            # транзакцией.
+            влезли = [x for x in ряды["nons_i_chaevyj"]
+                      if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
+            chk(f"{метка}: продажа в тяжёлом режиме влезает "
+                f"{ZHDEM_VLEZLO_PRODAZHA_TYAZHELYJ[p]} из "
+                f"{len(ряды['nons_i_chaevyj'])}",
+                len(влезли) == ZHDEM_VLEZLO_PRODAZHA_TYAZHELYJ[p],
+                (len(влезли), len(ряды["nons_i_chaevyj"])))
+            мин_б, макс_б = ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA[p]
+            ряд_б = ряды["bez_zakrytiya"]
+            chk(f"{метка}: продажа без закрытия счёта токена {мин_б}...{макс_б}",
+                ряд_б and min(ряд_б) == мин_б and max(ряд_б) == макс_б,
+                (min(ряд_б), max(ряд_б)) if ряд_б else None)
+            влезли_б = [x for x in ряд_б if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
             if p == PROG_KRIVAYA:
-                chk("кривая v2: продажа с таблицей полосы НЕ влезает в 1232",
-                    not влезли, ряды["usdc"])
+                chk("кривая v2: продажа без закрытия всё равно не влезает",
+                    not влезли_б, ряд_б)
             else:
-                chk(f"{метка}: продажа влезает в 1232 на всех живых сделках",
-                    len(влезли) == len(ряды["usdc"]) and влезли,
-                    (len(влезли), len(ряды["usdc"])))
+                chk(f"{метка}: продажа без закрытия влезает на всех сделках",
+                    len(влезли_б) == len(ряд_б) and влезли_б,
+                    (len(влезли_б), len(ряд_б)))
         # ЛЕКАРСТВО ПРОДАЖИ КРИВОЙ -- ЧИСЛАМИ, И ВЫБОР НЕ МОЙ
         if кр:
             о = кр[0]
