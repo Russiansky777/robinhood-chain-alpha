@@ -55,8 +55,12 @@ bloom_lane_two_step, инструкция ноги -- c2_swap_build. Самоп�
     котировки). Поэтому здесь нога собирается своими местами, а Code-1 получает
     это пятью строками (см. docs/usdc_noga_signaly_kak_vstroit.md).
 
-ОБРАЗЦОВ С КОТИРОВКОЙ РОВНО USDC ПО ЭТИМ ЧЕТЫРЁМ ТИПАМ В РЕПОЗИТОРИИ НЕТ, и это
-сказано числом, а не обойдено. В сборе Code-2
+ЖИВЫХ ИНСТРУКЦИЙ С КОТИРОВКОЙ РОВНО USDC ПО ЭТИМ ЧЕТЫРЁМ ТИПАМ -- ОДНА ШТУКА, и
+это сказано числом, а не обойдено. Сплошной обход 830 файлов data/ разбором
+КАЖДОЙ инструкции (место минта котировки -- из раскладки типа) нашёл её ровно
+одну: Pump AMM ZDadp1kxj3q46yU8..., пул PUMP/USDC, 25 счетов, внутри транзакции
+роутера FLASHX8. Она пересобрана БАЙТ В БАЙТ ЦЕЛИКОМ и цена по ней посчиталась.
+У CPMM, LaunchLab и кривой -- ноль. В сборе Code-2
 (data/podbivka/usdc_noga_dlya_code3.json, 22 сигнала) их нет по построению: он
 собирал «USDC в пулах НЕ CPMM и НЕ Pump AMM». В его же источнике
 (data/podbivka/kotirovki_grupp_2026-10-01.json, 1090 сигналов) с котировкой USDC
@@ -999,7 +1003,7 @@ def prodazha_sobrat(*, luts_gotovye: list | None = None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: молчаливый пропуск -- это провал. Если файла
 # образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 122
+ZHDEM_PROVEROK = 134
 
 # ЗАМЕР ПО ТИПАМ НА ЖИВЫХ СДЕЛКАХ С КОТИРОВОЧНЫМ ТОКЕНОМ (не WSOL). Образцы --
 # data/c2_pool_samples/<программа>.json плюс разновидности кривой
@@ -1097,6 +1101,60 @@ def _obrazcy(programma: str) -> list:
         out.append({"tx": tx, "vault": vault, "mint": r.get("mint") or mv.get("base_mint"),
                     "quote": q, "quote_program": mv.get("quote_program"),
                     "source": r.get("source"), "tpl": shab})
+    return out
+
+
+# ЖИВЫЕ ИНСТРУКЦИИ С КОТИРОВКОЙ РОВНО USDC -- СКОЛЬКО ИХ ЕСТЬ ВООБЩЕ. Ищутся не
+# по полю записи образца (там стоит котировка ДРУГОГО плеча маршрута), а разбором
+# КАЖДОЙ инструкции каждой сделки: место минта котировки берётся из раскладки
+# типа. Сплошной обход 830 файлов data/ (включая ветки Code-1 и Code-2, слитые в
+# эту) нашёл РОВНО ОДНУ такую инструкцию на все четыре типа -- Pump AMM
+# ZDadp1kxj3q46yU8..., пул PUMP/USDC внутри транзакции роутера FLASHX8. Здесь
+# обход идёт по образцам пулов: он быстрый, повторяемый и даёт то же самое.
+ZHDEM_USDC_ZHIVYH = {PROG_CPMM: 0, PROG_LAUNCHLAB: 0, PROG_PUMP_AMM: 1,
+                     PROG_KRIVAYA: 0}
+OBRAZEC_USDC_PUMP_AMM = "ZDadp1kxj3q46yU8TUqiVsxHycyuzHoTDh3fQ844XFB9ThP1iK1kY5WTDMS4F6f3V1hnwuajnEWHFA17mxsWGq4"
+
+
+def _mesto_kotirovki(B, programma: str, data: bytes):
+    """Место минта котировки в раскладке этого типа (у кривой -- по разновидности)."""
+    spec = B.SPECS.get(programma) or {}
+    if programma == PROG_KRIVAYA:
+        var = B.BONDING_DISCS.get(data[:8].hex()) or {}
+        return ((var.get("spec") or {}).get("quote_mint"))
+    return spec.get("quote_mint")
+
+
+def _obrazcy_usdc(programma: str) -> list:
+    """Живые инструкции этого типа, у которых котировка РОВНО USDC."""
+    C, B, _UN, _TS, _SB, _K = _moduli()
+    out, bylo = [], set()
+    for r in B.load_samples(programma):
+        tx = r.get("tx")
+        if not isinstance(tx, dict):
+            continue
+        for ix in B.all_instructions(tx):
+            if ix.get("programId") != programma:
+                continue
+            try:
+                data = B.b58decode(ix["data"])
+            except Exception:  # noqa: BLE001, S112
+                continue
+            qi = _mesto_kotirovki(B, programma, data)
+            if not isinstance(qi, int) or len(ix["accounts"]) <= qi:
+                continue
+            if ix["accounts"][qi] != USDC:
+                continue
+            klyuch = (C.first_signature(tx), tuple(ix["accounts"][:3]))
+            if klyuch in bylo:
+                continue
+            bylo.add(klyuch)
+            spec = B.SPECS.get(programma) or {}
+            vi = spec.get("quote_vault")
+            out.append({"tx": tx, "sig": C.first_signature(tx),
+                        "vault": (ix["accounts"][vi] if isinstance(vi, int)
+                                  and len(ix["accounts"]) > vi else None),
+                        "schetov": len(ix["accounts"]), "disc": data[:8].hex()})
     return out
 
 
@@ -1238,6 +1296,42 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             отказ_цены == ждём["otkaz_ceny"] and all(причины), отказ_цены)
     chk(f"байт в байт всего {ZHDEM_BAJT_VSEGO} живых сделок",
         байт_всего == ZHDEM_BAJT_VSEGO, байт_всего)
+
+    # ------------------------- 3б. живые образцы с котировкой РОВНО USDC
+    всего_usdc = 0
+    for p, ждём_n in ZHDEM_USDC_ZHIVYH.items():
+        метка = TIPY[p]["label"]
+        у = _obrazcy_usdc(p)
+        всего_usdc += len(у)
+        chk(f"{метка}: живых инструкций с котировкой РОВНО USDC -- {ждём_n}",
+            len(у) == ждём_n, len(у))
+        for о in у:
+            ст = storona(о["tx"], programma=p, hranilishche=о["vault"],
+                         mint_kotirovki=USDC)
+            chk(f"{метка}: USDC-образец {о['sig'][:10]} -- сторона разобралась",
+                ст["ok"], ст.get("why_not"))
+            if not ст["ok"]:
+                continue
+            u = polzovatel_istochnika(ст, о["tx"])
+            a0, a1 = struct.unpack_from("<QQ", ст["tpl"]["data"], 8)
+            наш = instrukciya_nogi(ст, user=u, amount_in=a0, min_out=a1,
+                                   tx_istochnika=о["tx"], kak_u_istochnika=True)
+            получили = [str(м.pubkey) for м in наш.accounts]
+            chk(f"{метка}: USDC-образец {о['sig'][:10]} -- байт в байт ЦЕЛИКОМ",
+                bytes(наш.data) == bytes(ст["tpl"]["data"])
+                and получили == list(ст["tpl"]["accounts"]),
+                [и for и, (x, y) in enumerate(zip(ст["tpl"]["accounts"],
+                                                  получили)) if x != y])
+            мо = min_out_boj(ст, о["tx"], amount_in=1_000_000,
+                             proskalzyvanie=0.35)
+            chk(f"{метка}: USDC-образец {о['sig'][:10]} -- цена посчиталась",
+                мо["ok"] and мо["min_out"] > 0, мо.get("why_not"))
+    chk("живых USDC-инструкций на все четыре типа -- ровно одна",
+        всего_usdc == 1, всего_usdc)
+    chk("и это тот самый образец Pump AMM (пул PUMP/USDC в маршруте роутера)",
+        (_obrazcy_usdc(PROG_PUMP_AMM) or [{}])[0].get("sig")
+        == OBRAZEC_USDC_PUMP_AMM,
+        (_obrazcy_usdc(PROG_PUMP_AMM) or [{}])[0].get("sig"))
 
     # ------------------------------------------------- 4. места кривой v2
     кр = образцы_по_типам.get(PROG_KRIVAYA) or []
@@ -1484,6 +1578,40 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     chk("23-счётная продажа Pump AMM живым образцом НЕ проверена -- и это сказано",
         н2.get("zhivym_obrazcom_ne_provereno") is True,
         н2.get("zhivym_obrazcom_ne_provereno"))
+    # МЕСТА 19 И 20 -- НЕ ПО ПАМЯТИ, А ВЫВОДОМ. 19 -- PDA global_volume_accumulator
+    # (один на программу), 20 -- PDA user_volume_accumulator нашего кошелька. На
+    # ВСЕХ живых покупках Pump AMM образцов (25 штук 26-счётных и одна
+    # 25-счётная) они стоят РОВНО на этих местах -- значит выбрасывать их у
+    # 25-счётной покупки так же законно, как у 26-счётной.
+    сч1 = (зап2 or {}).get("tpl", {}).get("accounts") or []
+    if сч1:
+        from solders.pubkey import Pubkey as _Pk  # noqa: PLC0415
+        гва = str(_Pk.find_program_address([b"global_volume_accumulator"],
+                                           _Pk.from_string(PROG_PUMP_AMM))[0])
+        ува = B.pda([SEMYA_UVA, "USER"], сч1[1], PROG_PUMP_AMM)
+        chk("место 19 покупки ноги -- PDA global_volume_accumulator",
+            сч1[19] == гва, (сч1[19], гва))
+        chk("место 20 покупки ноги -- PDA user_volume_accumulator её кошелька",
+            сч1[20] == ува, (сч1[20], ува))
+        пары = 0
+        for r in B.load_samples(PROG_PUMP_AMM):
+            for ix in B.all_instructions(r.get("tx") or {}):
+                if ix.get("programId") != PROG_PUMP_AMM:
+                    continue
+                try:
+                    д = B.b58decode(ix["data"])
+                except Exception:  # noqa: BLE001, S112
+                    continue
+                if д[:8] not in (B.disc("buy_exact_quote_in"), B.disc("buy")):
+                    continue
+                а = ix["accounts"]
+                if len(а) < 25:
+                    continue
+                if а[19] == гва and а[20] == B.pda([SEMYA_UVA, "USER"], а[1],
+                                                   PROG_PUMP_AMM):
+                    пары += 1
+        chk("на всех живых покупках Pump AMM места 19 и 20 именно эти -- 26 из 26",
+            пары == 26, пары)
     chk("выброшены РОВНО места 19 и 20 покупки ноги",
         н2["ok"] and н2["accounts"] == [a for i, a in enumerate(зап2["tpl"]["accounts"])
                                         if i not in PUMP_AMM_MESTA_TOLKO_POKUPKI],
@@ -1694,7 +1822,9 @@ def main() -> int:
                        "входит весь чужой маршрут (88 869...541 083 CU на пакет "
                        "источника), чистых сделок «только своп» по этим четырём "
                        "типам в образцах нет")},
-            "USDC_образцов_по_этим_типам": 0,
+            "живых_USDC_инструкций": {TIPY[p_]["label"]: ZHDEM_USDC_ZHIVYH[p_]
+                                      for p_ in TIPY},
+            "образец_USDC_Pump_AMM": OBRAZEC_USDC_PUMP_AMM,
             "запрошено_у_Code2": "по 6+ живых USDC-свопов на каждый тип",
         }, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"записано {put_}")
