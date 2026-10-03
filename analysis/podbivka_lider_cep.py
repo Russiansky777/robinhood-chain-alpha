@@ -70,9 +70,14 @@ def сбор(а) -> dict:
     до_ts = calendar.timegm(time.strptime(а.do, "%Y-%m-%dT%H:%M:%SZ")) if а.do else None
     уз = S.Узел()
     подписи, до, страниц = [], None, 0
+    сбои: list = []
     with уз.на("helius"):
         while страниц < а.stranic:
-            стр = уз.подписи(ЛИДЕР, до=до, limit=1000)
+            try:
+                стр = уз.подписи(ЛИДЕР, до=до, limit=1000)
+            except Exception as exc:  # noqa: BLE001
+                сбои.append(f"страница {страниц}: {type(exc).__name__}: {S.чисто(str(exc))[:200]}")
+                break
             страниц += 1
             if not стр:
                 break
@@ -87,9 +92,15 @@ def сбор(а) -> dict:
         РАЗМЕР_ПАК = 100
         for и in range(0, len(удачных), РАЗМЕР_ПАК):
             кусок = удачных[и:и + РАЗМЕР_ПАК]
-            пак = уз.пакет([з["signature"] for з in кусок],
-                           {з["signature"]: з.get("blockTime") for з in кусок})
+            try:
+                пак = уз.пакет([з["signature"] for з in кусок],
+                               {з["signature"]: з.get("blockTime") for з in кусок})
+            except Exception as exc:  # noqa: BLE001
+                сбои.append(f"пакет {и}: {type(exc).__name__}: {S.чисто(str(exc))[:200]}")
+                счёт["не_прочитано"] += len(кусок)
+                continue
             for з in кусок:
+              try:
                 т = пак.get(з["signature"])
                 if not т:
                     счёт["не_прочитано"] += 1
@@ -114,18 +125,33 @@ def сбор(а) -> dict:
                     счёт["пул_не_опознан"] += 1
                     continue
                 q = пул.get("quote_mint")
-                qd = пул.get("quote_delta")
-                сырое = abs(int(qd)) if qd is not None else None
-                sol_экв = None
-                if сырое is not None:
+                # РАЗМЕР ПОКУПКИ -- ПО СЫРОЙ ДЕЛЬТЕ КОТИРОВОЧНОГО ХРАНИЛИЩА.
+                # Поле quote_delta у identify_pool -- UI-число строкой (0.5), а не сырые
+                # единицы: первый заход (#158) падал на int("0.5"). Сырые берём из
+                # балансов того же счёта, курс котировочного -- лампорты за СЫРУЮ единицу.
+                все_ряды = {r["account"]: r for r in C.token_rows(т).values() if r["account"]}
+                кв = все_ряды.get(пул.get("quote_vault"))
+                sol_экв, сырое = None, None
+                if кв is not None:
+                    сырое = abs(int(кв["post"]) - int(кв["pre"]))
                     if q in SOLы:
                         sol_экв = round(сырое / 1e9, 6)
                     else:
                         if q not in курсы:
-                            ц, откуда = R2.цена_котировочного(уз, т, q)
+                            try:
+                                ц, откуда = R2.цена_котировочного(уз, т, q)
+                            except Exception as exc:  # noqa: BLE001
+                                ц, откуда = None, f"{type(exc).__name__}"
                             курсы[q] = (ц, откуда)
                         ц, _ = курсы[q]
                         sol_экв = round(сырое * ц / 1e9, 6) if ц else None
+                elif пул.get("quote_delta") is not None:
+                    # натив: quote_delta уже в SOL
+                    try:
+                        sol_экв = round(abs(float(пул["quote_delta"])), 6)
+                        сырое = int(round(sol_экв * 1e9))
+                    except (TypeError, ValueError):
+                        sol_экв, сырое = None, None
                 import c2_pool_programs as PP  # noqa: PLC0415
                 прг = PP.pool_program(т, пул["pool_vault"], PP.labels()).get("pool_program")
                 покупки.append({"signature": з["signature"], "mint": минт, "wallet": ЛИДЕР,
@@ -135,6 +161,10 @@ def сбор(а) -> dict:
                                 "подписант": bool(к["подписант"]), "группа": "лидер",
                                 "вид": "первая", "слотов_от_предыдущей": None})
                 счёт["покупок"] += 1
+              except Exception as exc:  # noqa: BLE001
+                сбои.append(f"подпись {з['signature'][:10]}: {type(exc).__name__}: "
+                            f"{S.чисто(str(exc))[:160]}")
+                счёт["разбор_упал"] = счёт.get("разбор_упал", 0) + 1
             del пак
     # вид: первая / докупка -- по предыдущей покупке того же минта в окне (1800 слотов)
     покупки.sort(key=lambda p: (p.get("slot") or 0))
@@ -148,13 +178,17 @@ def сбор(а) -> dict:
         посл[p["mint"]] = сл
     из_ = {"адрес": ЛИДЕР, "с_utc": а.s, "до_utc": а.do or "сейчас",
            "подписей": len(подписи), "упавших": len(подписи) - len(удачных),
-           "счёт": dict(счёт), "курсы_котировочных": {k: v[1] for k, v in курсы.items()},
+           "счёт": dict(счёт), "сбои": сбои[:50], "сбоев": len(сбои),
+           "курсы_котировочных": {k: v[1] for k, v in курсы.items()},
            "покупки": покупки, "расход": уз.расход()}
     out = П / "lider_cep_pokupki.json"
     out.write_text(json.dumps(из_, ensure_ascii=False, indent=1), encoding="utf-8")
     R.записано(out)
-    print(f"сбор: подписей {len(подписи)}, покупок {счёт['покупок']}, "
-          f"не покупатель {счёт['не_покупатель']}, без пула {счёт['без_пула']}", flush=True)
+    print(f"сбор: подписей {len(подписи)}, страниц {страниц}, покупок {счёт['покупок']}, "
+          f"не покупатель {счёт['не_покупатель']}, без пула {счёт['без_пула']}, сбоев {len(сбои)}",
+          flush=True)
+    for x in сбои[:5]:
+        print("  сбой:", x, flush=True)
     return из_
 
 
@@ -347,12 +381,29 @@ def main() -> int:
     р.add_argument("--model", action="store_true")
     р.add_argument("--svod", action="store_true")
     а = р.parse_args()
+    import podbivka_run as R  # noqa: PLC0415
+    import traceback  # noqa: PLC0415
+    шаги = []
     if а.sbor:
-        сбор(а)
+        шаги.append(("sbor", сбор))
     if а.model:
-        модель(а)
+        шаги.append(("model", модель))
     if а.svod or not (а.sbor or а.model):
-        свод(а)
+        шаги.append(("svod", свод))
+    беды = []
+    for имя, зови in шаги:
+        try:
+            зови(а)
+        except Exception as exc:  # noqa: BLE001
+            беды.append({"шаг": имя, "ошибка": f"{type(exc).__name__}: {exc}"[:300],
+                         "след": traceback.format_exc()[-1500:]})
+            print(f"шаг {имя} упал: {type(exc).__name__}: {exc}"[:300], flush=True)
+            break
+    if беды:
+        д = П / "lider_cep_bedy.json"
+        д.write_text(json.dumps({"беды": беды}, ensure_ascii=False, indent=1), encoding="utf-8")
+        R.записано(д)
+        return 1
     return 0
 
 
