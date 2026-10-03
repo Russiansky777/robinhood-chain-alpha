@@ -229,6 +229,9 @@ def self_test() -> int:
         f"  BLOOM_SOURCE_GROUPS = {файл_групп}  \n"))
     chk("пробелы вокруг имени и значения не ломают разбор", ок is True, почему)
 
+    chk("отдельный вход --tolko-imena существует и зовёт ту же проверку",
+        callable(globals().get("main_tolko_imena")))
+
     import shutil  # noqa: PLC0415
     shutil.rmtree(врем, ignore_errors=True)
     print(f"\nсамопроверка гейта перезапуска: {'ВСЁ ОК' if not плохо else 'ОТКАЗ'}; "
@@ -329,7 +332,27 @@ def main() -> int:
     return 0
 
 
+def main_tolko_imena() -> int:
+    """ТОЛЬКО обязательные имена окружения, без гейта позиций.
+
+    ЗАЧЕМ ОТДЕЛЬНЫЙ ВХОД. Полный гейт зовут лишь те шаги, что перезапускают
+    службу, а правка окружения и деплой МОГУТ окружение переписать и службу не
+    трогать: у деплоя продавца гейт позиций стоит при enable_service=yes, у
+    правки одной строки -- при sluzhba != none, а по умолчанию там none. То
+    есть окружение можно было оставить без обязательного имени и уйти зелёным,
+    а поломка ждала бы первого чужого перезапуска -- ровно как 03.10.
+    Этот вход зовут ПОСЛЕ любой правки окружения, независимо от перезапуска.
+    """
+    можно, почему = обязательные_имена()
+    print(почему if можно else f"СТОП: {почему}")
+    return 0 if можно else 6
+
+
 if __name__ == "__main__":
     import sys
 
-    raise SystemExit(self_test() if "--self-test" in sys.argv else main())
+    if "--self-test" in sys.argv:
+        raise SystemExit(self_test())
+    if "--tolko-imena" in sys.argv:
+        raise SystemExit(main_tolko_imena())
+    raise SystemExit(main())

@@ -1324,7 +1324,14 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers $IMENA --no-pager" \
             2>&1 | tee -a data/bloom_detector_deploy.txt
           # И ГЕЙТ: каждое имя обязано быть среди живых таймеров хоста.
-          ZHIVYE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers --all --no-pager | awk '{print \$NF}'" 2>/dev/null || true)
+          # ПЕРЕВОДЫ СТРОК В ПРОБЕЛЫ -- БЕЗ ЭТОГО СРАВНЕНИЕ ЛОЖНО ОТКАЗЫВАЕТ.
+          # Найдено 03.10 на прогоне 188: таймеры на хосте стояли все пять
+          # ("5 timers listed" в том же шаге), а гейт объявил, что нет ни
+          # одного. Причина -- в case ищется " имя ", а разделителем в выводе
+          # был перевод строки, и ни одно имя не совпало. Такой гейт хуже
+          # отсутствующего: он красит зелёный деплой красным и учит не верить
+          # проверкам.
+          ZHIVYE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers --all --no-pager | awk '{print \$NF}'" 2>/dev/null | tr '\n' ' ' || true)
           NET=""
           for T in $IMENA; do
             case " $ZHIVYE " in *" ${T%.timer}.service "*|*" $T "*) ;; *) NET="$NET $T" ;; esac
