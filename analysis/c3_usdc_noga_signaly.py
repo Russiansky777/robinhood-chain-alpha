@@ -134,6 +134,12 @@ PROG_CPMM = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
 PROG_LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj"
 PROG_PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 PROG_KRIVAYA = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+# ТИПЫ НЕ НАШЕЙ ТАБЛИЦЫ -- ТОЛЬКО ДЛЯ СВЕРКИ ПОРЯДКА РЕЗЕРВОВ (раздел 8а
+# самопроверки): их котировщики живут в чужих модулях, и читатели у них общие.
+PROG_CLMM_ = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK"
+PROG_DLMM_ = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+PROG_DAMM2_ = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+PROG_DBC_ = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
 
 # СПОСОБ КОТИРОВКИ -- ПО ФАКТУ ТОГО, ЧЕМ СЧИТАЕТСЯ ЦЕНА, а не по типу пула:
 #   rezervy   -- остатки хранилищ после сделки источника (x*y=k), нуль чтений;
@@ -1361,7 +1367,7 @@ def prodazha_sobrat(*, luts_gotovye: list | None = None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: молчаливый пропуск -- это провал. Если файла
 # образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 180
+ZHDEM_PROVEROK = 182
 
 # ЗАМЕР ПО ТИПАМ НА ЖИВЫХ СДЕЛКАХ С КОТИРОВОЧНЫМ ТОКЕНОМ (не WSOL). Образцы --
 # data/c2_pool_samples/<программа>.json плюс разновидности кривой
@@ -2420,42 +2426,86 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         finally:
             мод.POLUCHATEL_NASH = сохр_пол
 
-    # ------------------- 8а. ПОРЯДОК РЕЗЕРВОВ У КОТИРОВЩИКОВ РАЗНЫЙ (замер)
-    # ЭТО НЕ МОЙ КОД И НЕ МОЙ ОТВЕТ -- НО ЭТО МОЙ ТИП. launchlab_min_out отдаёт
-    # virtual_reserves_after как [БАЗА, КОТИРОВКА], а min_out_from_reserves --
-    # [КОТИРОВКА, БАЗА]. Правило тонкого пула в bloom_lane_two_step читает
-    # рез[0] КАК КОТИРОВКУ (делит на 10**q_dec и умножает на цену ноги), значит
-    # у LaunchLab оно видит резерв БАЗЫ. Замер на образце[0] с ценой статичного
-    # шаблона ноги: рез[0] даёт 5 527 021 SOL-экв., а настоящая котировочная
-    # сторона -- 4.18 SOL-экв. при пороге тонкого 30. То есть наценка на тонком
-    # пуле у LaunchLab не срабатывает НИКОГДА, а pool_reserve_quote_raw в
-    # журнале -- это резерв базы. Мой модуль этих полей не читает вовсе (беру
-    # только min_out/expected_out/fee_rate), и здесь стоит ЗАМЕР, чтобы правка
-    # порядка в чужом модуле сломала эту проверку громко. Диф -- Code-1 (пять
-    # строк в странице врезки, раздел «диф №5»).
-    обр_лл = (образцы_по_типам.get(PROG_LAUNCHLAB) or [None])[0]
-    обр_цп = (образцы_по_типам.get(PROG_CPMM) or [None])[0]
-    if обр_лл and обр_цп:
-        мо_лл = B.min_out_from_reserves(обр_лл["tpl"], обр_лл["tx"], 10_000_000,
-                                        0.35)
-        мо_цп = B.min_out_from_reserves(обр_цп["tpl"], обр_цп["tx"], 1_000_000,
-                                        0.35)
-        ев = B.launchlab_event(обр_лл["tx"]) or {}
-        база_лл = int(ев.get("virtual_base", 0)) - int(ев.get("real_base_after", 0))
-        кот_лл = int(ев.get("virtual_quote", 0)) + int(ев.get("real_quote_after", 0))
-        chk("LaunchLab: котировщик отдаёт резервы как [БАЗА, КОТИРОВКА]",
-            (мо_лл.get("virtual_reserves_after") or [None])[0] == база_лл
-            and (мо_лл.get("virtual_reserves_after") or [None, None])[1] == кот_лл,
-            мо_лл.get("virtual_reserves_after"))
-        строки_цп = {x["account"]: x for x in C.token_rows(обр_цп["tx"]).values()}
-        мв_цп = B.mints_and_vaults(обр_цп["tpl"], обр_цп["tx"]) or {}
-        chk("а у кирпичей -- наоборот, [КОТИРОВКА, БАЗА]: порядок РАЗНЫЙ",
-            (мо_цп.get("reserves_after") or [None])[0]
-            == строки_цп.get(мв_цп.get("quote_vault"), {}).get("post"),
-            (мо_цп.get("reserves_after"), мв_цп.get("quote_vault")))
-        chk("значит правило тонкого пула у LaunchLab смотрит на резерв базы -- "
-            "и не срабатывает (замер: 5 527 021 SOL-экв. против 4.18)",
-            база_лл > кот_лл * 1000, (база_лл, кот_лл))
+    # ------------------- 8а. СВЕРКА ПОРЯДКА РЕЗЕРВОВ ПО ВСЕМ КОТИРОВЩИКАМ
+    # ЗАЧЕМ ЗАМЕР, А НЕ ЧТЕНИЕ КОДА. Все читатели резервов -- правило тонкого
+    # пула (bloom_lane_two_step: thin pool и pool_reserve_quote_raw), наценка и
+    # нижний предел резерва одношагового пути (bloom_own_send: pool_reserve_sol,
+    # min_pool_sol_reserve) и мой c3_bilet_ot_rezerva -- берут ЭЛЕМЕНТ [0] КАК
+    # КОТИРОВКУ. Значит порядок у каждого котировщика -- это денежное условие, и
+    # он проверяется ЧИСЛАМИ на живых сделках: сравнением с остатками хранилищ
+    # (какое из них котировочное, говорит mints_and_vaults).
+    порядки = {}
+    for p_, обр_ in образцы_по_типам.items():
+        if not обр_:
+            continue
+        о_ = обр_[0]
+        мо_ = B.min_out_from_reserves(о_["tpl"], о_["tx"], 1_000_000, 0.35)
+        мо_ = мо_ if isinstance(мо_, dict) else {}
+        пара = мо_.get("reserves_after") or мо_.get("virtual_reserves_after")
+        мв_ = B.mints_and_vaults(о_["tpl"], о_["tx"]) or {}
+        стр_ = {x["account"]: x for x in C.token_rows(о_["tx"]).values()}
+        кот_ = стр_.get(мв_.get("quote_vault"), {}).get("post")
+        баз_ = стр_.get(мв_.get("base_vault"), {}).get("post")
+        порядки[p_] = {"пара": пара, "кот": кот_, "база": баз_,
+                       "ключ": ("reserves_after" if мо_.get("reserves_after")
+                                else "virtual_reserves_after"
+                                if мо_.get("virtual_reserves_after") else None)}
+    chk("CPMM и Pump AMM: reserves_after -- [КОТИРОВКА, база], как и ждут читатели",
+        all(порядки[p_]["пара"] and порядки[p_]["пара"][0] == порядки[p_]["кот"]
+            and порядки[p_]["пара"][1] == порядки[p_]["база"]
+            for p_ in (PROG_CPMM, PROG_PUMP_AMM) if p_ in порядки),
+        {TIPY[p_]["label"]: порядки[p_] for p_ in (PROG_CPMM, PROG_PUMP_AMM)
+         if p_ in порядки})
+    # LAUNCHLAB -- ЕДИНСТВЕННЫЙ ОБРАТНЫЙ, И ЭТО ДИФ №5.
+    ев_лл = B.launchlab_event((образцы_по_типам.get(PROG_LAUNCHLAB) or [{}])[0]
+                              .get("tx") or {}) or {}
+    база_лл = int(ев_лл.get("virtual_base", 0)) - int(ев_лл.get("real_base_after", 0))
+    кот_лл = int(ев_лл.get("virtual_quote", 0)) + int(ев_лл.get("real_quote_after", 0))
+    chk("LaunchLab: virtual_reserves_after -- [БАЗА, котировка], то есть ОБРАТНЫЙ",
+        (порядки.get(PROG_LAUNCHLAB, {}).get("пара") or [None, None])
+        == [база_лл, кот_лл],
+        порядки.get(PROG_LAUNCHLAB, {}).get("пара"))
+    chk("и правило тонкого пула видит из-за этого резерв базы вместо котировки "
+        "(замер: 5 527 021 SOL-экв. против 4.18 при пороге 30)",
+        база_лл > кот_лл * 1000, (база_лл, кот_лл))
+    # КРИВАЯ -- [КОТИРОВКА (SOL), база]. Берётся сделка с НАТИВНОЙ котировкой:
+    # у токеновой котировки чужой котировщик отказывает вовсе (обязательная часть
+    # события пуста по SOL -- см. диф в разделе 10), и порядок там не проверить.
+    пара_кр = None
+    for r_ in B.load_samples(PROG_KRIVAYA):
+        t_ = B.extract_template(r_["tx"], PROG_KRIVAYA, r_.get("pool_vault"))
+        if not t_.get("ok"):
+            continue
+        м_ = B.min_out_from_reserves(t_, r_["tx"], 1_000_000, 0.35)
+        if not isinstance(м_, dict) or not м_.get("ok"):
+            continue
+        ев_ = B.pump_trade_event(r_["tx"], r_.get("mint")) or {}
+        пара_кр = (м_.get("virtual_reserves_after"),
+                   [int(ев_.get("virtual_sol_reserves", -1)),
+                    int(ев_.get("virtual_token_reserves", -1))])
+        break
+    chk("кривая pump.fun: virtual_reserves_after -- [КОТИРОВКА (SOL), база]",
+        пара_кр and list(пара_кр[0] or []) == пара_кр[1], пара_кр)
+    # ТИПЫ, КОТОРЫЕ РЕЗЕРВОВ НЕ ОТДАЮТ ВОВСЕ -- тоже замер, а не чтение: читатели
+    # уходят в названную ветку «резерв неизвестен -- наценка обычная».
+    B.загрузить_ставки_clmm()
+    B.загрузить_ступени_dlmm()
+    без_резервов = {}
+    for p_, метка_ in ((PROG_CLMM_, "Raydium CLMM"), (PROG_DLMM_, "Meteora DLMM"),
+                       (PROG_DAMM2_, "Meteora DAMM v2"), (PROG_DBC_, "Meteora DBC")):
+        for r_ in B.load_samples(p_):
+            t_ = B.extract_template(r_["tx"], p_, r_.get("pool_vault"))
+            if not t_.get("ok"):
+                continue
+            м_ = B.min_out_from_reserves(t_, r_["tx"], 1_000_000, 0.35)
+            if not isinstance(м_, dict) or not м_.get("ok"):
+                continue
+            без_резервов[метка_] = sorted(k for k in м_ if "reserves" in k)
+            break
+    chk("CLMM, DLMM, DAMM v2 и DBC резервов не отдают ВОВСЕ -- читатель уходит "
+        "в ветку «резерв неизвестен»",
+        len(без_резервов) == 4 and all(not v for v in без_резервов.values()),
+        без_резервов)
 
     # ------------------------------------------------- 8б. тень
     # ТЕНЬ -- ЭТО ЧИСЛА БЕЗ ТРАНЗАКЦИИ, и вид ответа у неё обязан совпадать с
