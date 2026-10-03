@@ -162,6 +162,25 @@ jobs:
       - name: "Ключей в выгрузке быть не должно"
         run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"
 
+      # СВОД ОДНИМ ФАЙЛОМ (слово владельца 03.10, вечер, п.5). Code-2 нужна
+      # вся полоса с 27.09 в ОДНОМ файле, и дописывать его надо каждые сутки.
+      # Дописка, а не пересборка: пересборка за всё окно каждые сутки читала бы
+      # ротированные журналы и лазила в цепь за теми же строками. Склейка идёт
+      # по cid, и поздняя выгрузка правит поля ранней, но пустым полем живое
+      # число не затирает (сделка, проданная за границей суток, попадает в две
+      # выгрузки: открытой и закрытой).
+      - name: "Свод с 27.09 одним файлом"
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          [ -f "$OUT_FILE" ] || { echo "выгрузки нет -- свод не трогаем"; exit 0; }
+          python3 deploy/checks/sdelki_polosy_svod.py --self-test | tail -1
+          python3 deploy/checks/sdelki_polosy_svod.py \
+            --svod data/sdelki_polosy_vse_s_2709.json \
+            --dopisat "$OUT_FILE"
+          python3 deploy/checks/bez_klyuchey_v_otchete.py data/sdelki_polosy_vse_s_2709.json
+
       - name: "Коммит"
         if: always()
         run: |
@@ -169,6 +188,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           [ -f "$OUT_FILE" ] && git add "$OUT_FILE"
+          if [ -f data/sdelki_polosy_vse_s_2709.json ]; then git add data/sdelki_polosy_vse_s_2709.json; fi
           if [ -f data/peresvet_itogov.json ]; then git add data/peresvet_itogov.json; fi
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
           git commit -m "Vygruzka sdelok polosy za sutki dlya Code-2 [automated]"
