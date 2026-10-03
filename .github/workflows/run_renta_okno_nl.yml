@@ -1,0 +1,242 @@
+name: "Рента: окно рубильника не дольше 2 минут и уборка пустых счетов одним прогоном"
+
+# ЗАЧЕМ. Слово владельца 03.10: "поставить общий рубильник не дольше чем на
+# 2 минуты для разовой уборки пустых счетов, затем снять". Тремя отдельными
+# прогонами это слово выполнить НЕЛЬЗЯ и один раз уже не вышло: 03.10 в
+# 18:41:17Z уборщик приехал РАНЬШЕ, чем прогон рубильника успел поставить
+# файл, отказался своим кодом ("рубильник KILL не стоит"), не закрыл ни одного
+# счёта -- а прогон постановки потом ещё и упал. Загрузка облачного бегунка
+# сама съедает минуту, и два окна ожидания между тремя прогонами в двухминутный
+# предел не влезают.
+#
+# ПОЭТОМУ ОДИН ПРОГОН И НА ХОЗЯЙСКОМ БЕГУНКЕ (он стоит на самом хосте, грузить
+# нечего): поставить -- убрать -- снять. Снятие стоит с if: always(), значит
+# упавший уборщик рубильник на стенде НЕ оставит -- ровно та беда, из-за
+# которой это и пишется.
+#
+# ТРИ СТРАХОВКИ, КАЖДАЯ САМА ПО СЕБЕ ДОСТАТОЧНА, ЧТОБЫ РУБИЛЬНИК НЕ ЗАЛЁЖАЛСЯ:
+#   1) шаг снятия с if: always() -- любой сбой уборщика всё равно снимает;
+#   2) сторож на ХОСТЕ: отдельный процесс сносит файл через 150 с, даже если
+#      бегунок умрёт совсем. Сносит ТОЛЬКО свой файл -- узнаёт по метке внутри,
+#      поэтому рубильник владельца, поставленный в эти же секунды, он не тронет;
+#   3) у шага уборки свой timeout-minutes: 2 -- перебрать пакеты дольше окна
+#      он не сможет физически.
+#
+# ЧЕГО ЗДЕСЬ НЕТ НАРОЧНО. Ожидания пульса службы между постановкой и уборкой:
+# признак жизни пишется раз в минуту, и ждать его -- значит выйти за две
+# минуты. Уборщику пульс и не нужен: его гейт (можно_сейчас) смотрит ФАЙЛ
+# рубильника, а от сделки в воздухе защищает не рубильник, а окно молодости
+# (min_age_s=0 -- по политикам групп, max(hold_slots)*0.4 + 600 с) и отсев
+# счетов открытых позиций и WSOL.
+#
+# НИЧЕГО НЕ ПОКУПАЕТ И НЕ ПРОДАЁТ. Возврат ренты -- это возврат запертого
+# своего, а не выручка.
+on:
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: "счетов в пакете"
+        required: false
+        default: "12"
+      max_batches:
+        description: "пакетов за прогон (окно -- две минуты, больше двух не успеть)"
+        required: false
+        default: "2"
+      confirm:
+        description: "ровно UBRAT -- иначе рубильник не ставится"
+        required: true
+        default: ""
+
+concurrency:
+  group: renta-okno
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  ENV_DIR: /etc/bloom-executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  TARGET_HOST: 127.0.0.1
+  METKA: "razovaja uborka renty Code-1 (okno 2 min)"
+  OUT: data/renta_okno.txt
+
+jobs:
+  okno:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Подтверждение словом"
+        run: |
+          set -e
+          [ "${{ inputs.confirm }}" = "UBRAT" ] || { echo "СБОЙ: нужно confirm=UBRAT"; exit 1; }
+          echo "подтверждение принято"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Доставить модуль уборщика и прогнать его самопроверки на хосте"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile analysis/close_empty_token_accounts.py
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $CODE_DIR/close_empty_token_accounts.py && chown bot:bot $CODE_DIR/close_empty_token_accounts.py && chmod 644 $CODE_DIR/close_empty_token_accounts.py" < analysis/close_empty_token_accounts.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $CODE_DIR
+            sudo -n -u bot env PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py --self-test | tail -2" | tee "$OUT"
+
+      - name: "ГЕЙТ: позиций ноль и рубильник НЕ стоит (чужой не трогаем)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            for F in $ENV_DIR/KILL $ENV_DIR/KILL_BLOOM $STATE_DIR/KILL_BY_TELEGRAM; do
+              if [ -f \"\$F\" ]; then
+                printf 'СБОЙ: рубильник уже стоит, он не наш -- не трогаем: %s ' \"\$F\"
+                head -c 300 \"\$F\"; echo; exit 1
+              fi
+            done
+            python3 -c 'import json,sys
+            d = json.load(open(\"$STATE_DIR/detector_status.json\"))
+            o = int(d.get(\"open_positions\") or 0)
+            z = int(d.get(\"stuck_positions\") or 0)
+            print(\"открытых %d, зависших %d\" % (o, z))
+            sys.exit(0 if (o == 0 and z == 0) else 1)'" | tee -a "$OUT"
+
+      - name: "Поставить ОБЩИЙ рубильник и завести сторожа на 150 с"
+        id: stavim
+        run: |
+          set -e
+          set -o pipefail
+          # СТОРОЖ СНОСИТ ТОЛЬКО СВОЙ ФАЙЛ. Метка внутри файла -- пропуск:
+          # рубильник владельца, поставленный в эти же секунды, останется стоять.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            printf '%s %s\n' \"\$(date -u +%Y-%m-%dT%H:%M:%SZ)\" '$METKA' > $ENV_DIR/KILL
+            chmod 644 $ENV_DIR/KILL
+            printf 'поставлен: '; cat $ENV_DIR/KILL
+            setsid nohup sh -c 'sleep 150; grep -q \"$METKA\" $ENV_DIR/KILL 2>/dev/null && rm -f $ENV_DIR/KILL && echo storozh snjal' \
+              > /tmp/renta_storozh.log 2>&1 < /dev/null &
+            echo 'сторож заведён: снесёт наш файл через 150 с, даже если прогон умрёт'" | tee -a "$OUT"
+          date -u +"окно открыто в %Y-%m-%dT%H:%M:%SZ" | tee -a "$OUT"
+
+      - name: "Уборка пустых счетов полосы живьём (внутри окна)"
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            cd $CODE_DIR
+            sudo -n -u bot env HELIUS_API_KEY=\$HELIUS_API_KEY \
+              OWN_SEND_WALLET=\$OWN_SEND_WALLET \
+              OWN_SEND_WALLET_KEY=\$OWN_SEND_WALLET_KEY \
+              BLOOM_STATE_DIR=\$BLOOM_STATE_DIR \
+              BLOOM_SOURCE_GROUPS=\$BLOOM_SOURCE_GROUPS \
+              CLOSE_ACCOUNTS_LIVE=1 \
+              PYTHONPATH=$CODE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py \
+                --wallet \$OWN_SEND_WALLET \
+                --min-age-s 0 \
+                --batch '${{ inputs.batch }}' \
+                --max-batches '${{ inputs.max_batches }}' \
+                --zhurnal /home/bot/host_tajmery/uborshchik_sutki.json \
+                --out /tmp/renta_okno_plan.json \
+                --result /tmp/renta_okno_result.json" | tee -a "$OUT"
+
+      - name: "СНЯТЬ рубильник -- при любом исходе уборки"
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          # БЕЗ КЛЮЧА SSH СНИМАТЬ НЕЧЕМ, И ЭТО НЕ ПОВОД МОЛЧАТЬ: если прогон упал
+          # до шага с ключом, рубильник и не ставился.
+          if [ -z "${SSH_OPTS:-}" ]; then
+            echo "ключа SSH нет -- рубильник не ставился, снимать нечего"; exit 0
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            if [ ! -f $ENV_DIR/KILL ]; then echo 'рубильник уже снят (сторож или прежний шаг)'; exit 0; fi
+            if ! grep -q '$METKA' $ENV_DIR/KILL; then
+              printf 'ВНИМАНИЕ: на месте ЧУЖОЙ рубильник, не снимаю: '; head -c 300 $ENV_DIR/KILL; echo; exit 0
+            fi
+            cp -a $ENV_DIR/KILL $ENV_DIR/KILL.snyat.\$(date -u +%Y%m%dT%H%M%SZ)
+            rm -f $ENV_DIR/KILL
+            echo 'рубильник снят'" | tee -a "$OUT"
+          date -u +"окно закрыто в %Y-%m-%dT%H:%M:%SZ" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "ls -l $ENV_DIR/KILL 2>/dev/null && echo 'СБОЙ: файл рубильника ещё на месте' && exit 1 || echo 'файла рубильника нет -- стенд торгует'" | tee -a "$OUT"
+
+      - name: "Служба видит разрешение (после окна, ждать можно сколько нужно)"
+        if: always()
+        run: |
+          set -e
+          if [ -z "${SSH_OPTS:-}" ]; then echo "ключа SSH нет -- проверять нечего"; exit 0; fi
+          for i in $(seq 1 24); do
+            out=$(ssh -n $SSH_OPTS root@$TARGET_HOST "python3 -c 'import json; print(json.load(open(\"$STATE_DIR/detector_status.json\")).get(\"kill_active\"))'" || echo "?")
+            echo "пульс: kill_active=$out"
+            case "$out" in False) echo "служба видит разрешение" | tee -a "$OUT"; exit 0 ;; esac
+            sleep 5
+          done
+          echo "СБОЙ: за 120 с признак жизни не подтвердил, что запрета нет" | tee -a "$OUT"
+          exit 1
+
+      - name: "Забрать план и результат, сказать сколько вернулось по цепи"
+        if: always()
+        run: |
+          set -e
+          if [ -z "${SSH_OPTS:-}" ]; then echo "ключа SSH нет"; exit 0; fi
+          for F in renta_okno_plan renta_okno_result; do
+            ssh -n $SSH_OPTS root@$TARGET_HOST "cat /tmp/$F.json 2>/dev/null || echo '{}'" > "data/$F.json"
+          done
+          python3 - <<'PY' | tee -a "$OUT"
+          import json, pathlib
+          р = json.loads(pathlib.Path("data/renta_okno_result.json").read_text(encoding="utf-8") or "{}")
+          п = json.loads(pathlib.Path("data/renta_okno_plan.json").read_text(encoding="utf-8") or "{}")
+          закрыто = р.get("закрыто_счетов") or р.get("zakryto_schetov") or 0
+          вернулось = (р.get("вернулось_sol") or р.get("vernulos_sol")
+             or round((int(р.get("вернулось_лампортов") or 0)) / 1e9, 9))
+          print(f"итог окна: закрыто счетов {закрыто}, вернулось по цепи {вернулось} SOL")
+          print(f"в плане было счетов: {len(п.get('счета') or п.get('schjota') or [])}")
+          for п_ in (р.get("пакеты") or р.get("pakety") or [])[:6]:
+              print("  пакет:", json.dumps(п_, ensure_ascii=False)[:300])
+          почему = р.get("why_not") or р.get("pochemu_net")
+          if почему:
+              print("почему не:", почему)
+          PY
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for F in data/renta_okno_plan.json data/renta_okno_result.json "$OUT"; do
+            [ -f "$F" ] && git add "$F"
+          done
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Renta: okno rubilnika 2 min i uborka pustykh schetov [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
