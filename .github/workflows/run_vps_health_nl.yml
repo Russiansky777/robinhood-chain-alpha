@@ -98,6 +98,7 @@ jobs:
           ssh -n $SSH_OPTS root@$HOST "
             for f in /home/bot/bloom_executor_live_data/detector_status.json \
                      /home/bot/bloom_executor_live_data/seller_heartbeat.json \
+                     /home/bot/bloom_executor_live_data/samoproverka_hosta.json \
                      /home/bot/dbot_detect_probe/status.json \
                      /home/bot/grpc_feed_probe_data/heartbeat.json; do
               if [ -s \"\$f\" ]; then
