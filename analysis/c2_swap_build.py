@@ -1478,7 +1478,19 @@ def launchlab_min_out(tx: dict, amount_in: int, slippage: float) -> dict:
     fee_rate = D(fee) / D(ev["amount_in"]) if ev["amount_in"] else D(0)
     exp = launchlab_out(ev, amount_in, True, fee_rate)
     return {"ok": True, "fee_rate": float(fee_rate), "virtual_reserves_after": [
-        ev["virtual_base"] - ev["real_base_after"], ev["virtual_quote"] + ev["real_quote_after"]],
+        # ПОРЯДОК -- [КОТИРОВКА, БАЗА], как у двух соседей: min_out_from_reserves
+        # отдаёт [x1, y1] (вход-котировка, выход-база), bonding_min_out --
+        # [virtual_sol_reserves, virtual_token_reserves]. Здесь порядок был
+        # обратный, и правило тонкого пула в bloom_lane_two_step становилось
+        # СЛЕПЫМ на LaunchLab: оно читает рез[0] как котировку, делит на
+        # 10**q_dec и умножает на цену ноги. Замер Code-3 на образце
+        # 3vzWr8fvcP6RK8 (price_sol 0.008361, q_dec 6): база 661 046 006 523 532
+        # даёт 5 527 021 SOL-экв. при пороге тонкого пула 30, то есть наценка не
+        # срабатывала НИКОГДА; настоящая котировка 499 800 652 -- это 4.18
+        # SOL-экв., и пул тонкий. Заодно pool_reserve_quote_raw в журнале
+        # решений писал резерв БАЗЫ вместо котировки.
+        ev["virtual_quote"] + ev["real_quote_after"],
+        ev["virtual_base"] - ev["real_base_after"]],
         "expected_out": int(exp), "min_out": int(exp * D(1 - slippage))}
 
 
@@ -2672,6 +2684,57 @@ def self_test() -> int:
         else:
             os.environ["BLOOM_ASSOC_UVA_FILE"] = _env_св
         assoc_uva_забыть()
+
+    # --- ПОРЯДОК РЕЗЕРВОВ: [КОТИРОВКА, БАЗА] У ВСЕХ ТРЁХ (диф №5 Code-3,
+    # слово владельца 03.10). Правило тонкого пула в bloom_lane_two_step читает
+    # рез[0] КАК КОТИРОВКУ, и у LaunchLab порядок был обратным -- правило было
+    # слепым, а pool_reserve_quote_raw писал резерв базы. Проверка стоит на
+    # ЖИВОМ образце и сверяет порядок с двумя соседями: правка в любом из трёх
+    # мест теперь ломает её громко, а не меняет поведение полосы молча.
+    _ll_ф = (Path(__file__).resolve().parent.parent / "data" / "c2_pool_samples"
+             / "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj.json")
+    _ll_ев = None
+    if _ll_ф.exists():
+        try:
+            _ll_обр = json.loads(_ll_ф.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            _ll_обр = []
+        _ll_tx = (_ll_обр[0] or {}).get("tx") if _ll_обр else None
+        _ll_ев = launchlab_event(_ll_tx) if _ll_tx else None
+    checks.append(("живой образец LaunchLab на месте и событие разобралось",
+                   bool(_ll_ев)))
+    if _ll_ев:
+        _ll_мо = launchlab_min_out(_ll_tx, 10_000_000, 0.3)
+        _рез = _ll_мо.get("virtual_reserves_after") or []
+        _кот = _ll_ев["virtual_quote"] + _ll_ев["real_quote_after"]
+        _баз = _ll_ев["virtual_base"] - _ll_ев["real_base_after"]
+        checks.append(("LaunchLab: рез[0] -- КОТИРОВКА, а не база",
+                       len(_рез) == 2 and _рез[0] == _кот == 499800652))
+        checks.append(("LaunchLab: рез[1] -- база",
+                       len(_рез) == 2 and _рез[1] == _баз == 661046006523532))
+        # ЗАМЕР ВОСПРОИЗВЕДЁН СВОИМ СЧЁТОМ, А НЕ ПЕРЕПИСАН. По цене статичного
+        # шаблона ноги (price_sol 0.008361, q_dec 6) котировка даёт 4.1788
+        # SOL-экв., база -- 5 527 005.66. У Code-3 во второй клетке стоит
+        # 5 527 021: расхождение 15 единиц на пятом знаке от округления цены, и
+        # я ставлю СВОЁ число, а не его. Для правила это без разницы: порог
+        # тонкого пула 30, и разница между 4.18 и 5.5 млн -- шесть порядков.
+        _цена, _qdec = 0.008361, 6
+        checks.append((
+            "правило тонкого пула видит 4.18 SOL-экв. (пул тонкий), а не 5.5 млн",
+            abs(_рез[0] / 10 ** _qdec * _цена - 4.1788) < 0.001
+            and _рез[0] / 10 ** _qdec * _цена < 30.0
+            and 5.5e6 < _рез[1] / 10 ** _qdec * _цена < 5.6e6))
+    # СОСЕДИ: порядок -- это именно текст возврата, собрать событие кривой тут
+    # нечем, поэтому сверяется текст.
+    _ист = Path(__file__).resolve().read_text(encoding="utf-8")
+    checks.append((
+        "кривая отдаёт [virtual_sol_reserves, virtual_token_reserves]",
+        '"virtual_reserves_after": [ev["virtual_sol_reserves"], '
+        'ev["virtual_token_reserves"]]' in _ист))
+    checks.append((
+        "min_out_from_reserves отдаёт [x1, y1] -- вход-котировка, выход-база",
+        '"reserves_after": [x1, y1]' in _ист
+        and "expected = D(y1) * a_eff / (D(x1) + a_eff)" in _ист))
 
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")

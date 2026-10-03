@@ -829,7 +829,8 @@ def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
                         chaevye_spiskom: list | None = None,
                         chaevye_adres: str | None = None,
                         nons: tuple | None = None,
-                        zakryvat_schet_tokena: bool = True) -> dict:
+                        zakryvat_schet_tokena: bool | None = None,
+                        ostatok_usdc: int | None = None) -> dict:
     """СПИСОК инструкций продажи токен -> USDC -> SOL. Без компиляции и подписи.
 
     Первая нога -- зеркало НАШЕЙ покупки токена (c3_prodavec_sborka: шаблон из
@@ -908,9 +909,25 @@ def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
         if not sh2.get("ok"):
             iz["why_not"] = f"шаблон продажи второй ноги: {sh2.get('why_not')}"
             return iz
-        # ВХОД ВТОРОЙ НОГИ -- МИНИМУМ ПЕРВОЙ, ровно как у покупки: больше, чем
-        # принесла первая, вторая потратить не может.
-        iz["noga_2_amount_in"] = mo1
+        # ВХОД ВТОРОЙ НОГИ -- МИНИМУМ ПЕРВОЙ ПЛЮС УЖЕ ЛЕЖАЩИЙ НА СЧЁТЕ USDC
+        # (добавка MRKL, слово владельца 03.10). Прежде входом был РОВНО
+        # минимум первой ноги -- "больше, чем принесла первая, вторая потратить
+        # не может", и это верно про саму продажу. Но у покупки первая нога
+        # берёт SOL -> USDC с проскальзыванием и отдаёт в пул токена ровно свой
+        # min_out: разница между полученным USDC и этим минимумом остаётся на
+        # нашем счёте USDC и не уходит НИКОГДА -- копится монетой, которой в
+        # учёте полосы нет вовсе. Теперь продажа может забрать и её.
+        # ЧИСЛО ПРИХОДИТ СНАРУЖИ: остаток живёт на цепи, а этот модуль сети не
+        # читает вовсе. Не передали -- ведём себя как прежде и говорим это полем,
+        # а не молча.
+        _нога2_вход = int(mo1) + int(ostatok_usdc or 0)
+        iz["noga_2_ostatok_usdc"] = (None if ostatok_usdc is None
+                                     else int(ostatok_usdc))
+        iz["noga_2_ostatok_why_not"] = (
+            None if ostatok_usdc is not None
+            else "остаток USDC не передан -- вторая нога идёт только минимумом "
+                 "первой, остаток останется на счёте")
+        iz["noga_2_amount_in"] = int(_нога2_вход)
         if not (isinstance(min_out_nogi_2, int) and min_out_nogi_2 > 0):
             iz["why_not"] = WHY_NOGA2_NET_MIN
             return iz
@@ -930,12 +947,19 @@ def prodazha_instrukcii(*, tx_pokupki: dict, programma: str, nash_koshelek: str,
                 S.инструкция_продажи(sh1, наш_кошелёк=nash_koshelek,
                                      база_в=int(ostatok), минимум_выхода=mo1),
                 instrukciya_nogi_2_prodazhi(sh2, nash_koshelek=nash_koshelek,
-                                            kotirovki_v=mo1,
+                                            kotirovki_v=int(_нога2_вход),
                                             min_out=int(min_out_nogi_2))]
         # ЗАКРЫТИЕ СЧЕТОВ -- ТОЙ ЖЕ ТРАНЗАКЦИЕЙ, как у зеркальной продажи полосы:
         # токеновый счёт закрывается только когда продан весь остаток, а счёт
         # WSOL закрывается всегда -- иначе SOL остался бы завёрнутым.
-        if zakryvat_schet_tokena and sh1.get("минт_базы"):
+        # УМОЛЧАНИЕ -- ПО ТИПУ. None значит "как решает тип" (п.1б владельца);
+        # явный True или False по-прежнему сильнее таблицы: замер и круг должны
+        # уметь мерить оба режима.
+        _закрывать = (zakryvat_schet_tokena if zakryvat_schet_tokena is not None
+                      else zakryvat_schet_tokena_po_tipu(programma))
+        iz["zakryvaem_schet_tokena"] = bool(_закрывать)
+        iz["zakryvaem_po_tipu"] = zakryvat_schet_tokena is None
+        if _закрывать and sh1.get("минт_базы"):
             schet_bazy = B.ata(nash_koshelek, sh1["минт_базы"],
                                sh1.get("программа_базы") or B.TOKEN_PROGRAM)
             ixs.append(S.инструкция_закрытия(
@@ -1026,7 +1050,7 @@ def prodazha_sobrat(*, luts_gotovye: list | None = None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: молчаливый пропуск -- это провал. Если файла
 # образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 166
+ZHDEM_PROVEROK = 186
 
 # ЗАМЕР ПО ТИПАМ НА ЖИВЫХ СДЕЛКАХ С КОТИРОВОЧНЫМ ТОКЕНОМ (не WSOL). Образцы --
 # data/c2_pool_samples/<программа>.json плюс разновидности кривой
@@ -1144,6 +1168,28 @@ ZHDEM_PRODAZHA_KRIVOJ = {"4_zakryvaem": 1259, "10_zakryvaem": 1166,
 ZHDEM_PRODAZHA_KRIVOJ_TYAZHELYJ = {"4_zakryvaem": 1365, "10_zakryvaem": 1272,
                                    "4_bez_zakrytiya": 1295,
                                    "10_bez_zakrytiya": 1202}
+# ЗАКРЫВАТЬ ЛИ ТОКЕНОВЫЙ СЧЁТ ТОЙ ЖЕ ТРАНЗАКЦИЕЙ -- РЕШАЕТ ТИП, А НЕ ВЫЗЫВАЮЩИЙ
+# (слово владельца 03.10, п.1б). Прежде умолчание было "закрывать всегда", и в
+# боевом режиме (нонс + чужой чаевый) продажа LaunchHub и Pump AMM НЕ ВЛЕЗАЛА:
+# 1236...1267 и 1234...1265 байт при пределе 1232, перебор 4...35 байт. Без
+# закрытия -- 1197...1228 и 1195...1226, влезает. Рента остаётся на счёте и
+# забирается уборщиком (bloom_close_on_sell), как полоса и делала до 02.10.
+# CPMM закрывает счёт по-прежнему: у него и с закрытием 1127...1158.
+# Кривая не влезает ни так, ни иначе (1388...1420 без закрытия) -- ей нужны ещё
+# и десять адресов в таблице, и это отдельное решение владельца.
+ZAKRYVAT_SCHET_TOKENA_PO_TIPU = {
+    PROG_CPMM: True,
+    PROG_LAUNCHLAB: False,
+    PROG_PUMP_AMM: False,
+    PROG_KRIVAYA: False,
+}
+
+
+def zakryvat_schet_tokena_po_tipu(programma: str | None) -> bool:
+    """Закрывать ли счёт у ЭТОГО типа. Незнакомый тип -- закрываем, как прежде."""
+    return bool(ZAKRYVAT_SCHET_TOKENA_PO_TIPU.get(programma or "", True))
+
+
 KOSHELEK_PROVERKI = "D3JuFoSXuWEMUUdCtoB5NYWnN87vjJSHtDP5rTD6qnph"
 DRUGOJ_KOSHELEK = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
 # Живой образец кривой с котировочным минтом -- тот, на котором измерены места и
@@ -1811,9 +1857,11 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     try:
         for p, ждём in ZHDEM_PRODAZHI.items():
             метка = TIPY[p]["label"]
-            ряды = {"chaevyj_nash": [], "nons_i_chaevyj": [], "bez_zakrytiya": []}
+            ряды = {"chaevyj_nash": [], "nons_i_chaevyj": [], "bez_zakrytiya": [],
+                    "po_tipu": []}
             порядок, суммы = 0, 0
             без_мин = 0
+            по_типу_ок = 0
             for о in образцы_по_типам.get(p) or []:
                 кэш = SB.LegCache({}, None)
                 кэш.entries[о["quote"]] = зап2
@@ -1825,7 +1873,12 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 без = prodazha_instrukcii(**общие)
                 if not без["ok"] and WHY_NOGA2_NET_MIN in (без["why_not"] or ""):
                     без_мин += 1
-                рез = prodazha_instrukcii(**общие, min_out_nogi_2=1)
+                # ПОРЯДОК МЕРИТСЯ В РЕЖИМЕ С ЗАКРЫТИЕМ СЧЁТА, чтобы проверка
+                # осталась про ПОРЯДОК, а не про число закрытий: закрывать ли
+                # счёт -- это теперь решение по типу (п.1б владельца), и оно
+                # проверяется отдельно ниже.
+                рез = prodazha_instrukcii(**общие, min_out_nogi_2=1,
+                                          zakryvat_schet_tokena=True)
                 if not рез["ok"]:
                     continue
                 ixs = рез["ixs"]
@@ -1837,6 +1890,17 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                         and bytes(ixs[6].data)[:1] == b"\x09" \
                         and bytes(ixs[7].data)[:1] == b"\x09":
                     порядок += 1
+                # ПО ТИПУ: у кого счёт не закрываем -- закрытие РОВНО одно (WSOL).
+                _по_типу = prodazha_instrukcii(**общие, min_out_nogi_2=1)
+                if _по_типу.get("ok"):
+                    _закр = sum(1 for i in _по_типу["ixs"]
+                                if bytes(i.data)[:1] == b"\x09")
+                    _ждём_закр = 2 if zakryvat_schet_tokena_po_tipu(p) else 1
+                    if (_закр == _ждём_закр
+                            and _по_типу.get("zakryvaem_po_tipu") is True
+                            and _по_типу.get("zakryvaem_schet_tokena")
+                            is zakryvat_schet_tokena_po_tipu(p)):
+                        по_типу_ок += 1
                 if рез["noga_2_amount_in"] == рез["min_out_nogi_1"]:
                     суммы += 1
                 нашлось = B.ata(KOSHELEK_PROVERKI, о["quote"], о["quote_program"])
@@ -1845,11 +1909,19 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                        "chaevye_lamporty": 1_000_000,
                        "nons": (NONS_DLYA_ZAMERA, KOSHELEK_PROVERKI)}
                 for имя, кв in (
+                        # ПРЕЖНИЕ ДВА РЕЖИМА -- С ЗАКРЫТИЕМ СЧЁТА ЯВНО: их числа
+                        # остаются под проверкой, иначе правка умолчания скрыла
+                        # бы их, а не проверила.
                         ("chaevyj_nash", {"chaevye_adres": KOSHELEK_PROVERKI,
-                                          "chaevye_lamporty": 1_000_000}),
-                        ("nons_i_chaevyj", тяж),
+                                          "chaevye_lamporty": 1_000_000,
+                                          "zakryvat_schet_tokena": True}),
+                        ("nons_i_chaevyj", dict(тяж,
+                                                zakryvat_schet_tokena=True)),
                         ("bez_zakrytiya", dict(тяж,
-                                               zakryvat_schet_tokena=False))):
+                                               zakryvat_schet_tokena=False)),
+                        # НОВОЕ УМОЛЧАНИЕ -- БЕЗ ФЛАГА ВОВСЕ: ровно то, что
+                        # поедет в бой.
+                        ("po_tipu", тяж)):
                     сб = prodazha_sobrat(**общие, min_out_nogi_2=1,
                                          luts_gotovye=[L], **кв)
                     if isinstance(сб.get("size"), int):
@@ -1879,6 +1951,52 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 f"{len(ряды['nons_i_chaevyj'])}",
                 len(влезли) == ZHDEM_VLEZLO_PRODAZHA_TYAZHELYJ[p],
                 (len(влезли), len(ряды["nons_i_chaevyj"])))
+            # ОСТАТОК USDC ВО ВТОРОЙ НОГЕ (добавка MRKL): передали число --
+            # вход второй ноги на него больше, не передали -- как прежде, и
+            # причина названа полем. Проверяется на тех же живых сделках.
+            _ост = 12_345
+            _с_ост = prodazha_instrukcii(**общие, min_out_nogi_2=1,
+                                         ostatok_usdc=_ост)
+            _без_ост = prodazha_instrukcii(**общие, min_out_nogi_2=1)
+            if _с_ост.get("ok") and _без_ост.get("ok"):
+                chk(f"{метка}: остаток USDC добавлен во вход второй ноги",
+                    _с_ост["noga_2_amount_in"]
+                    == _без_ост["noga_2_amount_in"] + _ост
+                    and _с_ост["noga_2_ostatok_usdc"] == _ост,
+                    (_без_ост["noga_2_amount_in"], _с_ост["noga_2_amount_in"]))
+                chk(f"{метка}: без остатка -- вход РОВНО минимум первой ноги, "
+                    "и причина названа",
+                    _без_ост["noga_2_amount_in"] == _без_ост["min_out_nogi_1"]
+                    and _без_ост["noga_2_ostatok_usdc"] is None
+                    and "остаток USDC не передан"
+                    in (_без_ост["noga_2_ostatok_why_not"] or ""),
+                    _без_ост.get("noga_2_ostatok_why_not"))
+
+            # ЗАКРЫТИЕ СЧЁТА -- ПО ТИПУ, И ЭТО ПРОВЕРЯЕТСЯ ЧИСЛОМ ЗАКРЫТИЙ, а
+            # не только размером: у кого не закрываем -- закрытие РОВНО одно
+            # (WSOL), и признак zakryvaem_po_tipu в ответе стоит.
+            chk(f"{метка}: закрытие счёта по типу "
+                f"({'закрываем' if zakryvat_schet_tokena_po_tipu(p) else 'НЕ закрываем'}) "
+                f"на {ждём_сделок} сделках",
+                по_типу_ок == ждём_сделок and по_типу_ок > 0,
+                (по_типу_ок, ждём_сделок))
+            # УМОЛЧАНИЕ В ТЯЖЁЛОМ РЕЖИМЕ -- ТО, ЧТО ПОЕДЕТ В БОЙ. У CPMM оно
+            # равно режиму с закрытием, у остальных трёх -- режиму без него.
+            _ждём_умолч = (ZHDEM_PRODAZHI[p]["nons_i_chaevyj"]
+                           if zakryvat_schet_tokena_po_tipu(p)
+                           else ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA[p])
+            _ряд_у = ряды["po_tipu"]
+            chk(f"{метка}: умолчание (тяжёлый режим) {_ждём_умолч[0]}..."
+                f"{_ждём_умолч[1]} байт",
+                _ряд_у and (min(_ряд_у), max(_ряд_у)) == tuple(_ждём_умолч),
+                (min(_ряд_у), max(_ряд_у)) if _ряд_у else None)
+            _влезло_у = [x for x in _ряд_у if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
+            chk(f"{метка}: умолчанием влезает {len(_влезло_у)} из {len(_ряд_у)}"
+                + (" (кривой нужны ещё десять адресов)"
+                   if p == PROG_KRIVAYA else ""),
+                (len(_влезло_у) == len(_ряд_у) if p != PROG_KRIVAYA
+                 else len(_влезло_у) == 0),
+                (len(_влезло_у), len(_ряд_у)))
             мин_б, макс_б = ZHDEM_PRODAZHI_BEZ_ZAKRYTIYA[p]
             ряд_б = ряды["bez_zakrytiya"]
             chk(f"{метка}: продажа без закрытия счёта токена {мин_б}...{макс_б}",
