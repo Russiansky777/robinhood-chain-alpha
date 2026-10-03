@@ -1,0 +1,97 @@
+name: "Podbivka-2: konveyer (Pravilo 18) -- po taymeru, bez shtaba"
+
+# ZACHEM (Pravilo 18, slovo vladelca 03.10). Konveyer: kazhdye sutki posle progona
+# 06:30Z -- pravilo kandidatov po VSEY vselennoy arhiva (kazhdyy adres s >= 20
+# pervymi pokupkami ot 2 SOL-ekv za okno), vhod "konec slota", vyhod +108, bilet
+# 0.1; porogi ne podgonyayutsya. Vyhod: docs/konveyer_<data>.md i
+# data/konveyer/<data>.json s razdelami "dobavit" (<= 5), "zapas", "snova
+# prohodit" (log_only -- tolko stroka), "deystvuyuschie ne derzhatsya".
+#
+# POCHEMU ODIN PROHOD ARHIVA ZA NOCH, A NE 11. Yacheyki proshlyh sutok ne
+# menyayutsya, poetomu kazhduyu noch dochityvayutsya TOLKO proshedshie sutki
+# (metka konv_<data>), a pravilo schitaetsya oflayn po poslednim 11 sutochnym
+# faylam (konv_* i cand2_*: v nih signaly vsey vselennoy s porogom 2 SOL).
+# Poslednie sutki -- VNE VYBORKI i tozhe dolzhny byt v plyuse.
+#
+# Svoya gruppa concurrency: ne vstayot poverh ocheredi zadach (podbivka2-zadacha)
+# i ne otmenyaet eyo. Helius ne nuzhen: tolko arhiv PumpApi.
+on:
+  schedule:
+    - cron: "17 7 * * *"      # posle sutochnogo progona 06:30Z
+  workflow_dispatch:
+    inputs:
+      sutok:
+        description: "sutok v okne otbora (bez poslednih)"
+        required: false
+        default: "11"
+      bez_arhiva:
+        description: "da -- ne chitat arhiv, tolko peresobrat stranicu po gotovym faylam"
+        required: false
+        default: "net"
+
+concurrency:
+  group: podbivka2-konveyer
+  cancel-in-progress: false
+
+jobs:
+  konveyer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/podbivka
+          fetch-depth: 2
+
+      - name: "Python venv"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/pod_venv"
+          "$RUNNER_TEMP/pod_venv/bin/pip" install -q requests solders zstandard
+          echo "PY=$RUNNER_TEMP/pod_venv/bin/python" >> "$GITHUB_ENV"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: "Sutki arhiva za proshedshiy den"
+        if: ${{ github.event.inputs.bez_arhiva != 'da' }}
+        env:
+          SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          DEN=$(date -u -d "yesterday" +%Y-%m-%d)
+          echo "sutki: ${DEN}T17 -> +25 chasov, metka konv_${DEN}T17"
+          $PY analysis/podbivka_arhiv_den.py \
+            --s "${DEN}T17" --chasov 25 --porog 2 --okno 160 --ne-sol --okno-vsem \
+            --okno-dokupki 1800 --bilety 0.1,0.3 --bez-sobytij --bez-adresov \
+            --metka "konv_${DEN}T17"
+
+      - name: "Pravilo po vselennoy i stranica"
+        env:
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          SUTOK="${{ github.event.inputs.sutok }}"
+          [ -n "$SUTOK" ] || SUTOK=11
+          $PY analysis/podbivka_konveyer.py --sutok "$SUTOK" --data "$(date -u +%Y-%m-%d)"
+
+      - name: "Final commit"
+        if: always()
+        env:
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          [ -s "$PODB_MANIFEST" ] || { echo "nothing written"; exit 0; }
+          sort -u "$PODB_MANIFEST" > "$RUNNER_TEMP/mine.txt"
+          for i in 1 2 3 4 5 6 7 8; do
+            git fetch -q --depth=1 origin claude/podbivka
+            git reset -q FETCH_HEAD
+            xargs -a "$RUNNER_TEMP/mine.txt" -d '\n' git add -- || true
+            git diff --cached --quiet && { echo "already on branch"; exit 0; }
+            git commit -q -m "Konveyer: $(date -u +%Y-%m-%d) [automated]"
+            git push -q origin HEAD:claude/podbivka && exit 0
+            sleep 4
+          done
+          exit 1
