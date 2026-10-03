@@ -1,0 +1,140 @@
+name: "Лаборатория Miami: разбор трекера (только чтение)"
+
+# ЗАЧЕМ (слово владельца 04.10, п.1). Страница трекера снаружи открывается, но
+# данных в ней нет: "ряда за период нет", все поля прочерки. Владелец просил
+# разобрать по journalctl -u kapital-trekker и /var/lib/kapital/kapital.json.
+# Прогона, которым можно заглянуть в журнал лаборатории, не было ни одного.
+#
+# ЭТОТ ПРОГОН НИЧЕГО НЕ МЕНЯЕТ. Ни одной команды записи, кроме своего же
+# черновика в /tmp: только systemctl show, journalctl, ls и чтение json.
+# Службу не трогает, межсетевой экран не трогает (владелец сказал: не
+# трогать), /etc/kapital.env не перезаписывает.
+#
+# СЕКРЕТ В ЖУРНАЛЕ -- ГЛАВНАЯ ОПАСНОСТЬ ЭТОГО ПРОГОНА. Секрет трекера стоит в
+# ПУТИ ссылки, а веб-серверы пишут путь запроса в журнал. Владелец только что
+# заходил на страницу с телефона, значит его запрос в журнале есть, и вместе с
+# ним -- секрет. Поэтому весь разбор сперва собирается в файл НА ХОСТЕ, там же
+# чистится, там же проверяется сторожем, и только после этого печатается. Если
+# секрет после замены всё ещё находится -- прогон отказывает и не печатает
+# НИЧЕГО. Лучше пустой разбор, чем секрет в логе прогона, который видит
+# каждый, кто откроет страницу прогона.
+#
+# ПОЧЕМУ ВСЁ ОДНИМ ШАГОМ. Чистка и сторож должны стоять на ОДНОМ выходе. Если
+# разложить по шагам, каждый шаг пришлось бы чистить отдельно, и забытый шаг
+# означал бы секрет в логе.
+#
+# ПИТОН ЗДЕСЬ ТОЛЬКО ОДНОЙ СТРОКОЙ. Многострочный `python3 -c` внутри блока
+# YAML начинался бы с первой колонки и блок бы порвался: мой же линтер поймал
+# это на первой сборке этого файла.
+
+on:
+  workflow_dispatch:
+    inputs:
+      strok:
+        description: "сколько последних строк журнала (1..500)"
+        required: false
+        default: "150"
+
+concurrency:
+  group: lab-trekker-diagnoz
+  cancel-in-progress: false
+
+jobs:
+  diagnoz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "ВХОД: проверить ДО первого ssh -- иначе это код от root на хосте"
+        env:
+          STROK: ${{ inputs.strok }}
+        run: |
+          set -e
+          # Поля запуска идут дальше переменными окружения, а не подстановкой в
+          # строку ssh: строка ssh выполняется на лаборатории от root. Правило
+          # взято у Code-3, он поставил его 04.10.
+          printf '%s' "$STROK" | grep -qE '^[0-9]{1,3}$' || { echo "OTKAZ: strok -- tolko cifry"; exit 1; }
+          [ "$STROK" -ge 1 ] && [ "$STROK" -le 500 ] || { echo "OTKAZ: strok vne 1..500"; exit 1; }
+          echo "STROK=$STROK" >> $GITHUB_ENV
+          echo "vhod proveren: strok=$STROK"
+
+      - name: "Ключ лаборатории"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+        run: |
+          set -e
+          [ -n "$KLJUCH_MIAMI" ] || { echo "OTKAZ: sekreta VPS_SSH_KEY_MIAMI net"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_MIAMI" > ~/.ssh/lab_key
+          chmod 600 ~/.ssh/lab_key
+          echo "HOST=169.128.191.158" >> $GITHUB_ENV
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+
+      - name: "ЭТО ТОЧНО ЛАБОРАТОРИЯ, А НЕ ТОРГОВЫЙ ХОСТ"
+        run: |
+          set -e
+          IMJA=$(ssh -n $SSH_OPTS root@"$HOST" "hostname")
+          echo "hostname: $IMJA"
+          case "$IMJA" in
+            miami-code2) echo "mashina ta" ;;
+            *) echo "OTKAZ: eto ne lab-miami ($IMJA)"; exit 1 ;;
+          esac
+
+      - name: "Разбор: служба, журнал, файлы, узел -- одним куском и с чисткой"
+        env:
+          STROK_ENV: ${{ env.STROK }}
+        run: |
+          set -e
+          # Число строк уходит на хост ПЕРЕМЕННОЙ ОКРУЖЕНИЯ через ssh -o
+          # SendEnv нельзя (не включено на сервере), поэтому подставляем уже
+          # ПРОВЕРЕННОЕ выше число -- только цифры, ничего другого там быть
+          # не может.
+          N="$STROK_ENV"
+          ssh -n $SSH_OPTS root@"$HOST" '
+            set -e
+            . /etc/kapital.env
+            if [ -z "$BLOOM_TREKKER_SEKRET" ]; then
+              echo "OTKAZ: v /etc/kapital.env net BLOOM_TREKKER_SEKRET -- chistit nechem, nichego ne pokazyvaju"
+              exit 1
+            fi
+            CHERNOVIK=/tmp/trekker_razbor.txt
+            : > "$CHERNOVIK"
+            exec 3>&1
+            {
+              echo "=== SLUZHBA"
+              systemctl is-active kapital-trekker || true
+              systemctl show kapital-trekker -p NRestarts -p ActiveEnterTimestamp -p ExecMainStartTimestamp --no-pager || true
+              echo "=== IMENA V /etc/kapital.env (TOLKO IMENA, BEZ ZNACHENIJ)"
+              sed -n "s/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1 est/p" /etc/kapital.env || true
+              echo "=== FAJLY V /var/lib/kapital"
+              ls -la /var/lib/kapital 2>/dev/null || echo "kataloga net"
+              echo "=== kapital.json PO POLJAM"
+              python3 -c "import json,os;p=\"/var/lib/kapital/kapital.json\";d=(json.load(open(p)) if os.path.exists(p) else None);print(\"fajla net\") if d is None else [print(k,\"=\",str(v)[:400]) for k,v in sorted(d.items())]" 2>&1 || true
+              echo "=== sostojanie.json PO POLJAM"
+              python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else None);print(\"fajla net\") if d is None else [print(k,\"=\",str(v)[:400]) for k,v in sorted(d.items())]" 2>&1 || true
+              echo "=== UZEL: KAKOJ STOIT I CHTO OTVECHAET (adres ne pechataetsja)"
+              if [ -n "$BLOOM_TREKKER_RPC" ]; then
+                echo "uzel: svoj, BLOOM_TREKKER_RPC zadan"
+                U="$BLOOM_TREKKER_RPC"
+              else
+                echo "uzel: publichnyj api.mainnet-beta.solana.com, BLOOM_TREKKER_RPC NE zadan"
+                U="https://api.mainnet-beta.solana.com"
+              fi
+              KOD=$(curl -s -m 20 -o /tmp/uzel_otvet.txt -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getSlot\"}" "$U" || echo 000)
+              echo "getSlot: kod $KOD"
+              head -c 300 /tmp/uzel_otvet.txt 2>/dev/null; echo
+              rm -f /tmp/uzel_otvet.txt
+              echo "=== ZHURNAL, POSLEDNIE STROKI"
+              journalctl -u kapital-trekker -n '"$N"' --no-pager 2>&1 || echo "zhurnala net"
+            } > "$CHERNOVIK" 2>&1
+            # ЧИСТКА И СТОРОЖ -- НА ОДНОМ ВЫХОДЕ.
+            sed -i "s|$BLOOM_TREKKER_SEKRET|<SEKRET>|g" "$CHERNOVIK"
+            if grep -qF -e "$BLOOM_TREKKER_SEKRET" "$CHERNOVIK"; then
+              rm -f "$CHERNOVIK"
+              echo "OTKAZ: sekret ostalsja v tekste posle zameny -- nichego ne pechataju" >&3
+              exit 1
+            fi
+            cat "$CHERNOVIK" >&3
+            rm -f "$CHERNOVIK"
+          '
