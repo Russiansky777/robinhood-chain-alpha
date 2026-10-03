@@ -1070,7 +1070,7 @@ def sobrat(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ. Молчаливый пропуск -- это провал: если файла
 # живых образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 84
+ZHDEM_PROVEROK = 85
 
 # Живые образцы: свопы с котировкой USDC по типам пулов. Числа -- ЗАМЕР, они
 # объявлены здесь и сверяются по файлам; разошлось -- провал.
@@ -1090,7 +1090,15 @@ ZHDEM_SPISKOV = {"CLMM": 6, "Whirlpool": 12, "DLMM": 11, "DAMM v2": 3}
 ZHDEM_RAZMER = (1326, 1703)
 # Боевой котировщик на тех же живых сделках: DLMM считает нулём чтений, CLMM без
 # узла отказывает (его котировщик -- подготовить(), а он читает состояние пула).
-ZHDEM_DLMM_BOJ = 12
+#
+# 11, А НЕ 12, С 03.10 -- И ЭТО НЕ ПОТЕРЯ, А НОВЫЙ ОТКАЗ ПО ИМЕНИ. Слово
+# владельца 03.10: "при большом скачке -- отказ". У одной сделки (пул GE6QEGU9)
+# наш замерный размер 1 000 000 лампортов БОЛЬШЕ входа источника (680 591), то
+# есть корзины за его последней корзиной не доказаны, и путь нуля чтений теперь
+# отказывает вместо того, чтобы завысить цену. На живых парах свопов ровно такие
+# строки и завышали на +9...+10 % (c2_dlmm_bez_chteniy.zamer_zapasa).
+ZHDEM_DLMM_BOJ = 11
+ZHDEM_DLMM_OTKAZ_SKACHOK = 1
 ZHDEM_CLMM_BEZ_UZLA = 6
 # Образец, где источник торгует ВРЕМЕННЫМИ счетами: их нет в балансах, минт берётся
 # из инструкции создания. Наших мест у этой сделки два -- вход и выход.
@@ -1667,7 +1675,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         kb_chuzhoj["why_not"])
     # На живых образцах: DLMM считает боевой min_out нулём чтений, CLMM без узла
     # отказывает (его котировщик -- подготовить(), а он читает состояние пула).
-    dlmm_ok, clmm_otkaz, bez_chtenij = 0, 0, 0
+    dlmm_ok, clmm_otkaz, bez_chtenij, dlmm_skachok = 0, 0, 0, 0
     for r in ryady:
         tx = r["транзакция"]
         st = storona(tx, programma=r["program"], pul=r.get("пул"))
@@ -1678,8 +1686,14 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         if r["tip"] == "DLMM" and kb.get("ok"):
             dlmm_ok += 1
             bez_chtenij += 1 if kb.get("chtenij") == 0 else 0
+        if (r["tip"] == "DLMM" and not kb.get("ok")
+                and "скачок" in str(kb.get("why_not") or "")):
+            dlmm_skachok += 1
         if r["tip"] == "CLMM" and not kb.get("ok"):
             clmm_otkaz += 1
+    chk(f"DLMM: ещё {ZHDEM_DLMM_OTKAZ_SKACHOK} сделке отказано ПО ИМЕНИ СКАЧКА "
+        f"(наш размер больше входа источника -- корзины не доказаны)",
+        dlmm_skachok == ZHDEM_DLMM_OTKAZ_SKACHOK, dlmm_skachok)
     chk(f"DLMM: боевой min_out считается нулём чтений у {ZHDEM_DLMM_BOJ} сделок",
         dlmm_ok == ZHDEM_DLMM_BOJ and bez_chtenij == ZHDEM_DLMM_BOJ,
         (dlmm_ok, bez_chtenij))
