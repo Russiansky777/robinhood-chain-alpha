@@ -13,6 +13,15 @@ name: "NL-хост: живучесть служб (только чтение)"
 # Отсутствие службы -- это факт, а не сбой: пишем "не установлена" и
 # идём дальше. Падает job только если служба установлена и НЕ активна.
 on:
+  # ПОСЛЕДНЯЯ МИЛЯ ЖИВУЧЕСТИ -- СВОИМ РАСПИСАНИЕМ, А НЕ ЧУЖОЙ САМОПРОВЕРКОЙ.
+  # Таймер хоста bloom-zhivuchest-chas пишет признаки жизни КАЖДЫЙ час, но в
+  # ветку их везёт этот прогон, а запускала его почасовая самопроверка агента.
+  # 03.10 вечером самопроверку перевели на раз в 3 часа (слово владельца) -- и
+  # копия в ветке сразу стала отставать до трёх часов, а получасовая строка
+  # балансов читает именно её. Своё расписание убирает эту связку: числа на
+  # хосте и копия в ветке обновляются раз в час независимо от агента.
+  schedule:
+    - cron: "38 * * * *"
   workflow_dispatch:
     inputs:
       tail_decisions:
@@ -23,17 +32,25 @@ on:
         description: "разбор сбоев за N минут: журнал детектора + строки HANDLER_CRASHED/UNSOLD (0 -- не делать)"
         required: false
         default: "0"
+      runner:
+        description: "'nl' -- свой бегунок на хосте (по умолчанию), 'cloud' -- запасной облачный"
+        required: false
+        default: "nl"
 
 concurrency:
   group: vps-health-nl
   cancel-in-progress: false
 
-env:
-  HOST: 45.59.170.76
-
+# СВОЙ БЕГУНОК, А НЕ ОБЛАЧНЫЙ (слово владельца 02.10, п.6). Ночью 02->03.10
+# чужая сессия заняла облачные бегунки счёта одиннадцатью параллельными
+# работами, и служебные прогоны встали в очередь: учёт на 27 минут, живучесть и
+# чтение кошельков -- больше часа. Служебное чтение не должно зависеть от чужой
+# очереди. Облачный путь остаётся запасным: вход runner=cloud.
 jobs:
   health:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    env:
+      HOST: ${{ inputs.runner == 'cloud' && '45.59.170.76' || '127.0.0.1' }}
     timeout-minutes: 12
     permissions:
       contents: write
@@ -86,10 +103,17 @@ jobs:
           {
             echo ""
             echo "--- признаки жизни ---"
+            echo "(в списке и два файла СОСТОЯНИЯ денежного пути: реестр"
+            echo " обкатки круга 0.01 и запомненные связанные накопители"
+            echo " кривой v2 -- по ним сверяется вывод места 21, слово"
+            echo " владельца 03.10 п.4. Ключей в них нет: это адреса.)"
           } >> data/vps_health_nl.txt
           ssh -n $SSH_OPTS root@$HOST "
             for f in /home/bot/bloom_executor_live_data/detector_status.json \
                      /home/bot/bloom_executor_live_data/seller_heartbeat.json \
+                     /home/bot/bloom_executor_live_data/samoproverka_hosta.json \
+                     /home/bot/bloom_executor_live_data/own_sell_obkatany.json \
+                     /home/bot/bloom_executor_live_data/bonding_v2_assoc.json \
                      /home/bot/dbot_detect_probe/status.json \
                      /home/bot/grpc_feed_probe_data/heartbeat.json; do
               if [ -s \"\$f\" ]; then
@@ -164,6 +188,98 @@ jobs:
           } >> data/vps_health_nl.txt
           python3 analysis/helius_usage_report.py | tee -a data/vps_health_nl.txt
 
+      - name: "Забрать работу хостовых таймеров: выгрузка полосы, учёт, живучесть"
+        if: always()
+        run: |
+          set -e
+          # ПОСЛЕДНЯЯ МИЛЯ ДО ВЕТКИ ЕДЕТ ИМЕННО ЗДЕСЬ, И ЭТО НАЗВАНО, А НЕ
+          # ОБОЙДЕНО. Работу делают таймеры хоста (bloom-uchet-chas,
+          # bloom-zhivuchest-chas, bloom-vygruzka-sutki) -- их расписание не
+          # зависит от планировщика GitHub, который за ночь 01->02.10 пропустил
+          # пять назначенных прогонов учёта. Но САМ ХОСТ НА ВЕТКУ ПУШИТЬ НЕ
+          # МОЖЕТ: он не рабочий клон нашей ветки, токена записи у него нет, и
+          # заводить токен на торговой машине без слова владельца нельзя --
+          # прямой пуш с хоста означал бы ключ с правом записи в репозиторий
+          # рядом с ключами кошельков. Поэтому файлы ЗАБИРАЕТ этот прогон, как
+          # он уже забирает осколки расхода Helius. Пропал этот прогон -- отстаёт
+          # КОПИЯ в ветке, а не сами числа: они лежат на хосте и догонятся
+          # следующим забором.
+          # always() у шага значит, что он идёт и после падения шага выше. Без
+          # ключа ssh он сделать ничего не может, и молчать об этом нельзя.
+          [ -n "$SSH_OPTS" ] || { echo "SSH_OPTS пуст: шаг ключа не отработал"; exit 1; }
+          TAJM_DIR=/home/bot/host_tajmery
+          {
+            echo ""
+            echo "--- работа хостовых таймеров ---"
+          } >> data/vps_health_nl.txt
+          if ! ssh -n $SSH_OPTS root@$HOST "test -d $TAJM_DIR"; then
+            echo "каталога хостовых таймеров нет: их ставит деплой детектора" \
+              | tee -a data/vps_health_nl.txt
+            exit 0
+          fi
+          ssh -n $SSH_OPTS root@$HOST "systemctl list-timers 'bloom-uchet-chas.timer' 'bloom-zhivuchest-chas.timer' 'bloom-vygruzka-sutki.timer' --no-pager" \
+            2>&1 | tee -a data/vps_health_nl.txt
+          # ДОКЛАД ЖИВУЧЕСТИ И СВЕЖИЙ ФАЙЛ УЧЁТА -- ПОД СВОИМИ ИМЕНАМИ.
+          # ledger_status.json в ветке пишет прогон ledger_hourly.yml; затирать
+          # его копией хоста нельзя -- это два разных счёта, и молча подменять
+          # один другим значит потерять расхождение между ними.
+          # ЖИВЫЕ ПОЛИТИКИ ГРУПП -- ПОД СВОИМ ИМЕНЕМ sources_live.json (слово
+          # владельца 03.10, добавка п.4). ЗАЧЕМ. В ветке лежала копия
+          # sources_2026-09-25.json, сделанная 28.09: в ней пять групп и нет ни
+          # cand*, ни krug_001, ни konveyer -- то есть любой разбор по ней читал
+          # вчерашний стенд и не знал об этом. Копия переименована в
+          # sources_2026-09-25_USTAREL_2809.json, а живой файл забирается здесь
+          # и зовётся live. Секретов в нём нет по построению: адреса источников и
+          # числа политики, ключей кошельков там не бывает -- и шаг "ключей в
+          # отчёте быть не должно" проверяет это у всего, что прогон коммитит.
+          for PARA in "$TAJM_DIR/zhivuchest/zhivuchest.json data/zhivuchest_hosta.json" \
+                      "/home/bot/data/sources_2026-09-25.json data/sources_live.json" \
+                      "$TAJM_DIR/uchet/data/ledger_status.json data/ledger_status_hosta.json"; do
+            OTKUDA=$(echo "$PARA" | cut -d' ' -f1)
+            KUDA=$(echo "$PARA" | cut -d' ' -f2)
+            if ssh -n $SSH_OPTS root@$HOST "test -s $OTKUDA"; then
+              ssh -n $SSH_OPTS root@$HOST "cat $OTKUDA" > "$KUDA"
+              python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$KUDA" || {
+                echo "SBOY: $OTKUDA ne razbiraetsja kak json -- fajl ne kommitim"
+                rm -f "$KUDA"; exit 1; }
+              echo "забран $OTKUDA -> $KUDA ($(wc -c < "$KUDA") байт)" | tee -a data/vps_health_nl.txt
+            else
+              echo "$OTKUDA: нет или пуст -- таймер ещё не отработал" | tee -a data/vps_health_nl.txt
+            fi
+          done
+          # СУТОЧНАЯ ВЫГРУЗКА sdelki_polosy_<дата>: её ждёт Code-2 для сверки v6.
+          # Берутся ВСЕ файлы каталога выгрузок, а не только сегодняшний: если
+          # этот прогон пропустил сутки, вчерашняя выгрузка тоже должна доехать.
+          FAJLY=$(ssh -n $SSH_OPTS root@$HOST "ls -1 $TAJM_DIR/vygruzki/sdelki_polosy_*.json 2>/dev/null || true")
+          if [ -z "$FAJLY" ]; then
+            echo "выгрузок полосы на хосте нет: таймер 06:00Z ещё не отрабатывал" \
+              | tee -a data/vps_health_nl.txt
+          fi
+          for F in $FAJLY; do
+            IMYA=$(basename "$F")
+            # УЖЕ ЕСТЬ В ВЕТКЕ -- НЕ ЗАТИРАЕМ, А КЛАДЁМ РЯДОМ И ГОВОРИМ ЭТО.
+            # Тот же файл умеет писать прогон run_vygruzka_sdelok_c2_nl.yml; если
+            # он успел, его файл -- не хуже, и подменять его молча нельзя. Ровно
+            # так 29.09 был затёрт образец транзакций для самопроверки c2_common.
+            if [ -e "data/$IMYA" ]; then
+              KUDA="data/${IMYA%.json}_s_hosta.json"
+              echo "data/$IMYA уже в ветке (его написал прогон GitHub) -- копия хоста ляжет как $KUDA" \
+                | tee -a data/vps_health_nl.txt
+            else
+              KUDA="data/$IMYA"
+            fi
+            ssh -n $SSH_OPTS root@$HOST "cat $F" > "$KUDA"
+            SDELOK=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['сделок'])" "$KUDA") || {
+              echo "SBOY: $F ne razbiraetsja kak vygruzka -- fajl ne kommitim"
+              rm -f "$KUDA"; exit 1; }
+            # Ключей в забранном файле быть не должно -- проверяем КАЖДЫЙ сразу,
+            # а не образцом по каталогу: образец зацепил бы и прежние файлы
+            # ветки, и весь прогон живучести падал бы из-за чужой строки.
+            python3 deploy/checks/bez_klyuchey_v_otchete.py "$KUDA"
+            echo "забрана выгрузка $IMYA -> $KUDA, сделок $SDELOK" | tee -a data/vps_health_nl.txt
+          done
+          python3 deploy/checks/bez_klyuchey_v_otchete.py data/zhivuchest_hosta.json data/ledger_status_hosta.json
+
       - name: "Свежесть признаков жизни (порог 10 минут)"
         if: always()
         run: |
@@ -204,15 +320,36 @@ jobs:
           # самый свежий модуль каталога кода против момента старта каждой
           # службы, которая эти модули читает. Оба времени берутся НА ХОСТЕ --
           # часы бегунка и часы хоста разные часы.
+          #
+          # МОДУЛИ ТАЙМЕРОВ В СЧЁТ НЕ ИДУТ, И ЭТО НЕ ПОСЛАБЛЕНИЕ. В каталоге
+          # кода лежат не только модули служб: bloom_host_stroki.py зовут
+          # хостовые юниты (получасовая строка и часовая самопроверка), а ни
+          # детектор, ни сторож его не импортируют -- детектор читает только
+          # ФАЙЛ его вердикта. 03.10 в 01:47Z этот модуль обновился, и проверка
+          # с 02:10Z писала ТРЕВОГУ "служба работает со старым кодом" сразу у
+          # двух служб, хотя их код не менялся. Ложная тревога здесь хуже
+          # отсутствующей: она приучает не читать строку, и настоящий случай
+          # пройдёт незамеченным. Поэтому такие модули из счёта исключены
+          # СПИСКОМ, и список печатается рядом вместе с их временем -- спрятать
+          # обновление файла он не может.
           {
             echo ""
             echo "--- старт служб против mtime модулей ---"
           } >> data/vps_health_nl.txt
           OUT=$(ssh -n $SSH_OPTS root@$HOST "
-            MAXM=\$(stat -c '%Y %n' /home/bot/bloom_executor/*.py | sort -n | tail -1)
+            NE_SLUZHB='bloom_host_stroki.py'
+            MAXM=\$(stat -c '%Y %n' /home/bot/bloom_executor/*.py \
+                   | grep -v -F \"/\$NE_SLUZHB\" | sort -n | tail -1)
             MAXT=\$(echo \"\$MAXM\" | cut -d' ' -f1)
             MAXF=\$(echo \"\$MAXM\" | cut -d' ' -f2-)
-            printf 'самый свежий модуль: %s (%s)\n' \"\$MAXF\" \"\$(date -u -d @\$MAXT +%Y-%m-%dT%H:%M:%SZ)\"
+            printf 'самый свежий модуль служб: %s (%s)\n' \"\$MAXF\" \"\$(date -u -d @\$MAXT +%Y-%m-%dT%H:%M:%SZ)\"
+            for N in \$NE_SLUZHB; do
+              F=/home/bot/bloom_executor/\$N
+              if [ -e \"\$F\" ]; then
+                printf 'в счёт НЕ идёт (его зовут таймеры, службы не импортируют): %s (%s)\n' \
+                  \"\$N\" \"\$(date -u -r \"\$F\" +%Y-%m-%dT%H:%M:%SZ)\"
+              fi
+            done
             for S in bloom-detector bloom-seller; do
               TS=\$(systemctl show -p ActiveEnterTimestamp --value \$S)
               if [ -z \"\$TS\" ]; then echo \"\$S: не запускалась\"; continue; fi
@@ -326,6 +463,16 @@ jobs:
           # Осколки расхода тоже в репозиторий: иначе сводка печатается на
           # бегунке и исчезает вместе с ним, а проверить её потом нечем.
           git add -A data/helius_usage 2>/dev/null || true
+          # РАБОТА ХОСТОВЫХ ТАЙМЕРОВ. Это и есть та последняя миля, которую хост
+          # сам пройти не может: пушить на ветку ему нечем (токена нет, и
+          # заводить его без слова владельца нельзя), поэтому его файлы
+          # коммитятся отсюда. Суточные выгрузки берутся по образцу, а не
+          # поимённо: их имя содержит дату.
+          for F in data/zhivuchest_hosta.json data/ledger_status_hosta.json \
+                   data/sources_live.json; do
+            [ -f "$F" ] && git add "$F"
+          done
+          git add data/sdelki_polosy_*.json 2>/dev/null || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "NL-хост: проверка живучести служб [automated]"
           for i in 1 2 3 4 5; do
