@@ -19,20 +19,28 @@ on:
         description: "с какого времени брать сделки"
         required: false
         default: "2026-09-24T00:00:00Z"
+      runner:
+        description: "'nl' -- свой бегунок на хосте (по умолчанию), 'cloud' -- запасной облачный"
+        required: false
+        default: "nl"
 
 concurrency:
   group: vygruzka-nashih-sdelok-nl
   cancel-in-progress: false
 
+# СВОЙ БЕГУНОК, А НЕ ОБЛАЧНЫЙ (слово владельца 02.10, п.6): служебное чтение не
+# должно стоять в чужой очереди. Облачный путь остаётся запасным: runner=cloud.
+# Адрес хоста зависит от бегунка: со своего он сам себе loopback.
 env:
-  HOST: 45.59.170.76
   STATE_DIR: /home/bot/bloom_executor_live_data
   REPO_ROOT: /home/bot/robinhood-chain-alpha
   OUT: data/podbivka/nashi_sdelki_host.json
 
 jobs:
   vygruzka:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    env:
+      HOST: ${{ inputs.runner == 'cloud' && '45.59.170.76' || '127.0.0.1' }}
     timeout-minutes: 20
     permissions:
       contents: write
