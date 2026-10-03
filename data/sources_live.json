@@ -2440,7 +2440,6 @@
         },
         "7HmkKn8P6aZSMg7jn9esjdPQ9cBqg9LQgNECzoDeJiGQ": "log_only 02.10",
         "Gf2wYM2k5ojfPzN5Uqi3mbP1nWEdZhhzMyDBsKrHA3kC": "kust s DYAn4XpA, slovo vladelca 02.10",
-        "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij": "слово владельца 03.10 п.5: только лог сигналов, полосой не торговать",
         "GM7Hrz2bDq33ezMtL6KGidSWZXMWgZ6qBuugkb5H8NvN": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать",
         "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать"
       },
@@ -2680,7 +2679,7 @@
       "fanout": 0,
       "lane_sol": 0.01,
       "lane_size": 0.01,
-      "per_day": 20,
+      "per_day": 3,
       "hold_slots": 108,
       "lane_open_max": 1,
       "min_target_sol": 2.0,
@@ -2688,7 +2687,8 @@
       "sell_own_first": 1,
       "note": "ОБКАТКА КРУГА 0.01 НА СВОЕЙ ПРОДАЖЕ (слово владельца 03.10, п.1). Билет ровно 0.01 -- размер круга правила 8, поэтому дверь круга позицию пускает. sell_own_first=1: у ЭТОЙ группы второе мнение спрашивается ДО Jupiter, и первая удачная продажа взводит реестр обкатки. Jupiter остаётся сеткой: отказало своё мнение -- позиция всё равно уходит им. Один открытый и 20 покупок в сутки -- чтобы обкатка не превратилась в торговлю. Остальные группы этим не затронуты.",
       "addresses": {
-        "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy": "слово владельца 03.10 п.1: обкатка круга 0.01 на своей продаже, билет 0.01"
+        "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy": "слово владельца 03.10 п.1: обкатка круга 0.01 на своей продаже, билет 0.01",
+        "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij": "слово владельца 03.10 вечером, п.4: самый частый адрес log_only (443 сигнала за окно 02.10 22:00Z -> 03.10 16:57Z), покупки 4.0-20.0 SOL-экв при медиане 10.0 -- для обкатки круга 0.01 своей продажей"
       }
     },
     "konveyer": {
@@ -2705,7 +2705,8 @@
       "addresses": {
         "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd": "слово владельца 03.10 п.2: первый адрес конвейера; числа Code-2 за 11 суток -- n 62, медиана +7.99, половины +3.48/+10.57, 8 суток из 12 в плюсе; был в log_only, подписка и лог остаются",
         "ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy": "слово владельца 03.10 вечером, п.4: адрес из суточного прохода Code-2 (data/konveyer/2026-10-03.json, раздел «добавить»); порядок тот же, что будет у применителя c3_konveyer_primenitel"
-      }
+      },
+      "lane_open_max": 3
     }
   },
   "prefixes_resolved": {

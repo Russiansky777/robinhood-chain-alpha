@@ -98,6 +98,20 @@ jobs:
           # bloom_own_send) -- то есть ровно из того, чем полоса и собирает.
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 777 $RABOTA"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/lane_usdc_alt.py" < analysis/lane_usdc_alt.py
+          # НАБОР КРИВОЙ CODE-3 ЕДЕТ РЯДОМ С МОДУЛЕМ. Модуль на хосте лежит
+          # один, без каталога data, и без этого файла таблица собралась бы БЕЗ
+          # постоянных получателей комиссий -- молча, с ответом "доливать
+          # нечего". Файла нет в ветке -- скажем это и пойдём дальше: набор
+          # пустой, а не выдуманный.
+          NABOR=data/c3_usdc_noga_signaly/krivaya_v2_nabor_adresov.json
+          if [ -s "$NABOR" ]; then
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/nabor_krivoj.json" < "$NABOR"
+            echo "nabor Code-3 dostavlen: $(python3 -c "import json;print(len(json.load(open('$NABOR'))['набор']))") adresov"
+            FLAGI_NABOR="--nabor $RABOTA/nabor_krivoj.json"
+          else
+            echo "nabora Code-3 v vetke net -- tablica sobiraetsja bez ego adresov"
+            FLAGI_NABOR=""
+          fi
           FLAGI=""
           if [ "${{ inputs.sozdat }}" = "SOZDAT" ]; then
             FLAGI="--sozdat --katalog $STATE_DIR"
@@ -119,7 +133,7 @@ jobs:
             echo "rezhim prinjatija uzhe sozdannoj tablicy: deneg ne tratim"
           fi
           [ "${{ inputs.s_chaevymi }}" = "yes" ] && FLAGI="$FLAGI --s-chaevymi"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $KOD_HOSTA && PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/lane_usdc_alt.py --pokazat $FLAGI --out $RABOTA/out.json" | tail -90
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; cd $KOD_HOSTA && PYTHONPATH=$KOD_HOSTA:$RABOTA $PY_HOSTA $RABOTA/lane_usdc_alt.py --pokazat $FLAGI $FLAGI_NABOR --out $RABOTA/out.json" | tail -90
           ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/usdc_noga_alt.json || true
           if python3 -c "import json; json.load(open('/tmp/usdc_noga_alt.json'))" 2>/dev/null; then
             cp /tmp/usdc_noga_alt.json "$OUT_FILE"

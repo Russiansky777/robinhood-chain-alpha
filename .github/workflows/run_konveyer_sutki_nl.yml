@@ -72,13 +72,6 @@ jobs:
           ref: claude/nifty-sagan-r0polg
           fetch-depth: 0
 
-      - name: "Самопроверка применителя (63/63) до любых действий"
-        run: |
-          set -e
-          set -o pipefail
-          python3 -m py_compile analysis/c3_konveyer_primenitel.py
-          python3 analysis/c3_konveyer_primenitel.py | tail -2
-
       - name: "SSH key"
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -89,6 +82,52 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Самопроверка применителя НА ХОСТЕ (111/111) до любых действий"
+        run: |
+          set -e
+          set -o pipefail
+          # ПОЧЕМУ НА ХОСТЕ, А НЕ НА БЕГУНКЕ. У версии применителя Code-3
+          # появился вывод адресов (PDA и ATA получателей), а значит нужен
+          # solders. У питона БЕГУНКА его нет, и venv боевой службы бегунку
+          # недоступен -- прогон падал трижды с ModuleNotFoundError (видно в
+          # data/konveyer/primenitel_selftest.txt). Тот же venv, которым
+          # работают службы, доступен ПО SSH как bot -- так самопроверку гонят
+          # и все прогоны деплоя. PYTHONPATH -- каталог кода службы: модуль
+          # зовёт bloom_source_groups (тот же, что у полосы), и без него
+          # самопроверка падала ModuleNotFoundError уже на нём.
+          python3 -m py_compile analysis/c3_konveyer_primenitel.py
+          # РАСКЛАДКА -- ЗЕРКАЛО ВЕТКИ, И ЭТО НЕ ВКУСОВЩИНА. Модуль считает
+          # корень как <два каталога вверх от себя>, и в плоской раскладке
+          # (/tmp/konvprim/модуль.py) корнем выходил /tmp: живой файл Code-2 и
+          # файлы групп он искал в /tmp/data и не находил -- самопроверка
+          # молча пропускала 10 проверок из 111 и падала на расхождении.
+          ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim/analysis /tmp/konvprim/deploy/checks"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/analysis/c3_konveyer_primenitel.py" < analysis/c3_konveyer_primenitel.py
+          # САМОПРОВЕРКА ПРИМЕНИТЕЛЯ ЗОВЁТ И НАШ ПРИМЕНИТЕЛЬ ГРУПП: она сверяет
+          # вид правки с тем, что pravka_grupp реально делает. Значит рядом
+          # должен лежать и он.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/deploy/checks/pravka_grupp.py" < deploy/checks/pravka_grupp.py
+          ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim/data/konveyer"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/konveyer/$(date -u +%Y-%m-%d).json" < "data/konveyer/$(date -u +%Y-%m-%d).json" 2>/dev/null || echo "живого файла Code-2 за сегодня в ветке нет -- самопроверка скажет это сама"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_2026-09-25_USTAREL_2809.json" < data/sources_2026-09-25_USTAREL_2809.json
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_live.json" < data/sources_live.json
+          mkdir -p data/konveyer
+          set +e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            cd /tmp/konvprim
+            sudo -n -u bot env PYTHONPATH=/home/bot/bloom_executor:/tmp/konvprim/analysis:/tmp/konvprim/deploy/checks \
+              /home/bot/robinhood-chain-alpha/venv/bin/python \
+              analysis/c3_konveyer_primenitel.py" > data/konveyer/primenitel_selftest.txt 2>&1
+          rc=$?
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "rm -rf /tmp/konvprim" || true
+          tail -4 data/konveyer/primenitel_selftest.txt
+          if [ "$rc" != "0" ]; then
+            echo "САМОПРОВЕРКА НЕ ПРОШЛА (код $rc) -- файл групп не трогаем"
+            grep -iE "ПЛОХО|СБОЙ|Traceback|Error" data/konveyer/primenitel_selftest.txt | head -10 || true
+            exit "$rc"
+          fi
 
       - name: "Сторож: копия учёта в ветке не старше 1.5 ч"
         if: ${{ inputs.storozh != 'no' }}
@@ -172,11 +211,32 @@ jobs:
           D="${{ steps.vhod.outputs.data }}"
           P="data/konveyer/pravka_$D.json"
           [ -f "$P" ] || { echo "правки нет: $P -- применять нечего"; exit 0; }
+          # ПУСТАЯ ПРАВКА -- НЕ СБОЙ, А ОБЫЧНЫЕ СУТКИ (найдено 03.10 на прогоне
+          # №9: самопроверка 111/111, применитель чист, а прогон красный).
+          # Применитель за сутки может не выдать ни одного адреса -- 03.10 из 48
+          # рядов Code-2 47 лежали в разделе "действующие не держатся", а не
+          # "добавить". Тогда в правке "pravki": [], и сверка Code-3 честно
+          # отдаёт код 3 ("в правке нет списка pravki"): проверять ей нечего.
+          # Красить этим прогон нельзя -- иначе каждый день без новичков
+          # выглядит аварией, и настоящая авария в таком шуме не видна. Шаг
+          # ниже ("Правка на хосте") такую же проверку уже делает, значит и на
+          # хост при нуле правок никто не идёт.
+          PRAVOK=$(python3 -c "import json;print(len((json.load(open('$P')) or {}).get('pravki') or []))")
+          if [ "$PRAVOK" = "0" ]; then
+            echo "правок в плане 0 -- сверять нечего, применять нечего"
+            exit 0
+          fi
           # Файл групп перечитывается с хоста ЗАНОВО: между записью правки и
           # сверкой адрес мог куда-то попасть, и тогда perenesti снял бы его.
           ssh -n $SSH_OPTS root@"$HOST" "cat $FILE" > /tmp/gruppy_live_sverka.json
+          # КОД 5 -- НЕ СБОЙ (страница Code-3, раздел 11). Прогон ходит по
+          # суткам несколько раз (07:47Z плюс два тика сторожа), и "правка уже
+          # применена целиком" на втором тике красила бы прогон красным каждый
+          # день. Код 5 отдаётся ТОЛЬКО когда каждый адрес правки лежит ровно в
+          # konveyer; любой адрес в чужой группе -- по-прежнему код 3 и стоп.
           python3 analysis/c3_konveyer_primenitel.py --sverit "$P" \
-            --gruppy /tmp/gruppy_live_sverka.json
+            --gruppy /tmp/gruppy_live_sverka.json \
+            || { rc=$?; [ "$rc" = "5" ] && { echo "правка уже применена -- применять нечего"; exit 0; }; exit "$rc"; }
 
       - name: "Правка на хосте (pokazat=no -- применить)"
         if: steps.vhod.outputs.est == 'yes'
@@ -206,6 +266,14 @@ jobs:
         if: always()
         run: |
           set -e
+          # БЕЗ КЛЮЧА SSH СТРОКУ НЕ ПОСЛАТЬ, И ЭТО НЕ ПОВОД КРАСИТЬ ПРОГОН
+          # ВТОРОЙ РАЗ. Шаг стоит с if: always(), а ключ кладёт шаг выше: если
+          # прогон упал ДО него (например на самопроверке), SSH_OPTS пуст, и
+          # прежняя версия падала здесь ещё раз -- поверх настоящей причины.
+          if [ -z "${SSH_OPTS:-}" ]; then
+            echo "ключа SSH нет (прогон упал раньше) -- строка владельцу не уходит"
+            exit 0
+          fi
           D="${{ steps.vhod.outputs.data }}"
           [ -n "$D" ] || D=$(date -u +%Y-%m-%d)
           # В ТЕСТЕ -- ИЗ ЖИВОГО ФАЙЛА, А НЕ ИЗ ОТЧЁТА: отчёт применителя
