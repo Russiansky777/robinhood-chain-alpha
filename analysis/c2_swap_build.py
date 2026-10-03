@@ -158,6 +158,10 @@ DYN = {
 }
 ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+# TOKEN-2022 -- ОТДЕЛЬНАЯ ПРОГРАММА, И ОНА МЕНЯЕТ АДРЕС ATA. Нужна здесь имени
+# ради: у связанного накопителя кривой v2 котировка бывает минтом Token-2022
+# (живая пара хоста XsCPL9dN…), и ATA считается ЕЮ, а не классической.
+TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 SYSTEM = "11111111111111111111111111111111"
 COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111"
 B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -2572,6 +2576,40 @@ def self_test() -> int:
                        _спец["assoc_uva"][2] == 4
                        and ata(_acc[_место_накопителя(_спец)], _acc[2], _acc[3])
                        != _acc[_спец["assoc_uva"][0]]))
+        # ПАРЫ С ХОСТА -- СВЕРКА, КОТОРУЮ ВЕЛЕЛ ВЛАДЕЛЕЦ (03.10, п.4): вывести
+        # формулой каждую пару, которая в bonding_v2_assoc.json УЖЕ лежит, и
+        # сравнить. Прогон живучести 12:51Z отдал файл целиком, обе пары
+        # сошлись, и ВТОРАЯ закрывает случай, которого в проверке выше нет:
+        # котировка XsCPL9dN… -- минт Token-2022, и её ATA считается ДРУГОЙ
+        # программой. Ключи в файл попали из ошибки программы, то есть названы
+        # цепью; значит это сверка с цепью, а не с самой формулой.
+        _ПАРЫ_ХОСТА = {
+            "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x": {
+                ("So11111111111111111111111111111111111111112", TOKEN_PROGRAM):
+                    "FJiTxtBCCeQPyXJ1RPbYPaNoM2dSvpwcqvdBaRGNhvu2",
+                ("XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN", TOKEN_2022):
+                    "4NLZ5bLDDB7CckoqqFoMopxk59S63jkpd67AK4JaQqwy",
+            },
+        }
+        _сошлось_х = _всего_х = 0
+        for _к_х, _п_х in _ПАРЫ_ХОСТА.items():
+            _нак_х = pda([СЕМЯ_НАКОПИТЕЛЯ, "USER"], _к_х, BONDING)
+            for (_м_х, _пр_х), _помним_х in _п_х.items():
+                _всего_х += 1
+                _сошлось_х += ata(_нак_х, _м_х, _пр_х) == _помним_х
+        checks.append((f"вывод сошёлся с КАЖДОЙ запомненной парой хоста "
+                       f"({_сошлось_х} из {_всего_х})",
+                       _всего_х == 2 and _сошлось_х == _всего_х))
+        # И ИМЕННО ПРОГРАММА РЕШАЕТ: та же пара с классической программой даёт
+        # ДРУГОЙ адрес. Без места программы в раскладке мы подписали бы его.
+        checks.append(("у котировки Token-2022 классическая программа даёт ДРУГОЙ "
+                       "адрес -- место программы в раскладке обязательно",
+                       ata(pda([СЕМЯ_НАКОПИТЕЛЯ, "USER"],
+                               "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+                               BONDING),
+                           "XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN",
+                           TOKEN_PROGRAM)
+                       != "4NLZ5bLDDB7CckoqqFoMopxk59S63jkpd67AK4JaQqwy"))
         checks.append(("место накопителя найдено ПО СЕМЕНИ, а не числом",
                        _место_накопителя(_спец) == 20
                        and _место_накопителя({"pda": []}) is None))
