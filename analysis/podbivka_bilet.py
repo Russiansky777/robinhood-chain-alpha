@@ -39,20 +39,39 @@ XYK = {"raydium-cpmm", "meteora-damm-v1", "pump-amm"}
 N_МИН = 20
 
 
-def ключ(б: float, H: int = ВЫХОД, вход: str = "S0_дно") -> str:
-    return f"{вход}|{б:g}|{H}"
+def ключи(б: float, H: int = ВЫХОД, вход: str = "S0_дно") -> list:
+    """Модель пишет билет как repr float: 0.3 -> «0.3», 1 -> «1.0». Проверяем оба написания."""
+    return [f"{вход}|{б}|{H}", f"{вход}|{б:g}|{H}"]
 
 
 def пп(с: dict, б: float) -> float | None:
-    return ((с.get("модель") or {}).get("пп") or {}).get(ключ(б))
+    пп_ = (с.get("модель") or {}).get("пп") or {}
+    for k in ключи(б):
+        if k in пп_:
+            return пп_[k]
+    return None
 
 
-def ячейка(с: dict, б: float) -> bool:
+def причина(с: dict, б: float) -> str | None:
+    """Почему сигнал не стал ячейкой правила -- по делу, а не «тип вне модели» на всё."""
     м = с.get("модель") or {}
     тип = с.get("pool")
     ок_тип = тип in ДЛЯ_МОДЕЛИ or (тип == "pump-amm" and м.get("модель_pump_amm") == "v6")
-    return bool(с.get("по_окну") is True and с.get("quoteMint") == PR.K.WSOL and ок_тип
-                and not м.get("why_not") and пп(с, б) is not None)
+    if not ок_тип:
+        return f"тип пула вне модели ({тип or 'нет типа'})"
+    if с.get("quoteMint") != PR.K.WSOL:
+        return "котировка не SOL"
+    if с.get("по_окну") is not True:
+        return "не первая покупка по окну 1800"
+    if м.get("why_not"):
+        return f"модель: {м['why_not']}"
+    if пп(с, б) is None:
+        return f"нет п.п. на выходе +{ВЫХОД} (ряд пула кончился раньше)"
+    return None
+
+
+def ячейка(с: dict, б: float) -> bool:
+    return причина(с, б) is None
 
 
 def глубина(с: dict, б: float) -> dict:
@@ -135,8 +154,9 @@ def собрать(шаблоны: list, адреса: set) -> tuple[dict, dict]
                 к = по[с["trader"]]
                 к["сигналов"] += 1
                 тип = с.get("pool")
-                if not ячейка(с, 0.3):
-                    к["вне_модели"][тип or "нет типа"] += 1
+                пр = причина(с, 0.3)
+                if пр:
+                    к["вне_модели"][пр] += 1
                     continue
                 стр = {"signature": с["signature"], "mint": с.get("mint"), "block": с.get("block"),
                        "timestamp": с.get("timestamp"), "sol": с.get("sol"), "pool": тип,
@@ -229,13 +249,15 @@ def main() -> int:
                 кл.append(f"{s['среднее']:+.2f} / {s['медиана']:+.2f}" if s.get("n", 0) >= N_МИН
                           else (f"n={s['n']} (мало)" if s.get("n") else "—"))
             md.append(f"| `{a[:8]}` | {тип} | {len(стр)} | " + " | ".join(кл) + " |")
-    md += ["", "## 4. Вне модели -- не посчитано", ""]
+    md += ["", "## 4. Что не посчитано и почему", "",
+           "Сигналы живого правила, не ставшие ячейкой: по ним ни п.п., ни сдвиг цены не считаются. "
+           "«Тип пула вне модели» -- DLMM, CLMM, DAMM v2, Whirlpool, агрегаторы: там состояние пула не "
+           "x*y=k и не кривая. Остальные причины -- не про тип пула.", ""]
     for a in адреса:
         вм = по[a]["вне_модели"]
-        md.append(f"- `{a}`: сигналов по живому правилу вне модели архива **{sum(вм.values())}** "
-                  + ("(" + ", ".join(f"{k} {n}" for k, n in вм.most_common()) + ")" if вм else "")
-                  + " -- у этих типов состояние пула не x\\*y=k и не кривая (DLMM, CLMM, DAMM v2, Whirlpool, "
-                    "агрегаторы), модель архива их не считает: по ним ни п.п., ни сдвиг цены не посчитаны.")
+        md.append(f"- `{a}`: не стали ячейкой **{sum(вм.values())}** из {по[a]['сигналов']} сигналов "
+                  "живого правила"
+                  + (" -- " + ", ".join(f"{k}: {n}" for k, n in вм.most_common()) if вм else "") + ".")
     md.append("")
     out = КОРЕНЬ / "docs" / "podbivka_2026-10-03_bilet_stabilnye.md"
     out.write_text("\n".join(md) + "\n", encoding="utf-8")
