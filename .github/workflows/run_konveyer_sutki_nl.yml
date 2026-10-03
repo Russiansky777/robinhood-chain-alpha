@@ -72,7 +72,7 @@ jobs:
           ref: claude/nifty-sagan-r0polg
           fetch-depth: 0
 
-      - name: "Самопроверка применителя (63/63) до любых действий"
+      - name: "Самопроверка применителя (111/111) до любых действий"
         run: |
           set -e
           set -o pipefail
@@ -175,8 +175,14 @@ jobs:
           # Файл групп перечитывается с хоста ЗАНОВО: между записью правки и
           # сверкой адрес мог куда-то попасть, и тогда perenesti снял бы его.
           ssh -n $SSH_OPTS root@"$HOST" "cat $FILE" > /tmp/gruppy_live_sverka.json
+          # КОД 5 -- НЕ СБОЙ (страница Code-3, раздел 11). Прогон ходит по
+          # суткам несколько раз (07:47Z плюс два тика сторожа), и "правка уже
+          # применена целиком" на втором тике красила бы прогон красным каждый
+          # день. Код 5 отдаётся ТОЛЬКО когда каждый адрес правки лежит ровно в
+          # konveyer; любой адрес в чужой группе -- по-прежнему код 3 и стоп.
           python3 analysis/c3_konveyer_primenitel.py --sverit "$P" \
-            --gruppy /tmp/gruppy_live_sverka.json
+            --gruppy /tmp/gruppy_live_sverka.json \
+            || { rc=$?; [ "$rc" = "5" ] && { echo "правка уже применена -- применять нечего"; exit 0; }; exit "$rc"; }
 
       - name: "Правка на хосте (pokazat=no -- применить)"
         if: steps.vhod.outputs.est == 'yes'

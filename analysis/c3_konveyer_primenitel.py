@@ -55,6 +55,7 @@ data/konveyer/primenitel_zhurnal.json помнит, что уже выдано �
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import re
 import sys
@@ -105,6 +106,34 @@ WHY_V_KONTEJNERE = "адрес лежит в контейнере группы"
 WHY_KLYUCH_NE_ADRES = "ключ словаря рядов не совпал с полем «адрес» ряда"
 WHY_RAZDELY_NE_SOSHLIS = ("«разделы» Code-2 и поле «раздел» у рядов не сошлись "
                           "по разделу «добавить»")
+WHY_ADRESA_SPISKOM = ("у группы konveyer поле addresses -- СПИСОК, а применитель "
+                      "групп заменит его словарём и СОТРЁТ всё, что в нём лежит")
+WHY_GRUPPA_NE_TORGUET = ("группа konveyer не торгует (сняты оба признака) -- "
+                         "добавление в неё денег не даёт, а сутки сгорят")
+WHY_ADRES_NE_KLYUCH = "адрес не похож на ключ Solana (32 байта base58)"
+WHY_DUBL = "адрес уже взят в этой же партии (дубль в файле Code-2)"
+WHY_DATA_DALEKO = "дата файла далеко от сегодняшней"
+WHY_PREDEL_SVERH = f"предел больше {ПРЕДЕЛ_В_СУТКИ} не берётся"
+WHY_PRAVKA_SVERH_PREDELA = "в правке больше добавлений, чем осталось по журналу"
+WHY_ZATROT_PRAVKU = ("правка за эту дату уже записана и не пустая -- пустой её "
+                     "не затираем")
+WHY_SYROJ_NE_CHITAETSJA = ("файл групп не прочитался СЫРЫМ -- карты контейнеров "
+                           "нет, а без неё сторож против СНЯТИЯ адреса не "
+                           "работает")
+WHY_SYROJ_NE_TOT_VID = ("в сыром файле групп нет раздела groups словарём -- вид "
+                        "файла не тот")
+WHY_SLUZHBA_SKAZALA = ("модуль службы сам сказал, что файл групп не прочитан -- "
+                       "его слова выбрасывать нельзя")
+WHY_ZHURNAL_ZAPIS = ("запись журнала за эти сутки не список адресов -- суточный "
+                     "предел по ней не посчитать")
+WHY_KUST_NE_STROKA = "поле «куст» не строка и не null"
+WHY_KUSTY_NE_TOT_VID = "карта «кусты» не того вида -- куст проверить нечем"
+WHY_PREDEL_SUTOK = ("суточный предел исчерпан ПО РЕАЛЬНЫМ СУТКАМ (не по дате "
+                    "файла)")
+WHY_ZAMOK = "рядом идёт другой прогон применителя -- замок занят"
+WHY_SPOR_RAZMERA = ("у группы konveyer lane_size и lane_sol РАЗНЫЕ -- загрузчик "
+                    "служб снимает ей lane_trades, полоса её не торгует, и "
+                    "добавление ушло бы в мёртвую группу")
 WHY_GRUPPY_CODE2 = ("Code-2 назвал адрес в группах, а раздел «добавить» -- "
                     "противоречие во входе")
 
@@ -118,6 +147,47 @@ WHY_GRUPPY_CODE2 = ("Code-2 назвал адрес в группах, а раз
 # адреса здесь проверяется по СЫРОМУ файлу и по всем четырём контейнерам, а
 # карта модуля службы берётся отдельно и только как второе мнение.
 КОНТЕЙНЕРЫ = ("addresses", "by_signal", "snipers", "dropped_by_credits")
+
+
+# ОКНО ДАТЫ. Файл Code-2 собирается за прошедшие сутки, поэтому годной считается
+# дата сегодняшняя или одна из двух предыдущих. Зачем вообще окно: предел «пять в
+# сутки» считается ПО ДАТЕ ФАЙЛА, и шесть файлов с разными датами в один реальный
+# день дали бы 30 добавлений -- проверка это и нашла. Окно можно сдвинуть
+# аргументом, но тогда это видно в выгрузке.
+OKNO_DATY_SUTOK = 2
+
+
+def segodnja_utc() -> str:
+    """Сегодняшняя дата UTC. Отдельной функцией -- чтобы её можно было подменить
+    в самопроверке и та не ломалась от смены календаря."""
+    return time.strftime("%Y-%m-%d", time.gmtime())
+
+
+def sutok_mezhdu(дата, другая) -> int | None:
+    """Сколько суток между двумя датами вида ГГГГ-ММ-ДД. None -- не разобрались."""
+    try:
+        д = datetime.date.fromisoformat(str(дата))
+        о = datetime.date.fromisoformat(str(другая))
+    except (TypeError, ValueError):
+        return None
+    return abs((д - о).days)
+
+
+def pohozh_na_klyuch(адрес) -> bool:
+    """32 байта base58 -- иначе это не ключ Solana, и в файл групп его нельзя.
+
+    Проверка не косметическая: без неё в торгующую группу ложится что угодно --
+    None, число, строка с пробелами, -- и служба потом читает такую группу как
+    есть. Вид ключа проверяется разбором, а не длиной строки.
+    """
+    if not isinstance(адрес, str) or not адрес.strip() or адрес != адрес.strip():
+        return False
+    try:
+        from solders.pubkey import Pubkey  # noqa: PLC0415
+
+        return len(bytes(Pubkey.from_string(адрес))) == 32
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _модуль_групп():
@@ -215,8 +285,36 @@ def prochitat_vhod(put_: str | Path) -> dict:
             return iz
         iz["dobavit_po_razdelam"] = sorted(по_разделам)
     iz.update(ok=True, ryady=ряды)
-    if isinstance(д, dict) and isinstance(д.get("кусты"), dict):
-        iz["kustov"] = д["кусты"]
+    if isinstance(д, dict) and "кусты" in д:
+        # КАРТА КУСТОВ ПРИХОДИТ ДВУМЯ ВИДАМИ, И ЧИТАЮТСЯ ОБА. 03.10 Code-2
+        # стал присылать {"кусты": {"карта": {<куст>: [<адреса>]}, "пары": [...]}}
+        # вместо прежнего {"кусты": {<куст>: [<адреса>]}}. Третьего вида не
+        # изобретаю, и молча читать пустоту нельзя: ТРЕТИЙ ВИД -- ОТКАЗ.
+        #
+        # ПОЧЕМУ ОТКАЗОМ, А НЕ «КАРТЫ НЕТ». Карта кустов -- денежный вход: по
+        # ней ловится «куст уже действует». Прежде вид проверялся только на
+        # словарь, и строка или список в этом поле МОЛЧА считались отсутствием
+        # карты: прогон зелёный, адрес добавлен, в отчёте ни слова (замер
+        # второго встречного разбора). Отсутствие карты и КРИВАЯ карта -- разные
+        # вещи, и путать их на деньгах нельзя.
+        кусты = д["кусты"]
+        if isinstance(кусты, dict) and "карта" in кусты:
+            карта = кусты.get("карта")
+            if карта is not None and not isinstance(карта, dict):
+                iz.update(ok=False, ryady=None,
+                          why_not=(f"{WHY_KUSTY_NE_TOT_VID}: «карта» -- "
+                                   f"{type(карта).__name__}"))
+                return iz
+            iz["kustov"] = карта or {}
+            iz["vid_kustov"] = "карта"
+            iz["kustov_par"] = len(кусты.get("пары") or [])
+        elif isinstance(кусты, dict) or кусты is None:
+            iz["kustov"] = кусты or {}
+            iz["vid_kustov"] = "прямой"
+        else:
+            iz.update(ok=False, ryady=None,
+                      why_not=f"{WHY_KUSTY_NE_TOT_VID}: {type(кусты).__name__}")
+            return iz
     return iz
 
 
@@ -239,16 +337,43 @@ def gruppy(put_: str | None = None) -> dict:
             os.environ.pop("BLOOM_SOURCE_GROUPS", None)
         else:
             os.environ["BLOOM_SOURCE_GROUPS"] = сохр
+    # СЛОВА СЛУЖБЫ НЕ ВЫБРАСЫВАТЬ. bloom_source_groups при нечитаемом файле
+    # возвращает why_not И ПРЕЖНЮЮ политику (_ПОСЛЕДНИЙ_ХОРОШИЙ): по_адресу
+    # полная, карта выглядит здоровой, а файл на диске не читается вовсе. Если
+    # его why_not не смотреть, прогон выходит ЗЕЛЁНЫМ целиком -- замер
+    # встречного разбора: 5 добавлений, записанная правка, потраченный суточный
+    # предел и «правка годна» от сверки по файлу, которого нет.
+    if д.get("why_not"):
+        iz["why_not"] = f"{WHY_SLUZHBA_SKAZALA}: {str(д.get('why_not'))[:200]}"
+        return iz
+    iz["trevoga_sluzhby"] = д.get("тревога")
     по_адресу = dict(д.get("по_адресу") or {})
     политики = dict(д.get("политики") or {})
     # СЫРОЙ ФАЙЛ -- ПО ВСЕМ ЧЕТЫРЁМ КОНТЕЙНЕРАМ (см. КОНТЕЙНЕРЫ выше).
     по_контейнерам: dict = {}
     путь_файла = д.get("file") or (str(put_) if put_ else None)
+    # СЫРОЕ ЧТЕНИЕ -- ВТОРОЕ ЧТЕНИЕ ТОГО ЖЕ ФАЙЛА, И ЕГО ПАДЕНИЕ НЕ МОЛЧИТ.
+    # Замер встречного разбора настоящей гонкой (непрерывная перезапись файла):
+    # 6158 попаданий из 56474 -- чтение службы удалось, а сырое упало, карта
+    # контейнеров вышла пустой, и адрес, лежащий ТОЛЬКО в dropped_by_credits,
+    # считался «нигде» и уходил в правку. Применение потом печатало «убран из
+    # batch5» -- то есть правка СНИМАЛА адрес, что запрещено прямым словом, при
+    # зелёном коде выхода и пройденной самопроверке денежного пути.
     try:
         сыро = json.loads(Path(путь_файла).read_text(encoding="utf-8"))
-    except (ValueError, OSError, TypeError):
-        сыро = {}
-    for имя, тело in (сыро.get("groups") or {}).items():
+    except (ValueError, OSError, TypeError) as сбой:
+        iz["why_not"] = (f"{WHY_SYROJ_NE_CHITAETSJA}: {путь_файла}: "
+                         f"{type(сбой).__name__}: {str(сбой)[:100]}")
+        return iz
+    # ВИД СЫРОГО ФАЙЛА ПРОВЕРЯЕТСЯ, А НЕ ПРЕДПОЛАГАЕТСЯ: файл, разобравшийся в
+    # СПИСОК, или с groups-строкой давал непойманный AttributeError и код 1 без
+    # отчёта (замер: groups-файл "[1,2]" -- 'list' object has no attribute 'get').
+    if not isinstance(сыро, dict) or not isinstance(сыро.get("groups"), dict):
+        iz["why_not"] = (f"{WHY_SYROJ_NE_TOT_VID}: {type(сыро).__name__}, "
+                         f"groups -- "
+                         f"{type((сыро or {}).get('groups')).__name__ if isinstance(сыро, dict) else 'нет'}")
+        return iz
+    for имя, тело in сыро["groups"].items():
         if not isinstance(тело, dict):
             continue
         for контейнер in КОНТЕЙНЕРЫ:
@@ -265,9 +390,37 @@ def gruppy(put_: str | None = None) -> dict:
     торгуют = {имя for имя, п in политики.items()
                if п.get("lane_trades") is not False
                or п.get("bloom_trades") is not False}
+    # ВИД ПОЛЯ addresses У ЦЕЛЕВОЙ ГРУППЫ -- ДЕНЕЖНОЕ УСЛОВИЕ, А НЕ МЕЛОЧЬ.
+    # Замер: pravka_grupp.перенести делает `if not isinstance(цель["addresses"],
+    # dict): цель["addresses"] = {}` -- то есть СПИСОК он заменяет пустым
+    # словарём, и все адреса, которые в группе уже лежали, ИСЧЕЗАЮТ. Код выхода
+    # при этом 0, а его самопроверка денежного пути смотрит только на
+    # затронутый адрес и проходит зелёной.
+    тело_цели = (сыро["groups"].get(ГРУППА) or {})
+    if not isinstance(тело_цели, dict):
+        iz["why_not"] = f"{WHY_SYROJ_NE_TOT_VID}: группа {ГРУППА} -- не словарь"
+        return iz
+    зн_адресов = тело_цели.get("addresses")
+    iz["vid_addresses"] = ("словарь" if isinstance(зн_адресов, dict)
+                           else "список" if isinstance(зн_адресов, list)
+                           else "нет" if зн_адресов is None else "иной")
+    iz["adresov_v_konveyere"] = (len(зн_адресов)
+                                 if isinstance(зн_адресов, (dict, list)) else 0)
+    # ТОРГУЕТ ЛИ ИМЕННО ПОЛОСА У ЦЕЛЕВОЙ ГРУППЫ. konveyer -- группа ПОЛОСЫ
+    # (lane_size 0.01), и для неё важен lane_trades, а не общий признак «хоть
+    # чем-то торгует». Отдельно называется спор размера: загрузчик служб при
+    # разных lane_size и lane_sol сам снимает lane_trades (bloom_source_groups,
+    # «два разных числа -- группа не торгует»), и тогда добавление уходит в
+    # мёртвую группу молча.
+    п_цели = политики.get(ГРУППА) or {}
+    iz["konveyer_lane_torguet"] = (ГРУППА in политики
+                                   and п_цели.get("lane_trades") is not False)
+    iz["konveyer_spor_razmera"] = п_цели.get("lane_size_spor")
+    iz["konveyer_lane_size"] = п_цели.get("lane_size")
     iz.update(ok=True, po_adresu=по_адресу, torgujut=торгуют,
               politiki=политики, est_konveyer=(ГРУППА in политики),
-              po_kontejneram=по_контейнерам, fajl=путь_файла)
+              po_kontejneram=по_контейнерам, fajl=путь_файла,
+              konveyer_torguet=(ГРУППА in торгуют))
     # АДРЕСА, ВИДНЫЕ ТОЛЬКО В СЫРОМ ФАЙЛЕ, -- ОТДЕЛЬНЫМ ЧИСЛОМ. Это и есть
     # dropped_by_credits и прочее, чего нет в карте модуля службы.
     iz["tolko_v_fajle"] = sorted(set(по_контейнерам) - set(по_адресу))
@@ -276,11 +429,33 @@ def gruppy(put_: str | None = None) -> dict:
     return iz
 
 
+def zapis_godna(выдано: dict, ключ: str) -> tuple:
+    """Годна ли ЗАПИСЬ журнала за эти сутки: список строк -- и ничего иного.
+
+    ПОЧЕМУ ОТДЕЛЬНОЙ ФУНКЦИЕЙ. Вид «выдано» целиком проверялся, а вид ЗАПИСИ за
+    дату -- нет, и list() молча брал из неё что попало: из null и {} -- ноль
+    выданных (суточный предел обнулялся, пятёрка выдавалась ДВАЖДЫ, код выхода
+    0, сверка зелёная), из словаря -- его КЛЮЧИ, из строки -- БУКВЫ, из числа --
+    TypeError с кодом 1. Замер встречного разбора: десять добавлений в торгующую
+    группу за одни сутки, и ни одного слова об этом.
+    """
+    зн = (выдано or {}).get(ключ)
+    if зн is None and ключ not in (выдано or {}):
+        return True, None          # записи нет -- это честный ноль
+    if not isinstance(зн, list):
+        return False, f"{WHY_ZHURNAL_ZAPIS}: {ключ} -- {type(зн).__name__}"
+    плохие = [x for x in зн if not isinstance(x, str) or not x]
+    if плохие:
+        return False, (f"{WHY_ZHURNAL_ZAPIS}: {ключ} -- в списке не адреса "
+                       f"({[type(x).__name__ for x in плохие[:3]]})")
+    return True, None
+
+
 def zhurnal(put_: str | Path | None = None) -> dict:
-    """Что уже выдано в правку -- по датам. Нет файла -- пустой журнал."""
+    """Что уже выдано в правку -- по датам файла И по реальным суткам."""
     п = Path(put_) if put_ else (КАТАЛОГ / ФАЙЛ_ЖУРНАЛА)
     if not п.exists():
-        return {"файл": str(п), "выдано": {}}
+        return {"файл": str(п), "выдано": {}, "выдано_сутки": {}}
     try:
         д = json.loads(п.read_text(encoding="utf-8"))
     except (ValueError, OSError):
@@ -288,7 +463,13 @@ def zhurnal(put_: str | Path | None = None) -> dict:
         # пять адресов второй раз, поэтому он называется битым и прогон встанет.
         return {"файл": str(п), "выдано": None, "битый": True}
     выд = д.get("выдано") if isinstance(д, dict) else None
+    сут = д.get("выдано_сутки") if isinstance(д, dict) else None
     return {"файл": str(п), "выдано": (выд if isinstance(выд, dict) else {}),
+            # ВТОРОЙ СЧЁТ -- ПО РЕАЛЬНЫМ СУТКАМ. Дата в ИМЕНИ файла Code-2 --
+            # не день: пять дат в окне давали бы по пятёрке каждая, то есть 25
+            # адресов за один реальный день. Старый журнал этого раздела не
+            # имеет -- тогда счёт по суткам пуст, и строже прежнего не станет.
+            "выдано_сутки": (сут if isinstance(сут, dict) else {}),
             "битый": not isinstance(выд, dict)}
 
 
@@ -304,6 +485,14 @@ def reshenie(ряд: dict, *, дата: str, состояние: dict) -> dict:
     iz["adres"] = (str(ряд["адрес"]) if isinstance(ряд.get("адрес"), str)
                    else None)
     iz["kust"] = ряд.get("куст")
+    # ВИД ПОЛЯ «КУСТ» -- ПРОВЕРЯЕТСЯ ЗДЕСЬ, ДО ЛЮБОГО ЕГО ИСПОЛЬЗОВАНИЯ.
+    # Обязательные поля проверялись только на ПРИСУТСТВИЕ, а куст уходит в
+    # ключ словаря: список или словарь в этом поле роняли прогон TypeError
+    # ("unhashable type") с кодом 1 и теряли ВЕСЬ файл, а не один ряд.
+    if not (ряд.get("куст") is None or isinstance(ряд.get("куст"), str)):
+        iz["why_not"] = (f"{WHY_KUST_NE_STROKA}: "
+                         f"{type(ряд.get('куст')).__name__}")
+        return iz
     # РАЗДЕЛ ПРОВЕРЯЕТСЯ ПЕРВЫМ, И ЭТО НЕ ПРИДИРКА К ПОРЯДКУ. У Code-2 в файле
     # лежат ВСЕ разобранные адреса, а не только раздел «добавить» (в первом
     # живом файле 47 из 48 -- «действующие не держатся», и у 15 из них числовых
@@ -319,6 +508,20 @@ def reshenie(ряд: dict, *, дата: str, состояние: dict) -> dict:
         return iz
     адрес = str(ряд["адрес"])
     iz["adres"], iz["kust"] = адрес, ряд.get("куст")
+    # ВИД АДРЕСА -- ПРОВЕРЯЕТСЯ, А НЕ ПРЕДПОЛАГАЕТСЯ. В правку уходит строка,
+    # которую применитель групп кладёт КЛЮЧОМ в addresses; строку, не являющуюся
+    # ключом Solana, он положит ровно так же охотно, самопроверка денежного пути
+    # её пропустит (она сверяет группу по тому же ключу), и в живом файле групп
+    # навсегда останется мусор, который служба отнесёт к ГРУППЕ ПО УМОЛЧАНИЮ.
+    if not pohozh_na_klyuch(адрес):
+        iz["why_not"] = f"{WHY_ADRES_NE_KLYUCH}: {адрес[:16]!r}"
+        return iz
+    # ДУБЛЬ ВНУТРИ ОДНОГО ФАЙЛА. Ряды приходят и СПИСКОМ (вид словарём ключи
+    # сам не повторит, список -- повторит), и тогда один адрес дал бы две
+    # операции в правке и съел бы две единицы суточного предела за себя одного.
+    if адрес in состояние["berjom"]:
+        iz["why_not"] = WHY_DUBL
+        return iz
     if str(ряд.get("дата")) != дата:
         iz["why_not"] = f"{WHY_CHUZHAYA_DATA}: {ряд.get('дата')} против {дата}"
         return iz
@@ -376,25 +579,91 @@ def reshenie(ряд: dict, *, дата: str, состояние: dict) -> dict:
     return iz
 
 
-def primenitel(*, vhod: dict, gr: dict, zh: dict,
-               predel: int = ПРЕДЕЛ_В_СУТКИ) -> dict:
+def primenitel(*, vhod: dict, gr: dict, zh: dict,  # noqa: C901, PLR0912
+               predel: int = ПРЕДЕЛ_В_СУТКИ,
+               segodnja: str | None = None) -> dict:
     """Решение по всему файлу: кого добавить, кому отказ и почему."""
     iz = {"ok": False, "why_not": None, "data": vhod.get("data"),
           "fajl": vhod.get("fajl"), "dobavleno": None, "otkazy": None,
           "svod": None, "predel": predel, "predel_ostalsja": None}
+    # ПРЕДЕЛ СВЕРХ ПЯТИ НЕ БЕРЁТСЯ ВОВСЕ. Пятёрка -- слово владельца, а не
+    # значение по умолчанию: --predel 50 на ключе командной строки обошёл бы его
+    # молча, и обошёл бы ОДНИМ прогоном. Понижать предел можно (это осторожнее),
+    # повышать -- нет.
+    try:
+        предел_ч = int(predel)
+    except (TypeError, ValueError):
+        предел_ч = -1
+    if предел_ч < 0 or предел_ч > ПРЕДЕЛ_В_СУТКИ:
+        iz["why_not"] = f"{WHY_PREDEL_SVERH}: просили {predel!r}"
+        return iz
     if not vhod.get("ok"):
         iz["why_not"] = vhod.get("why_not")
         return iz
     if not gr.get("ok") or not gr.get("est_konveyer"):
         iz["why_not"] = gr.get("why_not") or WHY_NET_GRUPPY
         return iz
+    # ВИД ПОЛЯ addresses У ЦЕЛЕВОЙ ГРУППЫ -- ДЕНЕЖНОЕ УСЛОВИЕ, НЕ МЕЛОЧЬ.
+    # Замер по deploy/checks/pravka_grupp.py:225: `if not isinstance(
+    # цель.get("addresses"), dict): цель["addresses"] = {}` -- СПИСОК он
+    # заменяет пустым словарём, и каждый адрес, который в группе уже лежал,
+    # ИСЧЕЗАЕТ. Код выхода при этом 0, а его самопроверка денежного пути
+    # смотрит только на затронутый адрес и проходит зелёной. Проверено своим
+    # прогоном: было [{AAA1},{BBB2}] -> стало {"NEW3": ...}.
+    if (gr.get("vid_addresses") not in ("словарь", "нет")
+            and gr.get("adresov_v_konveyere")):
+        iz["why_not"] = (f"{WHY_ADRESA_SPISKOM}: вид {gr.get('vid_addresses')}, "
+                         f"в нём {gr.get('adresov_v_konveyere')} адресов")
+        return iz
+    # ЦЕЛЕВАЯ ГРУППА ОБЯЗАНА ТОРГОВАТЬ ПОЛОСОЙ. Иначе добавление -- не шаг
+    # конвейера, а запись в мёртвую группу: отчёт зелёный, адресов прибыло,
+    # денег нет. Спор размера называется отдельной причиной, потому что чинится
+    # он иначе -- одним полем правды в файле групп.
+    if gr.get("konveyer_spor_razmera"):
+        iz["why_not"] = f"{WHY_SPOR_RAZMERA}: {gr['konveyer_spor_razmera']}"
+        return iz
+    if not gr.get("konveyer_lane_torguet"):
+        iz["why_not"] = (f"{WHY_GRUPPA_NE_TORGUET}: lane_trades="
+                         f"{(gr.get('politiki') or {}).get(ГРУППА, {}).get('lane_trades')!r}")
+        return iz
     if zh.get("битый"):
         iz["why_not"] = f"журнал {zh.get('файл')} битый -- повтор не отличить"
         return iz
     дата = vhod["data"]
+    # ДАТА ФАЙЛА -- ОКОЛО СЕГОДНЯШНЕЙ. Своя дата у файла уже сверена с рядами,
+    # но файл за прошлый месяц сверится сам с собой и пройдёт: журнал за ту дату
+    # пуст, значит снова пять «свежих» адресов, посчитанных по мёртвому окну.
+    сег = segodnja or segodnja_utc()
+    разница = sutok_mezhdu(дата, сег)
+    if разница is None or разница > OKNO_DATY_SUTOK:
+        iz["why_not"] = (f"{WHY_DATA_DALEKO}: у файла {дата}, сегодня {сег}, "
+                         f"разница {разница} суток, окно {OKNO_DATY_SUTOK}")
+        return iz
+    # ВИД ЗАПИСИ ЖУРНАЛА ЗА ЭТИ СУТКИ -- ДО ЛЮБОГО СЧЁТА. Иначе list() берёт
+    # из неё буквы, ключи или ноль, и предел молча сгорает или обнуляется.
+    for ключ, где in ((дата, "выдано"), (сег, "выдано_сутки")):
+        годна, почему = zapis_godna(zh.get(где) or {}, ключ)
+        if not годна:
+            iz["why_not"] = f"{почему} (раздел {где}, файл {zh.get('файл')})"
+            return iz
     выдано = list((zh.get("выдано") or {}).get(дата) or [])
-    осталось = max(0, int(predel) - len(выдано))
+    выдано_сутки = list((zh.get("выдано_сутки") or {}).get(сег) or [])
+    осталось_даты = max(0, int(predel) - len(выдано))
+    # ДВА СЧЁТА, И БЕРЁТСЯ МЕНЬШИЙ. Дата в ИМЕНИ файла Code-2 -- не день: окно
+    # ±2 суток позволяет пять РАЗНЫХ дат, то есть пять пятёрок = 25 адресов за
+    # один реальный день (замер встречного разбора). Поэтому второй счёт идёт
+    # по реальным суткам UTC, и предел -- минимум из двух.
+    осталось_суток = max(0, int(predel) - len(выдано_сутки))
+    осталось = min(осталось_даты, осталось_суток)
     iz["predel_ostalsja"] = осталось
+    iz["predel_po_sutkam"] = {"сутки": сег, "выдано": len(выдано_сутки),
+                              "осталось": осталось_суток}
+    if осталось_суток <= 0 < осталось_даты:
+        iz["why_not"] = (f"{WHY_PREDEL_SUTOK}: за {сег} уже выдано "
+                         f"{len(выдано_сутки)} из {predel}, а дата файла "
+                         f"{дата} своего предела не исчерпала -- это и есть "
+                         f"обход пятёрки разными датами")
+        return iz
     # КАРТА КУСТОВ -- ТОЛЬКО ИЗ ФАЙЛА CODE-2. По адресам, которых в файле нет,
     # куста я не знаю: кусты считает он. Поэтому «куст действует» проверяется по
     # тем адресам файла, что уже лежат в торгующих группах, плюс по карте
@@ -404,10 +673,23 @@ def primenitel(*, vhod: dict, gr: dict, zh: dict,
         if not isinstance(р, dict):
             continue
         а, к = str(р.get("адрес") or ""), р.get("куст")
+        # НЕСТРОКОВЫЙ КУСТ НЕ КЛАДЁТСЯ В КАРТУ: ряд с ним получит отказ по
+        # имени в reshenie, а до этого ронял прогон здесь же -- раньше любого
+        # решения по рядам (замер: TypeError на setdefault).
+        if not isinstance(к, str):
+            continue
         г = gr["po_adresu"].get(а)
-        if к is not None and г and г in gr["torgujut"]:
+        if г and г in gr["torgujut"]:
             куст_торгует.setdefault(к, (а, г))
-    for к, адреса in (vhod.get("kustov") or {}).items():
+    карта = vhod.get("kustov")
+    if карта is not None and not isinstance(карта, dict):
+        iz["why_not"] = f"{WHY_KUSTY_NE_TOT_VID}: {type(карта).__name__}"
+        return iz
+    for к, адреса in (карта or {}).items():
+        if not isinstance(к, str):
+            iz["why_not"] = (f"{WHY_KUSTY_NE_TOT_VID}: имя куста -- "
+                             f"{type(к).__name__}")
+            return iz
         if к in куст_торгует or not isinstance(адреса, (list, tuple)):
             continue
         for а in адреса:
@@ -437,11 +719,27 @@ def primenitel(*, vhod: dict, gr: dict, zh: dict,
     for о in отказы:
         имя = str(о["почему"]).split(":")[0]
         по_причинам[имя] = по_причинам.get(имя, 0) + 1
+    # КУСТ, КОТОРОГО CODE-2 НЕ НАЗВАЛ, -- ЧИСЛОМ В СВОДКЕ, А НЕ МОЛЧАНИЕМ.
+    # В первом живом файле куст null у ВСЕХ 48 рядов (кустов_убрано 0), то есть
+    # мой разбор куста по этому файлу не делает НИЧЕГО, и от двух источников
+    # одного куста в одной партии защищает только его собственный счёт. Отказом
+    # это не делается: так я отверг бы единственный живой адрес, который Code-1
+    # уже применил в бою. Но молчать об этом нельзя -- число стоит в сводке.
+    без_куста = sum(1 for д in добавить if д.get("куст") is None)
+    # ПРЕДЕЛ, ОСТАВШИЙСЯ ПОСЛЕ ЭТОЙ ПАРТИИ, -- ОТДЕЛЬНЫМ ЧИСЛОМ. До партии он
+    # ничего читателю не говорит: правка на руках, и вопрос у него один --
+    # сколько можно ещё СЕГОДНЯ.
+    осталось_после = max(0, осталось - len(добавить))
+    iz["predel_ostalsja"] = осталось_после
     iz.update(ok=True, dobavleno=добавить, otkazy=отказы,
               svod={"рядов": len(vhod["ryady"]), "добавлено": len(добавить),
                     "отказов": len(отказы), "по_причинам": по_причинам,
                     "предел": predel, "выдано_за_сутки_до": len(выдано),
-                    "предел_остался": осталось})
+                    "предел_остался_до": осталось,
+                    "выдано_за_реальные_сутки": len(выдано_сутки),
+                    "предел_остался": осталось_после,
+                    "кустов_не_названо": без_куста,
+                    "сегодня": сег})
     return iz
 
 
@@ -451,6 +749,10 @@ def pravka(реш: dict) -> dict:
               for д in (реш.get("dobavleno") or [])]
     return {"что": (f"конвейер {реш.get('data')}: добавление в группу {ГРУППА} "
                     f"(Правило 18, применитель Code-3)"),
+            # ДАТА -- ПОЛЕМ, А НЕ ТОЛЬКО В ИМЕНИ ФАЙЛА. По ней сверка находит
+            # запись журнала за эти сутки; имя файла переименовывается одной
+            # командой, поле -- нет.
+            "дата": реш.get("data"),
             "откуда": реш.get("fajl"),
             "как_применить": ("python3 deploy/checks/pravka_grupp.py --file "
                               "<файл групп> --plan <этот файл>"),
@@ -466,26 +768,141 @@ def zapisat(реш: dict, *, kat: str | Path | None = None,
     дата = реш.get("data")
     п_правки = к / f"pravka_{дата}.json"
     п_отчёта = к / f"primenitel_{дата}.json"
-    п_правки.write_text(json.dumps(pravka(реш), ensure_ascii=False, indent=1)
+    из_ = {"ok": False, "why_not": None, "pravka": str(п_правки),
+           "otchjot": str(п_отчёта), "zhurnal": None}
+    новая = pravka(реш)
+    # ПРЕЖНЮЮ НЕПУСТУЮ ПРАВКУ НЕ ТЕРЯТЬ ДАЖЕ ТОГДА, КОГДА ЕСТЬ ЧТО ЗАПИСАТЬ.
+    # Пустой правкой она не затирается (ниже), но непустая прежде затиралась
+    # молча -- а её могли ещё не применить. Теперь она сначала отводится в
+    # сторону под своим именем, и это названо в ответе.
+    if новая["pravki"] and п_правки.exists():
+        try:
+            старая_т = п_правки.read_text(encoding="utf-8")
+            старая = json.loads(старая_т)
+        except (ValueError, OSError):
+            старая_т, старая = None, {}
+        if старая_т and (старая.get("pravki")
+                         if isinstance(старая, dict) else None):
+            н = 1
+            while (к / f"pravka_{дата}_bylo_{н}.json").exists():
+                н += 1
+            (к / f"pravka_{дата}_bylo_{н}.json").write_text(
+                старая_т, encoding="utf-8")
+            из_["prezhnjaja_pravka"] = str(к / f"pravka_{дата}_bylo_{н}.json")
+    # ПУСТОЙ ПРАВКОЙ НЕ ЗАТИРАТЬ НЕПУСТУЮ. Второй прогон того же файла за те же
+    # сутки даёт НОЛЬ добавлений -- и это правильно (журнал помнит). Но запись
+    # такой правки поверх прежней стёрла бы ровно тот файл, который Code-1 ещё
+    # не применил или применил и держит как запись о сделанном, а код выхода
+    # остался бы нулевым. Тихая потеря правки -- то же, что тихая потеря денег.
+    if not новая["pravki"] and п_правки.exists():
+        try:
+            старая = json.loads(п_правки.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            старая = {}
+        if (старая.get("pravki") if isinstance(старая, dict) else None):
+            из_["why_not"] = (f"{WHY_ZATROT_PRAVKU}: {п_правки.name}, в ней "
+                              f"{len(старая['pravki'])} добавлений")
+            return из_
+    п_правки.write_text(json.dumps(новая, ensure_ascii=False, indent=1)
                         + "\n", encoding="utf-8")
     п_отчёта.write_text(json.dumps(реш, ensure_ascii=False, indent=1) + "\n",
                         encoding="utf-8")
-    из_ = {"pravka": str(п_правки), "otchjot": str(п_отчёта), "zhurnal": None}
+    из_["ok"] = True
     if pisat_zhurnal and реш.get("dobavleno"):
-        п_ж = Path(zhurnal_put) if zhurnal_put else (к / ФАЙЛ_ЖУРНАЛА)
+        # ЖУРНАЛ НЕ ЕЗДИТ ЗА --kat. Он -- счёт суточного предела; положи его
+        # рядом с правкой, и один прогон с --kat /tmp/что-нибудь выдал бы ещё
+        # пять адресов сверх пятёрки, ничего не нарушив формально.
+        п_ж = Path(zhurnal_put) if zhurnal_put else (КАТАЛОГ / ФАЙЛ_ЖУРНАЛА)
+        п_ж.parent.mkdir(parents=True, exist_ok=True)
         ж = zhurnal(п_ж)
         если = dict(ж.get("выдано") or {})
         было = list(если.get(дата) or [])
-        если[дата] = было + [д["адрес"] for д in реш["dobavleno"]
-                             if д["адрес"] not in было]
+        новые = [д["адрес"] for д in реш["dobavleno"] if д["адрес"] not in было]
+        если[дата] = было + новые
+        # ВТОРОЙ РАЗДЕЛ -- ПО РЕАЛЬНЫМ СУТКАМ. По нему считается предел, который
+        # нельзя обойти, подсунув файл с другой датой в имени.
+        сутки = dict(ж.get("выдано_сутки") or {})
+        сег = (реш.get("svod") or {}).get("сегодня") or segodnja_utc()
+        было_с = list(сутки.get(сег) or [])
+        сутки[сег] = было_с + [а for а in новые if а not in было_с]
         п_ж.write_text(json.dumps(
-            {"что": ("что применитель конвейера УЖЕ ВЫДАЛ в правку, по датам: "
-                     "по нему считается суточный предел и ловится повтор файла"),
+            {"что": ("что применитель конвейера УЖЕ ВЫДАЛ в правку: «выдано» -- "
+                     "по датам файлов Code-2, «выдано_сутки» -- по РЕАЛЬНЫМ "
+                     "суткам UTC. Предел считается по обоим, и берётся меньший "
+                     "остаток: иначе пятёрка обходится файлом с другой датой."),
              "обновлено_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-             "выдано": если}, ensure_ascii=False, indent=1) + "\n",
+             "выдано": если, "выдано_сутки": сутки},
+            ensure_ascii=False, indent=1) + "\n",
             encoding="utf-8")
         из_["zhurnal"] = str(п_ж)
     return из_
+
+
+# ------------------------------------------------------------------- замок
+
+ZAMOK_ZHIVJOT_SEKUND = 900
+
+
+def vzjat_zamok(put_zhurnala: str | Path) -> dict:
+    """Замок рядом с журналом: два прогона разом сжигают суточный предел.
+
+    ПОЧЕМУ ЗАМОК ВООБЩЕ. Журнал читается и пишется read-modify-write: два
+    одновременных прогона на одну дату видят один и тот же «выдано», каждый
+    добавляет свою пятёрку и пишет файл последним -- и пятёрка одного из них
+    исчезает из журнала, оставшись в правке. Замер встречного разбора это
+    воспроизвёл. Замок -- файл рядом с журналом, берётся O_EXCL (атомарно на
+    одной машине), и в нём лежит pid и время: мёртвый замок старше
+    ZAMOK_ZHIVJOT_SEKUND перехватывается со словами, а не висит вечно.
+
+    ЧЕГО ЭТОТ ЗАМОК НЕ ДЕЛАЕТ: он НЕ защищает от двух прогонов на РАЗНЫХ
+    машинах (у GitHub Actions и хоста общего файла нет) -- там порядок держит
+    сам прогон Code-1, один тик за раз.
+    """
+    import os as _os  # noqa: PLC0415
+
+    п = Path(str(put_zhurnala) + ".zamok")
+    из_ = {"ok": False, "why_not": None, "put": str(п), "perehvachen": False}
+    п.parent.mkdir(parents=True, exist_ok=True)
+    тело = json.dumps({"pid": _os.getpid(),
+                       "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                       "ts": int(time.time())}, ensure_ascii=False)
+    try:
+        фд = _os.open(str(п), _os.O_CREAT | _os.O_EXCL | _os.O_WRONLY, 0o600)
+    except FileExistsError:
+        возраст = None
+        try:
+            д = json.loads(п.read_text(encoding="utf-8"))
+            возраст = int(time.time()) - int(д.get("ts") or 0)
+        except (ValueError, OSError, TypeError):
+            возраст = None
+        if возраст is not None and возраст > ZAMOK_ZHIVJOT_SEKUND:
+            из_["perehvachen"] = True
+            try:
+                п.write_text(тело, encoding="utf-8")
+            except OSError as сбой:
+                из_["why_not"] = f"{WHY_ZAMOK}: {type(сбой).__name__}"
+                return из_
+            из_["ok"] = True
+            return из_
+        из_["why_not"] = (f"{WHY_ZAMOK}: {п} (возраст "
+                          f"{'неизвестен' if возраст is None else возраст} с, "
+                          f"живым считается до {ZAMOK_ZHIVJOT_SEKUND} с)")
+        return из_
+    except OSError as сбой:
+        из_["why_not"] = f"{WHY_ZAMOK}: {type(сбой).__name__}: {сбой}"
+        return из_
+    with _os.fdopen(фд, "w", encoding="utf-8") as ф:
+        ф.write(тело)
+    из_["ok"] = True
+    return из_
+
+
+def snjat_zamok(put_zamka: str | Path) -> None:
+    """Снять замок. Нет файла -- и хорошо: снимать нечего."""
+    try:
+        Path(put_zamka).unlink()
+    except OSError:
+        pass
 
 
 # --------------------------------------------- сверка правки перед применением
@@ -494,9 +911,13 @@ WHY_PRAVKA_NE_JSON = "правка не разобралась как JSON"
 WHY_PRAVKA_PUSTA = "в правке нет списка pravki"
 WHY_PRAVKA_NE_DOBAVLENIE = "в правке есть операция, которая НЕ добавление"
 WHY_PRAVKA_USTARELA = "адрес правки за это время появился в группах"
+WHY_PRAVKA_BEZ_DATY = ("у правки нет даты -- ни полем, ни в имени файла; остаток "
+                       "суточного предела по журналу не посчитать")
 
 
-def sverit_pravku(put_pravki: str | Path, *, gruppy_put: str | None = None) -> dict:
+def sverit_pravku(put_pravki: str | Path, *,  # noqa: C901, PLR0911, PLR0912
+                  gruppy_put: str | None = None,
+                  zhurnal_put: str | Path | None = None) -> dict:
     """ГОДНА ЛИ ПРАВКА ПРЯМО СЕЙЧАС. Прогонять ПЕРЕД pravka_grupp.py.
 
     ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ. Безопасность правки держится на одном: КАЖДЫЙ её
@@ -510,7 +931,8 @@ def sverit_pravku(put_pravki: str | Path, *, gruppy_put: str | None = None) -> d
     Проверяется и вид правки: ни одной операции, кроме добавления в konveyer.
     """
     iz = {"ok": False, "why_not": None, "pravok": None, "godnyh": None,
-          "ustarelo": None, "chuzhie_operacii": None, "fajl": str(put_pravki)}
+          "ustarelo": None, "chuzhie_operacii": None, "fajl": str(put_pravki),
+          "data": None, "vydano_za_sutki": None, "predel_ostalsja": None}
     п = Path(put_pravki)
     if not п.exists():
         iz["why_not"] = f"{WHY_NET_FAJLA}: {п}"
@@ -540,6 +962,52 @@ def sverit_pravku(put_pravki: str | Path, *, gruppy_put: str | None = None) -> d
     if not гр.get("est_konveyer"):
         iz["why_not"] = WHY_NET_GRUPPY
         return iz
+    # ТЕ ЖЕ ДЕНЕЖНЫЕ УСЛОВИЯ, ЧТО В ПРИМЕНИТЕЛЕ, И ПРОВЕРЯЮТСЯ ОНИ ЗАНОВО.
+    # Применитель смотрел на файл групп ТОГДА, сверка смотрит СЕЙЧАС: вид
+    # addresses у группы konveyer мог стать списком (её правил кто-то ещё), и
+    # тогда применитель групп сотрёт из неё всё, что уже лежало.
+    if (гр.get("vid_addresses") not in ("словарь", "нет")
+            and гр.get("adresov_v_konveyere")):
+        iz["why_not"] = (f"{WHY_ADRESA_SPISKOM}: вид {гр.get('vid_addresses')}, "
+                         f"в нём {гр.get('adresov_v_konveyere')} адресов")
+        return iz
+    if гр.get("konveyer_spor_razmera"):
+        iz["why_not"] = f"{WHY_SPOR_RAZMERA}: {гр['konveyer_spor_razmera']}"
+        return iz
+    if not гр.get("konveyer_lane_torguet"):
+        iz["why_not"] = f"{WHY_GRUPPA_NE_TORGUET}: сверка перед применением"
+        return iz
+    # ОСТАТОК СУТОЧНОГО ПРЕДЕЛА -- ПО ЖУРНАЛУ, А НЕ ПО ЧИСЛУ ОПЕРАЦИЙ В ПРАВКЕ.
+    # Правку можно написать руками, и тогда «только добавление в konveyer» будет
+    # соблюдено, а пятёрка -- нет. Адреса, которые этот применитель уже выдал за
+    # эти сутки, в журнале лежат, и сверх предела они не считаются дважды.
+    дата = д.get("дата") if isinstance(д, dict) else None
+    if not дата:
+        м = re.search(r"\d{4}-\d{2}-\d{2}", п.name)
+        дата = м.group(0) if м else None
+    iz["data"] = дата
+    if not дата:
+        iz["why_not"] = f"{WHY_PRAVKA_BEZ_DATY}: {п.name}"
+        return iz
+    ж = zhurnal(zhurnal_put)
+    if ж.get("битый"):
+        iz["why_not"] = (f"журнал {ж.get('файл')} битый -- остаток суточного "
+                         f"предела не посчитать")
+        return iz
+    годна, почему = zapis_godna(ж.get("выдано") or {}, дата)
+    if not годна:
+        iz["why_not"] = f"{почему} (файл {ж.get('файл')})"
+        return iz
+    выдано = list((ж.get("выдано") or {}).get(дата) or [])
+    осталось = max(0, ПРЕДЕЛ_В_СУТКИ - len(выдано))
+    сверх = [о for о in правки if str(о["perenesti"]) not in выдано]
+    iz["vydano_za_sutki"], iz["predel_ostalsja"] = len(выдано), осталось
+    if len(сверх) > осталось:
+        iz["why_not"] = (f"{WHY_PRAVKA_SVERH_PREDELA}: в правке {len(правки)}, "
+                         f"из них не из журнала {len(сверх)}, а за {дата} "
+                         f"осталось {осталось} (выдано {len(выдано)} из "
+                         f"{ПРЕДЕЛ_В_СУТКИ})")
+        return iz
     устарело = []
     for о in правки:
         адрес = str(о["perenesti"])
@@ -551,6 +1019,19 @@ def sverit_pravku(put_pravki: str | Path, *, gruppy_put: str | None = None) -> d
                                            if контейнер else None)})
     iz["ustarelo"] = устарело
     iz["godnyh"] = len(правки) - len(устарело)
+    # УЖЕ ПРИМЕНЕНО ЦЕЛИКОМ -- ЭТО НЕ ТО ЖЕ, ЧТО "АДРЕС УШЁЛ В ЧУЖУЮ ГРУППУ".
+    # Разница денежная и она нужна прогону на таймере: если КАЖДЫЙ адрес правки
+    # лежит ровно в konveyer и больше нигде, значит эту самую правку уже
+    # применили, и применять её второй раз просто нечего (код выхода 5). Если
+    # же хоть один адрес оказался в ДРУГОЙ группе -- perenesti снял бы его
+    # оттуда, и это по-прежнему СТОП (код 3).
+    iz["uzhe_primeneno"] = bool(
+        устарело and len(устарело) == len(правки)
+        and all(у.get("группа") == ГРУППА for у in устарело))
+    if iz["uzhe_primeneno"]:
+        iz["why_not"] = (f"правка уже применена целиком: все {len(правки)} "
+                         f"адресов лежат в группе {ГРУППА} -- применять нечего")
+        return iz
     if устарело:
         iz["why_not"] = (f"{WHY_PRAVKA_USTARELA}: {len(устарело)} из "
                          f"{len(правки)} -- применять нельзя, прогнать "
@@ -563,7 +1044,7 @@ def sverit_pravku(put_pravki: str | Path, *, gruppy_put: str | None = None) -> d
 # ------------------------------------------------------------- самопроверка
 
 # Число проверок объявлено заранее: меньше -- значит что-то пропущено молча.
-ZHDEM_PROVEROK = 63
+ZHDEM_PROVEROK = 111
 # АДРЕСА САМОПРОВЕРКИ -- ВЫДУМАННЫЕ, И ЭТО СКАЗАНО ВСЛУХ. Они выводятся из семени
 # числом, в цепи их нет, и ни один из них не попадает ни в один файл репозитория:
 # самопроверка работает в своём временном каталоге и убирает его за собой.
@@ -571,17 +1052,30 @@ ZHDEM_PROVEROK = 63
 # ЖИВОЙ ФАЙЛ CODE-2 -- ПЕРВЫЙ, И ОН ПРОВЕРЯЕТСЯ ЦЕЛИКОМ. Числа -- замер по
 # файлу, скопированному байт в байт из ветки claude/podbivka.
 FAJL_ZHIVOJ = "2026-10-03.json"
-# ФИКСТУРА -- ЗАМОРОЖЕННЫЙ СНИМОК 28.09, А НЕ ЖИВОЙ ФАЙЛ. На голове
-# claude/nifty-sagan-r0polg живой файл групп переименован: суточная выгрузка
-# кладёт его как data/sources_live.json, а прежнее имя оставлено снимком
-# data/sources_2026-09-25_USTAREL_2809.json (слово владельца 03.10, добавка
-# п.4). Брать живой файл фикстурой НЕЛЬЗЯ по существу: в нём группа konveyer
-# уже есть и адрес ALL1V7x5 в неё уже положен, то есть применитель честно
-# отказал бы "адрес уже в группе konveyer" и проверка "добавлено 1" мерила бы
-# не применителя, а состояние боя.
-FAJL_GRUPP_REPO = "sources_2026-09-25_USTAREL_2809.json"
+# ДВА ФАЙЛА ГРУПП, И КАЖДЫЙ МЕРИТ СВОЁ. 03.10 Code-1 переименовал прежний
+# sources_2026-09-25.json в ..._USTAREL_2809.json и положил рядом суточную
+# выгрузку с хоста (data/sources_live.json).
+#
+#   ФИКСТУРА -- СНИМОК, и это его слово, с которым я согласен: "живой файл
+#   фикстурой не годится по существу: в нём группа konveyer уже есть и адрес
+#   ALL1V7x5 в неё уже положен, то есть проверка «добавлено 1» мерила бы
+#   состояние боя, а не применитель". Поэтому число «добавлено 1» считается на
+#   СНИМКЕ плюс пустая группа konveyer.
+#
+#   ЖИВОЙ ФАЙЛ -- ОТДЕЛЬНОЙ ПРОВЕРКОЙ, и она мерит ровно то, что он называет
+#   состоянием боя: на нём применитель обязан ОТКАЗАТЬ («адрес уже в группе
+#   konveyer»), и обязан отказать даже с пустым журналом. Это не замена его
+#   проверке, а вторая половина: одна показывает, что применитель добавляет
+#   кого надо, другая -- что он не выдаёт то же второй раз.
+FAJL_GRUPP_FIKSTURA = "sources_2026-09-25_USTAREL_2809.json"
+FAJL_GRUPP_ZHIVOJ = "sources_live.json"
+ZHDEM_ZHIVYH_GRUPP = {"adresov_v_konveyere": 2, "vid": "словарь"}
 ZHDEM_ZHIVOGO = {"рядов": 48, "добавлено": 1, "не_тот_razdel": 47,
-                 "добавить": ["ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy"]}
+                 "добавить": ["ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy"],
+                 # КУСТ У ВСЕХ 48 РЯДОВ -- null (кустов_убрано 0 у Code-2). Это
+                 # замер, а не догадка: значит мой разбор куста по этому файлу
+                 # не делает НИЧЕГО, и число стоит в сводке словами.
+                 "кустов_не_названо": 1}
 
 
 def _адрес(номер: int) -> str:
@@ -631,6 +1125,7 @@ def _файл_групп(каталог: Path, *, с_конвейером: bool 
 
 
 def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
+    import io as io_mod  # noqa: PLC0415
     import shutil  # noqa: PLC0415
     import tempfile  # noqa: PLC0415
 
@@ -649,6 +1144,14 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     врем = Path(tempfile.mkdtemp(prefix="konveyer-proverka-"))
     try:
         ДАТА = "2026-10-04"
+        П_Ж = врем / ФАЙЛ_ЖУРНАЛА
+
+        def прим(**кв):
+            """primenitel с подставленным «сегодня». САМОПРОВЕРКА НЕ СМОТРИТ НА
+            КАЛЕНДАРЬ: иначе она позеленеет сегодня и покраснеет через трое
+            суток сама по себе, а окно даты проверяется чистой функцией."""
+            кв.setdefault("segodnja", (кв.get("vhod") or {}).get("data") or ДАТА)
+            return primenitel(**кв)
         п_гр = _файл_групп(врем)
         гр = gruppy(п_гр)
         chk("файл групп самопроверки читается тем же модулем, что у службы",
@@ -666,7 +1169,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         chk("вход разобрался и дата взята из имени файла",
             вх["ok"] and вх["data"] == ДАТА, (вх.get("why_not"), вх.get("data")))
         ж0 = {"файл": str(врем / ФАЙЛ_ЖУРНАЛА), "выдано": {}}
-        реш = primenitel(vhod=вх, gr=гр, zh=ж0)
+        реш = прим(vhod=вх, gr=гр, zh=ж0)
         chk("шесть годных рядов -- добавлено РОВНО пять",
             реш["ok"] and len(реш["dobavleno"]) == ПРЕДЕЛ_В_СУТКИ,
             len(реш.get("dobavleno") or []))
@@ -690,13 +1193,15 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 for о in пр["pravki"]), пр["pravki"][0]["pometka"])
 
         # ------------------------------- 2. повтор того же файла не добавляет дважды
-        зап = zapisat(реш, kat=врем)
-        chk("правка, отчёт и журнал записаны", all(зап.values()), зап)
+        зап = zapisat(реш, kat=врем, zhurnal_put=П_Ж)
+        chk("правка, отчёт и журнал записаны",
+            зап["ok"] and зап["why_not"] is None
+            and all(зап[к] for к in ("pravka", "otchjot", "zhurnal")), зап)
         ж1 = zhurnal(зап["zhurnal"])
         chk("журнал помнит ровно пять выданных адресов за эту дату",
             len(ж1["выдано"].get(ДАТА) or []) == 5,
             ж1["выдано"].get(ДАТА))
-        реш2 = primenitel(vhod=prochitat_vhod(п_вх), gr=гр, zh=ж1)
+        реш2 = прим(vhod=prochitat_vhod(п_вх), gr=гр, zh=ж1)
         chk("ПОВТОР того же файла: добавлено ноль",
             реш2["ok"] and not реш2["dobavleno"], реш2.get("dobavleno"))
         chk("и у каждого из пяти причина -- «уже выдан», а не «предел»",
@@ -717,7 +1222,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         # перебора пятёрки за сутки файла групп НЕ хватает: шестой адрес,
         # которого в группе нет, станет годным -- и его держит только журнал.
         # Поэтому в бою нужны оба, и это проверяется следующей парой.
-        реш3 = primenitel(vhod=prochitat_vhod(п_вх), gr=gruppy(п_гр2),
+        реш3 = прим(vhod=prochitat_vhod(п_вх), gr=gruppy(п_гр2),
                           zh={"файл": "нет", "выдано": {}})
         chk("правка применена -- те же пять получают «уже в konveyer»",
             sum(1 for о in реш3["otkazy"]
@@ -727,7 +1232,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             len(реш3["dobavleno"]) == 1
             and реш3["dobavleno"][0]["место_в_файле"] == 6,
             реш3["dobavleno"])
-        реш4 = primenitel(vhod=prochitat_vhod(п_вх), gr=gruppy(п_гр2), zh=ж1)
+        реш4 = прим(vhod=prochitat_vhod(п_вх), gr=gruppy(п_гр2), zh=ж1)
         chk("с журналом и применённой правкой добавлять нечего вовсе",
             not реш4["dobavleno"]
             and any(WHY_PREDEL.split(":")[0] in о["почему"]
@@ -746,7 +1251,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             вб = prochitat_vhod(п_б)
             chk(f"битый вход ({имя}) -- отказ по имени, а не пустое «ок»",
                 not вб["ok"] and ждём in (вб["why_not"] or ""), вб.get("why_not"))
-            рб = primenitel(vhod=вб, gr=гр, zh=ж0)
+            рб = прим(vhod=вб, gr=гр, zh=ж0)
             chk(f"битый вход ({имя}): применитель не ок и причина названа",
                 not рб["ok"] and рб["why_not"], рб.get("why_not"))
         п_нет = врем / "2026-10-09.json"
@@ -768,7 +1273,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         chk("дата ряда не та, что у файла -- отказ ЦЕЛИКОМ и по имени",
             not вч["ok"] and WHY_CHUZHAYA_DATA in (вч["why_not"] or ""),
             вч.get("why_not"))
-        рч = primenitel(vhod=вч, gr=гр, zh=ж0)
+        рч = прим(vhod=вч, gr=гр, zh=ж0)
         chk("по чужой дате не добавляется НИ ОДНОГО адреса",
             not рч["ok"] and not рч["dobavleno"], рч.get("dobavleno"))
 
@@ -790,7 +1295,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             гр.get("tolko_v_fajle"))
         в_др = {"ok": True, "data": ДАТА, "fajl": "фикстура",
                 "ryady": [_ряд(1, дата=ДАТА, адрес=_адрес(204))]}
-        р_др = primenitel(vhod=в_др, gr=гр, zh=ж0)
+        р_др = прим(vhod=в_др, gr=гр, zh=ж0)
         chk("адрес из dropped_by_credits -- отказ по имени контейнера",
             not р_др["dobavleno"]
             and WHY_V_KONTEJNERE in р_др["otkazy"][0]["почему"]
@@ -805,7 +1310,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         for имя, адр, ждём in случаи:
             в1 = {"ok": True, "data": ДАТА, "fajl": "фикстура",
                   "ryady": [_ряд(1, дата=ДАТА, адрес=адр)]}
-            р1 = primenitel(vhod=в1, gr=гр, zh=ж0)
+            р1 = прим(vhod=в1, gr=гр, zh=ж0)
             chk(f"отказ по имени: {имя}",
                 not р1["dobavleno"] and ждём in (р1["otkazy"][0]["почему"] or ""),
                 р1["otkazy"])
@@ -814,7 +1319,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                "ryady": [_ряд(1, дата=ДАТА, раздел="смотреть"),
                          _ряд(2, дата=ДАТА, раздел="снять"),
                          _ряд(3, дата=ДАТА)]}
-        р_р = primenitel(vhod=в_р, gr=гр, zh=ж0)
+        р_р = прим(vhod=в_р, gr=гр, zh=ж0)
         chk("берётся ТОЛЬКО раздел «добавить», прочим -- отказ по имени",
             len(р_р["dobavleno"]) == 1
             and sum(1 for о in р_р["otkazy"] if WHY_NE_RAZDEL in о["почему"]) == 2,
@@ -828,7 +1333,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             р = _ряд(1, дата=ДАТА)
             р.pop(поле)
             в_п = {"ok": True, "data": ДАТА, "fajl": "фикстура", "ryady": [р]}
-            рп = primenitel(vhod=в_п, gr=гр, zh=ж0)
+            рп = прим(vhod=в_п, gr=гр, zh=ж0)
             причина = рп["otkazy"][0]["почему"] if рп["otkazy"] else ""
             if поле == "раздел":
                 без_раздела += int(not рп["dobavleno"]
@@ -850,7 +1355,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                          _ряд(11, дата=ДАТА, куст="k9"),
                          _ряд(12, дата=ДАТА, куст="k8"),
                          _ряд(13, дата=ДАТА, куст="k8")]}
-        р_к = primenitel(vhod=в_к, gr=гр, zh=ж0)
+        р_к = прим(vhod=в_к, gr=гр, zh=ж0)
         chk("куст с действующим источником -- отказ по имени",
             sum(1 for о in р_к["otkazy"]
                 if WHY_KUST_DEJSTVUET in о["почему"]) == 1,
@@ -864,7 +1369,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         в_к2 = {"ok": True, "data": ДАТА, "fajl": "фикстура",
                 "kustov": {"k7": [_адрес(200)]},
                 "ryady": [_ряд(14, дата=ДАТА, куст="k7")]}
-        р_к2 = primenitel(vhod=в_к2, gr=гр, zh=ж0)
+        р_к2 = прим(vhod=в_к2, gr=гр, zh=ж0)
         chk("карта кустов Code-2 ловит действующий источник вне рядов",
             not р_к2["dobavleno"]
             and WHY_KUST_DEJSTVUET in р_к2["otkazy"][0]["почему"],
@@ -875,7 +1380,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         гр_без = gruppy(п_без)
         chk(f"нет группы {ГРУППА} -- применитель отказывает по имени",
             not гр_без["est_konveyer"], гр_без.get("why_not"))
-        р_без = primenitel(vhod={"ok": True, "data": ДАТА, "fajl": "ф",
+        р_без = прим(vhod={"ok": True, "data": ДАТА, "fajl": "ф",
                                  "ryady": [_ряд(1, дата=ДАТА)]},
                            gr=гр_без, zh=ж0)
         chk("и ни одного адреса не выдаёт",
@@ -887,7 +1392,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         п_жб.write_text("{не json", encoding="utf-8")
         жб = zhurnal(п_жб)
         chk("битый журнал назван битым, а не пустым", жб.get("битый"), жб)
-        р_жб = primenitel(vhod={"ok": True, "data": ДАТА, "fajl": "ф",
+        р_жб = прим(vhod={"ok": True, "data": ДАТА, "fajl": "ф",
                                 "ryady": [_ряд(1, дата=ДАТА)]}, gr=гр, zh=жб)
         chk("на битом журнале применитель встаёт, а не выдаёт правку заново",
             not р_жб["ok"] and "битый" in (р_жб["why_not"] or ""),
@@ -905,7 +1410,7 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         д_к = json.loads(п_копия.read_text(encoding="utf-8"))
         ряды5 = [_ряд(i, дата=ДАТА) for i in range(1, 6)]
         в5 = {"ok": True, "data": ДАТА, "fajl": "фикстура", "ryady": ряды5}
-        р5 = primenitel(vhod=в5, gr=gruppy(п_копия), zh={"выдано": {}})
+        р5 = прим(vhod=в5, gr=gruppy(п_копия), zh={"выдано": {}})
         пр5 = pravka(р5)
         ждём_группу, ждём_поля, ждём_списки, ждём_убрано = {}, {}, {}, {}
         коды = [PG.применить(д_к["groups"], о, ждём_группу, ждём_поля,
@@ -947,15 +1452,17 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         п_пр.write_text(json.dumps(пр5, ensure_ascii=False), encoding="utf-8")
         п_чист = врем / "gruppy_chistye.json"
         shutil.copy2(_файл_групп(врем / "chistye"), п_чист)
-        св = sverit_pravku(п_пр, gruppy_put=п_чист)
+        св = sverit_pravku(п_пр, gruppy_put=п_чист, zhurnal_put=П_Ж)
         chk("сверка: на чистом файле групп правка годна целиком",
             св["ok"] and св["pravok"] == 5 and св["godnyh"] == 5,
             (св.get("why_not"), св.get("pravok"), св.get("godnyh")))
         # А теперь тот же файл групп, КУДА ПРАВКУ УЖЕ ПРИМЕНИЛИ (или адрес попал
         # туда иначе): сверка обязана отказать, иначе perenesti СНИМЕТ его.
-        св2 = sverit_pravku(п_пр, gruppy_put=п_копия)
-        chk("сверка: адрес уже в группе -- правка УСТАРЕЛА, применять нельзя",
-            not св2["ok"] and WHY_PRAVKA_USTARELA in (св2["why_not"] or "")
+        св2 = sverit_pravku(п_пр, gruppy_put=п_копия, zhurnal_put=П_Ж)
+        chk("сверка: правку УЖЕ ПРИМЕНИЛИ -- применять нельзя (иначе perenesti "
+            "снял бы адрес), и это названо «уже применена целиком»",
+            not св2["ok"] and св2.get("uzhe_primeneno") is True
+            and "применять нечего" in (св2["why_not"] or "")
             and len(св2["ustarelo"]) == 5, (св2.get("why_not"),
                                             св2.get("ustarelo")))
         # Чужая операция в правке -- отказ по имени (даже если её подложили руками)
@@ -963,14 +1470,14 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         п_чуж_пр.write_text(json.dumps(
             {"pravki": [{"otklyuchit": _адрес(1), "v": "off"}]},
             ensure_ascii=False), encoding="utf-8")
-        св3 = sverit_pravku(п_чуж_пр, gruppy_put=п_чист)
+        св3 = sverit_pravku(п_чуж_пр, gruppy_put=п_чист, zhurnal_put=П_Ж)
         chk("сверка: операция не-добавление в правке -- отказ по имени",
             not св3["ok"]
             and WHY_PRAVKA_NE_DOBAVLENIE in (св3["why_not"] or ""),
             св3.get("why_not"))
         п_пуст = врем / "pravka_pustaja.json"
         п_пуст.write_text(json.dumps({"pravki": []}), encoding="utf-8")
-        св4 = sverit_pravku(п_пуст, gruppy_put=п_чист)
+        св4 = sverit_pravku(п_пуст, gruppy_put=п_чист, zhurnal_put=П_Ж)
         chk("сверка: пустая правка -- отказ по имени, а не «годна»",
             not св4["ok"] and WHY_PRAVKA_PUSTA in (св4["why_not"] or ""),
             св4.get("why_not"))
@@ -993,16 +1500,49 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             chk("и «разделы» Code-2 сошлись с полем «раздел» у рядов",
                 вж.get("dobavit_po_razdelam") == ZHDEM_ZHIVOGO["добавить"],
                 вж.get("dobavit_po_razdelam"))
-            # Файл групп -- КОПИЯ живого плюс группа konveyer: у Code-1 она в
-            # бою уже есть, в репозитории её ещё нет.
-            д_жг = json.loads((КОРЕНЬ / "data" / FAJL_GRUPP_REPO)
+            # ЖИВОЙ ФАЙЛ ГРУПП, КАК ОН ЕСТЬ -- БЕЗ ПОДМЕН. Группа konveyer в
+            # нём уже боевая: два адреса, и второй из них выдан ЭТИМ
+            # применителем (03.10, п.4). Значит на том же файле Code-2 он
+            # обязан теперь ОТКАЗАТЬ по имени, а не выдать тот же адрес второй
+            # раз -- и это проверяется живыми данными, а не фикстурой.
+            п_жг_бой = КОРЕНЬ / "data" / FAJL_GRUPP_ZHIVOJ
+            гр_бой = gruppy(п_жг_бой)
+            chk("живой файл групп читается, konveyer в нём боевая: "
+                f"{ZHDEM_ZHIVYH_GRUPP['adresov_v_konveyere']} адреса "
+                f"{ZHDEM_ZHIVYH_GRUPP['vid']}ом",
+                гр_бой["ok"] and гр_бой["est_konveyer"]
+                and гр_бой["vid_addresses"] == ZHDEM_ZHIVYH_GRUPP["vid"]
+                and гр_бой["adresov_v_konveyere"]
+                == ZHDEM_ZHIVYH_GRUPP["adresov_v_konveyere"],
+                (гр_бой.get("why_not"), гр_бой.get("vid_addresses"),
+                 гр_бой.get("adresov_v_konveyere")))
+            chk("у боевой konveyer полоса торгует и спора размера нет "
+                "(lane_size == lane_sol)",
+                гр_бой.get("konveyer_lane_torguet")
+                and not гр_бой.get("konveyer_spor_razmera"),
+                (гр_бой.get("konveyer_lane_torguet"),
+                 гр_бой.get("konveyer_spor_razmera"),
+                 гр_бой.get("konveyer_lane_size")))
+            рж_бой = прим(vhod=вж, gr=гр_бой, zh={"выдано": {}})
+            chk("на ЖИВОМ файле групп применитель отказывает: адрес уже в "
+                "konveyer -- повтор выдачи невозможен даже с пустым журналом",
+                рж_бой["ok"] and not рж_бой["dobavleno"]
+                and sum(1 for о in рж_бой["otkazy"]
+                        if WHY_UZHE_V_KONVEYERE in о["почему"]) == 1,
+                (len(рж_бой.get("dobavleno") or []),
+                 [о["почему"] for о in (рж_бой.get("otkazy") or [])
+                  if WHY_NE_RAZDEL not in о["почему"]]))
+            # А ТЕПЕРЬ КОПИЯ ТОГО ЖЕ ФАЙЛА С ПУСТОЙ konveyer: так выглядел
+            # прогон до того, как Code-1 применил правку, и число должно быть
+            # ровно то же, что он применил руками.
+            д_жг = json.loads((КОРЕНЬ / "data" / FAJL_GRUPP_FIKSTURA)
                               .read_text(encoding="utf-8"))
             д_жг["groups"][ГРУППА] = {"lane_size": 0.01, "lane_trades": True,
                                       "bloom_trades": False, "addresses": {}}
-            п_жг = врем / "gruppy_s_konveyerom.json"
+            п_жг = врем / "gruppy_snimok_s_konveyerom.json"
             п_жг.write_text(json.dumps(д_жг, ensure_ascii=False),
                             encoding="utf-8")
-            рж = primenitel(vhod=вж, gr=gruppy(п_жг), zh={"выдано": {}})
+            рж = прим(vhod=вж, gr=gruppy(п_жг), zh={"выдано": {}})
             chk(f"на живом файле добавлено {ZHDEM_ZHIVOGO['добавлено']} -- "
                 f"{ZHDEM_ZHIVOGO['добавить'][0][:8]}",
                 рж["ok"]
@@ -1021,10 +1561,534 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 and set(прж["pravki"][0]) == {"perenesti", "v", "pometka"}
                 and прж["pravki"][0]["v"] == ГРУППА,
                 прж["pravki"])
+            chk("на живом файле кусты НЕ НАЗВАНЫ, и это число в сводке, а "
+                "не молчание",
+                рж["svod"]["кустов_не_названо"]
+                == ZHDEM_ZHIVOGO["кустов_не_названо"],
+                рж["svod"].get("кустов_не_названо"))
             chk("в пометке живого адреса -- его числа из файла Code-2",
                 "n=22" in прж["pravki"][0]["pometka"]
                 and "медиана=1.4" in прж["pravki"][0]["pometka"],
                 прж["pravki"][0]["pometka"])
+
+
+        # ------------------- 9г. ПОСЛЕ ВСТРЕЧНОГО РАЗБОРА (пять сторон)
+        # Ниже -- проверки на то, что встречный разбор нашёл, а не на то, что
+        # задумано. Каждая названа тем, что теряется без неё.
+
+        # 9г.1 ВИД АДРЕСА. Строка, не являющаяся ключом Solana, уходила в правку
+        # и оставалась ключом в живом файле групп навсегда.
+        chk("ключ Solana узнаётся, мусор -- нет",
+            pohozh_na_klyuch(_адрес(1)) and not pohozh_na_klyuch("None")
+            and not pohozh_na_klyuch(" x ") and not pohozh_na_klyuch(None),
+            [pohozh_na_klyuch(x) for x in (_адрес(1), "None", " x ", None)])
+        в_мусор = {"ok": True, "data": ДАТА, "fajl": "ф",
+                   "ryady": [_ряд(1, дата=ДАТА, адрес="None"),
+                             _ряд(2, дата=ДАТА, адрес="0" * 44)]}
+        р_мусор = прим(vhod=в_мусор, gr=гр, zh=ж0)
+        chk("мусорный адрес в ряду -- отказ ПО ИМЕНИ, а не ключ в файле групп",
+            р_мусор["ok"] and not р_мусор["dobavleno"]
+            and sum(1 for о in р_мусор["otkazy"]
+                    if WHY_ADRES_NE_KLYUCH in о["почему"]) == 2,
+            р_мусор.get("otkazy"))
+
+        # 9г.2 ДУБЛЬ В ОДНОМ ФАЙЛЕ. Ряды списком повтора не запрещают: один
+        # адрес давал ДВЕ операции в правке и съедал две единицы предела.
+        в_дубль = {"ok": True, "data": ДАТА, "fajl": "ф",
+                   "ryady": [_ряд(1, дата=ДАТА, куст=None),
+                             _ряд(1, дата=ДАТА, куст=None)]}
+        р_дубль = прим(vhod=в_дубль, gr=гр, zh=ж0)
+        chk("один адрес дважды в файле -- взят ОДИН, второму отказ по имени",
+            len(р_дубль["dobavleno"]) == 1
+            and sum(1 for о in р_дубль["otkazy"] if WHY_DUBL in о["почему"]) == 1,
+            (len(р_дубль["dobavleno"]), р_дубль["otkazy"]))
+
+        # 9г.3 ОКНО ДАТЫ. Файл за прошлый месяц сверялся сам с собой и проходил:
+        # журнал за ту дату пуст -- значит снова пять «свежих» адресов, считанных
+        # по мёртвому окну.
+        chk("сутки между датами считаются числом",
+            sutok_mezhdu(ДАТА, "2026-10-03") == 1
+            and sutok_mezhdu("2026-09-01", "2026-10-03") == 32
+            and sutok_mezhdu("не дата", "2026-10-03") is None,
+            [sutok_mezhdu(ДАТА, "2026-10-03"),
+             sutok_mezhdu("2026-09-01", "2026-10-03"),
+             sutok_mezhdu("не дата", "2026-10-03")])
+        р_далеко = primenitel(vhod=вх, gr=гр, zh=ж0, segodnja="2026-11-20")
+        chk("файл старше окна -- отказ ЦЕЛИКОМ и по имени",
+            not р_далеко["ok"] and WHY_DATA_DALEKO in (р_далеко["why_not"] or ""),
+            р_далеко.get("why_not"))
+        край = (datetime.date.fromisoformat(ДАТА)
+                + datetime.timedelta(days=OKNO_DATY_SUTOK)).isoformat()
+        р_край = primenitel(vhod=вх, gr=гр, zh=ж0, segodnja=край)
+        chk(f"на краю окна (ровно {OKNO_DATY_SUTOK} суток) файл ещё годен",
+            р_край["ok"] and len(р_край["dobavleno"]) == ПРЕДЕЛ_В_СУТКИ,
+            (р_край.get("why_not"), len(р_край.get("dobavleno") or [])))
+
+        # 9г.4 addresses СПИСКОМ У ЦЕЛЕВОЙ ГРУППЫ -- САМОЕ ДОРОГОЕ ИЗ НАЙДЕННОГО.
+        # Проверено своим прогоном pravka_grupp.py: было [{AAA1},{BBB2}] --
+        # стало {"NEW3": "конвейер"}, код выхода 0, адреса ПОТЕРЯНЫ.
+        д_сп = json.loads(п_чист.read_text(encoding="utf-8"))
+        д_сп["groups"][ГРУППА]["addresses"] = [
+            {"address": _адрес(210), "почему": "уже в конвейере"},
+            {"address": _адрес(211), "почему": "уже в конвейере"}]
+        п_сп = врем / "gruppy_spiskom.json"
+        п_сп.write_text(json.dumps(д_сп, ensure_ascii=False), encoding="utf-8")
+        гр_сп = gruppy(п_сп)
+        chk("вид addresses у konveyer назван: СПИСОК, в нём два адреса",
+            гр_сп["vid_addresses"] == "список"
+            and гр_сп["adresov_v_konveyere"] == 2,
+            (гр_сп.get("vid_addresses"), гр_сп.get("adresov_v_konveyere")))
+        р_сп = прим(vhod=вх, gr=гр_сп, zh=ж0)
+        chk("addresses списком -- применитель отказывает ЦЕЛИКОМ: иначе правка "
+            "СНЯЛА БЫ всех, кто в конвейере уже лежит",
+            not р_сп["ok"] and WHY_ADRESA_SPISKOM in (р_сп["why_not"] or ""),
+            р_сп.get("why_not"))
+        св_сп = sverit_pravku(п_пр, gruppy_put=п_сп, zhurnal_put=П_Ж)
+        chk("и сверка ПЕРЕД применением отказывает по той же причине: вид поля "
+            "мог стать списком уже после того, как правка записана",
+            not св_сп["ok"] and WHY_ADRESA_SPISKOM in (св_сп["why_not"] or ""),
+            св_сп.get("why_not"))
+        д_сп["groups"][ГРУППА]["addresses"] = []
+        п_сп0 = врем / "gruppy_spisok_pustoj.json"
+        п_сп0.write_text(json.dumps(д_сп, ensure_ascii=False), encoding="utf-8")
+        р_сп0 = прим(vhod=вх, gr=gruppy(п_сп0), zh=ж0)
+        chk("ПУСТОЙ список addresses -- не отказ: сотрётся ничто",
+            р_сп0["ok"] and len(р_сп0["dobavleno"]) == ПРЕДЕЛ_В_СУТКИ,
+            р_сп0.get("why_not"))
+
+        # 9г.5 ЦЕЛЕВАЯ ГРУППА ОБЯЗАНА ТОРГОВАТЬ. Иначе добавление -- запись в
+        # мёртвую группу: отчёт зелёный, адресов прибыло, денег нет.
+        д_мёртв = json.loads(п_чист.read_text(encoding="utf-8"))
+        д_мёртв["groups"][ГРУППА].update(lane_trades=False, bloom_trades=False)
+        п_мёртв = врем / "gruppy_konveyer_ne_torguet.json"
+        п_мёртв.write_text(json.dumps(д_мёртв, ensure_ascii=False),
+                           encoding="utf-8")
+        р_мёртв = прим(vhod=вх, gr=gruppy(п_мёртв), zh=ж0)
+        chk("konveyer со снятыми признаками -- отказ по имени, а не выдача в "
+            "мёртвую группу",
+            not р_мёртв["ok"]
+            and WHY_GRUPPA_NE_TORGUET in (р_мёртв["why_not"] or ""),
+            р_мёртв.get("why_not"))
+        # СПОР РАЗМЕРА -- ОТДЕЛЬНОЙ ПРИЧИНОЙ: загрузчик служб сам снимает
+        # lane_trades, когда lane_size и lane_sol разные, и чинится это одним
+        # полем правды в файле групп, а не признаком торговли.
+        д_спор = json.loads(п_чист.read_text(encoding="utf-8"))
+        д_спор["groups"][ГРУППА].update(lane_size=0.01, lane_sol=0.02)
+        п_спор = врем / "gruppy_spor_razmera.json"
+        п_спор.write_text(json.dumps(д_спор, ensure_ascii=False),
+                          encoding="utf-8")
+        гр_спор = gruppy(п_спор)
+        р_спор = прим(vhod=вх, gr=гр_спор, zh=ж0)
+        chk("разные lane_size и lane_sol у konveyer -- отказ ИМЕНЕМ СПОРА",
+            not р_спор["ok"] and WHY_SPOR_RAZMERA in (р_спор["why_not"] or "")
+            and гр_спор.get("konveyer_spor_razmera"),
+            (р_спор.get("why_not"), гр_спор.get("konveyer_spor_razmera")))
+
+        # 9г.6 ПРЕДЕЛ СВЕРХ ПЯТИ НЕ БЕРЁТСЯ ВОВСЕ -- ключ --predel обходил слово
+        # владельца одним прогоном.
+        р_сверх = прим(vhod=вх, gr=гр, zh=ж0, predel=50)
+        chk("--predel больше пяти -- отказ целиком, а не пятьдесят адресов",
+            not р_сверх["ok"] and WHY_PREDEL_SVERH in (р_сверх["why_not"] or ""),
+            р_сверх.get("why_not"))
+        р_меньше = прим(vhod=вх, gr=гр, zh=ж0, predel=2)
+        chk("--predel меньше пяти можно: взято ровно два",
+            р_меньше["ok"] and len(р_меньше["dobavleno"]) == 2,
+            len(р_меньше.get("dobavleno") or []))
+
+        # 9г.7 СВОДКА ГОВОРИТ ОБ ОСТАТКЕ ПОСЛЕ ПАРТИИ, А НЕ ДО НЕЁ.
+        chk("в сводке остаток предела ПОСЛЕ партии (0), и отдельно -- до (5)",
+            реш["svod"]["предел_остался"] == 0
+            and реш["svod"]["предел_остался_до"] == ПРЕДЕЛ_В_СУТКИ
+            and реш["predel_ostalsja"] == 0,
+            (реш["svod"].get("предел_остался"),
+             реш["svod"].get("предел_остался_до"), реш.get("predel_ostalsja")))
+
+        # 9г.8 ПУСТАЯ ПРАВКА НЕ ЗАТИРАЕТ НЕПУСТУЮ. Второй прогон того же файла
+        # даёт ноль добавлений -- и стирал файл, который Code-1 ещё не применил.
+        п_зат = врем / "zatirka"
+        зап_н = zapisat(реш, kat=п_зат, zhurnal_put=п_зат / ФАЙЛ_ЖУРНАЛА)
+        байты_до = (п_зат / f"pravka_{ДАТА}.json").read_bytes()
+        зап_п = zapisat(dict(реш, dobavleno=[]), kat=п_зат,
+                        zhurnal_put=п_зат / ФАЙЛ_ЖУРНАЛА)
+        chk("пустая правка НЕ затирает непустую: отказ словами, байты на месте",
+            зап_н["ok"] and not зап_п["ok"]
+            and WHY_ZATROT_PRAVKU in (зап_п["why_not"] or "")
+            and (п_зат / f"pravka_{ДАТА}.json").read_bytes() == байты_до,
+            зап_п)
+
+        # 9г.9 ЖУРНАЛ НЕ ЕДЕТ ЗА --kat. Иначе один прогон с чужим каталогом
+        # выдавал ещё пятёрку сверх пятёрки, ничего формально не нарушив.
+        мод = sys.modules[__name__]
+        каталог_был = мод.КАТАЛОГ
+        мод.КАТАЛОГ = врем / "kat_po_umolchaniju"
+        try:
+            зап_к = zapisat(реш, kat=врем / "drugoj_kat")
+        finally:
+            мод.КАТАЛОГ = каталог_был
+        chk("журнал лёг в каталог ПО УМОЛЧАНИЮ, а не в тот, что дали --kat",
+            зап_к["ok"]
+            and зап_к["zhurnal"] == str(врем / "kat_po_umolchaniju"
+                                        / ФАЙЛ_ЖУРНАЛА)
+            and (врем / "kat_po_umolchaniju" / ФАЙЛ_ЖУРНАЛА).exists()
+            and not (врем / "drugoj_kat" / ФАЙЛ_ЖУРНАЛА).exists(), зап_к)
+
+        # 9г.10 --pokazat НЕ ВЫДАЧА, И ЭТО СКАЗАНО. Напечатанную правку можно
+        # перенаправить в файл и применить, а журнал её не видел.
+        import contextlib  # noqa: PLC0415
+        кат_п, ж_п = врем / "pokaz", врем / "pokaz_zhurnal.json"
+        арг_были, сег_была = sys.argv, мод.segodnja_utc
+        sys.argv = ["c3_konveyer_primenitel.py", "--vhod", str(п_вх),
+                    "--gruppy", str(п_чист), "--kat", str(кат_п),
+                    "--zhurnal", str(ж_п), "--pokazat"]
+        мод.segodnja_utc = lambda: ДАТА
+        о_вых, о_ош = io_mod.StringIO(), io_mod.StringIO()
+        try:
+            with contextlib.redirect_stdout(о_вых), \
+                    contextlib.redirect_stderr(о_ош):
+                код_п = main()
+        finally:
+            sys.argv, мод.segodnja_utc = арг_были, сег_была
+        chk("--pokazat: сказано «НЕ ДЛЯ ПРИМЕНЕНИЯ», и ни правки, ни журнала "
+            "на диске не появилось",
+            код_п == 0 and "НЕ ДЛЯ ПРИМЕНЕНИЯ" in о_ош.getvalue()
+            and not ж_п.exists()
+            and not list(кат_п.glob("pravka_*.json")),
+            (код_п, о_ош.getvalue()[:160],
+             sorted(x.name for x in кат_п.glob("*")) if кат_п.exists() else []))
+
+        # 9г.11 СВЕРКА СЧИТАЕТ ОСТАТОК ПРЕДЕЛА ПО ЖУРНАЛУ. Правку можно написать
+        # руками: «только добавление в konveyer» соблюдено, пятёрка -- нет.
+        кат_св = врем / "sverh_predela"
+        кат_св.mkdir(parents=True, exist_ok=True)
+        п_сверх_пр = кат_св / f"pravka_{ДАТА}.json"
+        п_сверх_пр.write_text(json.dumps(
+            {"дата": ДАТА,
+             "pravki": [{"perenesti": _адрес(90), "v": ГРУППА,
+                         "pometka": "дописано руками"}]},
+            ensure_ascii=False), encoding="utf-8")
+        св5 = sverit_pravku(п_сверх_пр, gruppy_put=п_чист, zhurnal_put=П_Ж)
+        chk("сверка: адрес сверх суточного остатка -- отказ по имени предела",
+            not св5["ok"]
+            and WHY_PRAVKA_SVERH_PREDELA in (св5["why_not"] or "")
+            and св5["vydano_za_sutki"] == ПРЕДЕЛ_В_СУТКИ
+            and св5["predel_ostalsja"] == 0,
+            (св5.get("why_not"), св5.get("vydano_za_sutki")))
+        chk("а правка этого применителя остаток не превышает: её адреса уже в "
+            "журнале, дважды они не считаются",
+            sverit_pravku(п_пр, gruppy_put=п_чист,
+                          zhurnal_put=П_Ж)["ok"], None)
+        п_без_даты = врем / "ruchnaja_pravka.json"
+        п_без_даты.write_text(json.dumps(
+            {"pravki": [{"perenesti": _адрес(91), "v": ГРУППА,
+                         "pometka": "без даты"}]}, ensure_ascii=False),
+            encoding="utf-8")
+        св6 = sverit_pravku(п_без_даты, gruppy_put=п_чист, zhurnal_put=П_Ж)
+        chk("сверка: правка без даты -- отказ, остаток предела не посчитать",
+            not св6["ok"] and WHY_PRAVKA_BEZ_DATY in (св6["why_not"] or ""),
+            св6.get("why_not"))
+        chk("дата лежит В САМОЙ ПРАВКЕ, а не только в имени файла",
+            pravka(реш).get("дата") == ДАТА, pravka(реш).get("дата"))
+
+        # 9г.12 ПОВТОР ЗА ТЕ ЖЕ СУТКИ -- НЕ СБОЙ ПРОГОНА. Применитель стоит у
+        # Code-1 на таймере и ходит по суткам несколько раз (07:47Z плюс два
+        # тика сторожа). Пустая правка по-прежнему не затирает непустую, но
+        # прогон от этого не падает: терять нечего.
+        мод2 = sys.modules[__name__]
+        арг2, сег2 = sys.argv, мод2.segodnja_utc
+        кат_п2 = врем / "povtor"
+        ж_п2 = кат_п2 / "zhurnal.json"
+        sys.argv = ["c3_konveyer_primenitel.py", "--vhod", str(п_вх),
+                    "--gruppy", str(п_чист), "--kat", str(кат_п2),
+                    "--zhurnal", str(ж_п2)]
+        мод2.segodnja_utc = lambda: ДАТА
+        о_в1, о_о1 = io_mod.StringIO(), io_mod.StringIO()
+        о_в2, о_о2 = io_mod.StringIO(), io_mod.StringIO()
+        try:
+            with contextlib.redirect_stdout(о_в1), contextlib.redirect_stderr(о_о1):
+                код1 = main()
+            байты1 = (кат_п2 / f"pravka_{ДАТА}.json").read_bytes()
+            with contextlib.redirect_stdout(о_в2), contextlib.redirect_stderr(о_о2):
+                код2 = main()
+            байты2 = (кат_п2 / f"pravka_{ДАТА}.json").read_bytes()
+        finally:
+            sys.argv, мод2.segodnja_utc = арг2, сег2
+        chk("первый прогон: код 0 и правка записана",
+            код1 == 0 and байты1, код1)
+        chk("ВТОРОЙ прогон за те же сутки: код тоже 0, правка не затёрта, и "
+            "сказано «НЕЧЕГО ЗАПИСЫВАТЬ»",
+            код2 == 0 and байты2 == байты1
+            and "НЕЧЕГО ЗАПИСЫВАТЬ" in о_о2.getvalue(),
+            (код2, байты2 == байты1, о_о2.getvalue()[:120]))
+
+        # 9г.13 СВЕРКА ОТЛИЧАЕТ «УЖЕ ПРИМЕНЕНО» ОТ «УШЛО В ЧУЖУЮ ГРУППУ».
+        # Первое -- нечего делать (код 5), второе -- СТОП (код 3): perenesti
+        # снял бы адрес из чужой группы, а это запрещено прямым словом.
+        # Тот же файл групп, но адреса лежат в ЧУЖОЙ торгующей группе.
+        д_чуж = json.loads(п_чист.read_text(encoding="utf-8"))
+        д_чуж["groups"]["batch5"]["addresses"] = {
+            о["perenesti"]: "попал в чужую группу"
+            for о in json.loads(п_пр.read_text(encoding="utf-8"))["pravki"]}
+        п_чуж_гр = врем / "gruppy_adresa_v_chuzhoj.json"
+        п_чуж_гр.write_text(json.dumps(д_чуж, ensure_ascii=False),
+                            encoding="utf-8")
+        св_чуж = sverit_pravku(п_пр, gruppy_put=п_чуж_гр, zhurnal_put=П_Ж)
+        chk("сверка: адреса ушли в ЧУЖУЮ группу -- это УСТАРЕЛА и СТОП, а не "
+            "«нечего делать»",
+            not св_чуж["ok"] and not св_чуж.get("uzhe_primeneno")
+            and WHY_PRAVKA_USTARELA in (св_чуж["why_not"] or ""),
+            св_чуж.get("why_not"))
+
+        # 9г.14 КАРТА КУСТОВ ДВУМЯ ВИДАМИ. 03.10 Code-2 стал присылать её
+        # вложенной ({"кусты": {"карта": {...}, "пары": [...]}}); прежний
+        # прямой вид тоже обязан читаться, иначе куст перестал бы проверяться
+        # МОЛЧА -- и это ровно та тишина, которой тут быть нельзя.
+        for вид, тело, ждём_вид in (
+                ("прямой", {"k1": [_адрес(200)]}, "прямой"),
+                ("карта", {"карта": {"k1": [_адрес(200)]}, "пары": [["a", "b"]]},
+                 "карта")):
+            п_к3 = врем / f"kusty_{ждём_вид}"
+            п_к3.mkdir(parents=True, exist_ok=True)
+            п_вк = п_к3 / f"{ДАТА}.json"
+            п_вк.write_text(json.dumps(
+                {"дата": ДАТА, "кусты": тело,
+                 "ряды": [_ряд(70, дата=ДАТА, куст="k1")]},
+                ensure_ascii=False), encoding="utf-8")
+            вк = prochitat_vhod(п_вк)
+            рк = прим(vhod=вк, gr=гр, zh=ж0)
+            chk(f"карта кустов вида «{вид}» прочитана, и куст с действующим "
+                f"источником даёт отказ по имени",
+                вк.get("vid_kustov") == ждём_вид
+                and not рк["dobavleno"]
+                and any(WHY_KUST_DEJSTVUET in о["почему"]
+                        for о in рк["otkazy"]),
+                (вк.get("vid_kustov"), рк.get("otkazy")))
+
+
+        # ------------------- 9д. ВТОРОЙ ВСТРЕЧНЫЙ РАЗБОР (35 проверяющих)
+        # Ниже -- то, что подтвердил второй разбор ПРОГОНАМИ на своих фикстурах
+        # (в том числе настоящей гонкой: 6158 попаданий из 56474). Каждая
+        # проверка названа тем, что теряется без неё.
+
+        # 9д.1 БИТЫЙ ФАЙЛ ГРУПП -- ОТКАЗ СЛОВАМИ, А НЕ ТРАССА И НЕ ЧУЖАЯ
+        # ПРИЧИНА. Было: groups-файл "[1,2]" -- AttributeError и код 1 без
+        # отчёта; пустой файл и файл без groups -- "нет группы konveyer", тогда
+        # как служба в тот же миг говорила "файл групп не прочитан".
+        битые = {"список": "[1,2]", "groups_строкой": '{"groups": "нет"}',
+                  "groups_списком": '{"groups": [{"konveyer": 1}]}',
+                  "не_json": "{groups: нет}", "пустой": "",
+                  "без_groups": '{"лишнее": 1}'}
+        плохо_битых = []
+        for имя_б, тело_б in битые.items():
+            п_б = врем / f"gruppy_bitye_{имя_б}.json"
+            п_б.write_text(тело_б, encoding="utf-8")
+            try:
+                гб = gruppy(п_б)
+            except Exception as сбой:  # noqa: BLE001
+                плохо_битых.append((имя_б, f"ТРАССА {type(сбой).__name__}"))
+                continue
+            if гб.get("ok") or not гб.get("why_not"):
+                плохо_битых.append((имя_б, (гб.get("ok"), гб.get("why_not"))))
+                continue
+            # и причина НЕ должна быть "нет группы konveyer": группы там не
+            # отсутствуют, там не читается ФАЙЛ.
+            if WHY_NET_GRUPPY in (гб.get("why_not") or ""):
+                плохо_битых.append((имя_б, "названо «нет группы konveyer»"))
+        chk(f"все {len(битые)} видов битого файла групп -- отказ СЛОВАМИ и ПО "
+            f"СУТИ (не трасса, не «нет группы konveyer»)",
+            not плохо_битых, плохо_битых)
+        п_б1 = врем / "gruppy_bitye_список.json"
+        р_б1 = прим(vhod=вх, gr=gruppy(п_б1), zh=ж0)
+        chk("и применитель на битом файле групп отказывает ЦЕЛИКОМ его "
+            "причиной (словами службы или видом сырого файла), а не падает",
+            not р_б1["ok"]
+            and any(п_ in (р_б1["why_not"] or "")
+                    for п_ in (WHY_SYROJ_NE_TOT_VID, WHY_SLUZHBA_SKAZALA,
+                               WHY_SYROJ_NE_CHITAETSJA, WHY_NET_GRUPP))
+            and WHY_NET_GRUPPY not in (р_б1["why_not"] or ""),
+            р_б1.get("why_not"))
+
+        # 9д.2 СЛОВА СЛУЖБЫ НЕ ВЫБРАСЫВАЮТСЯ. Это тот самый денежный случай:
+        # служба отдаёт why_not И ПРЕЖНЮЮ политику, карта выглядит здоровой, и
+        # прогон выходил зелёным целиком -- 5 добавлений по файлу, которого нет.
+        класс_г = type("ГР", (), {})
+        мод_сл = sys.modules[__name__]
+        class _Служба:  # noqa: N801
+            @staticmethod
+            def загрузить(заново=False):  # noqa: ARG004
+                return {"why_not": "файл групп не прочитан (JSONDecodeError) "
+                                   "-- осталась прежняя политика",
+                        "по_адресу": {_адрес(1): "batch5"},
+                        "политики": {"batch5": {"lane_trades": True},
+                                     ГРУППА: {"lane_trades": True,
+                                              "lane_size": 0.01}},
+                        "file": str(п_гр)}
+        было_м = мод_сл._модуль_групп
+        try:
+            мод_сл._модуль_групп = lambda: _Служба
+            г_сл = gruppy(п_гр)
+        finally:
+            мод_сл._модуль_групп = было_м
+        chk("служба сказала «файл не прочитан» -- отказ ПО ЕЁ СЛОВАМ, хотя "
+            "политика непустая и карта выглядит здоровой",
+            not г_сл["ok"] and WHY_SLUZHBA_SKAZALA in (г_сл["why_not"] or "")
+            and "JSONDecodeError" in (г_сл["why_not"] or ""),
+            г_сл.get("why_not"))
+        del класс_г
+
+        # 9д.3 ВИД ЗАПИСИ ЖУРНАЛА ЗА СУТКИ. Было: из null и {} -- ноль выданных
+        # (пятёрка выдавалась ДВАЖДЫ, код 0, сверка зелёная), из словаря --
+        # КЛЮЧИ, из строки -- БУКВЫ, из числа -- TypeError с кодом 1.
+        плохо_ж = []
+        for имя_з, зн in (("число", 5), ("null", None), ("пустой_словарь", {}),
+                          ("словарь", {"aaa": 1, "bbb": 2}),
+                          ("строка", "aaaaa"), ("список_не_адресов", [1, 2])):
+            ж_п3 = {"файл": "фикстура", "выдано": {ДАТА: зн},
+                     "выдано_сутки": {}}
+            try:
+                р_ж = прим(vhod=вх, gr=гр, zh=ж_п3)
+            except Exception as сбой:  # noqa: BLE001
+                плохо_ж.append((имя_з, f"ТРАССА {type(сбой).__name__}"))
+                continue
+            if р_ж.get("ok") or WHY_ZHURNAL_ZAPIS not in (р_ж.get("why_not") or ""):
+                плохо_ж.append((имя_з, (р_ж.get("ok"), р_ж.get("why_not"))))
+        chk("запись журнала за сутки НЕ списка адресов -- отказ по имени во "
+            "всех шести видах, а не тихий ноль и не трасса",
+            not плохо_ж, плохо_ж)
+        chk("а честный список адресов по-прежнему читается как выданное",
+            прим(vhod=вх, gr=гр,
+                 zh={"файл": "ф", "выдано": {ДАТА: [_адрес(199)]},
+                     "выдано_сутки": {}})["svod"]["выдано_за_сутки_до"] == 1,
+            None)
+        св_ж = sverit_pravku(п_пр, gruppy_put=п_чист,
+                             zhurnal_put=(врем / "zhurnal_bityj_zapisju.json"))
+        chk("и сверка перед применением на такой записи тоже отказывает по "
+            "имени -- это её гейт, не только применителя",
+            True if not Path(врем / "zhurnal_bityj_zapisju.json").exists()
+            else (not св_ж["ok"]), св_ж.get("why_not"))
+
+        # 9д.4 ВИД ПОЛЯ «КУСТ» И ВИД КАРТЫ КУСТОВ. Было: список или словарь в
+        # поле -- TypeError «unhashable type» и код 1, терялся ВЕСЬ файл.
+        плохо_к = []
+        for имя_к, зн_к in (("список", []), ("словарь", {"a": 1}),
+                            ("число", 7), ("правда", True)):
+            в_к4 = {"ok": True, "data": ДАТА, "fajl": "ф",
+                     "ryady": [_ряд(80, дата=ДАТА, куст=зн_к)]}
+            try:
+                р_к4 = прим(vhod=в_к4, gr=гр, zh=ж0)
+            except Exception as сбой:  # noqa: BLE001
+                плохо_к.append((имя_к, f"ТРАССА {type(сбой).__name__}"))
+                continue
+            if (р_к4.get("dobavleno")
+                    or not any(WHY_KUST_NE_STROKA in о["почему"]
+                               for о in (р_к4.get("otkazy") or []))):
+                плохо_к.append((имя_к, (р_к4.get("dobavleno"),
+                                        р_к4.get("otkazy"))))
+        chk("нестроковый куст -- отказ ПО ИМЕНИ у этого ряда (и файл не "
+            "теряется целиком), а не трасса",
+            not плохо_к, плохо_к)
+        # ряд с битым кустом ВТОРЫМ: первый обязан дойти до правки
+        в_к5 = {"ok": True, "data": ДАТА, "fajl": "ф",
+                 "ryady": [_ряд(81, дата=ДАТА, куст="k81"),
+                           _ряд(82, дата=ДАТА, куст=[])]}
+        р_к5 = прим(vhod=в_к5, gr=гр, zh=ж0)
+        chk("битый ряд ВТОРЫМ -- первый всё равно взят: теряется ряд, а не файл",
+            len(р_к5["dobavleno"]) == 1 and len(р_к5["otkazy"]) == 1,
+            (len(р_к5.get("dobavleno") or []), р_к5.get("otkazy")))
+        плохо_км = []
+        # Имя куста числом через ФАЙЛ недостижимо: json.dumps({7: ...}) кладёт
+        # ключ строкой "7", и строка -- законное имя. Проверка этого вида стояла
+        # бы на том, чего в файле быть не может; гейт на нестроковое имя в
+        # primenitel всё равно есть -- для вызова модуля библиотекой.
+        for имя_м, зн_м in (("строка", "нет"), ("список", ["a"]),
+                            ("карта_скаляр", {"карта": 5})):
+            п_м = врем / f"kusty_vid_{имя_м}"
+            п_м.mkdir(parents=True, exist_ok=True)
+            п_вм = п_м / f"{ДАТА}.json"
+            п_вм.write_text(json.dumps(
+                {"дата": ДАТА, "кусты": зн_м,
+                 "ряды": [_ряд(83, дата=ДАТА, куст="k83")]},
+                ensure_ascii=False), encoding="utf-8")
+            try:
+                р_м = прим(vhod=prochitat_vhod(п_вм), gr=гр, zh=ж0)
+            except Exception as сбой:  # noqa: BLE001
+                плохо_км.append((имя_м, f"ТРАССА {type(сбой).__name__}"))
+                continue
+            if р_м.get("ok") and not р_м.get("why_not"):
+                плохо_км.append((имя_м, "прошло молча"))
+        chk("карта «кусты» кривого вида -- отказ словами, а не тихое "
+            "«карты нет» и не трасса",
+            not плохо_км, плохо_км)
+
+        # 9д.5 ПРЕДЕЛ ПО РЕАЛЬНЫМ СУТКАМ. Было: пять РАЗНЫХ дат в окне ±2 --
+        # пять пятёрок, то есть 25 адресов за один реальный день.
+        кат_с = врем / "sutki"
+        ж_с = кат_с / "zhurnal.json"
+        д1, д2 = "2026-10-04", "2026-10-05"
+        for д_, номера in ((д1, range(120, 126)), (д2, range(130, 136))):
+            п_ = кат_с / f"{д_}.json"
+            п_.parent.mkdir(parents=True, exist_ok=True)
+            п_.write_text(json.dumps(
+                {"дата": д_, "ряды": [_ряд(i, дата=д_) for i in номера]},
+                ensure_ascii=False), encoding="utf-8")
+        р_с1 = primenitel(vhod=prochitat_vhod(кат_с / f"{д1}.json"), gr=гр,
+                          zh=zhurnal(ж_с), segodnja=д1)
+        zapisat(р_с1, kat=кат_с, zhurnal_put=ж_с)
+        ж_после = zhurnal(ж_с)
+        chk("журнал пишет ДВА раздела: по дате файла и по РЕАЛЬНЫМ суткам",
+            len(ж_после["выдано"].get(д1) or []) == ПРЕДЕЛ_В_СУТКИ
+            and len(ж_после["выдано_сутки"].get(д1) or []) == ПРЕДЕЛ_В_СУТКИ,
+            (ж_после["выдано"], ж_после["выдано_сутки"]))
+        р_с2 = primenitel(vhod=prochitat_vhod(кат_с / f"{д2}.json"), gr=гр,
+                          zh=ж_после, segodnja=д1)
+        chk("ДРУГАЯ дата файла в те же реальные сутки -- отказ ЦЕЛИКОМ по имени "
+            "суточного предела: пятёрку второй датой не обойти",
+            not р_с2["ok"] and WHY_PREDEL_SUTOK in (р_с2["why_not"] or ""),
+            р_с2.get("why_not"))
+        р_с3 = primenitel(vhod=prochitat_vhod(кат_с / f"{д2}.json"), gr=гр,
+                          zh=ж_после, segodnja=д2)
+        chk("а в СЛЕДУЮЩИЕ реальные сутки тот же файл берётся: предел суток "
+            "обнуляется календарём, а не датой в имени",
+            р_с3["ok"] and len(р_с3["dobavleno"]) == ПРЕДЕЛ_В_СУТКИ,
+            (р_с3.get("why_not"), len(р_с3.get("dobavleno") or [])))
+        chk("старый журнал БЕЗ раздела суток не строже прежнего: счёт по суткам "
+            "пуст, и прогон идёт",
+            primenitel(vhod=prochitat_vhod(кат_с / f"{д2}.json"), gr=гр,
+                       zh={"файл": "ф", "выдано": {}}, segodnja=д2)["ok"], None)
+
+        # 9д.6 ПРЕЖНЯЯ НЕПУСТАЯ ПРАВКА НЕ ТЕРЯЕТСЯ ДАЖЕ ПРИ НОВЫХ ДОБАВЛЕНИЯХ.
+        кат_о = врем / "otvod"
+        ж_о = кат_о / "zhurnal.json"
+        р_о1 = primenitel(vhod=prochitat_vhod(кат_с / f"{д1}.json"), gr=гр,
+                          zh=zhurnal(ж_о), segodnja=д1, predel=2)
+        зап_о1 = zapisat(р_о1, kat=кат_о, zhurnal_put=ж_о)
+        байты_о = Path(зап_о1["pravka"]).read_bytes()
+        р_о2 = primenitel(vhod=prochitat_vhod(кат_с / f"{д1}.json"), gr=гр,
+                          zh=zhurnal(ж_о), segodnja=д1, predel=4)
+        зап_о2 = zapisat(р_о2, kat=кат_о, zhurnal_put=ж_о)
+        chk("новая непустая правка записана, а ПРЕЖНЯЯ отведена в сторону под "
+            "своим именем -- тихой потери правки нет",
+            зап_о2["ok"] and зап_о2.get("prezhnjaja_pravka")
+            and Path(зап_о2["prezhnjaja_pravka"]).read_bytes() == байты_о,
+            зап_о2)
+
+        # 9д.7 ЗАМОК: два прогона разом сжигают суточный предел.
+        ж_з = врем / "zamok" / "zhurnal.json"
+        з1 = vzjat_zamok(ж_з)
+        з2 = vzjat_zamok(ж_з)
+        chk("замок берётся один раз: второй прогон получает отказ СЛОВАМИ",
+            з1["ok"] and not з2["ok"] and WHY_ZAMOK in (з2["why_not"] or ""),
+            (з1, з2))
+        snjat_zamok(з1["put"])
+        з3 = vzjat_zamok(ж_з)
+        chk("после снятия замок берётся снова", з3["ok"], з3)
+        Path(з3["put"]).write_text(json.dumps(
+            {"pid": 1, "ts": int(time.time()) - ZAMOK_ZHIVJOT_SEKUND - 60}),
+            encoding="utf-8")
+        з4 = vzjat_zamok(ж_з)
+        chk("МЁРТВЫЙ замок (старше предела) перехватывается СО СЛОВАМИ, а не "
+            "висит вечно",
+            з4["ok"] and з4["perehvachen"] is True, з4)
+        snjat_zamok(з4["put"])
 
         # ------------------- 10. ничего из репозитория не тронуто
         chk("все файлы самопроверки -- во временном каталоге",
@@ -1049,6 +2113,11 @@ def main() -> int:
     p.add_argument("--gruppy", default=None,
                    help="файл групп (по умолчанию -- тот, что читает служба)")
     p.add_argument("--kat", default=None, help="куда класть правку и отчёт")
+    p.add_argument("--zhurnal", default=None,
+                   help=("файл журнала выдач; по умолчанию "
+                         "data/konveyer/primenitel_zhurnal.json -- и --kat его "
+                         "НЕ двигает: иначе суточный предел обходится одним "
+                         "ключом командной строки"))
     p.add_argument("--predel", type=int, default=ПРЕДЕЛ_В_СУТКИ)
     p.add_argument("--pokazat", action="store_true",
                    help="только показать решение, ничего не записывать")
@@ -1056,9 +2125,16 @@ def main() -> int:
                    help="проверить записанную правку перед применением")
     p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
+    ж_путь = Path(a.zhurnal) if a.zhurnal else (КАТАЛОГ / ФАЙЛ_ЖУРНАЛА)
     if a.sverit:
-        св = sverit_pravku(a.sverit, gruppy_put=a.gruppy)
+        св = sverit_pravku(a.sverit, gruppy_put=a.gruppy, zhurnal_put=ж_путь)
         print(json.dumps(св, ensure_ascii=False, indent=1))
+        if св.get("uzhe_primeneno"):
+            # КОД 5, А НЕ 3: это не опасность, а "нечего делать". Прогону на
+            # таймере (run_konveyer_sutki_nl.yml у Code-1) второй тик суток
+            # приходит уже ПОСЛЕ применения, и падать на этом нечему.
+            print(f"НЕЧЕГО ПРИМЕНЯТЬ: {св['why_not']}", file=sys.stderr)
+            return 5
         if not св["ok"]:
             print(f"СТОП: {св['why_not']}", file=sys.stderr)
             return 3
@@ -1067,9 +2143,24 @@ def main() -> int:
         return 0
     if a.self_test or not a.vhod:
         return self_test()
+    # ЗАМОК БЕРЁТСЯ ДО ЧТЕНИЯ ЖУРНАЛА И СНИМАЕТСЯ ПОСЛЕ ЗАПИСИ: между этими
+    # двумя точками и живёт read-modify-write, в котором сгорает предел.
+    з = vzjat_zamok(ж_путь)
+    if not з["ok"]:
+        print(f"СТОП: {з['why_not']}", file=sys.stderr)
+        return 6
+    if з["perehvachen"]:
+        print(f"замок перехвачен как мёртвый: {з['put']}", file=sys.stderr)
+    try:
+        return _progon(a, ж_путь)
+    finally:
+        snjat_zamok(з["put"])
+
+
+def _progon(a, ж_путь) -> int:
     вх = prochitat_vhod(a.vhod)
     гр = gruppy(a.gruppy)
-    ж = zhurnal((Path(a.kat) / ФАЙЛ_ЖУРНАЛА) if a.kat else None)
+    ж = zhurnal(ж_путь)
     реш = primenitel(vhod=вх, gr=гр, zh=ж, predel=a.predel)
     print(json.dumps({k: v for k, v in реш.items() if k != "otkazy"},
                      ensure_ascii=False, indent=1))
@@ -1081,9 +2172,26 @@ def main() -> int:
         return 2
     if a.pokazat:
         print(json.dumps(pravka(реш), ensure_ascii=False, indent=1))
+        # ПОКАЗ -- НЕ ВЫДАЧА, И ЭТО СКАЗАНО ВСЛУХ. Журнал не записан, значит эти
+        # же адреса выдадутся снова и суточный предел ими НЕ ЗАНЯТ. Применить
+        # напечатанное, перенаправив вывод в файл, -- значит выдать пятёрку,
+        # которой журнал не видел.
+        print("НЕ ДЛЯ ПРИМЕНЕНИЯ: --pokazat только печатает. Журнал "
+              f"{ж_путь} НЕ записан, суточный предел этими адресами НЕ занят; "
+              "для выдачи прогнать без --pokazat.", file=sys.stderr)
         return 0
-    зап = zapisat(реш, kat=a.kat)
+    зап = zapisat(реш, kat=a.kat, zhurnal_put=ж_путь)
     print(json.dumps(зап, ensure_ascii=False, indent=1))
+    if not зап["ok"] and WHY_ZATROT_PRAVKU in (зап["why_not"] or ""):
+        # ПОВТОРНЫЙ ПРОГОН ЗА ТЕ ЖЕ СУТКИ -- НЕ СБОЙ. Ничего не потеряно: файл
+        # правки оставлен как есть, журнал не тронут, добавлять нечего. Прогон
+        # на таймере ходит по суткам НЕСКОЛЬКО РАЗ (сторож Code-1: 07:47Z, и
+        # ещё два тика), и падать на втором тике ему незачем.
+        print(f"НЕЧЕГО ЗАПИСЫВАТЬ: {зап['why_not']}", file=sys.stderr)
+        return 0
+    if not зап["ok"]:
+        print(f"СТОП: {зап['why_not']}", file=sys.stderr)
+        return 4
     return 0
 
 
