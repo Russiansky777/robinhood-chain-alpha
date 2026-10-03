@@ -744,16 +744,41 @@ def self_test() -> int:  # noqa: C901
     chk("четыре адреса кривой по IDL -- ровно четыре и все разные",
         len(КРИВАЯ_V2_ПО_IDL) == 4
         and len({а for а, _, _ in КРИВАЯ_V2_ПО_IDL}) == 4)
-    _наб = набор_кривой_c3()
-    chk("набор Code-3 читается из его файла, а не переписан строками: 18 адресов, "
-       "среди них оба постоянных получателя и получатель mayhem",
-       len(_наб) == 18
-       and "7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX" in _наб
-       and "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD" in _наб
-       and "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS" in _наб,
-       len(_наб))
+    # НАБОР CODE-3 ПРОВЕРЯЕТСЯ НА ФИКСТУРЕ, А НЕ НА ЖИВОМ ФАЙЛЕ. Модуль
+    # уезжает на хост ОДНИМ файлом, без каталога data: проверка по живому
+    # файлу падала бы там, где файла нет по устройству, а не по ошибке
+    # (ровно так прогон таблицы и упал в первый раз).
+    import tempfile as _tf  # noqa: PLC0415
+    _кат = _tf.mkdtemp()
+    _ф = Path(_кат) / "nabor.json"
+    _ф.write_text(json.dumps({"набор": [
+        {"адрес": "7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX",
+         "что": "получатель комиссии (обычный)"},
+        {"адрес": "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS",
+         "что": "получатель для mayhem (reserved)"},
+        {"адрес": "коротко", "что": "мусор -- длина не та"},
+        {"что": "без адреса"}]}, ensure_ascii=False), encoding="utf-8")
+    _наб_ф = набор_кривой_c3(str(_ф))
+    chk("набор Code-3 читается из файла: годные адреса взяты, мусор отброшен",
+        set(_наб_ф) == {"7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX",
+                         "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS"}
+        and all("набор Code-3" in v for v in _наб_ф.values()),
+        sorted(_наб_ф))
     chk("файла набора нет -- пустой набор, а не выдумка",
-       набор_кривой_c3("/нет/такого/файла.json") == {})
+        набор_кривой_c3("/нет/такого/файла.json") == {})
+    # Живой файл проверяется ТОЛЬКО если он на месте (в ветке он есть, на
+    # хосте модуль лежит один).
+    _наб = набор_кривой_c3()
+    if _наб:
+        chk("живой набор Code-3: 18 адресов, оба постоянных получателя и mayhem",
+            len(_наб) == 18
+            and "7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX" in _наб
+            and "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD" in _наб
+            and "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS" in _наб,
+            len(_наб))
+    else:
+        print("  [--  ] живого набора Code-3 рядом нет (модуль без каталога data)"
+               " -- проверка пропущена, и это сказано")
     chk("четыре постоянных без имени -- ровно четыре и все разные",
         len(КРИВАЯ_V2_ПОСТОЯННЫЕ_БЕЗ_ИМЕНИ) == 4
         and len({а for а, _ in КРИВАЯ_V2_ПОСТОЯННЫЕ_БЕЗ_ИМЕНИ}) == 4)
