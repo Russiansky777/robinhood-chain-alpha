@@ -1011,22 +1011,26 @@ ZHDEM_PROVEROK = 134
 # Котировка РОВНО USDC по этим четырём типам в образцах не встречается ни разу --
 # запрошено у Code-2 по 6+ живых USDC-свопов на тип.
 ZHDEM_PO_TIPAM = {
-    # CPMM: цена отказывает на 8 образцах из 22 -- поле f > 1 (не снятые
+    # CPMM: цена отказывает на 13 образцах из 43 -- поле f > 1 (не снятые
     # protocol_fees/fund_fees в хранилище), отказ по имени, а не тихая подмена.
-    PROG_CPMM: {"obrazcov": 22, "storona": 22, "bajt": 22, "cena": 14,
-                "otkaz_ceny": 8},
-    PROG_LAUNCHLAB: {"obrazcov": 31, "storona": 31, "bajt": 31, "cena": 31,
+    PROG_CPMM: {"obrazcov": 43, "storona": 43, "bajt": 43, "cena": 30,
+                "otkaz_ceny": 13},
+    PROG_LAUNCHLAB: {"obrazcov": 35, "storona": 35, "bajt": 35, "cena": 35,
                      "otkaz_ceny": 0},
     # Pump AMM: живых сделок с котировочным токеном в образцах всего две (23 из
-    # 25 -- с WSOL). Это мало, и так и сказано числом.
+    # 25 -- с WSOL), и ОДНА из них -- с котировкой РОВНО USDC. Это мало, и так и
+    # сказано числом.
     PROG_PUMP_AMM: {"obrazcov": 2, "storona": 2, "bajt": 2, "cena": 2,
                     "otkaz_ceny": 0},
-    # Кривая: одна живая покупка с котировочным минтом (HiMSSzzwkZ...). Остальные
-    # 12 образцов -- нативная котировка (18 счетов) или WSOL.
-    PROG_KRIVAYA: {"obrazcov": 1, "storona": 1, "bajt": 1, "cena": 1,
-                   "otkaz_ceny": 0},
+    # Кривая: три живые покупки с котировочным минтом (HiMSSzzwkZ...,
+    # 3NZ9JMVBmGAq..., XspzcW1PRtgf...). У одной цена отказывает по имени:
+    # событие НЕ воспроизвело свою покупку (кривая дала 1 561 355 524 924,
+    # в событии 1 561 186 921 389 -- расхождение 1.1e-4, а допуск 1e-6). Это
+    # ровно та проверка, ради которой событие не берётся на слово.
+    PROG_KRIVAYA: {"obrazcov": 3, "storona": 3, "bajt": 3, "cena": 2,
+                   "otkaz_ceny": 1},
 }
-ZHDEM_BAJT_VSEGO = 56
+ZHDEM_BAJT_VSEGO = 83
 
 # РАЗМЕР ПАКЕТА -- ЗАМЕР НА ЭТИХ ЖЕ ОБРАЗЦАХ, с нашей таблицей и С ЧАЕВЫМИ.
 # "verh" -- как есть: котировочный токен образца в таблице не лежит.
@@ -1037,13 +1041,15 @@ ZHDEM_RAZMEROV = {
     PROG_CPMM: {"verh": (977, 1009), "usdc": (915, 947)},
     PROG_LAUNCHLAB: {"verh": (1086, 1118), "usdc": (1024, 1056)},
     PROG_PUMP_AMM: {"verh": (1086, 1118), "usdc": (1024, 1056)},
-    PROG_KRIVAYA: {"verh": (1311, 1311), "usdc": (1249, 1249)},
+    PROG_KRIVAYA: {"verh": (1280, 1343), "usdc": (1218, 1281)},
 }
-# КРИВАЯ НЕ ВЛЕЗАЕТ, И ЭТО ЧИСЛО, А НЕ МНЕНИЕ: 1249 байт при пределе 1232 даже с
-# нашей таблицей. Лекарство измерено: четыре ПОСТОЯННЫХ адреса программы кривой
-# (global, global_volume_accumulator, fee_config, event_authority) в таблице
-# полосы -- и пакет 1125 байт. Ещё два наших (накопитель объёма и связанный
-# накопитель) дают 1063, а четыре получателя комиссий -- 970.
+# КРИВАЯ ВЛЕЗАЕТ НЕ ВСЕГДА, И ЭТО ЧИСЛО, А НЕ МНЕНИЕ: 1218...1281 байт при пределе
+# 1232 даже с нашей таблицей -- то есть один живой образец из трёх влезает, два
+# нет. Лекарство измерено на образце OBRAZEC_KRIVOJ: четыре ПОСТОЯННЫХ адреса
+# программы кривой (global, global_volume_accumulator, fee_config,
+# event_authority) в таблице полосы -- и пакет 1125 байт. Ещё два наших
+# (накопитель объёма и связанный накопитель) дают 1063, а четыре получателя
+# комиссий -- 970.
 KRIVAYA_MESTA_POSTOYANNYH = (0, 19, 22, 25)
 ZHDEM_KRIVAYA_S_DOBAVKOJ = {4: 1125, 6: 1063, 10: 970}
 # ПОЧЕМУ НЕ ДВУХШАГОВЫМ ПУТЁМ -- ЧИСЛОМ, А НЕ РАССУЖДЕНИЕМ. bloom_lane_two_step
@@ -1067,8 +1073,12 @@ ZHDEM_PRODAZHI = {
     PROG_CPMM: {"verh": (1083, 1083), "usdc": (1021, 1052)},
     PROG_LAUNCHLAB: {"verh": (1192, 1192), "usdc": (1130, 1161)},
     PROG_PUMP_AMM: {"verh": (1190, 1190), "usdc": (1128, 1159)},
-    PROG_KRIVAYA: {"verh": (1383, 1383), "usdc": (1352, 1352)},
+    PROG_KRIVAYA: {"verh": (1383, 1415), "usdc": (1352, 1384)},
 }
+# ПРОДАЖА КРИВОЙ СОБИРАЕТСЯ НА ДВУХ ОБРАЗЦАХ ИЗ ТРЁХ: у третьего цена продажи
+# отказывает по имени -- событие его покупки не воспроизвело себя, и котировать
+# продажу нечем.
+ZHDEM_PRODAZH_KRIVOJ = 2
 # ПРОДАЖА КРИВОЙ НЕ ВЛЕЗАЕТ ДАЖЕ С ЧЕТЫРЬМЯ ДОБАВЛЕННЫМИ АДРЕСАМИ, и выбор тут
 # не мой: либо десять адресов в таблице, либо не закрывать токеновый счёт той же
 # транзакцией (рента остаётся на счёте и забирается потом). Числа -- замер.
@@ -1083,24 +1093,84 @@ KRIVAYA_RASHOZHDENIE = 875_307
 KRIVAYA_VYHOD_SOBYTIYA = 26_277_828_094_315
 
 
+# ЖИВЫЕ СДЕЛКИ БЕРУТСЯ НЕ ТОЛЬКО ИЗ ОБРАЗЦОВ ПУЛОВ. Покупки кривой v2 с
+# котировочным минтом лежат ещё в двух файлах репозитория, и пропустить их значило
+# бы проверить раскладку на одной сделке вместо трёх. Обход этих файлов -- по
+# КАЖДОЙ инструкции (у записей там своя форма и свои поля), с дедупом по подписи.
+DOP_FAJLY_OBRAZCOV = ("bloom_regression_txs.json",
+                      "c3_usdc_noga/obrazcy_usdc_noga.json")
+
+
+def _vse_tranzakcii(o, глубина: int = 0):
+    """Все транзакции (meta + transaction) внутри любой вложенности файла."""
+    if глубина > 6:
+        return
+    if isinstance(o, dict):
+        if "meta" in o and "transaction" in o:
+            yield o
+        for v in o.values():
+            yield from _vse_tranzakcii(v, глубина + 1)
+    elif isinstance(o, list):
+        for v in o[:500]:
+            yield from _vse_tranzakcii(v, глубина + 1)
+
+
 def _obrazcy(programma: str) -> list:
     """Живые сделки типа из образцов репозитория -- теми же глазами, что у полосы."""
-    _C, B, _UN, _TS, _SB, _K = _moduli()
-    out = []
-    for r in B.load_samples(programma):
-        tx, vault = r.get("tx"), r.get("pool_vault")
+    C, B, UN, _TS, _SB, _K = _moduli()
+    out, bylo = [], set()
+
+    def _vzyat(tx, vault, mint=None, source=None):
         if not isinstance(tx, dict) or not vault:
-            continue
+            return
         shab = B.extract_template(tx, programma, vault)
         if not shab.get("ok"):
-            continue
+            return
         mv = B.mints_and_vaults(shab, tx) or {}
         q = mv.get("quote_mint")
         if (B.spec_of(shab) or {}).get("native_quote") or q in (None, WSOL):
-            continue
-        out.append({"tx": tx, "vault": vault, "mint": r.get("mint") or mv.get("base_mint"),
+            return
+        klyuch = (C.first_signature(tx), vault)
+        if klyuch in bylo:
+            return
+        bylo.add(klyuch)
+        out.append({"tx": tx, "vault": vault, "mint": mint or mv.get("base_mint"),
                     "quote": q, "quote_program": mv.get("quote_program"),
-                    "source": r.get("source"), "tpl": shab})
+                    "source": source, "tpl": shab})
+
+    for r in B.load_samples(programma):
+        _vzyat(r.get("tx"), r.get("pool_vault"), r.get("mint"), r.get("source"))
+    spec = B.SPECS.get(programma) or {}
+    for imya in DOP_FAJLY_OBRAZCOV:
+        put_ = Path(C.DATA) / imya
+        if not put_.exists():
+            continue
+        try:
+            d = json.loads(put_.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        for tx in _vse_tranzakcii(d):
+            ak = (((tx.get("transaction") or {}).get("message") or {})
+                  .get("accountKeys") or [])
+            if ak and isinstance(ak[0], str):
+                try:
+                    tx = UN.tx_s_adresami(tx)
+                except Exception:  # noqa: BLE001, S112
+                    continue
+            for ix in B.all_instructions(tx):
+                if ix.get("programId") != programma:
+                    continue
+                try:
+                    dannye = B.b58decode(ix["data"])
+                except Exception:  # noqa: BLE001, S112
+                    continue
+                vi = _mesto_kotirovki(B, programma, dannye)
+                vi = (spec.get("quote_vault") if programma != PROG_KRIVAYA
+                      else (B.BONDING_DISCS.get(dannye[:8].hex())
+                            or {}).get("spec", {}).get("quote_vault"))
+                if not isinstance(vi, int) or len(ix["accounts"]) <= vi:
+                    continue
+                _vzyat(tx, ix["accounts"][vi])
     return out
 
 
@@ -1334,12 +1404,16 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         (_obrazcy_usdc(PROG_PUMP_AMM) or [{}])[0].get("sig"))
 
     # ------------------------------------------------- 4. места кривой v2
-    кр = образцы_по_типам.get(PROG_KRIVAYA) or []
-    chk("живой образец кривой с котировочным минтом на месте", len(кр) == 1, len(кр))
+    все_кр = образцы_по_типам.get(PROG_KRIVAYA) or []
+    chk("живых покупок кривой с котировочным минтом -- три",
+        len(все_кр) == 3, len(все_кр))
+    # ОБРАЗЕЦ ДЛЯ ЗАМЕРОВ ВЫБИРАЕТСЯ ПО ПОДПИСИ, А НЕ ПО ПОРЯДКУ: порядок
+    # образцов зависит от файлов, а числа ниже измерены на ЭТОЙ сделке.
+    кр = [о for о in все_кр if C.first_signature(о["tx"]) == OBRAZEC_KRIVOJ]
+    chk("образец, на котором измерены места и арифметика, на месте", len(кр) == 1,
+        [C.first_signature(о["tx"])[:12] for о in все_кр])
     if кр:
         о = кр[0]
-        chk("это тот самый образец, на котором измерены места",
-            C.first_signature(о["tx"]) == OBRAZEC_KRIVOJ, C.first_signature(о["tx"]))
         ст = storona(о["tx"], programma=PROG_KRIVAYA, hranilishche=о["vault"],
                      mint_kotirovki=о["quote"])
         сч = ст["tpl"]["accounts"]
@@ -1520,8 +1594,9 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                     (min(ряд), max(ряд)) if ряд else None)
             влезли = [x for x in размеры[p]["usdc"] if x <= TS.ПРЕДЕЛ_РАЗМЕРА_TX]
             if p == PROG_KRIVAYA:
-                chk("кривая v2: с таблицей полосы пакет НЕ влезает в 1232",
-                    not влезли, размеры[p]["usdc"])
+                chk("кривая v2: с таблицей полосы влезает ОДИН образец из трёх",
+                    len(влезли) == 1 and len(размеры[p]["usdc"]) == 3,
+                    (len(влезли), размеры[p]["usdc"]))
             else:
                 chk(f"{метка}: с таблицей полосы пакет влезает в 1232 целиком",
                     len(влезли) == len(размеры[p]["usdc"]) and влезли,
@@ -1659,13 +1734,15 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                                          chaevye_adres=KOSHELEK_PROVERKI)
                     if isinstance(сб.get("size"), int):
                         ряды[имя].append(сб["size"])
-            chk(f"{метка}: продажа собралась на всех живых сделках",
-                порядок == len(образцы_по_типам[p]) and порядок > 0,
-                (порядок, len(образцы_по_типам[p])))
+            ждём_сделок = (ZHDEM_PRODAZH_KRIVOJ if p == PROG_KRIVAYA
+                           else len(образцы_по_типам[p]))
+            chk(f"{метка}: продажа собралась на {ждём_сделок} живых сделках",
+                порядок == ждём_сделок and порядок > 0,
+                (порядок, ждём_сделок))
             chk(f"{метка}: вход второй ноги продажи -- это минимум первой",
-                суммы == len(образцы_по_типам[p]), суммы)
+                суммы == ждём_сделок, суммы)
             chk(f"{метка}: без минимума второй ноги -- отказ по имени, а не продажа",
-                без_мин == len(образцы_по_типам[p]), без_мин)
+                без_мин == ждём_сделок, (без_мин, ждём_сделок))
             for имя, (мин, макс) in ждём.items():
                 ряд = ряды[имя]
                 chk(f"{метка}: размер продажи ({имя}) {мин}...{макс} байт",
