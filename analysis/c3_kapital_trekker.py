@@ -105,6 +105,13 @@ WSOL = "So11111111111111111111111111111111111111112"
 # lab-miami уже кончался однажды. С запасом в час переписывание идёт
 # примерно раз в час, а файл держит ДЕРЖИМ_СУТОК плюс этот запас.
 ЗАПАС_ОБРЕЗКИ_СЕК = 3600
+# СОСТОЯНИЕ ПИШЕТСЯ НЕ КАЖДЫЙ ТИК. Файл состояния -- это позиции, сделки за
+# окно хранения и память подписей; на полосе это сотни килобайт. Между тиками
+# в нём меняются только часы и счётчик вызовов, а позиции и сделки -- ТОЛЬКО
+# когда прошла транзакция. Поэтому он пишется при разборе транзакции и не реже
+# чем раз в СОСТОЯНИЕ_НЕ_РЕЖЕ_СЕК; на перезапуске теряется только счёт вызовов
+# за эти минуты, и это сказано здесь, а не спрятано.
+СОСТОЯНИЕ_НЕ_РЕЖЕ_СЕК = 300
 ФАЙЛ_РЯДОВ = "rjady.jsonl"
 ФАЙЛ_СОСТОЯНИЯ = "sostojanie.json"
 ФАЙЛ_ВЫГРУЗКИ = "kapital.json"
@@ -628,7 +635,8 @@ def pustoe_sostojanie(koshelek: str = КОШЕЛЕК) -> dict:
             # Память разобранных подписей -- против двойного счёта (см.
             # ПОМНИМ_ПОДПИСЕЙ), выручка продаж без известного входа -- вне
             # итога за период, расходы -- числом, застревание -- поимённо.
-            "razobrannye_sig": [], "vyruchka_bez_vhoda_lamports": 0,
+            "razobrannye_sig": [], "sdelok_vsego": 0,
+            "vyruchka_bez_vhoda_lamports": 0,
             "rashodov": 0, "rashodov_lamports": 0, "povtorov_podpisi": 0,
             "zastrjali": None, "propushcheno_navsegda": [],
             "upjorlis_v_predel": False, "sbros_sostojanija_utc": None,
@@ -749,6 +757,8 @@ def prinjat_tranzakciju(sostojanie: dict, tx: dict,
         доля = (min(1.0, ушло / было) if было > 0 else 1.0)
         вход_части = int(round(int(п.get("vhod") or 0) * доля))
         итог = int(р.get("polucheno") or 0) - вход_части
+        sostojanie["sdelok_vsego"] = int(
+            sostojanie.get("sdelok_vsego") or 0) + 1
         sostojanie["sdelki"] = (sostojanie.get("sdelki") or []) + [{
             "mint": минт, "vhod": вход_части, "polucheno": int(р.get("polucheno") or 0),
             "itog": итог, "chast": round(доля, 6),
@@ -1284,7 +1294,11 @@ def vygruzka(rjady: list, sostojanie: dict, *, sejchas: float | None = None) -> 
             "bez_vhoda_minty": последний.get("bez_vhoda_minty") or [],
             "neopoznannyh": int(последний.get("neopoznannyh") or 0),
         })
-    из_["sdelok_vsego"] = len(sostojanie.get("sdelki") or [])
+    # СДЕЛОК ВСЕГО -- ОТДЕЛЬНЫМ СЧЁТЧИКОМ, А НЕ ДЛИНОЙ СПИСКА: список режется
+    # по окну хранения (см. progon), и считать по нему «всего» было бы ложью,
+    # уменьшающейся со временем.
+    из_["sdelok_vsego"] = int(sostojanie.get("sdelok_vsego")
+                              or len(sostojanie.get("sdelki") or []))
     из_["zakryto_schetov"] = int(sostojanie.get("zakryto_schetov") or 0)
     из_["podpisej_razobrano"] = int(sostojanie.get("podpisej_razobrano") or 0)
     # ЧЕГО ТРЕКЕР НЕ ЗНАЕТ ИЛИ ЧТО ПРОПУСТИЛ -- ЧИСЛАМИ В ВЫГРУЗКЕ, А НЕ ТОЛЬКО
@@ -2019,8 +2033,28 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
         return из_
     счётчик.obrezat()
     сост["kredity"] = счётчик.po_sutkam
-    п_сост.write_text(json.dumps(сост, ensure_ascii=False, indent=1) + "\n",
-                      encoding="utf-8")
+    # СПИСКИ СОСТОЯНИЯ РЕЖУТСЯ ПО ТОМУ ЖЕ ОКНУ, ЧТО И РЯД. Сделки и отметки
+    # копились НАВСЕГДА, а состояние пишется каждый тик: 350 сделок в сутки
+    # за неделю дали бы файл в полмегабайта, который переписывается раз в 20
+    # секунд. Окна страницы дальше трёх суток не смотрят, а «сделок всего»
+    # живёт отдельным счётчиком и от обрезки не врёт.
+    порог_сост = сейчас - derzhim_sutok * 86400.0
+    сост["sdelki"] = [с for с in (сост.get("sdelki") or [])
+                      if not isinstance(с.get("zakryta_utc"), int)
+                      or float(с["zakryta_utc"]) >= порог_сост][-5000:]
+    сост["metki"] = [м for м in (сост.get("metki") or [])
+                     if not isinstance(м.get("utc"), int)
+                     or float(м["utc"]) >= порог_сост][-500:]
+    было_тронуто = bool(int(из_["dognali"].get("razobrano") or 0)
+                        or int(из_["dognali"].get("net_tranzakcii") or 0)
+                        or из_.get("sshito"))
+    давно = (сейчас - float(сост.get("zapisano_utc") or 0)
+             >= СОСТОЯНИЕ_НЕ_РЕЖЕ_СЕК)
+    if было_тронуто or давно or not п_сост.exists():
+        сост["zapisano_utc"] = int(сейчас)
+        п_сост.write_text(json.dumps(сост, ensure_ascii=False, indent=1) + "\n",
+                          encoding="utf-8")
+        из_["sostojanie_pisali"] = True
     из_["zapis"] = dopisat_rjad(к / ФАЙЛ_РЯДОВ, р, derzhim_sutok=derzhim_sutok,
                                  sejchas=сейчас)
     # РЯД ДЛЯ ВЫГРУЗКИ -- ИЗ ПАМЯТИ, ЕСЛИ ЕСТЬ КТО ЕГО ДЕРЖИТ. Служба держит
@@ -2045,7 +2079,14 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
     (к / ФАЙЛ_ВЫГРУЗКИ).write_text(json.dumps(в, ensure_ascii=False, indent=1)
                                    + "\n", encoding="utf-8")
     if pisat_stranicu:
-        (к / ФАЙЛ_СТРАНИЦЫ).write_text(stranica(), encoding="utf-8")
+        # СТРАНИЦА НЕ МЕНЯЕТСЯ МЕЖДУ ТИКАМИ, и перезаписывать её 4320 раз в
+        # сутки незачем: пишем только когда её нет или она другая.
+        п_стр = к / ФАЙЛ_СТРАНИЦЫ
+        страница_ = stranica()
+        if (not п_стр.exists()
+                or п_стр.read_text(encoding="utf-8") != страница_):
+            п_стр.write_text(страница_, encoding="utf-8")
+            из_["stranicu_pisali"] = True
     из_.update(ok=True, rjad=р, vygruzka_bajt=len(json.dumps(в)),
                kapital_sol=round(int(р["kapital"]) / ЛАМПОРТОВ_В_SOL, 6),
                vyzovov_za_sutki=(счётчик.po_sutkam.get(

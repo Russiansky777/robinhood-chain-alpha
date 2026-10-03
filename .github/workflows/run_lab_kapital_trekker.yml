@@ -59,12 +59,67 @@ jobs:
         with:
           ref: claude/stroiteli
 
+      - name: "ВХОД: проверить ДО первого ssh -- иначе это код от root на хосте"
+        env:
+          DEJSTVIE: ${{ inputs.dejstvie }}
+          PORT: ${{ inputs.port }}
+          NARUZHU: ${{ inputs.naruzhu }}
+          PAUZA: ${{ inputs.pauza }}
+          SUTOK: ${{ inputs.sutok }}
+        run: |
+          set -e
+          # ПОЧЕМУ ЭТОТ ШАГ ЕСТЬ. Значения полей запуска раньше подставлялись
+          # прямо в строку ssh (${{ }} внутри shell), а эта строка выполняется
+          # на lab-miami ОТ ROOT. Значит любой, кто может нажать "запустить",
+          # мог вписать в поле "порт" что угодно и получить выполнение команд
+          # от root на лаборатории. Теперь поля сперва проверяются здесь, и
+          # дальше в оболочку идут ПЕРЕМЕННЫМИ ОКРУЖЕНИЯ, а не подстановкой.
+          case "$DEJSTVIE" in
+            postavit|ostanovit|proverit) : ;;
+            *) echo "OTKAZ: dejstvie dolzhno byt postavit|ostanovit|proverit"; exit 1 ;;
+          esac
+          case "$NARUZHU" in
+            yes|no) : ;;
+            *) echo "OTKAZ: naruzhu dolzhno byt yes ili no"; exit 1 ;;
+          esac
+          printf '%s' "$PORT"  | grep -qE '^[0-9]{4,5}$' || { echo "OTKAZ: port -- tolko cifry"; exit 1; }
+          printf '%s' "$PAUZA" | grep -qE '^[0-9]{1,3}$' || { echo "OTKAZ: pauza -- tolko cifry"; exit 1; }
+          printf '%s' "$SUTOK" | grep -qE '^[0-9]{1,2}$' || { echo "OTKAZ: sutok -- tolko cifry"; exit 1; }
+          [ "$PORT" -ge 1024 ] && [ "$PORT" -le 65535 ] || { echo "OTKAZ: port vne 1024..65535"; exit 1; }
+          [ "$PAUZA" -ge 10 ] && [ "$PAUZA" -le 600 ] || { echo "OTKAZ: pauza vne 10..600 s"; exit 1; }
+          [ "$SUTOK" -ge 1 ] && [ "$SUTOK" -le 7 ] || { echo "OTKAZ: sutok vne 1..7"; exit 1; }
+          ADRES=127.0.0.1
+          [ "$NARUZHU" = "yes" ] && ADRES=0.0.0.0
+          {
+            echo "DEJSTVIE=$DEJSTVIE"
+            echo "PORT=$PORT"
+            echo "PAUZA=$PAUZA"
+            echo "SUTOK=$SUTOK"
+            echo "NARUZHU=$NARUZHU"
+            echo "ADRES=$ADRES"
+            echo "OUT=data/lab_kapital_trekker.txt"
+          } >> $GITHUB_ENV
+          echo "vhod proveren: dejstvie=$DEJSTVIE port=$PORT pauza=$PAUZA sutok=$SUTOK naruzhu=$NARUZHU"
+
       - name: "ГЕЙТ: самопроверка модуля до всякой установки"
         run: |
           set -e
           set -o pipefail
           python3 -m py_compile analysis/c3_kapital_trekker.py
-          python3 analysis/c3_kapital_trekker.py --self-test | tail -3
+          # ИМЕНА УПАВШИХ ПРОВЕРОК ВИДНЫ ЗДЕСЬ, А НЕ ОТДЕЛЬНЫМ ПРОГОНОМ.
+          # Code-1 04.10: гейт показывал `| tail -3`, и чтобы узнать, ЧТО
+          # именно упало, ему пришлось снимать вывод своим прогоном. Теперь
+          # при отказе печатаются последние 30 строк, а модуль сам печатает
+          # имена упавших проверок перед итоговой строкой.
+          # SOLDERS ЗДЕСЬ НЕ НУЖЕН -- и это тоже его находка: сверка с чужой
+          # формулой читает фикстуры json-ом, а c2_itog_po_cepi -- чистая
+          # стандартная библиотека. Ставить solders на бегунок не нужно.
+          if ! python3 analysis/c3_kapital_trekker.py --self-test > /tmp/samoproverka.txt 2>&1; then
+            echo "SAMOPROVERKA NE PROSHLA -- poslednie 30 strok:"
+            tail -30 /tmp/samoproverka.txt
+            exit 1
+          fi
+          tail -2 /tmp/samoproverka.txt
 
       - name: "Ключ лаборатории"
         env:
@@ -77,14 +132,13 @@ jobs:
           chmod 600 ~/.ssh/lab_key
           echo "HOST=169.128.191.158" >> $GITHUB_ENV
           echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
-          echo "OUT=data/lab_kapital_trekker.txt" >> $GITHUB_ENV
 
       - name: "ЭТО ТОЧНО ЛАБОРАТОРИЯ, А НЕ ТОРГОВЫЙ ХОСТ"
         run: |
           set -e
           {
             echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "dejstvie=${{ inputs.dejstvie }} port=${{ inputs.port }} naruzhu=${{ inputs.naruzhu }} pauza=${{ inputs.pauza }}"
+            echo "dejstvie=$DEJSTVIE port=$PORT naruzhu=$NARUZHU pauza=$PAUZA"
           } > "$OUT"
           IMJA=$(ssh -n $SSH_OPTS root@"$HOST" "hostname")
           echo "hostname: $IMJA" | tee -a "$OUT"
@@ -148,8 +202,6 @@ jobs:
           set -e
           [ -n "$SEKRET" ] || { echo "OTKAZ: sekreta BLOOM_TREKKER_SEKRET net -- bez nego sluzhba ne podnimaetsja narochno" | tee -a "$OUT"; exit 1; }
           [ "${#SEKRET}" -ge 16 ] || { echo "OTKAZ: sekret koroche 16 znakov" | tee -a "$OUT"; exit 1; }
-          ADRES=127.0.0.1
-          [ "${{ inputs.naruzhu }}" = "yes" ] && ADRES=0.0.0.0
           ssh -n $SSH_OPTS root@"$HOST" "mkdir -p /opt/kapital /var/lib/kapital"
           scp $SSH_OPTS analysis/c3_kapital_trekker.py root@"$HOST":/opt/kapital/c3_kapital_trekker.py
           # СЕКРЕТЫ -- ТОЛЬКО ЧЕРЕЗ stdin И ТОЛЬКО В ФАЙЛ 0600.
@@ -168,7 +220,7 @@ jobs:
             '[Service]' \
             'Type=simple' \
             'EnvironmentFile=/etc/kapital.env' \
-            "ExecStart=/usr/bin/python3 /opt/kapital/c3_kapital_trekker.py --sluzhba --kat /var/lib/kapital --port ${{ inputs.port }} --adres $ADRES --pauza ${{ inputs.pauza }} --sutok ${{ inputs.sutok }}" \
+            "ExecStart=/usr/bin/python3 /opt/kapital/c3_kapital_trekker.py --sluzhba --kat /var/lib/kapital --port $PORT --adres $ADRES --pauza $PAUZA --sutok $SUTOK" \
             'Restart=always' \
             'RestartSec=10' \
             'Nice=5' \
@@ -198,7 +250,7 @@ jobs:
           ssh -n $SSH_OPTS root@"$HOST" '
             set -e
             . /etc/kapital.env
-            P='"${{ inputs.port }}"'
+            P='"$PORT"'
             KOD=$(printf "url = \"http://127.0.0.1:%s/%s/\"\n" "$P" "$BLOOM_TREKKER_SEKRET" | curl -s -o /dev/null -w "%{http_code}" --config - || true)
             KOD2=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$P/chuzhoj/" || true)
             echo "stranica po sekretu: $KOD (zhdjom 200)"
@@ -209,16 +261,31 @@ jobs:
           # ВЫГРУЗКА ЧИТАЕТСЯ ОДНОЙ СТРОКОЙ python: многострочный -c внутри
           # блока YAML начинался бы с первой колонки, и прогон не разобрался бы.
           ssh -n $SSH_OPTS root@"$HOST" "ls -la /var/lib/kapital 2>/dev/null | head -6; python3 -c \"import json;d=json.load(open('/var/lib/kapital/kapital.json'));print('kapital_sol',d.get('kapital_sol'),'rjadov',d.get('rjadov'),'pozicij',d.get('pozicij'),'bez_vhoda',d.get('bez_vhoda'),'neopoznannyh',d.get('neopoznannyh'));print('vyzovov za sutki',{k:(v or {}).get('всего') for k,v in (d.get('kredity_sutki') or {}).items()})\" || echo 'vygruzki escho net'" | tee -a "$OUT"
-          echo "ssylka: http://$HOST:${{ inputs.port }}/<SEKRET>/ (sekret -- v BLOOM_TREKKER_SEKRET, zdes ego net i ne budet)" | tee -a "$OUT"
+          echo "ssylka: http://$HOST:$PORT/<SEKRET>/ (sekret -- v BLOOM_TREKKER_SEKRET, zdes ego net i ne budet)" | tee -a "$OUT"
 
       - name: "Отчёт прогона в ветку"
         if: always()
+        env:
+          SEKRET: ${{ secrets.BLOOM_TREKKER_SEKRET }}
         run: |
           set -e
+          # ОТЧЁТА МОЖЕТ НЕ БЫТЬ ВОВСЕ, И ЭТО НЕ ПОВОД НА НЕГО РУГАТЬСЯ.
+          # Code-1 04.10: когда падал шаг до этого, $OUT был не задан, и шаг
+          # отчёта валился своим `grep: : No such file or directory` ПОВЕРХ
+          # настоящей причины -- второй сбой закрывал первый.
+          OUT="${OUT:-data/lab_kapital_trekker.txt}"
+          if [ ! -f "$OUT" ]; then
+            echo "otchjota net ($OUT) -- progon upal ranshe nego, kommitit nechego"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # СЕКРЕТА В ОТЧЁТЕ НЕТ: проверяем это ПЕРЕД коммитом, а не надеемся.
-          if [ -n "${{ secrets.BLOOM_TREKKER_SEKRET }}" ] && grep -qF "${{ secrets.BLOOM_TREKKER_SEKRET }}" "$OUT"; then
+          # Секрет приходит ОКРУЖЕНИЕМ, а не подстановкой ${{ }}: кавычка
+          # внутри секрета порвала бы кавычки оболочки, и сторож, который
+          # ищет секрет, сам стал бы дырой. `-e` -- чтобы секрет, начинающийся
+          # с минуса, не стал ключом grep.
+          if [ -n "$SEKRET" ] && grep -qF -e "$SEKRET" "$OUT"; then
             echo "OTKAZ: sekret popal v otchjot -- ne kommitim"; exit 1
           fi
           git add "$OUT"
