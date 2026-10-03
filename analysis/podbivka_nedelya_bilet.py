@@ -20,6 +20,14 @@
       (3) сочетание. По каждому: SOL в сутки, медиана, худшие сутки. Подбор -- первые 8 суток
       окна, проверка -- последние 3.
 
+ВЫГРУЗКА С 27.09 (слово владельца 03.10, добавка). Итог сделки -- `итог_po_cepi_sol`
+КИРИЛЛИЦЕЙ. Латинское `itog_po_cepi_sol` -- это ВОЗВРАТ, а не итог (его сумма по 578 строкам
++100.06 SOL против +2.96 у кириллического), и оно здесь не используется вовсе. У 121 строки из
+578 кириллического поля нет -- берётся `итог_sol`, и такие строки помечены («итог из полей»).
+Сутки -- по Мадриду, по времени ПОКУПКИ. Суточные суммы отдаются таблицей, чтобы владелец
+сверил их со строками балансов Code-1. Тестовые группы (test_krug, speed_only, lane_only,
+bloom_lane) и krug_001 (5YRgrP3m, билет 0.01) считаются ОТДЕЛЬНО от торгующих.
+
 Формулы: ячейка и п.п. -- podbivka_cand2 / podbivka_kandidaty_vne, любой билет по состояниям --
 podbivka_bilet.пп_по_состояниям, стабильность -- podbivka_stabilnost. Своих копий формул нет.
 """
@@ -46,6 +54,8 @@ import podbivka_stabilnost as ST  # noqa: E402
 КОРЕНЬ = C2.КОРЕНЬ
 П = C2.П
 БИЛЕТЫ = (0.1, 0.3, 0.5, 1.0, 2.0, 3.0)
+ТЕСТОВЫЕ = ("test_krug", "speed_only", "lane_only", "bloom_lane")
+МАДРИД = "Europe/Madrid"
 ПОТОЛОК = {"lane_s0": 0.5, "batch5": 0.3, "cand1": 0.1, "cand1_03": 0.3, "cand1_05": 0.5,
            "cand2": 0.1, "cand3": 0.1, "leader": 3.0, "konveyer": 0.1}
 СТУПЕНИ = ((2.0, 5.0, 0.1), (5.0, 15.0, 0.3), (15.0, float("inf"), 0.5))
@@ -173,35 +183,81 @@ def main() -> int:
     посл_конв = json.loads(конв[-1].read_text(encoding="utf-8")) if конв else {"ряды": {}}
 
     # ---- живые сделки (п.4б): выгрузка с 27.09, если она есть
-    живые_файл = КОРЕНЬ / "data" / "sdelki_polosy_vse_s_2709.json"
-    свои = sorted((П / "sdelki").glob("sdelki_polosy_*.json"))
-    живые_откуда, живые = [], []
-    if живые_файл.exists():
+    for кандидат in (КОРЕНЬ / "data" / "sdelki_polosy_vse_s_2709.json",
+                     П / "sdelki" / "vse_s_2709.json"):
+        if кандидат.exists():
+            живые_файл = кандидат
+            break
+    else:
+        живые_файл = None
+    живые_откуда, сырые = [], []
+    if живые_файл is not None:
         живые_откуда.append(живые_файл.name)
-        for r in json.loads(живые_файл.read_text(encoding="utf-8")).get("ряды") or []:
-            живые.append(r)
+        сырые = json.loads(живые_файл.read_text(encoding="utf-8")).get("ряды") or []
     else:
         по_cid: dict = {}
-        for f in свои:
+        for f in sorted((П / "sdelki").glob("sdelki_polosy_*.json")):
             живые_откуда.append(f.name)
             for r in json.loads(f.read_text(encoding="utf-8")).get("ряды") or []:
                 по_cid[r["cid"]] = r
-        живые = list(по_cid.values())
-    живые = [r for r in живые if r.get("итог_po_cepi_sol") is not None and r.get("sol_in")]
+        сырые = list(по_cid.values())
+
+    def итог_сделки(r: dict) -> tuple[float | None, str]:
+        """Итог -- кириллическое `итог_po_cepi_sol`; нет его -- `итог_sol`, и это помечается.
+
+        Латинское `itog_po_cepi_sol` -- возврат, а не итог (слово владельца 03.10), поэтому
+        оно не берётся ни при каких условиях.
+        """
+        if r.get("итог_po_cepi_sol") is not None:
+            return float(r["итог_po_cepi_sol"]), "цепь"
+        if r.get("итог_sol") is not None:
+            return float(r["итог_sol"]), "поля"
+        return None, "нет"
+
+    def сутки_мадрид(r: dict) -> str | None:
+        """Сутки по Мадриду по времени ПОКУПКИ (поле utc выгрузки -- время покупки)."""
+        т = r.get("utc")
+        if not т:
+            return None
+        try:
+            from datetime import datetime, timezone  # noqa: PLC0415
+            from zoneinfo import ZoneInfo  # noqa: PLC0415
+            d = datetime.strptime(т, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            return d.astimezone(ZoneInfo(МАДРИД)).strftime("%Y-%m-%d")
+        except Exception:  # noqa: BLE001
+            return т[:10]
+
+    живые = []
+    счёт_живых = collections.Counter()
+    for r in сырые:
+        и, откуда = итог_сделки(r)
+        счёт_живых[f"итог_{откуда}"] += 1
+        if и is None or not r.get("sol_in"):
+            continue
+        r = dict(r)
+        r["_итог"] = и
+        r["_итог_откуда"] = откуда
+        r["_сутки_мадрид"] = сутки_мадрид(r)
+        r["_крug_001"] = bool((r.get("cid") or "").startswith("krug_001")
+                              or (r.get("zapis") or {}).get("client_order_id", "").startswith("krug_001"))
+        живые.append(r)
+
+    def торгующая(г: str | None) -> bool:
+        return bool(г) and г not in ТЕСТОВЫЕ
 
     по_группам: dict = collections.defaultdict(list)
     for r in живые:
         по_группам[r.get("group") or "?"].append(r)
 
     def живой_свод(ряды: list) -> dict:
-        пп_ж = [100 * r["итог_po_cepi_sol"] / r["sol_in"] for r in ряды]
-        до = [M.до_расходов(r) for r in ряды]
+        пп_ж = [100 * r["_итог"] / r["sol_in"] for r in ряды]
+        до = [M.до_расходов(dict(r, **{"итог_po_cepi_sol": r["_итог"]})) for r in ряды]
         до = [x for x in до if x is not None]
         по_дням: dict = collections.defaultdict(float)
         for r in ряды:
-            д = (r.get("utc") or "")[:10]
-            по_дням[д] += float(r["итог_po_cepi_sol"])
-        return {"n": len(ряды), "итог_sol": round(sum(r["итог_po_cepi_sol"] for r in ряды), 4),
+            по_дням[r.get("_сутки_мадрид") or "?"] += float(r["_итог"])
+        return {"n": len(ряды), "итог_sol": round(sum(r["_итог"] for r in ряды), 4),
+                "из_полей": sum(1 for r in ряды if r["_итог_откуда"] == "поля"),
                 "медиана_пп": round(statistics.median(пп_ж), 2) if пп_ж else None,
                 "до_расходов_медиана": round(statistics.median(до), 2) if до else None,
                 "по_дням": {д: round(v, 4) for д, v in sorted(по_дням.items())}}
@@ -314,14 +370,44 @@ def main() -> int:
                   + f" | {v['суток_в_плюсе'] or '—'} | {v['подряд_суток_не_держится']} | "
                   + f"{v['ячеек']} | **{v['подпись']}** |")
 
-    md += ["", "## (б) Билет на большой выборке", "", "### Живые сделки по группам", "",
-           "| группа | сделок | итог, SOL | медиана итога, п.п. | медиана до расходов, п.п. |",
+    md += ["", "## (б) Билет на большой выборке", "",
+           f"Итог сделки -- кириллическое `итог_po_cepi_sol`; у {счёт_живых['итог_поля']} строк его нет, "
+           f"там взят `итог_sol` (столбец «из полей»). Латинское `itog_po_cepi_sol` -- возврат, а не "
+           f"итог, и не используется. Сутки -- по Мадриду, по времени покупки.", ""]
+    for заг, отбор in (("### Торгующие группы", lambda г: торгующая(г)),
+                       ("### Тестовые группы и krug_001 (отдельно)", lambda г: not торгующая(г))):
+        md += [заг, "",
+               "| группа | сделок | итог, SOL | из полей | медиана итога, п.п. | "
+               "медиана до расходов, п.п. |", "|---|---|---|---|---|---|"]
+        for г, v in sorted(дт["живые_по_группам"].items(), key=lambda kv: -kv[1]["n"]):
+            if not отбор(г):
+                continue
+            md.append(f"| {г} | {v['n']} | {v['итог_sol']:+.4f} | {v['из_полей']} | "
+                      + (f"{v['медиана_пп']:+.2f}" if v["медиана_пп"] is not None else "—") + " | "
+                      + (f"{v['до_расходов_медиана']:+.2f}" if v["до_расходов_медиана"] is not None else "—")
+                      + " |")
+        md += [""]
+    крug = [r for r in живые if r["_крug_001"]]
+    if крug:
+        с = живой_свод(крug)
+        md += [f"krug_001 (источник 5YRgrP3m, билет 0.01): сделок {с['n']}, итог {с['итог_sol']:+.4f} SOL, "
+               f"медиана {с['медиана_пп']:+.2f} п.п. -- в суммах торгующих групп НЕ участвует.", ""]
+    # суточные суммы -- для сверки со строками балансов Code-1
+    по_суткам_всё: dict = collections.defaultdict(lambda: [0.0, 0, 0.0, 0])
+    for r in живые:
+        д = r.get("_сутки_мадрид") or "?"
+        к = по_суткам_всё[д]
+        к[0] += float(r["_итог"])
+        к[1] += 1
+        if торгующая(r.get("group")):
+            к[2] += float(r["_итог"])
+            к[3] += 1
+    md += ["### Суточные суммы (Мадрид, по времени покупки) -- для сверки со строками балансов Code-1", "",
+           "| сутки | сделок всего | итог всего, SOL | сделок торгующих | итог торгующих, SOL |",
            "|---|---|---|---|---|"]
-    for г, v in sorted(дт["живые_по_группам"].items(), key=lambda kv: -kv[1]["n"]):
-        md.append(f"| {г} | {v['n']} | {v['итог_sol']:+.4f} | "
-                  + (f"{v['медиана_пп']:+.2f}" if v["медиана_пп"] is not None else "—") + " | "
-                  + (f"{v['до_расходов_медиана']:+.2f}" if v["до_расходов_медиана"] is not None else "—")
-                  + " |")
+    for д, (всё, n, торг, nт) in sorted(по_суткам_всё.items()):
+        md.append(f"| {д} | {n} | {всё:+.4f} | {nт} | {торг:+.4f} |")
+    md += [""]
     md += ["", "### Архив по билетам (по источникам)", "",
            "| источник | билет | n | среднее | медиана | среднее без верхних 2 % | SOL в сутки | "
            "SOL всего | худшие сутки |", "|---|---|---|---|---|---|---|---|---|"]
@@ -352,6 +438,22 @@ def main() -> int:
                     + f" | {ч['sol_всего']:+.4f} | "
                     + (f"{х[0]}: {х[1]:+.4f}" if х else "—"))
         md.append(f"| {имя} | {кл3(v['подбор'])} | {кл3(v['проверка'])} |")
+    # ПРИЛОЖЕНИЕ: сделки, где чаевые покупки по цепи не 0.001 (у Code-1 во всех записях 0.001)
+    ч_файл = П / "chaevye_rashozhdenie_2026-10-03.json"
+    if ч_файл.exists():
+        ч = json.loads(ч_файл.read_text(encoding="utf-8"))
+        md += ["", "## Приложение: чаевые покупки по цепи не 0.001 -- подписи для сверки Code-1", "",
+               f"Сделок {ч['сделок']}: суммы {ч['суммы']}, сервисы {ч['сервисы']}. У Code-1 во всех "
+               f"789 записях стоит Helius 0.001 -- по цепи перевод ушёл другому сервису и на другую "
+               f"сумму. Файл: `data/podbivka/chaevye_rashozhdenie_2026-10-03.json`.", "",
+               "| cid | группа | билет | источник | чаевые по цепи, SOL | сервис | подпись покупки |",
+               "|---|---|---|---|---|---|---|"]
+        for x in ч["сделки"]:
+            md.append(f"| `{x['cid'][-8:]}` | {x.get('группа') or '—'} | {x.get('билет_sol')} | "
+                      f"`{(x.get('источник') or '')[:8]}` | {x['чаевые_по_цепи_sol']} | "
+                      + ", ".join((x.get("по_сервисам") or {})) + " | "
+                      + (f"`{x['buy_sig']}`" if x.get("buy_sig") else "—") + " |")
+        md += [""]
     md += ["", "Ничего не рекомендуется -- решает владелец.", ""]
     out_m = КОРЕНЬ / "docs" / f"podbivka_{а.metka}_nedelya_bilet.md"
     out_m.write_text("\n".join(md) + "\n", encoding="utf-8")

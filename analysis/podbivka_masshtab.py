@@ -105,10 +105,17 @@ def расход_постоянный(r: dict) -> float | None:
     if по_цепи is not None:
         return float(по_цепи)
     ч = r.get("итог_po_cepi_chasti") or {}
-    if not (ч.get("покупка") and ч.get("продажа")) or r.get("чаевые_sol") is None:
+    пок, прод = ч.get("покупка") or {}, ч.get("продажа") or {}
+    # ЧАСТИ БЫВАЮТ БЕЗ КОМИССИИ. В сводной выгрузке с 27.09 части лежат как
+    # {все_sol, кошелёк_sol, завёрнутое_sol} -- без `комиссия_sol`; тогда расход по цепи
+    # не складывается и строка остаётся без числа, а не падает.
+    if (r.get("чаевые_sol") is None or пок.get("комиссия_sol") is None
+            or прод.get("комиссия_sol") is None):
+        if r.get("чаевые_sol") is not None and r.get("комиссия_sol") is not None:
+            return round(float(r["чаевые_sol"]) + float(r["комиссия_sol"]), 9)
         return None
-    return round(float(r["чаевые_sol"]) + float(ч["покупка"]["комиссия_sol"])
-                 + float(ч["продажа"]["комиссия_sol"]), 9)
+    return round(float(r["чаевые_sol"]) + float(пок["комиссия_sol"])
+                 + float(прод["комиссия_sol"]), 9)
 
 
 def до_расходов(r: dict) -> float | None:
