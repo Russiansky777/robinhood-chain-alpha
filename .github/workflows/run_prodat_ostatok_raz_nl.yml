@@ -59,6 +59,26 @@ on:
         description: "ФАНТОМ: 'yes' -- ДОПИСАТЬ итог по цепи в УЖЕ ЗАКРЫТУЮ запись (state, ts_closed и суточное число не трогаются)"
         required: false
         default: "no"
+      knizhit_cid:
+        description: "КНИЖЕНИЕ: client_order_id позиции, итог которой занести в сутки её продажи (пусто -- шаг не идёт)"
+        required: false
+        default: ""
+      knizhit_sutki:
+        description: "КНИЖЕНИЕ: сутки по Мадриду, YYYY-MM-DD (сверяется со временем продажи)"
+        required: false
+        default: ""
+      knizhit_ts_prodazhi:
+        description: "КНИЖЕНИЕ: время продажи -- ISO с Z или epoch"
+        required: false
+        default: ""
+      knizhit_itog_sol:
+        description: "КНИЖЕНИЕ: названный итог позиции по цепи (сверяется с частями записи до 1e-9)"
+        required: false
+        default: ""
+      knizhit_zhivjom:
+        description: "КНИЖЕНИЕ: 'yes' -- записать (по умолчанию только показать, что записалось бы)"
+        required: false
+        default: "no"
 
 concurrency:
   group: prodat-ostatok-raz
@@ -91,6 +111,8 @@ jobs:
           python3 -m py_compile deploy/checks/prodat_ostatok_raz.py
           python3 -m py_compile deploy/checks/zakryt_fantom.py
           python3 deploy/checks/zakryt_fantom.py --self-test | tail -2
+          python3 -m py_compile deploy/checks/knizhit_sutki_zadnim_chislom.py
+          python3 deploy/checks/knizhit_sutki_zadnim_chislom.py --self-test | tail -2
           echo "razbor ok"
 
       - name: "SSH key"
@@ -116,7 +138,7 @@ jobs:
       - name: "Продажа остатка (живой режим -- только по слову live=yes)"
         # КОГДА ПОЗВАЛИ ТОЛЬКО ЗАКРЫТЬ ЗАПИСЬ, продавать нечего и котировку
         # спрашивать незачем: токена на счёте уже нет.
-        if: ${{ inputs.zakryt_zapis_cid == '' }}
+        if: ${{ inputs.zakryt_zapis_cid == '' && inputs.knizhit_cid == '' }}
         run: |
           set -e
           set -o pipefail
@@ -238,13 +260,50 @@ jobs:
             exit 1
           fi
 
+      - name: "КНИЖЕНИЕ задним числом: итог в сутки продажи"
+        # ЗАЧЕМ ОТДЕЛЬНЫЙ ШАГ. Дописка выше кладёт подпись и итог в запись и
+        # НАРОЧНО не трогает суточный счёт. Здесь деньги ложатся в сутки самой
+        # продажи через add_pnl(ts=...), а запись идёт БЕЗ поля state -- иначе
+        # _учесть_закрытие занесло бы их в СЕГОДНЯШНИЕ сутки. Охраны и сверка
+        # числа по частям записи -- внутри модуля.
+        if: ${{ inputs.knizhit_cid != '' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@$TARGET_HOST "install -d -m 755 $RABOTA"
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/knizhit.py" < deploy/checks/knizhit_sutki_zadnim_chislom.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "$PY_HOSTA $RABOTA/knizhit.py --self-test | tail -3"
+          ZHIVYOM=""
+          if [ "${{ inputs.knizhit_zhivjom }}" = "yes" ]; then ZHIVYOM="KNIZHIT_LIVE=1"; fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -a; . $ENV_DIR/env; set +a
+            install -d -m 777 $RABOTA/out
+            su bot -s /bin/sh -c \"cd $CODE_DIR && env BLOOM_STATE_DIR='\$BLOOM_STATE_DIR' \
+              BLOOM_CODE_DIR='$CODE_DIR' $ZHIVYOM PYTHONPATH=$CODE_DIR \
+              $PY_HOSTA $RABOTA/knizhit.py \
+                --cid '${{ inputs.knizhit_cid }}' \
+                --sutki '${{ inputs.knizhit_sutki }}' \
+                --ts-prodazhi '${{ inputs.knizhit_ts_prodazhi }}' \
+                --itog-sol '${{ inputs.knizhit_itog_sol }}' \
+                --out $RABOTA/out/knizhit.json\"
+          " 2>&1 | tail -60 || echo "KNIZHIT_NE_OK=1" >> "$GITHUB_ENV"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out/knizhit.json 2>/dev/null || true" > /tmp/knizhit.json || true
+          if python3 -c "import json; json.load(open('/tmp/knizhit.json'))" 2>/dev/null; then
+            cp /tmp/knizhit.json data/knizhit_zadnim_chislom.json
+            python3 -c "import json; d=json.load(open('data/knizhit_zadnim_chislom.json')); print('KNIZHIT ok=', d.get('ok'), '| why_not=', d.get('why_not')); print('sverka:', json.dumps(d.get('сверка'), ensure_ascii=False)); print('schet do/posle:', json.dumps(d.get('счёт_до'), ensure_ascii=False), '->', json.dumps(d.get('счёт_после'), ensure_ascii=False)); print('segodnja:', json.dumps(d.get('счёт_сегодня'), ensure_ascii=False))"
+          else
+            echo "SBOY: svodka knizhenija ne sobralas"
+            exit 1
+          fi
+
       - name: "Ключей в отчёте быть не должно"
         if: always()
         run: |
           set -e
           # if, а НЕ "[ -f ] && ...": под set -e неудачная проверка последнего
           # файла валит шаг, и прогон краснеет из-за отсутствующего файла.
-          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json data/zakryt_fantom.json; do
+          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json data/zakryt_fantom.json \
+                   data/knizhit_zadnim_chislom.json; do
             if [ -f "$F" ]; then python3 deploy/checks/bez_klyuchey_v_otchete.py "$F"; fi
           done
 
@@ -258,7 +317,8 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json data/zakryt_fantom.json; do
+          for F in "$OUT_FILE" data/prodat_ostatok_zakrytie.json data/zakryt_fantom.json \
+                   data/knizhit_zadnim_chislom.json; do
             if [ -f "$F" ]; then git add "$F"; fi
           done
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }

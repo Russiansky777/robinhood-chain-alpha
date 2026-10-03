@@ -16,6 +16,14 @@ on:
         description: "ограничить число сделок (0 -- все)"
         required: false
         default: "0"
+      istochnik:
+        description: "'dbot' (учёт площадки, по умолчанию) или 'polosa' (выгрузки полосы -- её сделок в учёте площадки НЕТ)"
+        required: false
+        default: "dbot"
+      s_utc:
+        description: "граница окна для istochnik=polosa"
+        required: false
+        default: "2026-09-27T00:00:00Z"
 
 concurrency:
   group: solana-transfer-fee-audit
@@ -45,14 +53,22 @@ jobs:
         run: |
           python -u analysis/solana_transfer_fee_audit.py \
             --min-interval-s "${{ github.event.inputs.min_interval_s || '0.05' }}" \
-            --limit "${{ github.event.inputs.limit || '0' }}" 2>&1 | tail -250
+            --limit "${{ github.event.inputs.limit || '0' }}" \
+            --istochnik "${{ github.event.inputs.istochnik || 'dbot' }}" \
+            --s-utc "${{ github.event.inputs.s_utc || '2026-09-27T00:00:00Z' }}" 2>&1 | tail -250
       - name: "Коммит"
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A data/helius_usage 2>/dev/null || true
-          for f in data/solana_transfer_fee_audit.json data/solana_transfer_fee_audit_cache.json; do
+          # ОТЧЁТ ПОЛОСЫ -- В СВОЙ ФАЙЛ: иначе прогон полосы затёр бы аудит
+          # площадки, и следующий вопрос по DBot пришлось бы мерить заново.
+          if [ "${{ github.event.inputs.istochnik }}" = "polosa" ] \
+             && [ -f data/solana_transfer_fee_audit.json ]; then
+            mv data/solana_transfer_fee_audit.json data/solana_transfer_fee_audit_polosa.json
+          fi
+          for f in data/solana_transfer_fee_audit.json data/solana_transfer_fee_audit_polosa.json data/solana_transfer_fee_audit_cache.json; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
