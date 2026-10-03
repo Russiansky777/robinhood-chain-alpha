@@ -207,11 +207,38 @@ jobs:
         if: inputs.dejstvie == 'postavit'
         env:
           SEKRET: ${{ secrets.BLOOM_TREKKER_SEKRET }}
+          # УЗЕЛ ТРЕКЕРА (Code-1, слово владельца 04.10, п.1).
+          # Публичный узел режет: 41 тик подряд ответил 429 Too Many Requests,
+          # с 18:54 по 19:11 EDT, ни одного капитала за это время. Владелец
+          # разрешил Helius из уже заведённого секрета лаборатории, кредиты
+          # ~20 тыс. в сутки. Берём КЛЮЧ ЗОНДОВ (HELIUS_API_KEY2): он и заведён
+          # ровно под измерения, торговый ключ трогать нечего. Если его нет --
+          # общий HELIUS_API, и только потом пусто (тогда остаётся публичный).
+          # Отдельного секрета BLOOM_TREKKER_RPC в репозитории нет, поэтому он
+          # стоит первым: как только владелец его заведёт, он перебьёт всё
+          # остальное без правки этого файла.
           UZEL: ${{ secrets.BLOOM_TREKKER_RPC }}
+          HELIUS_ZONDOV: ${{ secrets.HELIUS_API_KEY2 }}
+          HELIUS_OBSHCHIJ: ${{ secrets.HELIUS_API }}
         run: |
           set -e
           [ -n "$SEKRET" ] || { echo "OTKAZ: sekreta BLOOM_TREKKER_SEKRET net -- bez nego sluzhba ne podnimaetsja narochno" | tee -a "$OUT"; exit 1; }
           [ "${#SEKRET}" -ge 16 ] || { echo "OTKAZ: sekret koroche 16 znakov" | tee -a "$OUT"; exit 1; }
+          # УЗЕЛ ВЫБИРАЕТСЯ ЗДЕСЬ, И В ОТЧЁТ ИДЁТ ТОЛЬКО ИМЯ ИСТОЧНИКА.
+          # Ни ключ, ни адрес узла не печатаются ни разу: ключ Helius стоит
+          # прямо в адресе, поэтому напечатать адрес -- это напечатать ключ.
+          if [ -n "$UZEL" ]; then
+            ISTOCHNIK_UZLA="BLOOM_TREKKER_RPC"
+          elif [ -n "$HELIUS_ZONDOV" ]; then
+            UZEL="https://mainnet.helius-rpc.com/?api-key=$HELIUS_ZONDOV"
+            ISTOCHNIK_UZLA="HELIUS_API_KEY2 (kljuch zondov)"
+          elif [ -n "$HELIUS_OBSHCHIJ" ]; then
+            UZEL="https://mainnet.helius-rpc.com/?api-key=$HELIUS_OBSHCHIJ"
+            ISTOCHNIK_UZLA="HELIUS_API (obshchij kljuch)"
+          else
+            ISTOCHNIK_UZLA="net ni odnogo -- ostajotsja publichnyj uzel"
+          fi
+          echo "uzel trekera: $ISTOCHNIK_UZLA" | tee -a "$OUT"
           ssh -n $SSH_OPTS root@"$HOST" "mkdir -p /opt/kapital /var/lib/kapital"
           scp $SSH_OPTS analysis/c3_kapital_trekker.py root@"$HOST":/opt/kapital/c3_kapital_trekker.py
           # СЕКРЕТЫ -- ТОЛЬКО ЧЕРЕЗ stdin И ТОЛЬКО В ФАЙЛ 0600.
