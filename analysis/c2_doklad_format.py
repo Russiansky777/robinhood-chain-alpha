@@ -340,8 +340,7 @@ def _buy(п: dict, поз: dict | None) -> str:
     поз = поз if isinstance(поз, dict) else {}
     время = п.get("время")
     голова = f"🟢 {время} BUY" if время else "🟢 BUY"
-    имя = (_экран(п.get("имя_токена")) if п.get("имя_токена")
-           else (_экран(str(п.get("минт"))[:6]) if п.get("минт") else НЕТ))
+    имя = имя_с_минтом(п)
     s = f"S+{int(п['s_n'])}" if п.get("s_n") is not None else "S+?"
     # ПУТЬ -- ТРЕМЯ БУКВАМИ, как в образце: У увидели, Р решили, С собрали.
     # Скобка печатается только целиком: половина кусков хуже, чем ни одного,
@@ -386,6 +385,35 @@ def _buy(п: dict, поз: dict | None) -> str:
                  f"посадка не подтверждена: {_экран(п['посадка_почему'])}",
                  ссылка(п.get("подпись_источника"))]
     return " · ".join([ч for ч in части if ч])
+
+
+# ИМЯ ТОКЕНА РЯДОМ С МИНТОМ -- ИНАЧЕ ОДНОИМЁННЫЕ ЧИТАЮТСЯ КАК ПОВТОР.
+# Найдено ночью 02->03.10: источник 5YRgrP3m купил Fleek в 23:56:04Z и снова
+# Fleek в 23:57:01Z, и это выглядело двойной покупкой одной пары. По цепи это
+# ДВА РАЗНЫХ МИНТА (7DpzqFua1UvSe9... и Fs7xotBXuGbLLA...) с одинаковым именем;
+# правило "одна покупка на пару источник+минт" не нарушалось -- за сутки пар 58
+# и повторов 0. А имён, под которыми ходили РАЗНЫЕ минты, в тех же сутках три:
+# Fleek (2 минта), Poopy Bot (3), Fuck Chairman (2).
+#
+# ПОЭТОМУ ИМЯ БЕЗ МИНТА НЕ ПЕЧАТАЕТСЯ НИГДЕ: имя -- не личность токена, личность
+# -- минт. Пять знаков минта хватает, чтобы два одноимённых различались глазом,
+# и строка от них не распухает.
+ЗНАКОВ_МИНТА_В_СТРОКЕ = 5
+
+
+def имя_с_минтом(п: dict) -> str:
+    """«<имя>·<минт[:5]>». Нет имени -- один минт, нет минта -- одно имя."""
+    п = п if isinstance(п, dict) else {}
+    имя_ = п.get("имя_токена")
+    минт_ = п.get("минт") or п.get("mint")
+    кусок = (str(минт_)[:ЗНАКОВ_МИНТА_В_СТРОКЕ] if минт_ else "")
+    if имя_ and кусок:
+        return f"{_экран(имя_)}·{_экран(кусок)}"
+    if имя_:
+        return _экран(имя_)
+    if минт_:
+        return _экран(str(минт_)[:6])
+    return НЕТ
 
 
 def строка_buy(п: dict, прежняя: str, *, поз: dict | None = None) -> str:
@@ -545,8 +573,7 @@ def _sell(п: dict, поз: dict | None) -> str:
     д = деньги_продажи(п, поз)
     if not д["ok"]:
         raise ValueError(д["why_not"])
-    имя = (_экран(п.get("имя_токена")) if п.get("имя_токена")
-           else (_экран(str(п.get("минт"))[:6]) if п.get("минт") else НЕТ))
+    имя = имя_с_минтом(п)
     время = п.get("время_продажи")
     _м = маркер_продажи(д.get("процент"))
     голова = f"{_м} {время} SELL" if время else f"{_м} SELL"
@@ -1363,7 +1390,7 @@ def подменить(вид: str, прежняя: str, п=None, *, поз=None
 
 # ------------------------------------------------------------- самопроверка
 
-ОБРАЗЕЦ_BUY = ("🟢 14:06:15 BUY · lane_s0 · frank · 0.3 · The Torture Chamber · "
+ОБРАЗЕЦ_BUY = ("🟢 14:06:15 BUY · lane_s0 · frank · 0.3 · The Torture Chamber·9twiu · "
                 "S+3 · 77 мс (У52·Р18·С7) · astralane / EU→EU · [tx]")
 # ОБРАЗЦЫ ЧАСА -- В ШАБЛОНЕ 02.10 (прежние, вида «сделок 3 на 0.90 · итог
 # −0.1006», отменены словом владельца 02.10 00:17 вместе со всем форматом).
@@ -1446,12 +1473,34 @@ def self_test() -> int:  # noqa: C901
         провалено += (not ок)
 
     # --- BUY БАЙТ В БАЙТ ПО ОБРАЗЦУ ВЛАДЕЛЬЦА
+    # МИНТ В ОБРАЗЦЕ ЕСТЬ, И ЭТО НЕ УКРАШЕНИЕ. У живой позиции минт есть всегда,
+    # а имя -- не личность токена: 02->03.10 под именем Fleek ходили два разных
+    # минта, и строка без минта читалась как двойная покупка одной пары.
     п = {"время": "14:06:15", "группа": "lane_s0", "имя_источника": "frank",
          "вошло_sol": 0.3, "имя_токена": "The Torture Chamber", "s_n": 3,
+         "минт": "9twiuK7Y3rLhPLnKzq6s9LJmHcJvEayqWVAJkz8Kpump",
          "путь_всего": 77, "путь_увидели": 52, "путь_решили": 18,
          "путь_собрали": 7, "довёз": "astralane", "подпись_источника": None}
     поз = {"lane_region_point": "EU", "lane_region_leader": "EU"}
     выш = строка_buy(п, "ПРЕЖНЯЯ", поз=поз)
+    # ОДНОИМЁННЫЕ ТОКЕНЫ РАЗЛИЧАЮТСЯ В СТРОКЕ -- живой случай 02->03.10.
+    _fleek1 = строка_buy(dict(п, имя_токена="Fleek",
+                              минт="7DpzqFua1UvSe9zTqCnPFhMqNCRfr3sN7dwKpBpHpump"),
+                         "П", поз=поз)
+    _fleek2 = строка_buy(dict(п, имя_токена="Fleek",
+                              минт="Fs7xotBXuGbLLArTkCfkJWcPsCkJRUMAYa1EJ1E1pump"),
+                         "П", поз=поз)
+    chk("два РАЗНЫХ минта с одним именем дают РАЗНЫЕ строки",
+        _fleek1 != _fleek2 and "Fleek·7Dpzq" in _fleek1
+        and "Fleek·Fs7xo" in _fleek2, (_fleek1[:80], _fleek2[:80]))
+    chk("имени без минта в строке покупки больше нет",
+        "· Fleek ·" not in _fleek1, _fleek1[:120])
+    _без_имени = строка_buy(dict(п, имя_токена=None,
+                                  минт="7DpzqFua1UvSe9zTqCnPFhMqNCRfr3sN7dwKpBpHpump"),
+                             "П", поз=поз)
+    chk("имени нет -- в строке стоит минт шестью знаками и без точки-разделителя",
+        "· 7Dpzq" in _без_имени and "7DpzqF" in _без_имени
+        and "·7Dpzq" not in _без_имени, _без_имени[:110])
     # В образце владельца ссылка записана как [tx]; в чате она уходит разметкой
     # <a href=…>tx</a>, а без подписи -- голым словом tx. Сверяем обе формы.
     chk("BUY байт в байт по образцу (ссылка без подписи -- слово tx)",
@@ -1920,19 +1969,19 @@ def self_test() -> int:  # noqa: C901
         b13 = строка_buy(п13, "ПРЕЖНЯЯ", поз=поз13)
         b14 = строка_buy(п14, "ПРЕЖНЯЯ", поз=поз14)
         chk("21:11Z BUY байт в байт: время 23:11 по Мадриду, отправитель / точка -> лидер",
-            b11 == ('🟢 23:11:28 BUY · cand1 · 0.1 · Call Market · ист 6qud…KMhy · S+0 · '
+            b11 == ('🟢 23:11:28 BUY · cand1 · 0.1 · Call Market·2YJPp · ист 6qud…KMhy · S+0 · '
                     '94 мс (У69·Р17·С8) · jito / EU→EU · '
                     '<a href="https://solscan.io/tx/3FnoR5D7N2mCDCJVDhw7D8pAr1fh8gW'
                     '9wBVGX6k5TqrYF7WEShQ1hscGYKMey5mineaYWnBVstntvC4GMi7zpjrR">'
                     'tx</a>'), b11)
         chk("21:13Z BUY байт в байт: 23:13 по Мадриду (довёз astralane, точка EU)",
-            b13 == ('🟢 23:13:37 BUY · cand1 · 0.1 · Yuri The Space Monkey · ист 6qud…KMhy · S+0 · '
+            b13 == ('🟢 23:13:37 BUY · cand1 · 0.1 · Yuri The Space Monkey·AgwKs · ист 6qud…KMhy · S+0 · '
                     '90 мс (У68·Р15·С7) · astralane / EU→EU · '
                     '<a href="https://solscan.io/tx/3NMM9L15jD16jwiiULLB6oXH3v1eQ6Qq'
                     'DAX75gRXjftrWR5yBTNRfA5mtSPwr84twgXvWiRiD8M6Se4KDLVNjMPS">'
                     'tx</a>'), b13)
         chk("14:06Z BUY байт в байт: 16:06 по Мадриду, точки нет -> прочерк, лидер Asia",
-            b14 == ('🟢 16:06:15 BUY · lane_s0 · frank · 0.3 · The Torture Chamber · '
+            b14 == ('🟢 16:06:15 BUY · lane_s0 · frank · 0.3 · The Torture Chamber·9twiu · '
                     'ист 498g…AayQ · S+3 · 77 мс (У52·Р18·С7) · astralane / —→Asia · '
                     '<a href="https://solscan.io/tx/Zh4DHgJWUuh8ihfdtcvuyqdZAxXSVx2L'
                     '7EHBvX1PGcKK2NUMdWuDutJg9LfZR3iAMyiMQtaYAxc6svcA9euCzwi">'
@@ -1968,7 +2017,7 @@ def self_test() -> int:  # noqa: C901
         # --- ДЕФЕКТ 2: SELL брал ПЛАН билета и ВАЛОВЫЙ оборот
         s11 = строка_sell(п11, "ПРЕЖНЯЯ", поз=поз11)
         chk("21:11Z SELL байт в байт: 23:11 по Мадриду, факт ушло -> факт вернулось",
-            s11 == ('🔴 23:11:57 SELL · Call Market · ист 6qud…KMhy · 29.4 с / 112 слотов (план 108) '
+            s11 == ('🔴 23:11:57 SELL · Call Market·2YJPp · ист 6qud…KMhy · 29.4 с / 112 слотов (план 108) '
                     '· 0.103351 → 0.110062 SOL · +0.006710 (+6.5 %) · '
                     '<a href="https://solscan.io/tx/2Pws1o8TBAWijnsvvgBCmtxneYsQpUZt'
                     'FDEkhbjcjdcBGqQp9kSriQGTWdmfojYRjL4Ldq6WATyKwVSbvTutmTSe">'
@@ -1986,7 +2035,7 @@ def self_test() -> int:  # noqa: C901
         # --- ДЕФЕКТ 3: двойной кружок
         s13 = строка_sell(п13, "ПРЕЖНЯЯ", поз=поз13)
         chk("21:14:03Z SELL байт в байт: 23:14:03 по Мадриду, маркер +46.7 % -> 🔴🟢",
-            s13 == ('🔴🟢 23:14:03 SELL · Yuri The Space Monkey · ист 6qud…KMhy · 26.1 с / 107 слотов '
+            s13 == ('🔴🟢 23:14:03 SELL · Yuri The Space Monkey·AgwKs · ист 6qud…KMhy · 26.1 с / 107 слотов '
                     '(план 108) · 0.102005 → 0.149628 SOL · +0.047623 '
                     '(+46.7 %) · <a href="https://solscan.io/tx/3s6gLxE9ejCEJDyBRGTR'
                     'vbFjtWRCu85hWB71Ry4U9rgeDbduMT1p41v391qMpEevKqH797JiDJC19e8jrrf'
