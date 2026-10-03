@@ -10,14 +10,16 @@ on:
         description: "минт сделки"
         required: true
       pool:
-        description: "адрес пула (из записи решения, поле source_pool)"
-        required: true
+        description: "адрес пула (поле pool записи позиции). ПУСТО -- считается только продажа источника: у сделок на кривой pump.fun пула нет вовсе"
+        required: false
+        default: ""
       source_signature:
         description: "подпись покупки источника -- от неё отсчитывается окно"
         required: true
       source_slot:
-        description: "слот покупки источника"
-        required: true
+        description: "слот покупки источника (нужен только вместе с пулом)"
+        required: false
+        default: ""
       our_wallet:
         description: "наш кошелёк (чтобы подписать строки 'мы')"
         required: false
@@ -66,19 +68,39 @@ jobs:
       - name: "Разбор по цепи"
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          # ПОЛЯ ЗАПУСКА ИДУТ ПЕРЕМЕННЫМИ ОКРУЖЕНИЯ, А НЕ ПОДСТАНОВКОЙ.
+          # Раньше они подставлялись прямо в командную строку внутри одинарных
+          # кавычек: одна кавычка в поле -- и это уже чужая команда на хосте.
+          # Code-3 закрыл такую же дыру в своём прогоне 04.10, беру правило
+          # как есть. Заодно пустой --pool больше не ломает разбор: модуль
+          # сам считает только продажу источника, если пула нет.
+          MINT: ${{ inputs.mint }}
+          POOL: ${{ inputs.pool }}
+          SRC_SIG: ${{ inputs.source_signature }}
+          SRC_SLOT: ${{ inputs.source_slot }}
+          OUR_WALLET: ${{ inputs.our_wallet }}
+          SRC_WALLET: ${{ inputs.source_wallet }}
+          WINDOW_SLOTS: ${{ inputs.window_slots }}
+          MAX_TX: ${{ inputs.max_tx }}
         run: |
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "нет ключа Helius -- разбор невозможен"; exit 1; }
           mkdir -p data docs
+          DOVODY=""
+          [ -n "$POOL" ] && DOVODY="$DOVODY --pool $POOL"
+          [ -n "$SRC_SLOT" ] && DOVODY="$DOVODY --source-slot $SRC_SLOT"
+          if [ -z "$POOL" ]; then
+            echo "пула нет -- считается ТОЛЬКО продажа источника (2-3 кредита)"
+            [ -n "$SRC_WALLET" ] || { echo "OTKAZ: без пула нужен source_wallet"; exit 1; }
+          fi
           "$PY" analysis/night_trade_forensics.py \
-            --mint '${{ inputs.mint }}' \
-            --pool '${{ inputs.pool }}' \
-            --source-signature '${{ inputs.source_signature }}' \
-            --source-slot '${{ inputs.source_slot }}' \
-            --our-wallet '${{ inputs.our_wallet }}' \
-            --source-wallet '${{ inputs.source_wallet }}' \
-            --window-slots '${{ inputs.window_slots }}' \
-            --max-tx '${{ inputs.max_tx }}' \
+            --mint "$MINT" \
+            --source-signature "$SRC_SIG" \
+            --our-wallet "$OUR_WALLET" \
+            --source-wallet "$SRC_WALLET" \
+            --window-slots "$WINDOW_SLOTS" \
+            --max-tx "$MAX_TX" \
+            $DOVODY \
             --out data/trade_forensics.json \
             --out-md docs/trade_forensics.md 2>&1 | tail -80
 
