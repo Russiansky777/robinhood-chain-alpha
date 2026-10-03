@@ -113,6 +113,17 @@ jobs:
             for H in /root /home/*; do
               [ -d \"\$H/arhiv_pumpapi\" ] || continue
               printf '%s/arhiv_pumpapi: %s, файлов %s\n' \"\$H\" \"\$(du -sh \"\$H/arhiv_pumpapi\" | cut -f1)\" \"\$(find \"\$H/arhiv_pumpapi\" -type f | wc -l)\"
+              # ВОЗРАСТ -- ДО ЧИСТКИ И В ОТЧЁТ. Потолок режет с САМЫХ СТАРЫХ
+              # файлов, и это чужие данные (архивы зондов Code-2). Числом по
+              # месяцам видно, что именно уедет, а что останется; без этой
+              # строки \"стало 110 ГБ\" ничего не говорит о том, чего лишились.
+              echo '  по месяцам (ГБ, по времени изменения файла):'
+              find \"\$H/arhiv_pumpapi\" -type f -printf '%TY-%Tm %s\n' 2>/dev/null \
+                | awk '{g[\$1]+=\$2; n[\$1]++} END {for (m in g) printf \"    %s  %7.1f GB  %4d fajlov\n\", m, g[m]/1073741824, n[m]}' \
+                | sort
+              echo '  самый старый и самый свежий файл:'
+              find \"\$H/arhiv_pumpapi\" -type f -printf '%TY-%Tm-%Td %p\n' 2>/dev/null \
+                | sort | sed -n \"1p;\\\$p\" | sed 's/^/    /'
             done
             echo '--- журналы systemd ---'; journalctl --disk-usage 2>/dev/null || true
           " 2>&1 | tee -a "$OUT_FILE"
