@@ -466,7 +466,16 @@ def tokennye_scheta(rpc_call, koshelek: str, *, schjotchik=None) -> list:
                                 {"encoding": "jsonParsed",
                                  "commitment": "confirmed"}]),
                       "getTokenAccountsByOwner")
-        for зап in ((р.get("value") if isinstance(р, dict) else р) or []):
+        ряд = (р.get("value") if isinstance(р, dict) else р) or []
+        if not isinstance(ряд, list):
+            raise ОшибкаТрекера(
+                f"getTokenAccountsByOwner: value не список, а "
+                f"{type(ряд).__name__} -- узел отдал не то")
+        for зап in ряд:
+            if not isinstance(зап, dict):
+                raise ОшибкаТрекера(
+                    f"getTokenAccountsByOwner: запись счёта не словарь "
+                    f"({type(зап).__name__})")
             счёт = зап.get("account") or {}
             инфо = (((счёт.get("data") or {}).get("parsed") or {})
                     .get("info") or {})
@@ -474,11 +483,22 @@ def tokennye_scheta(rpc_call, koshelek: str, *, schjotchik=None) -> list:
             рез = ((инфо.get("rentExemptReserve") or {}).get("amount")
                    if isinstance(инфо.get("rentExemptReserve"), dict)
                    else инфо.get("rentExemptReserve"))
+            # ЧИСЛА УЗЛА ПРОВЕРЯЮТСЯ, А НЕ ПРЕДПОЛАГАЮТСЯ: лампорты строкой
+            # «сто» давали бы ValueError из глубины int(), и причина в прогоне
+            # читалась бы как поломка модуля, а не как мусор от узла.
+            try:
+                лампорты = int(счёт.get("lamports") or 0)
+                остаток = int(сумма or 0)
+            except (TypeError, ValueError) as сбой:
+                raise ОшибкаТрекера(
+                    f"getTokenAccountsByOwner: в счёте {зап.get('pubkey')} не "
+                    f"числа (lamports={счёт.get('lamports')!r}, "
+                    f"amount={сумма!r}): {type(сбой).__name__}") from сбой
             счета.append({
                 "adres": зап.get("pubkey"),
                 "mint": str(инфо.get("mint") or ""),
-                "lamports": int(счёт.get("lamports") or 0),
-                "amount": int(сумма or 0),
+                "lamports": лампорты,
+                "amount": остаток,
                 "decimals": int(((инфо.get("tokenAmount") or {})
                                  .get("decimals")) or 0),
                 "renta_rezerv": (int(рез) if рез not in (None, "") else None),
@@ -1439,7 +1459,9 @@ function нарисовать() {
   if (данные.neopoznannyh) {
     сл.push("непонятных транзакций: " + данные.neopoznannyh);
   }
-  if (о.propuskov) {
+  // ПРОПУСКИ СЧИТАЮТСЯ, ТОЛЬКО ЕСЛИ РЯД ВООБЩЕ ЕСТЬ: на пустом ряде «пропусков
+  // 145» -- это шум поверх честного «ряда ещё нет».
+  if (о.propuskov && о.korzin_est) {
     сл.push("пропусков в ряде: " + о.propuskov
             + (о.dolgij_propusk_sek ? " (самый долгий "
                + Math.round(о.dolgij_propusk_sek / 60) + " мин)" : ""));
@@ -1802,7 +1824,7 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
 
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: меньше -- значит что-то пропущено молча, и
 # это считается провалом, а не мелочью.
-ZHDEM_PROVEROK = 60
+ZHDEM_PROVEROK = 61
 # СУТОЧНЫЕ ИТОГИ УЧЁТА ПОЛОСЫ -- ЗАМЕР ПО ФАЙЛУ data/sdelki_polosy_vse_s_2709.json
 # (снят 03.10T17:07Z, 578 рядов), поле «итог_po_cepi_sol» КИРИЛЛИЦЕЙ. Числа
 # объявлены, чтобы смена файла была видна числом, а не молчанием.
@@ -2127,6 +2149,34 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         chk("позиция без цены входа: капитал занижен, и это названо числом",
             р6["bez_vhoda"] == 1 and р6["pozicii"] == 0
             and р6["bez_vhoda_minty"] == [МИНТ], р6)
+        # МУСОР ОТ УЗЛА НАЗЫВАЕТСЯ МУСОРОМ ОТ УЗЛА, А НЕ ПОЛОМКОЙ МОДУЛЯ.
+        мусорные = {
+            "ошибка узла": lambda м, п: {"error": {"code": -32000, "message": "oops"}},
+            "пустой ответ": lambda м, п: {},
+            "не словарь": lambda м, п: ["мусор"],
+            "лампорты строкой": lambda м, п: (
+                {"result": {"context": {"slot": 1}, "value": 5}} if м == "getBalance"
+                else {"result": {"value": [{"pubkey": "ata1",
+                                            "account": {"lamports": "сто",
+                                                        "data": {}}}]}}),
+        }
+        плохо_мусора = []
+        for имя_м, зов_м in мусорные.items():
+            кат_м = врем / f"musor_{abs(hash(имя_м))}"
+            try:
+                р_м = progon(кат_м, rpc_call=зов_м, koshelek=КОШ,
+                             sejchas=1_700_000_000)
+            except Exception as сбой:  # noqa: BLE001
+                плохо_мусора.append((имя_м, f"ТРАССА {type(сбой).__name__}"))
+                continue
+            if р_м.get("ok") or not р_м.get("why_not"):
+                плохо_мусора.append((имя_м, (р_м.get("ok"), р_м.get("why_not"))))
+            elif not (кат_м / ФАЙЛ_СОСТОЯНИЯ).exists():
+                плохо_мусора.append((имя_м, "состояние не записано"))
+        chk("узел отдал мусор -- отказ СЛОВАМИ (и состояние на месте), а не "
+            "трасса и не тихий ноль: четыре вида мусора",
+            not плохо_мусора, плохо_мусора)
+
         chk("кредиты считаются по методам и по суткам",
             any("getBalance" in (v or {}) for v in счёт.po_sutkam.values())
             and any("getTransaction" in (v or {}) for v in счёт.po_sutkam.values()),
