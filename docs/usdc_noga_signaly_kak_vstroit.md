@@ -1,6 +1,6 @@
 # USDC-нога для типов, куда идут сигналы: как врезать, что проверено и чего нет
 
-Модуль: `analysis/c3_usdc_noga_signaly.py` (самопроверка **166/166**,
+Модуль: `analysis/c3_usdc_noga_signaly.py` (самопроверка **171/171**,
 `python3 analysis/c3_usdc_noga_signaly.py`). Замер таблицей:
 `python3 analysis/c3_usdc_noga_signaly.py --zamer data/c3_usdc_noga_signaly/zamer.json`.
 База — голова `claude/nifty-sagan-r0polg`, слита в `claude/stroiteli` (правило 8).
@@ -174,32 +174,95 @@ USDC-нога закрыта:
 
 ## 6. Диф №2 (Code-1, `bloom_own_send`) — врезка второй таблицы типов
 
-Врезка ставится **сразу после** блока USDC-ноги (`из_["lane_usdc_noga_why_not"]`)
-и до `lane_route`. Вид ответа у `storona`/`instrukcii`/`sobrat` **тот же**, что у
-`c2_usdc_noga`, поэтому врезка — копия той же формы:
+Прочитан ТЕКУЩИЙ код врезки USDC-ноги (`bloom_own_send.py`, блок
+`if (not сб.get("ok") and ПРИЗНАК_КОТИРОВКИ_НЕ_SOL in (сб.get("why_not") or "")):`
+— там `разм_un = размер_первой_двухшаговой(позиции_сейчас, лампорты)`, потолок
+`потолок_usdc_ноги_sol(позиции_сейчас)`, тень `тень_usdc_ноги(...)`, бой
+`бой_usdc_ноги(группа)` + `таблица_ноги(состояние)`), и врезка ниже написана **его
+именами**, а не примерными: размер, потолок и таблица адресов уже посчитаны
+выше — второй раз их считать не надо.
+
+Место: **внутри того же `if`**, сразу за `else: из_["lane_usdc_noga_boj_why_not"]
+= ун.get("why_not")` и до блока `# ВТОРОЙ МАРШРУТ`.
 
 ```python
-    # USDC-НОГА СИГНАЛЬНЫХ ТИПОВ (CPMM, LaunchLab, Pump AMM, кривая v2). Тот же
-    # флаг BLOOM_USDC_NOGA и тот же режим: таблицы типов две, выключатель один.
-    if not сб.get("ok") and ПРИЗНАК_КОТИРОВКИ_НЕ_SOL in (сб.get("why_not") or "") \
-            and not из_.get("lane_usdc_noga_godilos"):
-        import c3_usdc_noga_signaly as UNS  # noqa: PLC0415
-        размер_un = размер_первой_двухшаговой(позиции_сейчас, лампорты)["lamports"]
-        сн = UNS.sobrat(tx_istochnika=tx_источника or {}, istochnik=источник or "",
-                        mint=минт or "", nash_koshelek=наш_кошелёк,
-                        lamporty=размер_un, kesh_nog=кэш_ног,
-                        proskalzyvanie=проскальзывание, gruppa=группа,
-                        nashi_tablicy=[UNS.TABLICA_ADRESOV], rpc_call=rpc_call,
-                        nons=нонс, чаевые как у двухшагового)
-        из_["lane_usdc_signaly_godilos"] = сн.get("ok")
-        из_["lane_usdc_signaly_why_not"] = сн.get("why_not")
-        из_["lane_usdc_signaly"] = {к: сн.get(к) for к in
-            ("label", "kotirovshchik", "leg1_min_out", "leg2_amount_in",
-             "min_out", "expected_out", "min_out_from", "razvernut", "size")}
+        # USDC-НОГА СИГНАЛЬНЫХ ТИПОВ (CPMM, LaunchLab, Pump AMM, кривая v2).
+        # Тот же флаг BLOOM_USDC_NOGA и тот же размер/потолок/таблица, что у
+        # ноги выше: таблицы типов две, выключатель один. Берётся ТОЛЬКО если
+        # та нога не собралась -- у CPMM тип есть в обеих таблицах, и первым
+        # зовётся её путь.
+        if not сб.get("ok") and not из_.get("lane_usdc_noga_godilos"):
+            из_["stage"] = "usdc_signaly_shadow"
+            try:
+                import c3_usdc_noga_signaly as UNS  # noqa: PLC0415
+
+                тс = UNS.ten(tx_istochnika=tx_источника or {},
+                             istochnik=источник or "", mint=минт or "",
+                             lamporty=лампорты_un, kesh_nog=кэш_ног,
+                             proskalzyvanie=проскальзывание, gruppa=группа)
+            except Exception as exc:  # noqa: BLE001
+                тс = {"ok": False,
+                      "why_not": (f"тень USDC-ноги сигнальных типов не "
+                                   f"загрузилась: {след_сбоя(exc)}")}
+            из_["lane_usdc_signaly_godilos"] = тс.get("ok")
+            из_["lane_usdc_signaly_why_not"] = тс.get("why_not")
+            из_["lane_usdc_signaly"] = {к: тс.get(к) for к in
+                ("rezhim", "pool_program", "label", "kotirovshchik",
+                 "leg1_pool_program", "leg1_template_age_s", "leg1_min_out",
+                 "leg2_amount_in", "leg2_to_pool", "quote_fee_bps", "min_out",
+                 "expected_out", "min_out_from", "razvernut", "chtenij")}
+            # БОЙ -- ТЕМ ЖЕ ПРИЗНАКОМ ГРУППЫ, что у ноги выше.
+            if тс.get("ok") and бой_usdc_ноги(группа):
+                из_["stage"] = "usdc_signaly_build"
+                try:
+                    сн = UNS.sobrat(
+                        tx_istochnika=tx_источника or {},
+                        istochnik=источник or "", mint=минт or "",
+                        nash_koshelek=кошелёк_полосы(), lamporty=лампорты_un,
+                        kesh_nog=кэш_ног, proskalzyvanie=проскальзывание,
+                        cu_units=предел_cu("two_step"),
+                        prioritet_lamporty=int(round(приоритет_sol()
+                                                      * ЛАМПОРТОВ_В_SOL)),
+                        chaevye_lamporty=int(round(чаевые_sol()
+                                                    * ЛАМПОРТОВ_В_SOL)),
+                        chaevye_spiskom=чаевые_всем,
+                        chaevye_adres=(None if чаевые_всем else выбрать_чаевые(
+                            источник_подпись or ключ_операции)),
+                        nons=нонс_сборщикам, rpc_call=rpc_call, gruppa=группа,
+                        nashi_tablicy=([_альт_un["адрес"]]
+                                        if _альт_un.get("ok") else None))
+                except Exception as exc:  # noqa: BLE001
+                    сн = {"ok": False,
+                          "why_not": (f"сборка USDC-ноги сигнальных типов не "
+                                       f"загрузилась: {след_сбоя(exc)}")}
+                из_["lane_usdc_signaly_boj"] = {к: сн.get(к) for к in
+                    ("ok", "why_not", "min_out", "min_out_from", "expected_out",
+                     "size", "build_ms", "lut_tables")}
+                if сн.get("ok"):
+                    # Дальше путь ОБЩИЙ: ответ sobrat() того же вида, что у
+                    # прямой, двухшаговой и USDC-ноги.
+                    сб = сн
+                    из_["route"] = UNS.ROUTE
+                    лампорты = лампорты_un
+                    из_["lamports"] = лампорты
+                    из_["size_sol"] = лампорты / ЛАМПОРТОВ_В_SOL
+                else:
+                    из_["lane_usdc_signaly_boj_why_not"] = сн.get("why_not")
 ```
 
-В тени (`BLOOM_USDC_NOGA=ten`) `sobrat` ничего не собирает и говорит почему;
-список инструкций и цену можно смотреть через `instrukcii(...)` без сборки.
+Что здесь важно и проверено:
+
+* **поля тени -- те же имена**, что у `c2_usdc_noga.ten` (самопроверка это
+  сверяет: все её поля покрыты, включая `usdc_v_pul_istochnika` и
+  `token_iz_pula_istochnika`), поэтому разбор журнала решений менять не надо —
+  меняется только префикс `lane_usdc_signaly_`;
+* **`_альт_un` и `лампорты_un` уже есть** в этом блоке выше: таблица адресов
+  читается один раз, размер и потолок — тоже;
+* **в тени `min_out` даёт КОТИРОВЩИК ТИПА, а не цена события** (нуль чтений), то
+  есть ровно то число, с которым пошла бы боевая сборка; цена события при этом
+  тоже кладётся в журнал — двумя полями источника;
+* **условие `not из_.get("lane_usdc_noga_godilos")`** и есть старшинство: CPMM
+  стоит в обеих таблицах, и первым работает путь `c2_usdc_noga`.
 
 ## 7. Диф №3 ✅ ВЗЯТ 03.10 (Code-1, `c2_swap_build`) — связанный накопитель выводится
 

@@ -552,6 +552,102 @@ def summy_nog(**kw) -> dict:
     return _moduli()[2].summy_nog(**kw)
 
 
+# ------------------------------------------------------------------ тень
+
+def ten(*, tx_istochnika: dict, istochnik: str, mint: str, lamporty: int,
+        kesh_nog, proskalzyvanie: float = 0.35, gruppa: str | None = None,
+        nalog_kotirovki_bps=None, mint_kotirovki: str = USDC) -> dict:
+    """ЧИСЛА ноги без транзакции и без сети: годилось бы или нет, и почему.
+
+    Вид ответа -- РОВНО как у c2_usdc_noga.ten, чтобы поля журнала решений у двух
+    таблиц типов совпадали и врезка была одна на обе. Решений не принимает:
+    транзакции здесь нет вовсе, и в тени полоса ничего не отправляет.
+
+    ОТЛИЧИЕ ОДНО, И ОНО В ПОЛЬЗУ ТЕНИ: min_out считает КОТИРОВЩИК ТИПА (нуль
+    чтений), а не цена события. У цены события наш объём не учтён, и выход она
+    завышает; у котировщика цена из состояния ПОСЛЕ сделки источника -- то есть
+    то самое число, с которым пошла бы боевая сборка. Поэтому тень здесь
+    отвечает на вопрос «сколько бы дали», а не «сколько обещает чужая сделка».
+    """
+    C, _B, UN, TS, SB, _K = _moduli()
+    iz = {"ok": False, "why_not": None, "route": ROUTE, "rezhim": rezhim(gruppa),
+          "pool_program": None, "label": None, "way": None,
+          "quote_mint": mint_kotirovki, "leg1_pool_program": None,
+          "leg1_template_age_s": None, "leg1_min_out": None,
+          "leg2_amount_in": None, "leg2_to_pool": None, "quote_fee_bps": None,
+          "min_out": None, "expected_out": None, "min_out_from": None,
+          "razvernut": None, "chtenij": 0, "kotirovshchik": None,
+          # ЦЕНА СОБЫТИЯ ИСТОЧНИКА -- ТЕМИ ЖЕ ИМЕНАМИ, ЧТО У c2_usdc_noga.ten.
+          # Числа не для отправки (наш объём в них не входит), а для журнала:
+          # по ним видно, по какой цене прошёл САМ источник.
+          "usdc_v_pul_istochnika": None, "token_iz_pula_istochnika": None}
+    if rezhim(gruppa) == UN.MODE_OFF:
+        iz["why_not"] = UN.WHY_OFF
+        return iz
+    try:
+        pul = C.identify_pool(tx_istochnika, istochnik, mint)
+        if not pul.get("ok"):
+            iz["why_not"] = f"пул источника: {pul.get('why_not')}"
+            return iz
+        prog = UN.programma_pula(tx_istochnika, pul["pool_vault"])
+        iz["pool_program"] = prog
+        st = storona(tx_istochnika, programma=prog, hranilishche=pul["pool_vault"],
+                     mint_kotirovki=mint_kotirovki)
+        iz.update(label=st.get("label"), way=st.get("way"),
+                  razvernut=st.get("razvernut"),
+                  kotirovshchik=st.get("kotirovshchik"))
+        if not st.get("ok"):
+            iz["why_not"] = st.get("why_not")
+            return iz
+        if kesh_nog is None:
+            iz["why_not"] = ("кэша шаблонов первой ноги нет -- билет в котировку "
+                             "не посчитать")
+            return iz
+        e, vozrast = kesh_nog.get(mint_kotirovki)
+        if e is None:
+            iz["why_not"] = f"шаблона SOL -> {mint_kotirovki[:8]} в кэше нет"
+            return iz
+        iz["leg1_pool_program"] = e.get("program")
+        iz["leg1_template_age_s"] = (round(vozrast, 1) if vozrast is not None
+                                     else None)
+        s = summy_nog(lamporty=lamporty, price_sol=e.get("price_sol"),
+                      q_dec=e.get("q_dec"),
+                      quote_program=(e.get("mv") or {}).get("base_program"),
+                      nalog_bps=nalog_kotirovki_bps)
+        iz.update(quote_fee_bps=s.get("quote_fee_bps"),
+                  leg1_min_out=s.get("leg1_min_out"),
+                  leg2_amount_in=s.get("leg2_amount_in"),
+                  leg2_to_pool=s.get("leg2_to_pool"))
+        if not s.get("ok"):
+            iz["why_not"] = s.get("why_not")
+            return iz
+        try:
+            c = UN.cena_sobytiya(tx_istochnika, st["tpl"],
+                                 base_mint=st["base_mint"],
+                                 quote_mint=mint_kotirovki)
+            iz.update(usdc_v_pul_istochnika=c.get("usdc_v_pul"),
+                      token_iz_pula_istochnika=c.get("token_iz_pula"))
+        except Exception as exc:  # noqa: BLE001
+            iz["cena_sobytiya_why_not"] = f"{type(exc).__name__}"
+        kb = min_out_boj(st, tx_istochnika, amount_in=int(s["leg2_to_pool"]),
+                         proskalzyvanie=proskalzyvanie,
+                         mint_kotirovki=mint_kotirovki)
+        iz.update(min_out=kb.get("min_out"), expected_out=kb.get("expected_out"),
+                  min_out_from=kb.get("put"), fee_share=kb.get("fee_share"))
+        if not kb.get("ok"):
+            iz["why_not"] = kb.get("why_not")
+            return iz
+        if vozrast is not None and vozrast > SB.LEG_MAX_AGE_S:
+            iz["why_not"] = (f"шаблон первой ноги старше {SB.LEG_MAX_AGE_S} с "
+                             f"({vozrast:.0f} с)")
+            return iz
+    except Exception as exc:  # noqa: BLE001
+        iz["why_not"] = f"тень USDC-ноги сигнальных типов: {UN._sled(exc)}"
+        return iz
+    iz["ok"] = True
+    return iz
+
+
 # ------------------------------------------------- список инструкций и сборка
 
 def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek: str,
@@ -1026,7 +1122,7 @@ def prodazha_sobrat(*, luts_gotovye: list | None = None,
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: молчаливый пропуск -- это провал. Если файла
 # образцов нет или тип перестал разбираться, проверок станет МЕНЬШЕ, и
 # самопроверка упадёт на несовпадении числа, а не промолчит зелёным.
-ZHDEM_PROVEROK = 166
+ZHDEM_PROVEROK = 171
 
 # ЗАМЕР ПО ТИПАМ НА ЖИВЫХ СДЕЛКАХ С КОТИРОВОЧНЫМ ТОКЕНОМ (не WSOL). Образцы --
 # data/c2_pool_samples/<программа>.json плюс разновидности кривой
@@ -1960,6 +2056,54 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
                 f"-- без нашей таблицы",
                 ряд and (min(ряд), max(ряд)) == ждём["razmer"],
                 (min(ряд), max(ряд)) if ряд else None)
+
+    # ------------------------------------------------- 8б. тень
+    # ТЕНЬ -- ЭТО ЧИСЛА БЕЗ ТРАНЗАКЦИИ, и вид ответа у неё обязан совпадать с
+    # c2_usdc_noga.ten: врезка в полосу одна на две таблицы типов, и поля
+    # журнала решений она берёт по именам.
+    ключи_un = set(UN.ten(tx_istochnika={}, istochnik="", mint="", lamporty=1,
+                          kesh_nog=None))
+    os.environ[UN.FLAG] = UN.MODE_SHADOW
+    os.environ.pop(UN.FLAG_GROUPS, None)
+    тени = {}
+    for p, обр in образцы_по_типам.items():
+        if not обр:
+            continue
+        о = обр[0]
+        кэш = SB.LegCache({}, None)
+        кэш.entries[о["quote"]] = зап
+        ист = о["source"] or (sorted(C.signers(о["tx"]))[0]
+                              if C.signers(о["tx"]) else None)
+        тени[p] = ten(tx_istochnika=о["tx"], istochnik=ист, mint=о["mint"],
+                      lamporty=10_000_000, kesh_nog=кэш, proskalzyvanie=0.35,
+                      mint_kotirovki=о["quote"])
+    chk("тень даёт числа по всем четырём типам",
+        len(тени) == 4 and all(т["ok"] and т["min_out"] > 0
+                               for т in тени.values()),
+        {TIPY[p]["label"]: (т["ok"], т.get("why_not")) for p, т in тени.items()})
+    chk("и говорит, КАКОЙ котировщик дал число",
+        {т["min_out_from"] for т in тени.values()}
+        == {SPOSOB_REZERVY, SPOSOB_LAUNCHLAB, SPOSOB_KRIVAYA_V2},
+        {TIPY[p]["label"]: т["min_out_from"] for p, т in тени.items()})
+    chk("в тени нет ни транзакции, ни чтений сети",
+        all("tx_base64" not in т and т["chtenij"] == 0 for т in тени.values()),
+        None)
+    нет_полей = sorted(ключи_un - set(next(iter(тени.values()))))
+    chk("поля тени покрывают все поля c2_usdc_noga.ten -- врезка одна на две таблицы",
+        not нет_полей, нет_полей)
+    os.environ[UN.FLAG] = UN.MODE_OFF
+    try:
+        т_выкл = ten(tx_istochnika={}, istochnik="x", mint="y", lamporty=1,
+                     kesh_nog=None)
+        chk("флаг выключен -- тень тоже молчит и называет причину",
+            not т_выкл["ok"] and т_выкл["why_not"] == UN.WHY_OFF,
+            т_выкл.get("why_not"))
+    finally:
+        for k, v in сохр.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
     # ------------------------------------------------- 9. режимы
     os.environ[UN.FLAG] = UN.MODE_OFF
