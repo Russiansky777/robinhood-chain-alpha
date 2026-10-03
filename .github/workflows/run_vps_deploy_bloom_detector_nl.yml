@@ -1308,8 +1308,32 @@ jobs:
             echo "SBOY: tajmer zhivuchesti ne napisal fajl doklada"
             ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u bloom-zhivuchest-chas -n 40 --no-pager"
             exit 1; }
-          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers bloom-uchet-chas.timer bloom-zhivuchest-chas.timer bloom-vygruzka-sutki.timer --no-pager" \
+          # ИМЕНА ТАЙМЕРОВ -- У САМОГО УСТАНОВЩИКА, А НЕ СПИСКОМ ЗДЕСЬ. Прежде
+          # здесь стояли три имени руками, и два таймера уборщика ренты
+          # (bloom-uborshchik-chas, bloom-uborshchik-itog-sutki), добавленные
+          # 03.10, в проверку не попали вовсе: на хосте их не было, а шаг
+          # печатал зелёные три и молчал. Найдено 03.10 на самопроверке по
+          # списку живых таймеров хоста. Теперь список берётся из модуля, и
+          # забытый таймер виден сразу.
+          # Имена -- из исходника установщика, а не списком руками: своего
+          # машинного вывода (--json) у него нет, а список имён в нём один.
+          IMENA=$(python3 -c "import re,pathlib; print(' '.join(и + '.timer' for и in re.findall(r'\"имя\":\s*\"([a-z0-9-]+)\"', pathlib.Path('deploy/hostovye_tajmery.py').read_text(encoding='utf-8'))))")
+          [ -n "$IMENA" ] || { echo "СБОЙ: имён таймеров из установщика не добыто -- проверять нечего"; exit 1; }
+          echo "таймеры установщика: $IMENA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers $IMENA --no-pager" \
             2>&1 | tee -a data/bloom_detector_deploy.txt
+          # И ГЕЙТ: каждое имя обязано быть среди живых таймеров хоста.
+          ZHIVYE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers --all --no-pager | awk '{print \$NF}'" 2>/dev/null || true)
+          NET=""
+          for T in $IMENA; do
+            case " $ZHIVYE " in *" ${T%.timer}.service "*|*" $T "*) ;; *) NET="$NET $T" ;; esac
+          done
+          if [ -n "$(echo "$NET" | tr -d ' ')" ]; then
+            echo "СБОЙ: установщик объявил таймеры, которых на хосте нет:$NET" \
+              | tee -a data/bloom_detector_deploy.txt
+            exit 1
+          fi
+          echo "все таймеры установщика на хосте есть" | tee -a data/bloom_detector_deploy.txt
           python3 deploy/checks/bez_klyuchey_v_otchete.py data/bloom_detector_deploy.txt
 
       - name: "Коммит отчёта"
