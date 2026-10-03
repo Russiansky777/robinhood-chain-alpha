@@ -344,8 +344,16 @@ def mesta_krivoj_v2(scheta: list, *, nash_koshelek: str) -> dict:
     Связанный накопитель (место 21) здесь ВЫВОДИТСЯ, а не берётся из состояния:
     в c2_swap_build про него написано «ключ не выводится семенами», и для USDC
     такого состояния у нас не будет никогда (файл заполняется ошибками цепи).
-    Замер: на живой покупке с котировкой HiMSSzzwkZ... место 21 равно
-    ATA(место 20, минт котировки, программа котировки) РОВНО.
+    Два независимых источника говорят обратное:
+      * ПУБЛИЧНЫЙ IDL (pump-fun/pump-public-docs, idl/pump.json,
+        buy_exact_quote_in_v2, счёт 21 associated_user_volume_accumulator):
+        pda.seeds = [account user_volume_accumulator, account
+        quote_token_program, account quote_mint], program -- константа, равная
+        ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL. Это и есть вывод ATA;
+      * ЗАМЕР: на трёх живых покупках с котировочными минтами (HiMSSzzwkZ...,
+        3NZ9JMVBmGAq..., XspzcW1PRtgf...) место 21 равно ATA(место 20, минт
+        котировки, программа котировки) РОВНО, 5 мест из 5 на каждой.
+    У sell_v2 эти же счета стоят на местах 19 и 20 (место gva покупки выпадает).
     """
     _C, B, _UN, _TS, _SB, _K = _moduli()
     M = KRIVAYA_V2_MESTA

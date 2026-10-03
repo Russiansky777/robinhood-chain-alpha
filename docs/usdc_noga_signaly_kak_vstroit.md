@@ -102,7 +102,9 @@ USDC-нога закрыта:
 минта котировки зависят (наш ATA котировки, связанный накопитель кривой), на них
 и проверены.
 
-**ЗАПРОС CODE-2** (без него в бою у этих типов остаётся тень):
+**ЗАПРОС CODE-2** -- отдельной страницей, с подписями и форматом:
+`docs/dlja_code2_usdc_obrazcy_2026-10-03.md`. Коротко (без этого в бою у этих типов
+остаётся тень):
 
 1. по **6+ живых покупок с котировкой USDC на каждый из четырёх типов**
    (`tx_jsonParsed` + `tx_base64`, как он отдавал продажи в
@@ -177,8 +179,24 @@ USDC-нога закрыта:
 ## 7. Диф №3 (Code-1, `c2_swap_build`) — связанный накопитель выводится
 
 В `c2_swap_build` про место 21 кривой v2 написано: «ключ не выводится семенами,
-берётся из состояния (см. `assoc_uva`)». **Выводится.** Замер на живой покупке
-`3bn6wPKuLm62t7nqfK8u9iABz8zpAQQhLhznZiPSsRN8` (котировка `HiMSSzzwkZ…`):
+берётся из состояния (см. `assoc_uva`)». **Выводится**, и это говорят два
+независимых источника.
+
+**Публичный IDL** (`pump-fun/pump-public-docs`, `idl/pump.json`, инструкция
+`buy_exact_quote_in_v2`, счёт 21 `associated_user_volume_accumulator`):
+
+```
+pda.seeds   = [account user_volume_accumulator, account quote_token_program,
+               account quote_mint]
+pda.program = ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL   (константой)
+```
+
+То есть семена ЕСТЬ, и это ровно вывод ATA. У `sell_v2` те же два счёта стоят на
+местах 19 и 20 (место `global_volume_accumulator` покупки выпадает).
+
+**Замер** на трёх живых покупках с котировочными минтами (`3bn6wPKuLm…`
+котировка `HiMSSzzwkZ…`, `K6k7PzMs…` котировка `3NZ9JMVBmGAq…`, `5dPPnCEKCX…`
+котировка `XspzcW1PRtgf…`) — 5 мест из 5 на каждой:
 
 ```
 место 20 == PDA(["user_volume_accumulator", наш кошелёк], программа кривой)
