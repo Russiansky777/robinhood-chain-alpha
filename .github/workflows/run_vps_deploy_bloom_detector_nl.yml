@@ -477,6 +477,14 @@ jobs:
           REGION_SEND=0
           LANE_MAX_POOL_FEE=0.05
           COPIERS_FILE=/home/bot/bloom_executor_live_data/kopirovshchiki.json
+          # РАЗОВЫЕ РАЗРЕШЕНИЯ ГЕЙТА -- НЕ ФЛАГИ СЛУЖБЫ. В env они не уходят:
+          # их читает только проверка перед перезапуском. Разбираются ЗДЕСЬ,
+          # потому что этот разбор строгий и падает на любом имени не из
+          # белого списка: до 03.10 vtoroe_mnenie_pervyj_deploj в список не
+          # входил, и названная в самом гейте дверь была непроходима -- прогон
+          # падал здесь, раньше гейта.
+          ZAVISSHIE_FANTOMY=no
+          VTOROE_MNENIE_PERVYJ_DEPLOJ=no
           IFS=,
           for para in $NOCHNYE; do
             imya=${para%%=*}
@@ -490,6 +498,8 @@ jobs:
               region_send)       REGION_SEND=$znach ;;
               lane_max_pool_fee) LANE_MAX_POOL_FEE=$znach ;;
               copiers_file)      COPIERS_FILE=$znach ;;
+              zavisshie_fantomy) ZAVISSHIE_FANTOMY=$znach ;;
+              vtoroe_mnenie_pervyj_deploj) VTOROE_MNENIE_PERVYJ_DEPLOJ=$znach ;;
               *) echo "СБОЙ: имя $imya не из белого списка"; exit 1 ;;
             esac
           done
@@ -497,6 +507,12 @@ jobs:
           for pair in CLOSE_ON_SELL=$CLOSE_ON_SELL TG_FORMAT=$TG_FORMAT REGION_SEND=$REGION_SEND LANE_MAX_POOL_FEE=$LANE_MAX_POOL_FEE COPIERS_FILE=$COPIERS_FILE; do
             echo "$pair" >> "$GITHUB_ENV"
             echo "ночной флаг: $pair"
+          done
+          # РАЗРЕШЕНИЯ ГЕЙТА -- ОТДЕЛЬНОЙ СТРОКОЙ И СЛОВАМИ В ЖУРНАЛ: пропуск
+          # проверки, которая про деньги, виден в прогоне, а не прячется.
+          for pair in ZAVISSHIE_FANTOMY=$ZAVISSHIE_FANTOMY VTOROE_MNENIE_PERVYJ_DEPLOJ=$VTOROE_MNENIE_PERVYJ_DEPLOJ; do
+            echo "$pair" >> "$GITHUB_ENV"
+            echo "разовое разрешение гейта: $pair"
           done
 
       - name: "ГЕЙТ: четыре ключа отправителей не пусты (иначе PEREPISAT сотрёт их строки)"
@@ -1093,12 +1109,13 @@ jobs:
           # РАЗОВОЕ РАЗРЕШЕНИЕ ГЕЙТА -- ИЗ ОДНОСТРОЧНОГО ВХОДА nochnye: у
           # workflow_dispatch предел 25 входов, и он уже выбран. Разбираем ровно
           # ту же строку, что и ночные флаги, и ничего не добавляем в список.
-          VMP="no"
-          case ",${{ inputs.nochnye }}," in
-            *,vtoroe_mnenie_pervyj_deploj=yes,*) VMP="yes" ;;
-          esac
-          echo "razovoe razreshenie gejta vtorogo mnenija: $VMP"
-          ssh -n $SSH_OPTS root@$TARGET_HOST "VTOROE_MNENIE_PERVYJ_DEPLOJ='$VMP' python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
+          # ОБА РАЗРЕШЕНИЯ РАЗОБРАНЫ ВЫШЕ, в шаге ночных флагов, и пришли
+          # сюда переменными окружения прогона. Второго разбора той же строки
+          # здесь больше нет: он читал имя, которого белый список не знал, и
+          # прогон до этого шага просто не доходил.
+          echo "razovoe razreshenie gejta vtorogo mnenija: $VTOROE_MNENIE_PERVYJ_DEPLOJ"
+          echo "razovoe razreshenie gejta po zavisshim fantomam: $ZAVISSHIE_FANTOMY"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "VTOROE_MNENIE_PERVYJ_DEPLOJ='$VTOROE_MNENIE_PERVYJ_DEPLOJ' ZAVISSHIE_FANTOMY='$ZAVISSHIE_FANTOMY' python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pered_perezapuskom_sluzhby.py"
 
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
