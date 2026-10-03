@@ -33,6 +33,16 @@
 кладёт рядом оба: knizhit_itog_sol и knizhit_itog_likvidnyj_sol, чтобы разница
 0.00151384 на сделку нигде не была невидимой.
 
+ЗАПИСЬ ЧИТАЕТСЯ ПО ВСЕЙ ИСТОРИИ, А НЕ ЧЕРЕЗ positions(). Найдено сухим прогоном
+03.10: ExecState.positions() нарочно читает текущий журнал и РОВНО ОДИН самый
+свежий ротированный файл -- его зовут гейты перед каждой сделкой, и тянуть всю
+историю туда нельзя. Покупка BTN от 01.10 20:34Z лежит двумя ротациями раньше,
+поэтому lane_buy_native_sol через positions() не виден вовсе, и сверка числа
+отказала словами ("в записи нет lane_buy_native_sol"). Здесь история читается
+целиком и ровно по ОДНОМУ cid: это не горячий путь, а разовое книжение. Охраны от
+этого только крепче -- closed_sol_net и pnl_counted ищутся во ВСЕХ строках, а не
+в последних.
+
 ОХРАНЫ -- каждая отказывает словами, без записи:
   * позиция существует и ЗАКРЫТА;
   * prodano_vne_sluzhby стоит и vne_sluzhby_sol_net -- число (дописка сделана);
@@ -97,7 +107,13 @@ def книжить(*, состояние, cid: str, сутки: str, ts_прод
             сегодня_ключ=None) -> dict:
     из_: dict = {"ok": False, "why_not": None, "cid": cid, "живьём": живьём,
                  "сутки": сутки, "режим": "книжение задним числом"}
-    поз = (состояние.positions() or {}).get(cid)
+    if hasattr(состояние, "позиция_по_всей_истории"):
+        поз = состояние.позиция_по_всей_истории(cid) or {}
+        из_["откуда_запись"] = "вся история журнала"
+    else:
+        поз = (состояние.positions() or {}).get(cid) or {}
+        из_["откуда_запись"] = "positions()"
+    из_["прочитано"] = поз.get("_прочитано")
     if not поз:
         из_["why_not"] = f"позиции {cid} в журнале нет"
         return из_
@@ -204,7 +220,16 @@ class _Состояние:
         self.звали_add_pnl = []
 
     def positions(self):
-        return self._поз
+        """Как в бою: свежие строки БЕЗ полей покупки (они в старой ротации)."""
+        усечённое = {}
+        for cid, п in self._поз.items():
+            усечённое[cid] = {к: з for к, з in п.items()
+                              if к not in ("lane_buy_native_sol", "lane_buy_fee_sol",
+                                           "lane_buy_rent_sol")}
+        return усечённое
+
+    def позиция_по_всей_истории(self, cid):
+        return dict(self._поз.get(cid) or {})
 
     def day_key_для(self, ts):
         import datetime as dt
@@ -283,6 +308,20 @@ def self_test() -> int:
         (р["запись"]["knizhit_itog_likvidnyj_sol"]
          != р["запись"]["knizhit_itog_sol"]), р.get("запись"))
 
+    print("-- полная история журнала -- несущая, а не украшение")
+    р, с = зов()
+    chk("запись взята из всей истории",
+        р.get("откуда_запись") == "вся история журнала", р.get("откуда_запись"))
+    # ЕСЛИ БЫ КОД ЧИТАЛ positions(), СВЕРКА ОТКАЗАЛА БЫ: поддельный positions()
+    # нарочно режет поля покупки, ровно как боевой на старой ротации.
+    _с = _Состояние({"CID": dict(ОСНОВА)})
+    chk("через positions() поля покупки не видны -- значит история нужна",
+        "lane_buy_native_sol" not in _с.positions()["CID"],
+        sorted(_с.positions()["CID"]))
+    chk("сверка по усечённой записи отказала бы словами",
+        not сверка_числа(_с.positions()["CID"]).get("ok"),
+        сверка_числа(_с.positions()["CID"]))
+
     print("-- сухой прогон ничего не пишет")
     р, с = зов(живьём=False)
     chk("сухой: отказ словами", not р.get("ok") and "сухой" in (р.get("why_not") or ""))
@@ -325,7 +364,50 @@ class _Боевое:
         self.с = ST.ExecState()
 
     def positions(self):
+        """Позиции через ExecState -- для тех, кому хватает свежих строк."""
         return self.с.positions()
+
+    def позиция_по_всей_истории(self, cid: str) -> dict:
+        """Слить ВСЕ строки журнала по одному cid: текущий файл и все ротации.
+
+        Порядок -- от старых к новым, чтобы поздние строки правили поля поверх
+        ранних, ровно как это делает positions(). Ротации узнаются по mtime, а
+        не по номеру в имени: номера у logrotate сдвигаются.
+        """
+        import gzip  # noqa: PLC0415
+        путь = self.с.positions_path
+        файлы = []
+        try:
+            файлы = sorted(путь.parent.glob(путь.name + ".*.gz"),
+                           key=lambda п: п.stat().st_mtime)
+        except OSError:
+            файлы = []
+        слито: dict = {}
+        прочитано = {"файлов": 0, "строк": 0, "строк_этого_cid": 0}
+        for ф in [*файлы, путь]:
+            if not ф.exists():
+                continue
+            прочитано["файлов"] += 1
+            открыть = (gzip.open if str(ф).endswith(".gz") else open)
+            try:
+                with открыть(ф, "rt", encoding="utf-8", errors="replace") as fh:
+                    for строка in fh:
+                        прочитано["строк"] += 1
+                        if cid not in строка:
+                            continue
+                        try:
+                            р = json.loads(строка)
+                        except ValueError:
+                            continue
+                        if р.get("client_order_id") != cid:
+                            continue
+                        прочитано["строк_этого_cid"] += 1
+                        слито.update(р)
+            except OSError:
+                continue
+        if слито:
+            слито["_прочитано"] = прочитано
+        return слито
 
     def day_key_для(self, ts):
         return self._ST.day_key(ts)
