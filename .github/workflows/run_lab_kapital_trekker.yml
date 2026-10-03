@@ -1,0 +1,206 @@
+name: "Лаборатория Miami: трекер капитала кошелька полосы"
+
+# ЗАЧЕМ (слово владельца 03.10, п.1). Трекер капитала кошелька полосы
+# 4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x живёт на lab-miami, читает ТОЛЬКО
+# публичные данные цепи и отдаёт одну страницу по ссылке с секретом в пути.
+#
+# ПОЧЕМУ ИМЕННО lab-miami, А НЕ ТОРГОВЫЙ ХОСТ. На лаборатории по слову владельца
+# не должно быть ни ключей кошельков, ни env полосы, ни торговых служб -- и
+# трекеру ничего из этого не нужно: ни одного ключа, ни одной подписи, ни одной
+# отправки. Поэтому шаг "это точно лаборатория" стоит ПЕРВЫМ и роняет прогон,
+# если имя машины не то: поставить это на торговый хост нельзя даже случайно.
+#
+# ЧТО ЭТОТ ПРОГОН ДЕЛАЕТ. Один прогон ставит (или снимает) ОДНУ службу systemd
+# kapital-trekker: в ней и сборщик (тик раз в `pauza` секунд), и отдача
+# страницы. Две службы означали бы два юнита и два места, где можно забыть
+# секрет.
+#
+# СЕКРЕТЫ. Секрет пути -- BLOOM_TREKKER_SEKRET, узел (если не публичный) --
+# BLOOM_TREKKER_RPC. Оба уходят на хост ЧЕРЕЗ stdin в файл 0600 и НИ РАЗУ не
+# появляются ни в командной строке, ни в логе прогона: в argv их видит любой
+# процесс на машине, а в логе -- каждый, кто откроет прогон.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dejstvie:
+        description: "postavit | ostanovit | proverit"
+        required: false
+        default: "proverit"
+      port:
+        description: "порт отдачи на хосте"
+        required: false
+        default: "8787"
+      naruzhu:
+        description: "'yes' -- слушать 0.0.0.0 (ссылка снаружи, БЕЗ TLS); 'no' -- только 127.0.0.1"
+        required: false
+        default: "no"
+      pauza:
+        description: "пауза между тиками сборщика, секунд (владелец просил 15--30)"
+        required: false
+        default: "20"
+      sutok:
+        description: "восстановление истории по цепи за столько суток при первом запуске"
+        required: false
+        default: "3"
+
+concurrency:
+  group: lab-kapital-trekker
+  cancel-in-progress: false
+
+jobs:
+  treker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/stroiteli
+
+      - name: "ГЕЙТ: самопроверка модуля до всякой установки"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile analysis/c3_kapital_trekker.py
+          python3 analysis/c3_kapital_trekker.py --self-test | tail -3
+
+      - name: "Ключ лаборатории"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+        run: |
+          set -e
+          [ -n "$KLJUCH_MIAMI" ] || { echo "OTKAZ: sekreta VPS_SSH_KEY_MIAMI net"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_MIAMI" > ~/.ssh/lab_key
+          chmod 600 ~/.ssh/lab_key
+          echo "HOST=169.128.191.158" >> $GITHUB_ENV
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> $GITHUB_ENV
+          echo "OUT=data/lab_kapital_trekker.txt" >> $GITHUB_ENV
+
+      - name: "ЭТО ТОЧНО ЛАБОРАТОРИЯ, А НЕ ТОРГОВЫЙ ХОСТ"
+        run: |
+          set -e
+          {
+            echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "dejstvie=${{ inputs.dejstvie }} port=${{ inputs.port }} naruzhu=${{ inputs.naruzhu }} pauza=${{ inputs.pauza }}"
+          } > "$OUT"
+          IMJA=$(ssh -n $SSH_OPTS root@"$HOST" "hostname")
+          echo "hostname: $IMJA" | tee -a "$OUT"
+          case "$IMJA" in
+            miami-code2) echo "mashina ta" | tee -a "$OUT" ;;
+            *) echo "OTKAZ: eto ne lab-miami ($IMJA) -- treker stavitsja tolko tuda" | tee -a "$OUT"; exit 1 ;;
+          esac
+          # Ключей кошельков и env полосы на лаборатории быть не должно: если
+          # они там есть, ставить сюда что-либо нельзя до разбора.
+          ssh -n $SSH_OPTS root@"$HOST" '
+            NAJDENO=0
+            for P in /home/bot/.bloom_env /home/bot/bloom_executor /root/.bloom_env; do
+              [ -e "$P" ] && { echo "NAJDENO: $P"; NAJDENO=1; }
+            done
+            grep -rlE "(EXEC_WALLET_KEY|BLOOM_WALLET_KEY|LANE_WALLET_KEY)" /etc /root /home 2>/dev/null | head -3
+            exit $NAJDENO' | tee -a "$OUT"
+
+      - name: "Диск: на lab-miami он уже кончался 03.10"
+        run: |
+          set -e
+          SVOBODNO=$(ssh -n $SSH_OPTS root@"$HOST" "df -BM --output=avail / | tail -1 | tr -dc '0-9'")
+          echo "svobodno na /: ${SVOBODNO}M" | tee -a "$OUT"
+          # Ряд трекера -- около 4 МБ в сутки при тике раз в 20 с, держим 4 суток.
+          [ "$SVOBODNO" -ge 2048 ] || { echo "OTKAZ: menshe 2 GB svobodno -- snachala uborka (run_lab_uborka_nl.yml)" | tee -a "$OUT"; exit 1; }
+
+      - name: "Остановить службу"
+        if: inputs.dejstvie == 'ostanovit'
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "
+            systemctl stop kapital-trekker 2>/dev/null || true
+            systemctl disable kapital-trekker 2>/dev/null || true
+            echo 'sluzhba ostanovlena'" | tee -a "$OUT"
+
+      - name: "Поставить модуль, секреты и службу"
+        if: inputs.dejstvie == 'postavit'
+        env:
+          SEKRET: ${{ secrets.BLOOM_TREKKER_SEKRET }}
+          UZEL: ${{ secrets.BLOOM_TREKKER_RPC }}
+        run: |
+          set -e
+          [ -n "$SEKRET" ] || { echo "OTKAZ: sekreta BLOOM_TREKKER_SEKRET net -- bez nego sluzhba ne podnimaetsja narochno" | tee -a "$OUT"; exit 1; }
+          [ "${#SEKRET}" -ge 16 ] || { echo "OTKAZ: sekret koroche 16 znakov" | tee -a "$OUT"; exit 1; }
+          ADRES=127.0.0.1
+          [ "${{ inputs.naruzhu }}" = "yes" ] && ADRES=0.0.0.0
+          ssh -n $SSH_OPTS root@"$HOST" "mkdir -p /opt/kapital /var/lib/kapital"
+          scp $SSH_OPTS analysis/c3_kapital_trekker.py root@"$HOST":/opt/kapital/c3_kapital_trekker.py
+          # СЕКРЕТЫ -- ТОЛЬКО ЧЕРЕЗ stdin И ТОЛЬКО В ФАЙЛ 0600.
+          { printf 'BLOOM_TREKKER_SEKRET=%s\n' "$SEKRET"
+            [ -n "$UZEL" ] && printf 'BLOOM_TREKKER_RPC=%s\n' "$UZEL"
+            printf 'PYTHONUNBUFFERED=1\n'; } \
+            | ssh $SSH_OPTS root@"$HOST" "umask 077 && cat > /etc/kapital.env && chmod 600 /etc/kapital.env"
+          # ЮНИТ СОБИРАЕТСЯ ОДНИМ printf, А НЕ heredoc-ом: строки юнита
+          # начинаются с "[Unit]" в первой колонке, а блок YAML такой строки
+          # внутри себя не терпит -- прогон бы просто не разобрался.
+          UNIT_TEKST=$(printf '%s\n' \
+            '[Unit]' \
+            'Description=Trekker kapitala koshelka polosy (tolko publichnye dannye cepi)' \
+            'After=network-online.target' \
+            '' \
+            '[Service]' \
+            'Type=simple' \
+            'EnvironmentFile=/etc/kapital.env' \
+            "ExecStart=/usr/bin/python3 /opt/kapital/c3_kapital_trekker.py --sluzhba --kat /var/lib/kapital --port ${{ inputs.port }} --adres $ADRES --pauza ${{ inputs.pauza }} --sutok ${{ inputs.sutok }}" \
+            'Restart=always' \
+            'RestartSec=10' \
+            'Nice=5' \
+            'NoNewPrivileges=true' \
+            'PrivateTmp=true' \
+            'ProtectSystem=strict' \
+            'ReadWritePaths=/var/lib/kapital' \
+            'ProtectHome=true' \
+            '' \
+            '[Install]' \
+            'WantedBy=multi-user.target')
+          printf '%s\n' "$UNIT_TEKST" | ssh $SSH_OPTS root@"$HOST" "cat > /etc/systemd/system/kapital-trekker.service"
+          ssh -n $SSH_OPTS root@"$HOST" "
+            systemctl daemon-reload
+            systemctl enable kapital-trekker >/dev/null 2>&1
+            systemctl restart kapital-trekker
+            sleep 12
+            systemctl is-active kapital-trekker" | tee -a "$OUT"
+
+      - name: "Проверить: служба жива и отвечает только по секрету"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active kapital-trekker || true" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "systemctl show kapital-trekker -p NRestarts --value 2>/dev/null || true" \
+            | sed 's/^/perezapuskov: /' | tee -a "$OUT"
+          # URL С СЕКРЕТОМ НЕ ПОПАДАЕТ В argv: curl читает его со stdin.
+          ssh -n $SSH_OPTS root@"$HOST" '
+            set -e
+            . /etc/kapital.env
+            P='"${{ inputs.port }}"'
+            KOD=$(printf "url = \"http://127.0.0.1:%s/%s/\"\n" "$P" "$BLOOM_TREKKER_SEKRET" | curl -s -o /dev/null -w "%{http_code}" --config - || true)
+            KOD2=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$P/chuzhoj/" || true)
+            echo "stranica po sekretu: $KOD (zhdjom 200)"
+            echo "chuzhoj put: $KOD2 (zhdjom 404)"
+            KOD3=$(printf "url = \"http://127.0.0.1:%s/%s/kapital.json\"\n" "$P" "$BLOOM_TREKKER_SEKRET" | curl -s -o /dev/null -w "%{http_code}" --config - || true)
+            echo "vygruzka po sekretu: $KOD3 (zhdjom 200)"
+            [ "$KOD" = "200" ] && [ "$KOD2" = "404" ] || { echo "OTKAZ: otdacha vedjot sebja ne tak"; exit 1; }' | tee -a "$OUT"
+          # ВЫГРУЗКА ЧИТАЕТСЯ ОДНОЙ СТРОКОЙ python: многострочный -c внутри
+          # блока YAML начинался бы с первой колонки, и прогон не разобрался бы.
+          ssh -n $SSH_OPTS root@"$HOST" "ls -la /var/lib/kapital 2>/dev/null | head -6; python3 -c \"import json;d=json.load(open('/var/lib/kapital/kapital.json'));print('kapital_sol',d.get('kapital_sol'),'rjadov',d.get('rjadov'),'pozicij',d.get('pozicij'),'bez_vhoda',d.get('bez_vhoda'),'neopoznannyh',d.get('neopoznannyh'));print('vyzovov za sutki',{k:(v or {}).get('всего') for k,v in (d.get('kredity_sutki') or {}).items()})\" || echo 'vygruzki escho net'" | tee -a "$OUT"
+          echo "ssylka: http://$HOST:${{ inputs.port }}/<SEKRET>/ (sekret -- v BLOOM_TREKKER_SEKRET, zdes ego net i ne budet)" | tee -a "$OUT"
+
+      - name: "Отчёт прогона в ветку"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # СЕКРЕТА В ОТЧЁТЕ НЕТ: проверяем это ПЕРЕД коммитом, а не надеемся.
+          if [ -n "${{ secrets.BLOOM_TREKKER_SEKRET }}" ] && grep -qF "${{ secrets.BLOOM_TREKKER_SEKRET }}" "$OUT"; then
+            echo "OTKAZ: sekret popal v otchjot -- ne kommitim"; exit 1
+          fi
+          git add "$OUT"
+          git diff --cached --quiet || git commit -m "Lab Miami: treker kapitala [automated]"
+          git push origin HEAD:claude/stroiteli || true
