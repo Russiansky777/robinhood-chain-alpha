@@ -18,6 +18,7 @@ name: "Podbivka-2: konveyer (Pravilo 18) -- po taymeru, bez shtaba"
 on:
   schedule:
     - cron: "17 7 * * *"      # posle sutochnogo progona 06:30Z
+    - cron: "47 8 * * 1"      # ponedelnik: nedelnaya chast (p.4g)
   workflow_dispatch:
     inputs:
       sutok:
@@ -26,6 +27,10 @@ on:
         default: "11"
       bez_arhiva:
         description: "da -- ne chitat arhiv, tolko peresobrat stranicu po gotovym faylam"
+        required: false
+        default: "net"
+      nedelya:
+        description: "da -- dobavit nedelnuyu chast (pokupateli za posrednikami)"
         required: false
         default: "net"
 
@@ -65,8 +70,29 @@ jobs:
           echo "sutki: ${DEN}T17 -> +25 chasov, metka konv_${DEN}T17"
           $PY analysis/podbivka_arhiv_den.py \
             --s "${DEN}T17" --chasov 25 --porog 2 --okno 160 --ne-sol --okno-vsem \
-            --okno-dokupki 1800 --bilety 0.1,0.3 --bez-sobytij --bez-adresov \
+            --okno-dokupki 1800 --bilety 0.1,0.3 --pered 10 --bez-sobytij --bez-adresov \
             --metka "konv_${DEN}T17"
+
+      - name: "Nedelnaya chast (ponedelnik)"
+        if: ${{ github.event.schedule == '47 8 * * 1' || github.event.inputs.nedelya == 'da' }}
+        env:
+          SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          PODB_HELIUS_RPS: "3"
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          # Pokupateli za posrednikami: verhnie posredniki iz razdela "za kem idut nashi".
+          # Adresa posrednikov berutsya IZ FAYLA (data/podbivka/poisk_svod.json, razdel
+          # "zakem": kto chasche vsego stoit vperedi nashih istochnikov) -- ne iz pamyati.
+          POSR=$($PY -c "import json; d=json.load(open('data/podbivka/poisk_svod.json'))['закем']['ряды']; print(' '.join(a for a, _ in sorted(d.items(), key=lambda kv: -(kv[1].get('раз') or 0))[:3]))")
+          echo "posredniki: $POSR"
+          for A in $POSR; do
+            $PY analysis/podbivka_posrednik.py --adres "$A" \
+              --s "$(date -u -d '7 days ago' +%Y-%m-%dT%H:00:00Z)" --stranic 30 \
+              --iskat Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit \
+              --metka "$(date -u +%Y-%m-%d)" || echo "posrednik $A: progon ne doshel"
+          done
 
       - name: "Pravilo po vselennoy i stranica"
         env:
