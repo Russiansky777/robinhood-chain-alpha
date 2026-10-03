@@ -72,18 +72,39 @@ jobs:
           ref: claude/nifty-sagan-r0polg
           fetch-depth: 0
 
+      - name: "Питон с solders (venv хоста), иначе системный"
+        run: |
+          set -e
+          # САМОПРОВЕРКА ПРИМЕНИТЕЛЯ ТЕПЕРЬ ТРЕБУЕТ solders. У версии Code-3
+          # появился вывод адресов (PDA и ATA получателей), а у СИСТЕМНОГО
+          # питона бегунка solders нет -- ровно на этом прогон упал дважды
+          # (ModuleNotFoundError, видно в data/konveyer/primenitel_selftest.txt).
+          # Бегунок живёт НА хосте, поэтому тот же venv, которым работают
+          # службы, лежит рядом. Нет venv -- берём системный и говорим это.
+          PY=python3
+          for К in /home/bot/robinhood-chain-alpha/venv/bin/python \
+                   /home/bot/bloom_executor/venv/bin/python; do
+            if [ -x "$К" ] && "$К" -c "import solders" 2>/dev/null; then
+              PY="$К"; break
+            fi
+          done
+          echo "питон прогона: $PY"
+          "$PY" -c "import sys; print('версия', sys.version.split()[0]); import solders; print('solders есть')" || \
+            echo "solders НЕТ -- самопроверка применителя это скажет сама"
+          echo "PY=$PY" >> "$GITHUB_ENV"
+
       - name: "Самопроверка применителя (111/111) до любых действий"
         run: |
           set -e
           set -o pipefail
-          python3 -m py_compile analysis/c3_konveyer_primenitel.py
+          "$PY" -m py_compile analysis/c3_konveyer_primenitel.py
           # ВЫВОД САМОПРОВЕРКИ -- В ФАЙЛ, А НЕ ТОЛЬКО В ЖУРНАЛ ПРОГОНА. Журнал
           # прогона читается не всегда (у агента нет доступа к логам Actions), и
           # "упало на самопроверке" без строк -- это тупик. Файл едет в ветку
           # шагом коммита вместе с остальным каталогом konveyer.
           mkdir -p data/konveyer
           set +e
-          python3 analysis/c3_konveyer_primenitel.py \
+          "$PY" analysis/c3_konveyer_primenitel.py \
             > data/konveyer/primenitel_selftest.txt 2>&1
           rc=$?
           set -e
@@ -175,7 +196,7 @@ jobs:
           set -e
           set -o pipefail
           D="${{ steps.vhod.outputs.data }}"
-          python3 analysis/c3_konveyer_primenitel.py \
+          "$PY" analysis/c3_konveyer_primenitel.py \
             --vhod "data/konveyer/$D.json" \
             --gruppy /tmp/gruppy_live.json \
             --kat data/konveyer | tee "$OUT"
@@ -195,7 +216,7 @@ jobs:
           # применена целиком" на втором тике красила бы прогон красным каждый
           # день. Код 5 отдаётся ТОЛЬКО когда каждый адрес правки лежит ровно в
           # konveyer; любой адрес в чужой группе -- по-прежнему код 3 и стоп.
-          python3 analysis/c3_konveyer_primenitel.py --sverit "$P" \
+          "$PY" analysis/c3_konveyer_primenitel.py --sverit "$P" \
             --gruppy /tmp/gruppy_live_sverka.json \
             || { rc=$?; [ "$rc" = "5" ] && { echo "правка уже применена -- применять нечего"; exit 0; }; exit "$rc"; }
 
