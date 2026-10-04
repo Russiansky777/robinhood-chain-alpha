@@ -81,6 +81,35 @@ WSOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 КОТИРОВОЧНЫЕ_МИНТЫ = (WSOL, USDC, USDT)
+
+# ОТКРЫТАЯ ПОЗИЦИЯ СЧИТАЕТСЯ ПО ТЕКУЩЕЙ КОТИРОВКЕ ВЫХОДА, А НЕ ПО ЦЕНЕ ВХОДА
+# (слово владельца 04.10). Цена входа -- это то, сколько МЫ заплатили, и она
+# не меняется никогда: рагпул, из которого выхода уже нет, висел бы в капитале
+# по входу вечно. Живой пример, с которого это и началось:
+# D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump -- вход до 0.5 SOL, продать
+# некуда, и страница на этот вход завышала капитал.
+#
+# ХОСТЫ И ПАРАМЕТРЫ ВЗЯТЫ У РАБОЧЕГО КОДА РЕПОЗИТОРИЯ, А НЕ ПРИДУМАНЫ:
+# analysis/dbot_rescue.py:160 `quote_sol_for` -- те же два хоста в том же
+# порядке и те же четыре параметра. Там же сказано, почему НЕ передаётся
+# restrictIntermediateTokens: бесплатный тариф Jupiter его отклоняет
+# (NOT_SUPPORTED). lite-api ключа не требует -- а ключей на лаборатории нет
+# и быть не должно.
+КОТИРОВКА_ХОСТЫ = ("https://lite-api.jup.ag/swap/v1/quote",
+                   "https://quote-api.jup.ag/v6/quote")
+# Проскальзывание на СТОИМОСТЬ не влияет (оно меняет только
+# otherAmountThreshold), но параметр обязателен, поэтому стоит обычная сотня.
+КОТИРОВКА_BPS = 100
+КОТИРОВКА_ТАЙМАУТ_С = 6.0
+# НЕ ЧАЩЕ РАЗА В МИНУТУ НА ПОЗИЦИЮ (слово владельца). При тике раз в 20 секунд
+# это втрое меньше запросов, и Jupiter не получает от нас поток.
+КОТИРОВКА_НЕ_ЧАЩЕ_СЕК = 60
+# СПИСАНИЕ: котировка ниже этой доли входа -- считаем нулём. Пять процентов --
+# слово владельца; доля, а не абсолют, потому что билеты разного размера.
+ДОЛЯ_СПИСАНИЯ = 0.05
+ПОЧЕМУ_НЕТ_МАРШРУТА = "нет маршрута"
+ПОЧЕМУ_МАЛО = "котировка ниже доли списания"
+ПОЧЕМУ_СЕТЬ = "котировка не получена"
 ИМЕНА_КОТИРОВОК = {WSOL: "WSOL", USDC: "USDC", USDT: "USDT"}
 ПРОГ_ТОКЕНА = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 ПРОГ_ТОКЕНА_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -158,6 +187,7 @@ USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 СОСТОЯНИЕ_НЕ_РЕЖЕ_СЕК = 300
 ФАЙЛ_РЯДОВ = "rjady.jsonl"
 ФАЙЛ_СОСТОЯНИЯ = "sostojanie.json"
+ФАЙЛ_КОТИРОВОК = "kotirovki.json"
 ФАЙЛ_ВЫГРУЗКИ = "kapital.json"
 ФАЙЛ_СТРАНИЦЫ = "kapital.html"
 
@@ -727,6 +757,133 @@ def tranzakciya(rpc_call, sig: str, *, schjotchik=None) -> dict:
     return р or {}
 
 
+def kotirovka_vyhoda(минт: str, ostatok: int, *, zov=None,
+                     tajmaut: float = КОТИРОВКА_ТАЙМАУТ_С) -> dict:
+    """СКОЛЬКО SOL ДАДУТ ЗА ВЕСЬ ОСТАТОК ЭТОГО МИНТА ПРЯМО СЕЙЧАС.
+
+    Только чтение, ни подписи, ни ключа: lite-api Jupiter ключа не требует.
+    `zov(url, параметры)` приходит снаружи -- тем же приёмом, что и rpc_call,
+    чтобы самопроверка шла БЕЗ СЕТИ на поддельном агрегаторе.
+
+    Отказ называется словами и РАЗНЫМИ словами: «нет маршрута» (Jupiter
+    ответил, маршрута нет -- позиция списывается) и «котировка не получена»
+    (сеть молчит -- списывать нельзя, это не ответ рынка).
+    """
+    из_ = {"ok": False, "lamports": 0, "why_not": None, "host": None,
+            "marshrut": None, "utc": int(time.time())}
+    if not минт or минт in КОТИРОВОЧНЫЕ_МИНТЫ:
+        из_["why_not"] = "котировка нужна только некотировочному минту"
+        return из_
+    if not isinstance(ostatok, int) or ostatok <= 0:
+        из_["why_not"] = "остатка нет -- котировать нечего"
+        return из_
+    зов = zov if zov is not None else _kotirovka_setju
+    отказы, нет_маршрута = [], False
+    for хост in КОТИРОВКА_ХОСТЫ:
+        пар = {"inputMint": минт, "outputMint": WSOL, "amount": str(ostatok),
+               "slippageBps": str(КОТИРОВКА_BPS)}
+        try:
+            о = зов(хост, пар, tajmaut)
+        except Exception as сбой:  # noqa: BLE001
+            отказы.append(f"{хост.split('//')[-1].split('/')[0]}: "
+                          f"{type(сбой).__name__}")
+            continue
+        if not isinstance(о, dict):
+            отказы.append("ответ не словарь")
+            continue
+        ошибка = о.get("error") or о.get("errorCode")
+        if ошибка:
+            # МАРШРУТА НЕТ -- ЭТО ОТВЕТ РЫНКА, А НЕ СБОЙ СЕТИ.
+            нет_маршрута = True
+            отказы.append(f"{хост.split('//')[-1].split('/')[0]}: {str(ошибка)[:60]}")
+            continue
+        вышло = о.get("outAmount")
+        try:
+            лам = int(вышло)
+        except (TypeError, ValueError):
+            отказы.append("outAmount не число")
+            continue
+        из_.update(ok=True, lamports=max(0, лам), host=хост,
+                   marshrut=" -> ".join(
+                       str((rp.get("swapInfo") or {}).get("label"))
+                       for rp in (о.get("routePlan") or [])) or None)
+        return из_
+    из_["why_not"] = ((ПОЧЕМУ_НЕТ_МАРШРУТА if нет_маршрута else ПОЧЕМУ_СЕТЬ)
+                      + ": " + "; ".join(отказы)[:200])
+    из_["net_marshruta"] = нет_маршрута
+    return из_
+
+
+def _kotirovka_setju(url: str, параметры: dict, tajmaut: float) -> dict:
+    """GET к Jupiter поверх стандартной библиотеки. Сеть -- только здесь."""
+    import urllib.parse  # noqa: PLC0415
+    import urllib.request  # noqa: PLC0415
+
+    полный = url + "?" + urllib.parse.urlencode(параметры)
+    зап = urllib.request.Request(  # noqa: S310
+        полный, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(зап, timeout=tajmaut) as отв:  # noqa: S310
+        return json.loads(отв.read().decode("utf-8", "replace"))
+
+
+def stoimost_pozicii(минт: str, ostatok: int, vhod: int, *, kesh: dict,
+                     sejchas: float, zov=None,
+                     ne_chashche: int = КОТИРОВКА_НЕ_ЧАЩЕ_СЕК) -> dict:
+    """ЧЕГО СТОИТ ПОЗИЦИЯ СЕЙЧАС: котировка выхода, кэш и списание.
+
+    Правило владельца, целиком: стоимость -- котировка выхода за ВЕСЬ
+    остаток; нет маршрута или котировка меньше ДОЛЯ_СПИСАНИЯ от входа -- ноль
+    и пометка «списана». Вход при этом НЕ трогается: он отдельной колонкой.
+
+    СЕТЬ МОЛЧИТ -- ЭТО НЕ СПИСАНИЕ. Тогда берётся последняя известная
+    котировка (с её возрастом), а если её не было вовсе -- вход, и позиция
+    помечается «котировки нет». Списывать позицию из-за своего же обрыва
+    связи значило бы показать владельцу убыток, которого не было.
+    """
+    з = (kesh or {}).get(минт) or {}
+    свежая = (isinstance(з.get("utc"), int)
+              and сейчас_разница(sejchas, з["utc"]) < ne_chashche
+              and з.get("ostatok") == ostatok)
+    if not свежая:
+        к = kotirovka_vyhoda(минт, ostatok, zov=zov)
+        if к["ok"]:
+            з = {"utc": int(sejchas), "lamports": int(к["lamports"]),
+                 "ostatok": ostatok, "why_not": None,
+                 "marshrut": к.get("marshrut")}
+        elif к.get("net_marshruta"):
+            з = {"utc": int(sejchas), "lamports": 0, "ostatok": ostatok,
+                 "why_not": ПОЧЕМУ_НЕТ_МАРШРУТА, "marshrut": None}
+        else:
+            # Сеть. Старое значение остаётся, но его возраст виден.
+            з = dict(з) or {}
+            з.setdefault("lamports", None)
+            з["why_not"] = ПОЧЕМУ_СЕТЬ
+        (kesh if kesh is not None else {})[минт] = з
+    лам = з.get("lamports")
+    из_ = {"mint": минт, "ostatok": ostatok, "vhod": int(vhod or 0),
+            "kotirovka_lamports": лам, "why_not": з.get("why_not"),
+            "vozrast_sek": (int(сейчас_разница(sejchas, з["utc"]))
+                            if isinstance(з.get("utc"), int) else None),
+            "spisana": False, "po_vhodu": False,
+            "marshrut": з.get("marshrut")}
+    if лам is None:
+        # Котировки не было ни разу: считаем по входу и ГОВОРИМ об этом.
+        из_.update(stoimost=int(vhod or 0), po_vhodu=True,
+                   why_not=ПОЧЕМУ_СЕТЬ)
+        return из_
+    порог = int(int(vhod or 0) * ДОЛЯ_СПИСАНИЯ)
+    if з.get("why_not") == ПОЧЕМУ_НЕТ_МАРШРУТА or (vhod and лам < порог):
+        из_.update(stoimost=0, spisana=True,
+                   why_not=(з.get("why_not") or ПОЧЕМУ_МАЛО))
+        return из_
+    из_["stoimost"] = int(лам)
+    return из_
+
+
+def сейчас_разница(сейчас: float, было: int) -> float:
+    return max(0.0, float(сейчас) - float(было))
+
+
 # -------------------------------------------- состояние: позиции и переводы
 
 def pustoe_sostojanie(koshelek: str = КОШЕЛЕК) -> dict:
@@ -949,7 +1106,8 @@ def prinjat_tranzakciju(sostojanie: dict, tx: dict,
 
 def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = None,
          schjotchik=None, sejchas: float | None = None,
-         schitat_scheta: bool = True) -> dict:
+         schitat_scheta: bool = True, kotirovka_call=None,
+         kesh_kotirovok: dict | None = None) -> dict:
     """ОДИН РЯД капитала: чтение цепи плюс арифметика. Сети внутри нет.
 
     schitat_scheta=False -- взять счета из состояния (кэш), не спрашивая узел.
@@ -984,17 +1142,35 @@ def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = 
             котировок_с_остатком += 1
             continue
         остатки[минт_с] = остатки.get(минт_с, 0) + int(с["amount"])
-    позиции_вход: dict = {}
+    # ПОЗИЦИЯ СТОИТ СТОЛЬКО, СКОЛЬКО ЗА НЕЁ ДАЮТ СЕЙЧАС, А НЕ СКОЛЬКО МЫ ЗА
+    # НЕЁ ЗАПЛАТИЛИ (слово владельца 04.10). Вход остаётся рядом отдельным
+    # числом: по нему видно, сколько позиция СТОИЛА, а по котировке -- сколько
+    # она стоит. Рагпул, из которого выхода нет, даёт ноль и помечается
+    # списанным, а не висит по входу вечно.
+    позиции_стоимость: dict = {}
+    позиции_табл: list = []
+    вход_всего = 0
+    списано = 0
+    по_входу_нет_котировки = 0
+    кэш_кот = (kesh_kotirovok if kesh_kotirovok is not None
+               else сост.setdefault("kotirovki", {}))
     без_входа = []
-    for минт in остатки:
+    for минт, ост in остатки.items():
         п = (сост.get("pozicii") or {}).get(минт)
-        if п and int(п.get("vhod") or 0) > 0:
-            позиции_вход[минт] = int(п["vhod"])
-        else:
+        вход = int((п or {}).get("vhod") or 0)
+        if not (п and вход > 0):
             # ЦЕНЫ ВХОДА НЕТ -- И ЭТО НАЗЫВАЕТСЯ ЧИСЛОМ. Такой минт даёт нуль в
             # капитал, значит капитал ЗАНИЖЕН на его вход, и прятать это нельзя.
             без_входа.append(минт)
-    к = kapital(б["lamports"], счета, позиции_вход)
+            continue
+        ст = stoimost_pozicii(минт, int(ост), вход, kesh=кэш_кот,
+                              sejchas=сейчас_, zov=kotirovka_call)
+        позиции_стоимость[минт] = int(ст.get("stoimost") or 0)
+        вход_всего += вход
+        списано += bool(ст.get("spisana"))
+        по_входу_нет_котировки += bool(ст.get("po_vhodu"))
+        позиции_табл.append(ст)
+    к = kapital(б["lamports"], счета, позиции_стоимость)
     # НАКОПИТЕЛЬНЫЕ ЧИСЛА ИДУТ СО СДВИГОМ: ряд живёт дольше состояния, и после
     # потери состояния счётчик обязан продолжить ряд, а не начаться с нуля.
     сдв = сост.get("sdvigi") or {}
@@ -1019,6 +1195,18 @@ def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = 
                                  for с in (сост.get("sdelki") or [])),
             "neopoznannyh": int(сост.get("neopoznannyh") or 0)}
     из_["bez_vhoda_minty"] = без_входа[:5]
+    из_["pozicii_po_vhodu"] = вход_всего
+    из_["spisano_pozicij"] = списано
+    из_["pozicij_po_vhodu_bez_kotirovki"] = по_входу_нет_котировки
+    # ТАБЛИЦА ПОЗИЦИЙ -- ДЛЯ СТРАНИЦЫ: минт, вход, котировка, возраст, пометка.
+    из_["pozicii_tablica"] = sorted(
+        ({"mint": т["mint"], "vhod": т["vhod"],
+          "stoimost": int(т.get("stoimost") or 0),
+          "ostatok": т["ostatok"], "vozrast_sek": т.get("vozrast_sek"),
+          "spisana": bool(т.get("spisana")),
+          "po_vhodu": bool(т.get("po_vhodu")),
+          "why_not": т.get("why_not")} for т in позиции_табл),
+        key=lambda т: -int(т.get("vhod") or 0))[:20]
     из_["kotirovok_s_ostatkom"] = котировок_с_остатком
     из_["scheta_vozrast_sek"] = возраст
     return из_
@@ -1456,6 +1644,11 @@ def vygruzka(rjady: list, sostojanie: dict, *, sejchas: float | None = None) -> 
             "bez_vhoda": int(последний.get("bez_vhoda") or 0),
             "bez_vhoda_minty": последний.get("bez_vhoda_minty") or [],
             "kotirovok_s_ostatkom": int(последний.get("kotirovok_s_ostatkom") or 0),
+            "pozicii_po_vhodu": int(последний.get("pozicii_po_vhodu") or 0),
+            "spisano_pozicij": int(последний.get("spisano_pozicij") or 0),
+            "pozicij_po_vhodu_bez_kotirovki": int(
+                последний.get("pozicij_po_vhodu_bez_kotirovki") or 0),
+            "pozicii_tablica": последний.get("pozicii_tablica") or [],
             "neopoznannyh": int(последний.get("neopoznannyh") or 0),
         })
     # СДЕЛОК ВСЕГО -- ОТДЕЛЬНЫМ СЧЁТЧИКОМ, А НЕ ДЛИНОЙ СПИСКА: список режется
@@ -1474,6 +1667,7 @@ def vygruzka(rjady: list, sostojanie: dict, *, sejchas: float | None = None) -> 
     из_["zastrjali_na_sig"] = ((sostojanie.get("zastrjali") or {}).get("sig")
                                or None)
     из_["sbros_sostojanija_utc"] = sostojanie.get("sbros_sostojanija_utc")
+    из_["dolja_spisanija"] = ДОЛЯ_СПИСАНИЯ
     из_["prodazh_v_kotirovku"] = int(
         sostojanie.get("prodazh_v_kotirovku") or 0)
     из_["rashodov"] = int(sostojanie.get("rashodov") or 0)
@@ -1657,6 +1851,18 @@ header h1 { font-size: 14px; font-weight: 700; color: var(--ink-2);
   font-size: 12px; color: var(--ink-2); padding: 7px 8px; margin: 4px 0;
   border-radius: 8px; background: var(--surface-2); font-family: var(--mono);
   font-variant-numeric: tabular-nums; }
+/* ПОЗИЦИИ: сколько стоит СЕЙЧАС и сколько СТОИЛА -- двумя числами в строке.
+   Вход отдельной колонкой -- слово владельца: по нему видно, что позиция
+   стоила, а по котировке -- чего она стоит. */
+.pozicii { margin: 4px 0 8px; padding: 0; list-style: none; }
+.pozicii li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px;
+  align-items: baseline; font-size: 12px; color: var(--ink-2);
+  padding: 7px 8px; margin: 4px 0; border-radius: 8px;
+  background: var(--surface-2); font-family: var(--mono);
+  font-variant-numeric: tabular-nums; }
+.pozicii .vhod { color: var(--ink-3); }
+.pozicii .spisana { color: var(--bad); }
+.pozicii .zagolovok { background: none; color: var(--ink-3); padding-bottom: 0; }
 .slovami { margin: 14px 2px 0; font-size: 13px; color: var(--ink-2);
            background: var(--bad-bg); border-radius: 10px; padding: 10px 12px; }
 .slovami:empty { display: none; }
@@ -1877,7 +2083,9 @@ function нарисовать() {
   var ч = document.getElementById("chasti");
   ч.innerHTML = "";
   [["SOL", (данные.chasti || {}).sol], ["WSOL", (данные.chasti || {}).wsol],
-   ["позиции по входу", (данные.chasti || {}).pozicii],
+   /* ПОДПИСЬ ЧЕСТНАЯ: в капитале стоит КОТИРОВКА позиций, а не их вход.
+      Вход виден ниже отдельной колонкой в таблице позиций. */
+   ["позиции сейчас", (данные.chasti || {}).pozicii],
    ["рента счетов", (данные.chasti || {}).renta]].forEach(function (п) {
     var д = document.createElement("div");
     var dt = document.createElement("dt"); текст(dt, п[0]);
@@ -1909,6 +2117,34 @@ function нарисовать() {
         sol(о.vyruchka_bez_vhoda_lamports, 4) + " SOL");
   }
   ряд("позиций открыто сейчас", String(данные.pozicij === undefined ? "—" : данные.pozicij));
+  if (данные.pozicii_po_vhodu) {
+    ряд("эти позиции СТОИЛИ (сумма входов)",
+        sol(данные.pozicii_po_vhodu, 4) + " SOL");
+  }
+  /* ТАБЛИЦА ПОЗИЦИЙ: котировка выхода, вход и пометка «списана». */
+  var поз = (данные.pozicii_tablica || []);
+  if (поз.length) {
+    var сп_п = document.createElement("ul"); сп_п.className = "pozicii";
+    var шапка = document.createElement("li"); шапка.className = "zagolovok";
+    ["минт", "сейчас", "вход"].forEach(function (и) {
+      var э = document.createElement("span"); текст(э, и); шапка.appendChild(э);
+    });
+    сп_п.appendChild(шапка);
+    поз.forEach(function (п) {
+      var li = document.createElement("li");
+      var м = document.createElement("span");
+      текст(м, String(п.mint || "").slice(0, 6) + "…"
+            + (п.spisana ? " списана" : (п.po_vhodu ? " по входу" : "")));
+      if (п.spisana) { м.className = "spisana"; }
+      var с = document.createElement("span");
+      текст(с, sol(п.stoimost, 4));
+      var в = document.createElement("span"); в.className = "vhod";
+      текст(в, sol(п.vhod, 4));
+      li.appendChild(м); li.appendChild(с); li.appendChild(в);
+      сп_п.appendChild(li);
+    });
+    под.appendChild(сп_п);
+  }
   ряд("токен-счетов (из них пустых)",
       (данные.schetov === undefined ? "—" : данные.schetov)
         + " (" + (данные.schetov_pustyh === undefined ? "—" : данные.schetov_pustyh) + ")");
@@ -1936,6 +2172,16 @@ function нарисовать() {
   }
   if (данные.neopoznannyh) {
     сл.push("непонятных транзакций: " + данные.neopoznannyh);
+  }
+  if (данные.spisano_pozicij) {
+    сл.push("позиций списано (нет выхода или дают меньше "
+            + Math.round(100 * (данные.dolja_spisanija || 0.05)) + " % входа): "
+            + данные.spisano_pozicij + " -- в капитал они идут нулём");
+  }
+  if (данные.pozicij_po_vhodu_bez_kotirovki) {
+    сл.push("позиций без свежей котировки: "
+            + данные.pozicij_po_vhodu_bez_kotirovki
+            + " -- считаны ПО ВХОДУ, это не ответ рынка");
   }
   if (данные.kotirovok_s_ostatkom) {
     сл.push("котировок с остатком (USDC/USDT/WSOL): " + данные.kotirovok_s_ostatkom
@@ -2130,7 +2376,7 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
            koshelek: str = КОШЕЛЕК, sutok: float = 3.0,
            sejchas: float | None = None, pisat_stranicu: bool = True,
            derzhim_sutok: int = ДЕРЖИМ_СУТОК,
-           rjady_kesh: list | None = None) -> dict:
+           rjady_kesh: list | None = None, kotirovka_call=None) -> dict:
     """ОДИН ТИК СБОРЩИКА: догнать цепь, посчитать ряд, записать всё.
 
     Вызывается раз в 15--30 с бегунком или циклом; состояние и ряд лежат на
@@ -2165,6 +2411,20 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
     # считается ПОСЛЕ восстановления истории (оно само накопит часть заново).
     сшить = (not прочлось) and (к / ФАЙЛ_РЯДОВ).exists()
     хвост_ряда = poslednij_rjad(к / ФАЙЛ_РЯДОВ) if сшить else {}
+    # КЭШ КОТИРОВОК -- ОТДЕЛЬНЫМ МАЛЕНЬКИМ ФАЙЛОМ, А НЕ В СОСТОЯНИИ. Состояние
+    # на полосе весит сотни килобайт и пишется по делу (раз в пять минут), а
+    # котировка живёт минуту: держать её там значило бы либо писать состояние
+    # каждую минуту, либо каждый тик спрашивать Jupiter заново.
+    п_кот = к / ФАЙЛ_КОТИРОВОК
+    кэш_кот: dict = {}
+    if п_кот.exists():
+        try:
+            прежние = json.loads(п_кот.read_text(encoding="utf-8"))
+            if isinstance(прежние, dict):
+                кэш_кот = прежние
+        except (ValueError, OSError):
+            кэш_кот = {}
+    кот_было = json.dumps(кэш_кот, sort_keys=True)
     счётчик = Schjotchik(сост.get("kredity"))
     if rpc_call is None:
         url = uzel_iz_okruzheniya()
@@ -2197,7 +2457,8 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
         из_["scheta_chitali"] = читать_счета
         р = rjad(rpc_call, koshelek=koshelek, sostojanie=сост,
                  schjotchik=счётчик, sejchas=сейчас,
-                 schitat_scheta=читать_счета)
+                 schitat_scheta=читать_счета, kotirovka_call=kotirovka_call,
+                 kesh_kotirovok=кэш_кот)
     except (ОшибкаТрекера, OSError, ValueError) as сбой:
         # УЗЕЛ МОЛЧИТ -- ЭТО НЕ ПОТЕРЯ РЯДА, А ПРОПУСК, И ОН НАЗЫВАЕТСЯ.
         из_["why_not"] = f"{type(сбой).__name__}: {zateret(str(сбой))[:160]}"
@@ -2205,6 +2466,11 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
         п_сост.write_text(json.dumps(сост, ensure_ascii=False, indent=1),
                           encoding="utf-8")
         return из_
+    # КЭШ КОТИРОВОК ПИШЕТСЯ, ТОЛЬКО ЕСЛИ ИЗМЕНИЛСЯ.
+    if json.dumps(кэш_кот, sort_keys=True) != кот_было:
+        п_кот.write_text(json.dumps(кэш_кот, ensure_ascii=False, indent=1),
+                         encoding="utf-8")
+        из_["kotirovki_pisali"] = True
     счётчик.obrezat()
     сост["kredity"] = счётчик.po_sutkam
     # СПИСКИ СОСТОЯНИЯ РЕЖУТСЯ ПО ТОМУ ЖЕ ОКНУ, ЧТО И РЯД. Сделки и отметки
@@ -2473,7 +2739,7 @@ def servis(kat: str | Path | None = None, *, sekret: str | None = None,
 def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
             pauza: float = 20.0, sutok: float = 3.0, port: int = 8787,
             adres: str = "127.0.0.1", tikov: int = 0,
-            sejchas=None) -> dict:
+            sejchas=None, kotirovka_call=None) -> dict:
     """СБОРЩИК И ОТДАЧА В ОДНОМ ПРОЦЕССЕ -- чтобы на хосте была ОДНА служба.
 
     Две службы (сборщик и сервер) означали бы два юнита, два перезапуска и два
@@ -2499,7 +2765,7 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
     try:
         while True:
             р = progon(к, koshelek=koshelek, sutok=sutok,
-                       rjady_kesh=кэш_ряда)
+                       rjady_kesh=кэш_ряда, kotirovka_call=kotirovka_call)
             из_["tikov"] += 1
             из_["sboev"] += (not р.get("ok"))
             # ТИХИМ СБОЙ НЕ БЫВАЕТ: каждая неудача тика печатается строкой, её
@@ -2516,6 +2782,8 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
                               "капитал_sol": р.get("kapital_sol"),
                               "sol": рр.get("sol"), "wsol": рр.get("wsol"),
                               "позиции": рр.get("pozicii"),
+                              "позиции_по_входу": рр.get("pozicii_po_vhodu"),
+                              "списано_позиций": рр.get("spisano_pozicij"),
                               "рента": рр.get("renta"),
                               "счетов": рр.get("schetov"),
                               "счетов_пустых": рр.get("schetov_pustyh"),
@@ -2540,7 +2808,7 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
 
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: меньше -- значит что-то пропущено молча, и
 # это считается провалом, а не мелочью.
-ZHDEM_PROVEROK = 101
+ZHDEM_PROVEROK = 108
 # СУТОЧНЫЕ ИТОГИ УЧЁТА ПОЛОСЫ -- ЗАМЕР ПО ФАЙЛУ data/sdelki_polosy_vse_s_2709.json
 # (снят 03.10T17:07Z, 578 рядов), поле «итог_po_cepi_sol» КИРИЛЛИЦЕЙ. Числа
 # объявлены, чтобы смена файла была видна числом, а не молчанием.
@@ -2675,6 +2943,17 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
 
     print("c3_kapital_trekker: самопроверка")
     врем = Path(tempfile.mkdtemp(prefix="kapital-proverka-"))
+    # НИ ОДНОГО ВЫХОДА В СЕТЬ ЗА КОТИРОВКОЙ. По умолчанию зов котировки
+    # заменён на отказ сети: старые проверки писались до котировок, и позиции
+    # в них обязаны считаться ПО ВХОДУ -- ровно то, что модуль и делает, когда
+    # Jupiter недоступен. Там, где проверяется сама котировка, поддельный
+    # агрегатор передаётся явно.
+    прежний_зов_кот = globals()["_kotirovka_setju"]
+
+    def _кот_сети_нет(url, параметры, тайм):  # noqa: ARG001
+        raise OSError("самопроверка: сети нет нарочно")
+
+    globals()["_kotirovka_setju"] = _кот_сети_нет
     try:
         КОШ = "KoshelekProverki1111111111111111111111111111"
         АТА = "AtaProverki111111111111111111111111111111111"
@@ -3644,6 +3923,13 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             and о_шк["shkala"]["x1"] == о_шк["tochki_x"][-1]
             and len(о_шк["tochki_x"]) == len(о_шк["tochki"])
             and len(о_шк["tochki_y"]) == len(о_шк["tochki"]), о_шк["shkala"])
+        chk("на странице есть таблица позиций: котировка СЕЙЧАС, вход "
+            "отдельной колонкой и пометка «списана»",
+            'class = "pozicii"' in html.replace("className", "class")
+            or ('сп_п.className = "pozicii"' in html
+                and 'текст(с, sol(п.stoimost, 4))' in html
+                and 'текст(в, sol(п.vhod, 4))' in html
+                and '" списана"' in html), None)
         chk("страница рисует отметки и крест по готовой шкале выгрузки",
             "о.shkala" in html and "о.tochki_x" in html
             and "о.tochki_y" in html, None)
@@ -3960,7 +4246,129 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             and "не уходил" in (п_д.get("pochemu") or ""),
             (сост_д["pozicii"], п_д.get("pochemu")))
 
+
+        # ------------------------- 17. ПОЗИЦИЯ СЧИТАЕТСЯ ПО КОТИРОВКЕ ВЫХОДА,
+        #                              А НЕ ПО ЦЕНЕ ВХОДА (слово владельца)
+        ЖИВОЙ = "MintZhivoj11111111111111111111111111111111"
+        РАГПУЛ = "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump"
+        ВХОД_Ж, ВХОД_Р = 300_000_000, 500_000_000
+        ОСТАТОК = 1_000_000
+        КОТИРОВКА_Ж = 180_000_000          # живой минт: дают 0.18 SOL
+
+        зовы_кот: list = []
+
+        def _поддельный_jupiter(url, параметры, тайм):  # noqa: ARG001
+            """Агрегатор, которого нет: отвечает по таблице и СЧИТАЕТ зовы."""
+            зовы_кот.append((параметры.get("inputMint"),
+                             параметры.get("amount")))
+            м = параметры.get("inputMint")
+            if м == ЖИВОЙ:
+                return {"outAmount": str(КОТИРОВКА_Ж),
+                        "routePlan": [{"swapInfo": {"label": "Raydium"}}]}
+            if м == РАГПУЛ:
+                # Так Jupiter и отвечает, когда выхода нет.
+                return {"errorCode": "COULD_NOT_FIND_ANY_ROUTE"}
+            return {"outAmount": "1"}
+
+        сост_ц = pustoe_sostojanie(КОШ)
+        сост_ц["pozicii"] = {
+            ЖИВОЙ: {"vhod": ВХОД_Ж, "ostatok": ОСТАТОК, "sig": "b1",
+                     "utc": 1_700_000_000, "slot": 1, "dobavok": 0},
+            РАГПУЛ: {"vhod": ВХОД_Р, "ostatok": ОСТАТОК, "sig": "b2",
+                      "utc": 1_700_000_000, "slot": 1, "dobavok": 0}}
+        счета_ц = [{"mint": ЖИВОЙ, "lamports": РЕНТА, "amount": ОСТАТОК,
+                     "adres": "a1"},
+                    {"mint": РАГПУЛ, "lamports": РЕНТА, "amount": ОСТАТОК,
+                     "adres": "a2"}]
+        узел_ц = _poddelnyj_uzel(sol=SOL0, scheta=счета_ц)
+        кэш_ц: dict = {}
+        р_ц = rjad(узел_ц, koshelek=КОШ, sostojanie=сост_ц, sejchas=1_800_000_000,
+                   kotirovka_call=_поддельный_jupiter, kesh_kotirovok=кэш_ц)
+        chk("ЖИВАЯ ПОЗИЦИЯ СЧИТАЕТСЯ ПО КОТИРОВКЕ ВЫХОДА: вход 0.3 SOL, дают "
+            f"{КОТИРОВКА_Ж / ЛАМПОРТОВ_В_SOL} -- в капитал идёт котировка, а "
+            "вход остаётся отдельным числом",
+            р_ц["pozicii"] == КОТИРОВКА_Ж
+            and р_ц["pozicii_po_vhodu"] == ВХОД_Ж + ВХОД_Р
+            and р_ц["kapital"] == SOL0 + КОТИРОВКА_Ж + 2 * РЕНТА,
+            (р_ц["pozicii"], р_ц["pozicii_po_vhodu"], р_ц["kapital"]))
+        стр_рагпул = [т for т in р_ц["pozicii_tablica"] if т["mint"] == РАГПУЛ]
+        chk("РАГПУЛ, ИЗ КОТОРОГО ВЫХОДА НЕТ, ДАЁТ НОЛЬ И ПОМЕТКУ «списана»: "
+            "по входу он висел бы в капитале вечно (живой случай 04.10 -- "
+            f"{РАГПУЛ[:10]}…, вход до 0.5 SOL)",
+            len(стр_рагпул) == 1 and стр_рагпул[0]["stoimost"] == 0
+            and стр_рагпул[0]["spisana"] is True
+            and стр_рагпул[0]["vhod"] == ВХОД_Р
+            and стр_рагпул[0]["why_not"] == ПОЧЕМУ_НЕТ_МАРШРУТА
+            and р_ц["spisano_pozicij"] == 1, стр_рагпул)
+        # КОТИРОВКА НИЖЕ ПЯТИ ПРОЦЕНТОВ ВХОДА -- ТОЖЕ НОЛЬ.
+        МАЛО = "MintMalo1111111111111111111111111111111111"
+        сост_м = pustoe_sostojanie(КОШ)
+        сост_м["pozicii"] = {МАЛО: {"vhod": 1 * ЛАМПОРТОВ_В_SOL,
+                                     "ostatok": ОСТАТОК, "sig": "b3",
+                                     "utc": 1_700_000_000, "slot": 1,
+                                     "dobavok": 0}}
+        узел_м = _poddelnyj_uzel(
+            sol=SOL0, scheta=[{"mint": МАЛО, "lamports": РЕНТА,
+                                "amount": ОСТАТОК, "adres": "a3"}])
+
+        def _jupiter_malo(url, параметры, тайм):  # noqa: ARG001
+            # Дают 4.9 % входа -- ниже порога списания в 5 %.
+            return {"outAmount": str(int(0.049 * ЛАМПОРТОВ_В_SOL))}
+        р_м = rjad(узел_м, koshelek=КОШ, sostojanie=сост_м, sejchas=1_800_000_000,
+                   kotirovka_call=_jupiter_malo, kesh_kotirovok={})
+        chk(f"котировка ниже {int(ДОЛЯ_СПИСАНИЯ * 100)} %% входа -- тоже ноль и "
+            "«списана»: доля, а не абсолют, потому что билеты разного размера",
+            р_м["pozicii"] == 0 and р_м["spisano_pozicij"] == 1
+            and р_м["pozicii_tablica"][0]["why_not"] == ПОЧЕМУ_МАЛО,
+            (р_м["pozicii"], р_м["pozicii_tablica"]))
+        # НЕ ЧАЩЕ РАЗА В МИНУТУ НА ПОЗИЦИЮ.
+        зовы_кот.clear()
+        кэш_ч: dict = {}
+        for и in range(3):            # тики 0, 20, 40 с -- ВНУТРИ минуты
+            rjad(узел_ц, koshelek=КОШ, sostojanie=сост_ц,
+                 sejchas=1_800_000_100 + 20 * и,
+                 kotirovka_call=_поддельный_jupiter, kesh_kotirovok=кэш_ч)
+        живого_за_минуту = sum(1 for м, _ in зовы_кот if м == ЖИВОЙ)
+        rjad(узел_ц, koshelek=КОШ, sostojanie=сост_ц, sejchas=1_800_000_400,
+             kotirovka_call=_поддельный_jupiter, kesh_kotirovok=кэш_ч)
+        живого_всего = sum(1 for м, _ in зовы_кот if м == ЖИВОЙ)
+        chk(f"котировка берётся НЕ ЧАЩЕ раза в {КОТИРОВКА_НЕ_ЧАЩЕ_СЕК} с на "
+            "позицию: три тика внутри минуты -- ОДИН зов на минт, тик за "
+            "минутой -- ещё один (рагпул спрашивает два хоста на зов, и это "
+            "видно отдельно)",
+            живого_за_минуту == 1 and живого_всего == 2
+            and sum(1 for м, _ in зовы_кот if м == РАГПУЛ) == 4,
+            (живого_за_минуту, живого_всего, зовы_кот))
+        # СЕТЬ МОЛЧИТ -- ЭТО НЕ СПИСАНИЕ.
+        def _jupiter_molchit(url, параметры, тайм):  # noqa: ARG001
+            raise OSError("соединение оборвано")
+        р_с = rjad(узел_м, koshelek=КОШ, sostojanie=сост_м, sejchas=1_800_000_000,
+                   kotirovka_call=_jupiter_molchit, kesh_kotirovok={})
+        chk("СЕТЬ МОЛЧИТ -- ЭТО НЕ ОТВЕТ РЫНКА: позиция считается ПО ВХОДУ и "
+            "помечается «котировки нет», а не списывается в ноль",
+            р_с["pozicii"] == 1 * ЛАМПОРТОВ_В_SOL
+            and р_с["spisano_pozicij"] == 0
+            and р_с["pozicij_po_vhodu_bez_kotirovki"] == 1
+            and р_с["pozicii_tablica"][0]["po_vhodu"] is True
+            and р_с["pozicii_tablica"][0]["why_not"] == ПОЧЕМУ_СЕТЬ,
+            (р_с["pozicii"], р_с["pozicii_tablica"]))
+        # ПРИ НУЛЕ ПОЗИЦИЙ КАПИТАЛ НЕ МЕНЯЕТСЯ И JUPITER НЕ СПРАШИВАЕТСЯ ВОВСЕ.
+        зовы_кот.clear()
+        капиталы_н = []
+        кэш_н: dict = {}
+        for и in range(3):
+            р_н = rjad(узел_х, koshelek=КОШ, sostojanie=pustoe_sostojanie(КОШ),
+                       sejchas=1_800_001_000 + 120 * и,
+                       kotirovka_call=_поддельный_jupiter, kesh_kotirovok=кэш_н)
+            капиталы_н.append(р_н["kapital"])
+        chk("при НУЛЕ позиций капитал не меняется от котировок вовсе: Jupiter "
+            "не спрашивается ни разу, три опроса дают одно число",
+            len(set(капиталы_н)) == 1 and not зовы_кот
+            and капиталы_н[0] == СОЛЬ_ХОСТА + 2_039_280 + 200 * 1_488_440,
+            (капиталы_н, зовы_кот))
+
     finally:
+        globals()["_kotirovka_setju"] = прежний_зов_кот
         shutil.rmtree(врем, ignore_errors=True)
 
     # ИМЕНА УПАВШИХ ПРОВЕРОК -- В ПОСЛЕДНИХ СТРОКАХ ВЫВОДА. Code-1 04.10:
