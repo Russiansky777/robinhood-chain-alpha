@@ -131,7 +131,12 @@ jobs:
               # другие. Гадать имена в денежном разборе нельзя, поэтому запись
               # уезжает целиком -- Code-3 разберёт её по своим именам. Позиций
               # две, то есть объём тут ни при чём.
-              python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else {});k=[x for x in sorted(d) if isinstance(d.get(x),(list,dict)) and \"pozic\" in x.lower()];print(\"spiska pozicij net; kljuchi fajla:\",sorted(d)) if not k else print(\"kljuch spiska:\",k[0]);r=(d.get(k[0]) if k else None);r=(list(r.values()) if isinstance(r,dict) else (r or []));print(\"pozicij:\",len(r));[print(\"POZ\",i,json.dumps(z,ensure_ascii=False)[:700]) for i,z in enumerate(r[:20])]" 2>&1 || true
+              # КЛЮЧ СЛОВАРЯ ПЕЧАТАЕТСЯ ОТДЕЛЬНО. Второй прогон (37203868692)
+              # отдал запись БЕЗ минта: {"vhod": 0, "ostatok": 1100, ...}.
+              # Минт у трекера -- это КЛЮЧ словаря позиций, а list(values())
+              # его терял, то есть ровно то, что Code-3 и нужно (какой токен),
+              # в таблицу не попадало.
+              python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else {});k=[x for x in sorted(d) if isinstance(d.get(x),(list,dict)) and \"pozic\" in x.lower()];print(\"spiska pozicij net; kljuchi fajla:\",sorted(d)) if not k else print(\"kljuch spiska:\",k[0]);r=(d.get(k[0]) if k else None);r=(sorted(r.items()) if isinstance(r,dict) else [(\"\",z) for z in (r or [])]);print(\"pozicij:\",len(r));[print(\"POZ\",i,\"kljuch=\",kl,json.dumps(z,ensure_ascii=False)[:700]) for i,(kl,z) in enumerate(r[:20])]" 2>&1 || true
               echo "=== UZEL: KAKOJ STOIT I CHTO OTVECHAET (adres ne pechataetsja)"
               if [ -n "$BLOOM_TREKKER_RPC" ]; then
                 echo "uzel: svoj, BLOOM_TREKKER_RPC zadan"
