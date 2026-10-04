@@ -1,6 +1,6 @@
-=== Лаборатория Miami, таймеры расписаний, 2026-10-04T12:00:00Z ===
-NEXT                        LEFT LAST                           PASSED UNIT                    ACTIVATES
-Sun 2026-10-04 08:07:00 EDT 6min Sun 2026-10-04 07:07:09 EDT 52min ago lab-potolok-diska.timer lab-potolok-diska.service
+=== Лаборатория Miami, таймеры расписаний, 2026-10-04T13:43:18Z ===
+NEXT                         LEFT LAST                           PASSED UNIT                    ACTIVATES
+Sun 2026-10-04 10:07:00 EDT 23min Sun 2026-10-04 09:07:07 EDT 36min ago lab-potolok-diska.timer lab-potolok-diska.service
 
 1 timers listed.
 --- LoadState ---
@@ -13,7 +13,7 @@ env_raspisanija=net
   - github-pages
   VYVOD: okruzhenija EST -- sekret mog byt zavedjon v odnom iz nih; togda nuzhen environment: v zadanii
 --- какие имена допуска видны прогону (только имена) ---
-  LAB_DISPATCH_TOKEN net
+  LAB_DISPATCH_TOKEN est
   LAB_DISPATCH net
   LAB_TOKEN net
   DISPATCH_TOKEN net
@@ -21,3 +21,26 @@ env_raspisanija=net
   vars.LAB_DISPATCH_TOKEN net
   vars.LAB_TOKEN net
   GH_RUNNER_PAT est (SHIROKIJ -- berjotsja tolko po slovu vo vhode)
+dopusk: LAB_DISPATCH_TOKEN
+-rw------- 1 root root 113 Oct  4 09:43 /etc/lab-raspisanie.env
+LAB_DISPATCH_TOKEN est
+oba skripta na hoste razobrany bez oshibok
+Created symlink /etc/systemd/system/timers.target.wants/lab-uchjot-chas.timer → /etc/systemd/system/lab-uchjot-chas.timer.
+Created symlink /etc/systemd/system/timers.target.wants/lab-zdorovje-chas.timer → /etc/systemd/system/lab-zdorovje-chas.timer.
+Created symlink /etc/systemd/system/timers.target.wants/lab-konveyer-sutki.timer → /etc/systemd/system/lab-konveyer-sutki.timer.
+--- postavleno ---
+lab-uchjot-chas.timer LoadState=loaded ActiveState=active
+  ExecStart: { path=/usr/local/sbin/lab_raspisanie_dispatch.sh ; argv[]=/usr/local/sbin/lab_raspisanie_dispatch.sh ledger_hourly.yml@claude/nifty-sagan-r0polg ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+lab-zdorovje-chas.timer LoadState=loaded ActiveState=active
+  ExecStart: { path=/usr/local/sbin/lab_raspisanie_dispatch.sh ; argv[]=/usr/local/sbin/lab_raspisanie_dispatch.sh run_vps_health_nl.yml@claude/nifty-sagan-r0polg ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+lab-konveyer-sutki.timer LoadState=loaded ActiveState=active
+  ExecStart: { path=/usr/local/sbin/lab_raspisanie_dispatch.sh ; argv[]=/usr/local/sbin/lab_raspisanie_dispatch.sh run_podbivka2_konveyer.yml@claude/podbivka run_konveyer_sutki_nl.yml@claude/nifty-sagan-r0polg ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+NEXT                         LEFT LAST PASSED UNIT                     ACTIVATES
+Sun 2026-10-04 10:09:00 EDT 25min -         - lab-uchjot-chas.timer    lab-uchjot-chas.service
+Sun 2026-10-04 10:39:00 EDT 55min -         - lab-zdorovje-chas.timer  lab-zdorovje-chas.service
+Mon 2026-10-05 03:17:00 EDT   17h -         - lab-konveyer-sutki.timer lab-konveyer-sutki.service
+
+3 timers listed.
+Pass --all to see loaded but inactive timers, too.
+--- pervyj zapusk lab-uchjot-chas
+client_loop: send disconnect: Broken pipe
