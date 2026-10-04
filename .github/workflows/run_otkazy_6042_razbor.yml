@@ -1,4 +1,4 @@
-name: "Отказы 6042 кривой pump.fun: уход цены против допуска (только чтение)"
+name: "Отказы по допуску цены (6042 кривой и 6040 Pump AMM): уход против допуска и задержка (только чтение)"
 
 # ЗАЧЕМ (слово владельца 04.10, вечер). Два отказа 6042
 # BuySlippageBelowMinTokensOut подряд на cand1_03 / 6qudAN2k. Нужно: сколько
@@ -17,14 +17,26 @@ name: "Отказы 6042 кривой pump.fun: уход цены против �
 on:
   workflow_dispatch:
     inputs:
-      since_utc:
-        description: "начало суток полосы UTC (полночь Мадрида -- 22:00Z)"
+      sutki_s:
+        description: "начало ЭТИХ суток полосы UTC (полночь Мадрида -- 22:00Z)"
         required: false
         default: "2026-10-03T22:00:00Z"
+      sutki_proshlye_s:
+        description: "начало ПРОШЛЫХ суток полосы UTC"
+        required: false
+        default: "2026-10-02T22:00:00Z"
+      vecher_s:
+        description: "начало «вечера» UTC (для «участились ли вечером»)"
+        required: false
+        default: "2026-10-04T16:00:00Z"
+      posle_deploev_s:
+        description: "начало окна «после сегодняшних деплоев» UTC"
+        required: false
+        default: "2026-10-04T14:56:00Z"
       sluchaev:
         description: "сколько последних отказов разбирать по цепи"
         required: false
-        default: "7"
+        default: "8"
 
 concurrency:
   group: otkazy-6042-razbor
@@ -33,7 +45,7 @@ concurrency:
 env:
   HOST: 45.59.170.76
   STATE_DIR: /home/bot/bloom_executor_live_data
-  OUT: data/otkazy_6042_razbor.json
+  OUT: data/otkazy_dopuska_razbor.json
 
 jobs:
   razbor:
@@ -46,22 +58,34 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
-      - name: "ВХОД и самопроверки ДО всякой сети"
+      - name: "ВХОД, окна файлом и самопроверки ДО всякой сети"
         env:
-          S: ${{ inputs.since_utc }}
+          S1: ${{ inputs.sutki_s }}
+          S0: ${{ inputs.sutki_proshlye_s }}
+          V: ${{ inputs.vecher_s }}
+          D: ${{ inputs.posle_deploev_s }}
           N: ${{ inputs.sluchaev }}
         run: |
           set -e
           set -o pipefail
           # Время -- только цифры, дефисы, T, двоеточия и Z; число -- цифры.
-          case "$S" in
-            *[!0-9T:Z-]*) echo "OTKAZ: vo vremeni lishnie znaki"; exit 1;;
-          esac
+          for X in "$S1" "$S0" "$V" "$D"; do
+            case "$X" in
+              ""|*[!0-9T:Z-]*) echo "OTKAZ: vo vremeni lishnie znaki"; exit 1;;
+            esac
+          done
           case "$N" in
             ""|*[!0-9]*) echo "OTKAZ: sluchaev -- ne chislo"; exit 1;;
           esac
-          python3 deploy/checks/otkazy_6042_iz_zhurnala.py --self-test | tail -1
-          python3 analysis/otkazy_6042_po_cepi.py --self-test | tail -1
+          python3 deploy/checks/otkazy_dopuska_iz_zhurnala.py --self-test | tail -1
+          python3 analysis/otkazy_dopuska_po_cepi.py --self-test | tail -1
+          # ОКНА -- ФАЙЛОМ, И СОБИРАЕТ ЕГО printf, А НЕ ТЕЛО СКРИПТА В ШАГЕ.
+          # В этом доме скрипты едут файлами из дерева; здесь скрипта и не
+          # нужно -- это пять пар времён, уже проверенных выше на знаки. В
+          # команду root на хост уедет только путь к файлу.
+          printf '{"okna":{"sutki_eti":["%s",""],"sutki_proshlye":["%s","%s"],"vecher_segodnya":["%s",""],"do_deploev_segodnya":["%s","%s"],"posle_deploev_segodnya":["%s",""]}}\n' \
+            "$S1" "$S0" "$S1" "$V" "$S1" "$D" "$D" > /tmp/okna_6042.json
+          python3 -c "import json;d=json.load(open('/tmp/okna_6042.json'));print('okon:', len(d['okna']), sorted(d['okna']))"
 
       - name: "Питон с requests и solders"
         run: |
@@ -90,20 +114,21 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Выжимка из журналов хоста (только чтение)"
-        env:
-          S: ${{ inputs.since_utc }}
         run: |
           set -e
           set -o pipefail
-          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/otkazy_6042_iz_zhurnala.py" \
-            < deploy/checks/otkazy_6042_iz_zhurnala.py
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/otkazy_dopuska_iz_zhurnala.py" \
+            < deploy/checks/otkazy_dopuska_iz_zhurnala.py
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/okna_6042.json" < /tmp/okna_6042.json
+          # В КОМАНДЕ root НИ ОДНОГО ЗНАКА ИЗ ВХОДОВ: только литералы и путь.
           ssh -n $SSH_OPTS root@"$HOST" "
-            nice -n 15 python3 /tmp/otkazy_6042_iz_zhurnala.py \
-              --state-dir '$STATE_DIR' --since-utc '$S' --out /tmp/otkazy_6042.json
-            rm -f /tmp/otkazy_6042_iz_zhurnala.py"
-          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/otkazy_6042.json" > /tmp/otkazy_6042.json
-          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/otkazy_6042.json"
-          wc -c /tmp/otkazy_6042.json
+            nice -n 15 python3 /tmp/otkazy_dopuska_iz_zhurnala.py \
+              --state-dir '$STATE_DIR' --okna /tmp/okna_6042.json \
+              --out /tmp/otkazy_dopuska.json
+            rm -f /tmp/otkazy_dopuska_iz_zhurnala.py /tmp/okna_6042.json"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/otkazy_dopuska.json" > /tmp/otkazy_dopuska.json
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/otkazy_dopuska.json"
+          wc -c /tmp/otkazy_dopuska.json
 
       - name: "Разбор по цепи"
         env:
@@ -111,7 +136,8 @@ jobs:
         run: |
           set -e
           [ -n "$HELIUS_API_KEY" ] || { echo "SBOY: HELIUS_API ne zadan"; exit 1; }
-          $PY analysis/otkazy_6042_po_cepi.py --vyzhimka /tmp/otkazy_6042.json \
+          $PY analysis/otkazy_dopuska_po_cepi.py \
+            --vyzhimka /tmp/otkazy_dopuska.json \
             --sluchaev "${{ inputs.sluchaev }}" --out "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
@@ -127,7 +153,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$OUT"
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
-          git commit -m "Otkazy 6042 krivoj: uhod ceny protiv dopuska [automated]"
+          git commit -m "Otkazy po dopusku ceny: uhod protiv dopuska i zaderzhka [automated]"
           for i in 1 2 3 4 5; do
             git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
             git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
