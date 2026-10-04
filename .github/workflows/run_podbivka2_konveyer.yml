@@ -15,15 +15,22 @@ name: "Podbivka-2: konveyer (Pravilo 18) -- po taymeru, bez shtaba"
 #
 # Svoya gruppa concurrency: ne vstayot poverh ocheredi zadach (podbivka2-zadacha)
 # i ne otmenyaet eyo. Helius ne nuzhen: tolko arhiv PumpApi.
-# VAZHNO (04.10): raspisaniya GitHub Actions rabotayut TOLKO s vetki po
-# umolchaniyu repozitoriya (claude/robinhood-copytrading-hypothesis-awjj0g), a
-# etot fayl lezhit na claude/podbivka -- poetomu cron nizhe NIKOGDA ne
-# srabatyvaet (progona konv_2026-10-03T17 v 07:17Z 04.10 ne bylo, v spiske
-# workflows repozitoriya etogo prokhoda net). Nochnoy konveyer vedyotsya
-# routine'om Code-2 "CODE-2: konveyer (Pravilo 18) -- nochnoy prohod"
-# (22 7 * * *): on stavit marker zadacha_konveyer.json v ochered
-# podbivka2-zadacha i schitaet pravilo oflayn. Cron ostavlen kak est: esli
-# fayl kogda-nibud poyavitsya na vetke po umolchaniyu, on zarabotaet sam.
+# DVE BEDY, NAYDENNYE 04.10 (ispravleno zdes zhe).
+# 1. FLAG --bez-adresov BYL OSHIBKOY. On znachit "tolko celi (--celi) i ryady ih
+#    pulov": adresa obnulyayutsya (adr = {}), signalov ne poyavlyaetsya vovse.
+#    Nochnye prohody konv_2026-10-02T17 i konv_2026-10-03T17 vyshli pustymi
+#    (317 i 357 bayt, 46.7 mln strok prochitano, signalov 0), poetomu v
+#    docs/konveyer_2026-10-04.md u vseh 45 deystvuyuschih "net dannyh za
+#    poslednie sutki", a proverka "vne vyborki" byla pustoy. Vselennaya
+#    kandidatov beryotsya iz spiskov "pered" u NASHIH signalov, poetomu adresa
+#    iz arhiv_adresa.json nuzhny -- kak v prohodah cand2_*.
+# 2. Cron 17 7 * * * 04.10 ne srabotal (sobytiya schedule u etogo progona net,
+#    byl tolko workflow_dispatch). Fayl na vetke po umolchaniyu lezhit s 03.10
+#    18:31Z, tak chto raspisanie imeet pravo rabotat; propusk pervogo
+#    sutochnogo srabatyvaniya -- izvestnoe povedenie Actions. Podstrahovka:
+#    routine Code-2 "CODE-2: konveyer (Pravilo 18) -- nochnoy prohod" (22 7 * * *)
+#    stavit tot zhe prohod markerom v ochered podbivka2-zadacha, esli stranicy
+#    za sutki net.
 on:
   schedule:
     - cron: "17 7 * * *"      # posle sutochnogo progona 06:30Z
@@ -79,7 +86,7 @@ jobs:
           echo "sutki: ${DEN}T17 -> +25 chasov, metka konv_${DEN}T17"
           $PY analysis/podbivka_arhiv_den.py \
             --s "${DEN}T17" --chasov 25 --porog 2 --okno 160 --ne-sol --okno-vsem \
-            --okno-dokupki 1800 --bilety 0.1,0.3 --pered 10 --bez-sobytij --bez-adresov \
+            --okno-dokupki 1800 --bilety 0.1,0.3 --pered 10 --bez-sobytij \
             --metka "konv_${DEN}T17"
 
       - name: "Nedelnaya chast (ponedelnik)"
