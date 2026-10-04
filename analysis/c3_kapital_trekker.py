@@ -69,6 +69,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 КАТАЛОГ = КОРЕНЬ / "data" / "kapital"
 
 КОШЕЛЕК = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+# КАПИТАЛ ВСЕЙ СИСТЕМЫ, А НЕ ОДНОЙ ПОЛОСЫ (слово владельца 05.10). Адреса
+# взяты ИЗ РЕЕСТРА РЕПОЗИТОРИЯ -- data/solana_trades_all.json, поля
+# wallet_name и wallet: BATCH-5 на 4346 сделках, BATCH-3 на 1563, BATCH-8 на
+# 717. BATCH-8 -- он же исполнитель Bloom: тот самый 4s87RRC2…, который Code-1
+# называет «баланс X» в докладах. Ни один адрес не вписан по памяти.
+#
+# ЧЕГО ПРО ЭТИ ТРИ КОШЕЛЬКА ТРЕКЕР НЕ ЗНАЕТ, И ЭТО СКАЗАНО НА СТРАНИЦЕ:
+# ИХ ОТКРЫТЫЕ ПОЗИЦИИ В КАПИТАЛ НЕ ВХОДЯТ. Цену входа трекер ведёт только для
+# полосы -- он разбирает её подписи; у остальных считается то, что видно одним
+# чтением: SOL, WSOL и рента их токен-счетов. Выдавать их токены за ноль молча
+# было бы тем же враньём, что и выдавать рагпул за цену входа.
+КОШЕЛЬКИ_СИСТЕМЫ = (
+    {"imja": "полоса", "adres": КОШЕЛЕК, "pozicii": True,
+     "istochnik": "кошелёк полосы, слово владельца"},
+    {"imja": "BATCH-5", "adres": "5Y8h877swoTzTdc8in9hU3SvXXVv1q9p19Y85tAsdqBv",
+     "pozicii": False, "istochnik": "data/solana_trades_all.json, 4346 сделок"},
+    {"imja": "BATCH-3", "adres": "BmjAUDbwBMxR5shrmzBtKRwveVahFGFiEH3oTq7QTHnu",
+     "pozicii": False, "istochnik": "data/solana_trades_all.json, 1563 сделки"},
+    {"imja": "Bloom", "adres": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+     "pozicii": False,
+     "istochnik": "data/solana_trades_all.json, BATCH-8, 717 сделок; он же "
+                  "исполнитель Bloom в докладах"},
+)
 WSOL = "So11111111111111111111111111111111111111112"
 # КОТИРОВОЧНЫЕ ВАЛЮТЫ -- НЕ ПОЗИЦИИ (слово владельца 04.10). Полоса ходит в
 # токен не только прямо за SOL: у неё есть нога через USDC, и в ОДНОЙ
@@ -886,6 +909,31 @@ def сейчас_разница(сейчас: float, было: int) -> float:
 
 # -------------------------------------------- состояние: позиции и переводы
 
+def kapital_koshelka(rpc_call, adres: str, *, schjotchik=None,
+                     scheta: list | None = None) -> dict:
+    """КАПИТАЛ ЧУЖОГО КОШЕЛЬКА ОДНИМ ЧТЕНИЕМ: SOL, WSOL, рента. Без позиций.
+
+    Позиции сюда НЕ входят и это названо: цену входа трекер ведёт только для
+    полосы. Отдельной строкой идёт РЕНТА ПУСТЫХ СЧЕТОВ -- её вернёт уборка, и
+    владелец просил видеть её отдельно от ренты счетов с остатком.
+    """
+    из_ = {"adres": adres, "ok": False, "why_not": None, "sol": 0, "wsol": 0,
+            "renta": 0, "renta_pustyh": 0, "schetov": 0, "schetov_pustyh": 0,
+            "s_ostatkom": 0, "kapital": 0}
+    б = sol_koshelka(rpc_call, adres, schjotchik=schjotchik)
+    сч = (scheta if scheta is not None
+          else tokennye_scheta(rpc_call, adres, schjotchik=schjotchik))
+    к = kapital(б["lamports"], сч, {})
+    рента_пустых = sum(renta_scheta(с) for с in сч
+                       if not int(с.get("amount") or 0))
+    из_.update(ok=True, sol=к["sol"], wsol=к["wsol"], renta=к["renta"],
+               renta_pustyh=рента_пустых, schetov=к["schetov"],
+               schetov_pustyh=к["schetov_pustyh"],
+               s_ostatkom=к["schetov"] - к["schetov_pustyh"],
+               kapital=к["kapital"], slot=б.get("slot"), scheta_dano=bool(scheta))
+    return из_
+
+
 def pustoe_sostojanie(koshelek: str = КОШЕЛЕК) -> dict:
     return {"koshelek": koshelek, "obnovleno_utc": None, "poslednjaja_sig": None,
             "pervaja_sig_istorii": None, "pozicii": {}, "sdelki": [],
@@ -1104,10 +1152,17 @@ def prinjat_tranzakciju(sostojanie: dict, tx: dict,
     return из_
 
 
+def сумма_ренты_пустых(scheta: list) -> int:
+    """Рента ПУСТЫХ счетов -- та, что вернётся уборкой. Отдельным числом."""
+    return sum(renta_scheta(с) for с in (scheta or [])
+               if not int(с.get("amount") or 0))
+
+
 def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = None,
          schjotchik=None, sejchas: float | None = None,
          schitat_scheta: bool = True, kotirovka_call=None,
-         kesh_kotirovok: dict | None = None) -> dict:
+         kesh_kotirovok: dict | None = None,
+         drugie_koshelki: tuple | None = None) -> dict:
     """ОДИН РЯД капитала: чтение цепи плюс арифметика. Сети внутри нет.
 
     schitat_scheta=False -- взять счета из состояния (кэш), не спрашивая узел.
@@ -1209,6 +1264,56 @@ def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = 
         key=lambda т: -int(т.get("vhod") or 0))[:20]
     из_["kotirovok_s_ostatkom"] = котировок_с_остатком
     из_["scheta_vozrast_sek"] = возраст
+    # --- КАПИТАЛ ВСЕЙ СИСТЕМЫ. Полоса считается полностью (позиции по
+    # котировке), остальные -- одним чтением: SOL, WSOL, рента. Их открытые
+    # позиции в капитал НЕ входят, и это названо числом `bez_pozicij`.
+    кош = {"полоса": {"kapital": из_["kapital"], "sol": из_["sol"],
+                       "wsol": из_["wsol"], "renta": из_["renta"],
+                       "renta_pustyh": сумма_ренты_пустых(счета),
+                       "pozicii": из_["pozicii"], "schetov": из_["schetov"],
+                       "schetov_pustyh": из_["schetov_pustyh"],
+                       "s_pozicijami": True}}
+    для_других = (drugie_koshelki if drugie_koshelki is not None
+                  else tuple(к for к in КОШЕЛЬКИ_СИСТЕМЫ
+                             if к["adres"] != koshelek))
+    # СЧЕТА ЧУЖИХ КОШЕЛЬКОВ ПЕРЕЧИТЫВАЮТСЯ РЕДКО. Их подписи мы не разбираем,
+    # значит узнать о смене счетов можем только по времени: берём тот же срок,
+    # что и для полосы (СЧЕТА_НЕ_СТАРШЕ_СЕК). Иначе три кошелька добавляли бы
+    # по шесть вызовов в КАЖДЫЙ тик -- 26 тысяч вызовов в сутки впустую.
+    кэш_других = сост.setdefault("scheta_drugih", {})
+    for к_ in для_других:
+        з = кэш_других.get(к_["adres"]) or {}
+        свежие = (isinstance(з.get("utc"), int)
+                  and (сейчас_ - з["utc"]) < СЧЕТА_НЕ_СТАРШЕ_СЕК
+                  and isinstance(з.get("scheta"), list))
+        try:
+            if свежие:
+                кк = kapital_koshelka(rpc_call, к_["adres"],
+                                      schjotchik=schjotchik,
+                                      scheta=з["scheta"])
+            else:
+                счета_ч = tokennye_scheta(rpc_call, к_["adres"],
+                                          schjotchik=schjotchik)
+                кэш_других[к_["adres"]] = {"utc": int(сейчас_),
+                                            "scheta": счета_ч}
+                кк = kapital_koshelka(rpc_call, к_["adres"],
+                                      schjotchik=schjotchik, scheta=счета_ч)
+        except (ОшибкаТрекера, OSError, ValueError) as сбой:
+            кош[к_["imja"]] = {"why_not": f"{type(сбой).__name__}: "
+                                           f"{zateret(str(сбой))[:100]}"}
+            continue
+        кош[к_["imja"]] = {"kapital": кк["kapital"], "sol": кк["sol"],
+                            "wsol": кк["wsol"], "renta": кк["renta"],
+                            "renta_pustyh": кк["renta_pustyh"],
+                            "pozicii": 0, "schetov": кк["schetov"],
+                            "schetov_pustyh": кк["schetov_pustyh"],
+                            "bez_pozicij": кк["s_ostatkom"],
+                            "s_pozicijami": False}
+    из_["koshelki"] = кош
+    из_["kapital_sistemy"] = sum(int(з.get("kapital") or 0)
+                                 for з in кош.values())
+    из_["renta_pustyh_sistemy"] = sum(int(з.get("renta_pustyh") or 0)
+                                      for з in кош.values())
     return из_
 
 
@@ -2376,7 +2481,8 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
            koshelek: str = КОШЕЛЕК, sutok: float = 3.0,
            sejchas: float | None = None, pisat_stranicu: bool = True,
            derzhim_sutok: int = ДЕРЖИМ_СУТОК,
-           rjady_kesh: list | None = None, kotirovka_call=None) -> dict:
+           rjady_kesh: list | None = None, kotirovka_call=None,
+           drugie_koshelki: tuple | None = None) -> dict:
     """ОДИН ТИК СБОРЩИКА: догнать цепь, посчитать ряд, записать всё.
 
     Вызывается раз в 15--30 с бегунком или циклом; состояние и ряд лежат на
@@ -2458,7 +2564,7 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
         р = rjad(rpc_call, koshelek=koshelek, sostojanie=сост,
                  schjotchik=счётчик, sejchas=сейчас,
                  schitat_scheta=читать_счета, kotirovka_call=kotirovka_call,
-                 kesh_kotirovok=кэш_кот)
+                 kesh_kotirovok=кэш_кот, drugie_koshelki=drugie_koshelki)
     except (ОшибкаТрекера, OSError, ValueError) as сбой:
         # УЗЕЛ МОЛЧИТ -- ЭТО НЕ ПОТЕРЯ РЯДА, А ПРОПУСК, И ОН НАЗЫВАЕТСЯ.
         из_["why_not"] = f"{type(сбой).__name__}: {zateret(str(сбой))[:160]}"
@@ -3258,9 +3364,13 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             sol=SOL0, scheta=[{"mint": МИНТ, "lamports": РЕНТА, "amount": 1000,
                                 "adres": АТА}],
             podpisi=[], tranzakcii={})
-        р_к1 = progon(кат_к, rpc_call=узел_к, koshelek=КОШ, sejchas=1_700_000_000)
+        # ЧУЖИЕ КОШЕЛЬКИ ЗДЕСЬ НЕ УЧАСТВУЮТ НАРОЧНО: проверка про кэш счетов
+        # ПОЛОСЫ, и чужие вызовы мерили бы не то, что она называет.
+        р_к1 = progon(кат_к, rpc_call=узел_к, koshelek=КОШ, sejchas=1_700_000_000,
+                      drugie_koshelki=())
         было_счетов = узел_к.зовы.count("getTokenAccountsByOwner")
-        р_к2 = progon(кат_к, rpc_call=узел_к, koshelek=КОШ, sejchas=1_700_000_040)
+        р_к2 = progon(кат_к, rpc_call=узел_к, koshelek=КОШ, sejchas=1_700_000_040,
+                      drugie_koshelki=())
         стало_счетов = узел_к.зовы.count("getTokenAccountsByOwner")
         chk("второй тик БЕЗ новых подписей счета не перечитывает, и возраст "
             "снимка стоит числом в ряде",
