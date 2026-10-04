@@ -126,8 +126,14 @@ for SHAG in "$@"; do
     ZHDALI=$((ZHDALI + 5))
   done
   if [ "$NOMER" = "0" ]; then
-    echo "progon otpravlen, no svoj zapusk za 180 s ne opoznan -- dalshe ne zhdu"
-    continue
+    # ЦЕПОЧКА ОСТАНАВЛИВАЕТСЯ, А НЕ ИДЁТ ДАЛЬШЕ. Здесь стоял continue -- и это
+    # была дыра ровно в том, что владелец сказал прямо: "применитель -- после
+    # конвейера". Не опознали свой запуск конвейера -- continue дёрнул бы
+    # применитель СРАЗУ, по вчерашнему файлу или вовсе без файла. Шаги здесь
+    # упорядочены и зависимы, поэтому неопознанный шаг рвёт цепочку со словами.
+    echo "progon otpravlen, no svoj zapusk za 180 s ne opoznan -- cepochka ostanovlena" >&2
+    ne_otpravleno=$((ne_otpravleno + 1))
+    break
   fi
   echo "zapusk: $NOMER"
 
@@ -150,7 +156,12 @@ for SHAG in "$@"; do
     ZHDALI=$((ZHDALI + SHAG_S))
   done
   if [ "$ZHDALI" -ge "$PREDEL_S" ]; then
-    echo "predel ozhidanija ${PREDEL_S} s ischerpan, progon $NOMER vsjo idjot"
+    # ТОТ ЖЕ ПОВОД: конвейер всё ещё идёт, значит файла за сутки ещё нет, и
+    # применитель по нему работать не должен. Лучше не сделать второй шаг и
+    # сказать это, чем сделать его по недоделанному входу.
+    echo "predel ozhidanija ${PREDEL_S} s ischerpan, progon $NOMER vsjo idjot -- cepochka ostanovlena" >&2
+    ne_otpravleno=$((ne_otpravleno + 1))
+    break
   fi
 done
 
