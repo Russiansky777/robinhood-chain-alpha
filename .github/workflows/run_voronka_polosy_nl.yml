@@ -23,6 +23,10 @@ on:
         description: "до какого времени UTC, ISO с Z (пусто -- до конца)"
         required: false
         default: ""
+      gruppa:
+        description: "одна группа источников -- отдельный разбор по всему журналу (пусто -- без него)"
+        required: false
+        default: ""
 
 concurrency:
   group: voronka-polosy
@@ -48,8 +52,16 @@ jobs:
         env:
           S: ${{ inputs.s }}
           DO: ${{ inputs.do }}
+          GRUPPA: ${{ inputs.gruppa }}
         run: |
           set -e
+          # ИМЯ ГРУППЫ -- только буквы, цифры, подчёркивание и дефис. Оно идёт
+          # доводом питону на бегунке, а не в команду root, но проверить
+          # дешевле, чем доверять.
+          case "$GRUPPA" in
+            "") : ;;
+            *[!A-Za-z0-9_-]*) echo "OTKAZ: v imeni gruppy lishnie znaki"; exit 1;;
+          esac
           # Время -- только цифры, дефисы, T, двоеточия и Z. В команду root оно
           # всё равно не попадает (разбор идёт на бегунке), но проверить дешевле,
           # чем доверять.
@@ -77,6 +89,7 @@ jobs:
         env:
           S: ${{ inputs.s }}
           DO: ${{ inputs.do }}
+          GRUPPA: ${{ inputs.gruppa }}
         run: |
           set -e
           set -o pipefail
@@ -90,15 +103,20 @@ jobs:
           echo "=== Полоса: воронка по журналу решений, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
           echo "окно: с '$S' до '${DO:-конца журнала}'" | tee -a "$OUT"
           python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl "$S" "$DO" | tee -a "$OUT"
-          # ОКНО ТРЕВОГИ ОТДЕЛЬНО: владелец назвал его прямо -- "отправленных
-          # покупок НОЛЬ за 30 минут" в 11:15:38Z. Считаем ровно его, чтобы
-          # ответ был про тот же отрезок, а не про похожий.
-          echo "--- окno trevogi 10:45-11:16Z otdelno ---" | tee -a "$OUT"
-          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
-            "2026-10-04T10:45:00Z" "2026-10-04T11:16:00Z" | tee -a "$OUT"
-          echo "--- do deploja: 09:40-10:43Z (dlja sravnenija) ---" | tee -a "$OUT"
-          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
-            "2026-10-04T09:40:00Z" "2026-10-04T10:43:00Z" | tee -a "$OUT"
+          # ВЕСЬ ЖУРНАЛ БЕЗ ОКНА -- отдельной строкой. Журнал держит около 16
+          # часов (измерено 04.10: 03.10 22:00:02Z -> 04.10 14:02:48Z), и это
+          # ЕДИНСТВЕННОЕ окно, которое по нему вообще можно посчитать; спрошенное
+          # владельцем 03.10 18:23Z в журнале уже не существует.
+          echo "--- ves zhurnal bez okna ---" | tee -a "$OUT"
+          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl "" "" | tee -a "$OUT"
+          # ОДНА ГРУППА ПО ВСЕМУ ЖУРНАЛУ. Общий свод по этапам на вопрос "что
+          # получила именно эта группа" не отвечает: 16 отказов гейта за окно
+          # принадлежали шести группам, и по своду их было не разделить.
+          if [ -n "$GRUPPA" ]; then
+            echo "--- gruppa $GRUPPA po vsemu zhurnalu ---" | tee -a "$OUT"
+            python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
+              "" "" "$GRUPPA" | tee -a "$OUT"
+          fi
 
       - name: "Ключей в отчёте быть не должно"
         if: always()
