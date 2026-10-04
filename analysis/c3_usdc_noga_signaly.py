@@ -688,7 +688,13 @@ def ten(*, tx_istochnika: dict, istochnik: str, mint: str, lamporty: int,
         iz["why_not"] = UN.WHY_OFF
         return iz
     try:
-        pul = C.identify_pool(tx_istochnika, istochnik, mint)
+        # КОТИРОВКА НАЗВАНА ЗАРАНЕЕ -- USDC (правка 05.10). Вторая нога этого
+        # пути идёт USDC -> токен по определению, поэтому среди встречных
+        # счетов сделки источника нас интересует именно счёт USDC. Без этого
+        # сделка, где рядом с USDC стоит USDT, отказывала "неоднозначная
+        # котировка" -- и за сутки 04->05.10 это были ВСЕ отказы ветки.
+        pul = C.identify_pool(tx_istochnika, istochnik, mint,
+                               предпочесть_котировку=mint_kotirovki)
         if not pul.get("ok"):
             iz["why_not"] = f"пул источника: {pul.get('why_not')}"
             return iz
@@ -790,7 +796,13 @@ def instrukcii(*, tx_istochnika: dict, istochnik: str, mint: str, nash_koshelek:
     nons = np_["пара"]
     iz["nonce_para"] = nons
     try:
-        pul = C.identify_pool(tx_istochnika, istochnik, mint)
+        # КОТИРОВКА НАЗВАНА ЗАРАНЕЕ -- USDC (правка 05.10). Вторая нога этого
+        # пути идёт USDC -> токен по определению, поэтому среди встречных
+        # счетов сделки источника нас интересует именно счёт USDC. Без этого
+        # сделка, где рядом с USDC стоит USDT, отказывала "неоднозначная
+        # котировка" -- и за сутки 04->05.10 это были ВСЕ отказы ветки.
+        pul = C.identify_pool(tx_istochnika, istochnik, mint,
+                               предпочесть_котировку=mint_kotirovki)
         if not pul.get("ok"):
             iz["why_not"] = f"пул источника: {pul.get('why_not')}"
             return iz
