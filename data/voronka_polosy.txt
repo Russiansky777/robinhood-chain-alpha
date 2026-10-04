@@ -1,560 +1,62 @@
-=== Полоса: воронка по журналу решений, 2026-10-04T14:46:56Z ===
-окно: с '2026-10-04T13:00:00Z' до 'конца журнала'
+=== Полоса: воронка по журналу решений, 2026-10-04T14:57:19Z ===
+окно: с '2026-10-04T14:56:00Z' до 'конца журнала'
 {
- "строк_всего": 198879,
- "попыток_полосы": 258,
- "в_окне": 24,
- "с": "2026-10-04T13:00:00Z",
+ "строк_всего": 199278,
+ "попыток_полосы": 262,
+ "в_окне": 1,
+ "с": "2026-10-04T14:56:00Z",
  "до": null,
  "группа": null,
  "по_этапам": {
-  "gate": 9,
-  "sent": 8,
-  "build": 5,
-  "usdc_signaly_build": 2
+  "sent": 1
  },
  "по_группам": {
-  "batch5": {
-   "sent": 1
-  },
-  "cand1_03": {
-   "sent": 1
-  },
-  "cand2": {
-   "build": 3,
-   "usdc_signaly_build": 1,
-   "sent": 1
-  },
-  "cand2_03": {
-   "build": 2
-  },
-  "cand3": {
-   "sent": 1
-  },
-  "kandidaty": {
-   "gate": 2
-  },
-  "konveyer": {
-   "sent": 1
-  },
-  "krug_001": {
-   "gate": 2
-  },
   "lane_s0": {
-   "sent": 3,
-   "usdc_signaly_build": 1
-  },
-  "sniper_src": {
-   "gate": 5
+   "sent": 1
   }
  },
- "причины": {
-  "build": [
-   {
-    "почему": "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)",
-    "раз": 2
-   },
-   {
-    "почему": "пул: неоднозначная котировка: 3 встречных счетов (EPjFWd)",
-    "раз": 1
-   },
-   {
-    "почему": "тип пула вне полосы: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-    "раз": 1
-   },
-   {
-    "почему": "тип пула вне полосы: LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",
-    "раз": 1
-   }
-  ],
-  "gate": [
-   {
-    "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "раз": 5
-   },
-   {
-    "почему": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
-    "раз": 2
-   },
-   {
-    "почему": "предел полосы: за сутки уже 3 сделок при пределе 3",
-    "раз": 2
-   }
-  ],
-  "usdc_signaly_build": [
-   {
-    "почему": "котировка пула не SOL -- полоса только одношаговая",
-    "раз": 2
-   }
-  ]
- },
- "причины_по_группам": {
-  "cand2": {
-   "build": [
-    {
-     "почему": "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)",
-     "раз": 2
-    },
-    {
-     "почему": "пул: неоднозначная котировка: 3 встречных счетов (EPjFWd)",
-     "раз": 1
-    }
-   ],
-   "usdc_signaly_build": [
-    {
-     "почему": "котировка пула не SOL -- полоса только одношаговая",
-     "раз": 1
-    }
-   ]
-  },
-  "cand2_03": {
-   "build": [
-    {
-     "почему": "тип пула вне полосы: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-     "раз": 1
-    },
-    {
-     "почему": "тип пула вне полосы: LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",
-     "раз": 1
-    }
-   ]
-  },
-  "kandidaty": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
-     "раз": 2
-    }
-   ]
-  },
-  "krug_001": {
-   "gate": [
-    {
-     "почему": "предел полосы: за сутки уже 3 сделок при пределе 3",
-     "раз": 2
-    }
-   ]
-  },
-  "lane_s0": {
-   "usdc_signaly_build": [
-    {
-     "почему": "котировка пула не SOL -- полоса только одношаговая",
-     "раз": 1
-    }
-   ]
-  },
-  "sniper_src": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-     "раз": 5
-    }
-   ]
-  }
- },
+ "причины": {},
+ "причины_по_группам": {},
  "примеры": {
-  "batch5/sent": [
-   {
-    "ts_utc": "2026-10-04T14:02:08Z",
-    "group": "batch5",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "7vPeJRWqqPchBGPTyLMB6QdE6i9vQ8EgpW8A522mgx8C",
-    "source_sig": "3hT4xLLQkttSLgofBGMk3g5cd7Xd2YhvhxpC1q876HpzxDzt6y9sjHefMfLXfQw4gZZqdyfyiAMxCyVLd1Hm3hZJ",
-    "signature": "2M8PbcXvDPu7wut8Eex655WJrvZU67Av84JGeMikDwoksxhT5YVRh1k1y9XVn5FYcMie1Qva3oup3jcTSGP5XbQP",
-    "size_sol": 0.3,
-    "source": "9zZCjLr9xfXfp3qdqvPh6YeaEaagepz21khLhca69B18"
-   }
-  ],
-  "cand1_03/sent": [
-   {
-    "ts_utc": "2026-10-04T14:43:39Z",
-    "group": "cand1_03",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "2d1RrVaNKX2NyEQhKjENAQdU1X5JJr6Yvmj9kCfmpump",
-    "source_sig": "2GTEK7evbqu2ytF9sY5PgFnDq9UCP7R7yfu63LorAhsCCcsSs5ShqM2BQ7moMZ69RrE2joVTYVZtBXoUW8nyC6Wc",
-    "signature": "5ELCd6Gk43Qs3C89AqVsvaEDyQenmhXwpVDS6y5r2akNMoFpLqYnSLorhn2QyRSQyJavRsCj4gyaungfnta6KT2m",
-    "size_sol": 0.5,
-    "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy"
-   }
-  ],
-  "cand2/build": [
-   {
-    "ts_utc": "2026-10-04T13:11:45Z",
-    "group": "cand2",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "пул: неоднозначная котировка: 3 встречных счетов (EPjFWd)",
-    "mint": "4GYzenzx3X7jtCPVpHfVtgDYRbEfy1ExDeQqXtwspump",
-    "source_sig": "3XpNxEiPZc3iAqkSVvQKRKGwfRZ6J9b3XzAwtc9kP3UzSXtHhu5ygg3yAvcYaDNn56wT2t8HZV8GrMXXRUuTEZxm",
-    "size_sol": 0.1,
-    "source": "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ"
-   },
-   {
-    "ts_utc": "2026-10-04T13:18:10Z",
-    "group": "cand2",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)",
-    "mint": "4YrijaGmrSZMesx1X8TJAn2skAyGsPpuJwXMy32oB5YN",
-    "source_sig": "2X2oJBueEwCmva8XTrkUE1W7f1EyeojZDHUdANW6gZePJjDuEuUZ9xuUspEwnj936rPpn1cp8wtwH7tM7poNhQHa",
-    "size_sol": 0.1,
-    "source": "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ"
-   },
-   {
-    "ts_utc": "2026-10-04T14:14:27Z",
-    "group": "cand2",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)",
-    "mint": "CrkBHKmGQ4udyt3v197CZLjgr2SibLhBYQ6pVT9Gpump",
-    "source_sig": "5EfmGx4KjXLmKM8mL5LbgRBsY5ygrUoZFtmyQ3ZWKVw6ks58DJ6RYSiLGEeeFFnZaYwZs3ni4NyhXwNiAzQ4hECk",
-    "size_sol": 0.1,
-    "source": "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ"
-   }
-  ],
-  "cand2/sent": [
-   {
-    "ts_utc": "2026-10-04T13:52:48Z",
-    "group": "cand2",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "2Jrkp1PWkz33BAy5s5MUwqUs5odMgYj1fZYaxC8RygpG",
-    "source_sig": "5VerTJHWcuHzngmajj56sxxJuiB7rDytdeXahbm5DGqnDavma5MiR6698WFPs2BgCUtXTmEsHgUXBwU2Q5LiC6WY",
-    "signature": "4ERCGje4heNrF1NFV5mLMZ531GFJbY3dYpmot8uNrg47kQ83rLDb1TyRrpTTas3tgRN5eXcgQSGSD4YjgUyfpCRR",
-    "size_sol": 0.1,
-    "source": "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ"
-   }
-  ],
-  "cand2/usdc_signaly_build": [
-   {
-    "ts_utc": "2026-10-04T13:31:14Z",
-    "group": "cand2",
-    "stage": "usdc_signaly_build",
-    "ok": false,
-    "sent": false,
-    "why_not": "котировка пула не SOL -- полоса только одношаговая",
-    "mint": "Bqwvj6FxwZWZWi7SwPzmoyuB1NHLp7zAjKWZuHdTNahj",
-    "source_sig": "4dkUhH9yR5ATHMUv3WgwF9bZT6CQ1UYYj2NhjxZnJ9uXFyVyYzPzVC4h3V5XLwwGps9vP5n3f8Ja9Zc7Bk1MeuXa",
-    "size_sol": 0.1,
-    "source": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
-    "lane_route_offered": true,
-    "direct_why_not": "котировка пула не SOL -- полоса только одношаговая",
-    "lane_usdc_signaly_godilos": false,
-    "lane_usdc_signaly_why_not": "котировка пула не EPjFWdd5: стороны пула DJTu7vi8/Bqwvj6Fx",
-    "lane_usdc_signaly": {
-     "label": "Raydium LaunchLab",
-     "kotirovshchik": "launchlab",
-     "leg1_min_out": null,
-     "leg2_amount_in": null,
-     "min_out": null,
-     "expected_out": null,
-     "min_out_from": null,
-     "razvernut": false,
-     "size": null
-    },
-    "lane_usdc_signaly_alt": {
-     "ok": true,
-     "адрес": "B1LxDr9ib1ezCSebbxnF73hCSAsVsy23U5fEwrqkfzXY",
-     "адресов": 47,
-     "why_not": null
-    },
-    "lane_usdc_noga_godilos": false,
-    "lane_usdc_noga_why_not": "тип пула не в таблице USDC-ноги: LanMV9sA",
-    "lane_usdc_noga_potolok_sol": 0.01,
-    "lane_usdc_noga_posadok": 0,
-    "lane_usdc_noga_potolok_snjat": false
-   }
-  ],
-  "cand2_03/build": [
-   {
-    "ts_utc": "2026-10-04T13:35:01Z",
-    "group": "cand2_03",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "тип пула вне полосы: 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-    "mint": "GQZp6AquEspKpvHL5jyKCrxjm79KJNkeFWwrDLeapump",
-    "source_sig": "2Udq4Hv2nZD4SPjJhVhksr8b1Lz3XSXA3KAHqnULHqXTtiaPxuHQzBY1hVdHPfanJWyq1xAmTp7QwSQu1Ex9rxeU",
-    "size_sol": 0.3,
-    "source": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE"
-   },
-   {
-    "ts_utc": "2026-10-04T13:49:54Z",
-    "group": "cand2_03",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "тип пула вне полосы: LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",
-    "mint": "BR3TZ9MoNYLXoRW31zuevewjhfchwvr5hVWhZe44GqUj",
-    "source_sig": "eZC9vwGJNG1HS3QFVTS45iDce4hqxEqUFWdWjHqnGwMp7oBpxd1mjEHN8hcjNmSUAK6ndqRNDJkmB5qYoG88rrY",
-    "size_sol": 0.3,
-    "source": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE"
-   }
-  ],
-  "cand3/sent": [
-   {
-    "ts_utc": "2026-10-04T13:01:48Z",
-    "group": "cand3",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "3bdjLugQ7NKXWqArqzSmx9i2jxWGA9sXQ2s6KWzdpump",
-    "source_sig": "tGPhwhw3kZCT76cK85rmWzKE8vw6ktKJSbEKAKefRkyA7AQwHy4FhYVCWAVo6dqSqMAoF19bdcwL7NUSttDeY9o",
-    "signature": "JwBecTmwjwLdMZ2qrDKx172mvS5n3zvtKofyb27VVfx7aTuXJ4rTYvLpHLTSBbErGn6cxQhCqnp5C8AGg44GjeP",
-    "size_sol": 0.1,
-    "source": "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT"
-   }
-  ],
-  "kandidaty/gate": [
-   {
-    "ts_utc": "2026-10-04T13:16:15Z",
-    "group": "kandidaty",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
-    "mint": "CscZaq5twomhUkvCY8Jdd1tge32L4Yj9FbkFFEZQpump",
-    "source_sig": "4rV65xg7Ya3nMKtJgiUhVBewoev5DBJ3sorcm45Dj8G8cAJhCK2S6p2qfn24hup2xaMoiN3uayY78r3EMCuECTGr",
-    "size_sol": 0.05,
-    "source": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns"
-   },
-   {
-    "ts_utc": "2026-10-04T14:02:52Z",
-    "group": "kandidaty",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
-    "mint": "7vPeJRWqqPchBGPTyLMB6QdE6i9vQ8EgpW8A522mgx8C",
-    "source_sig": "647PmrLQRZBYzkst2xBS6VT8zFpgbCmsFA3o63ycvr3NMc7BywzTLAX933KHg7y5j4wZdh64gLecUoxg9uLJiH7N",
-    "size_sol": 0.05,
-    "source": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns"
-   }
-  ],
-  "konveyer/sent": [
-   {
-    "ts_utc": "2026-10-04T13:13:26Z",
-    "group": "konveyer",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "DoVAVzViX8Bjy3r15nwikSaSbzE6dV4ovd28aWpJpump",
-    "source_sig": "4dNPJaBpXRBTiTMvy4sDmzFyZX2nASRbAze9h2kEsK7dz8Tst9aqcXzfJSTpMsK4paBnqw4gfau5F8HzNeNjQPHr",
-    "signature": "54bQB861pAAjNECd8PZH8Qw8WbVHzGNuVZNBRMKxnxdujMNZcTfQYSnrnYzjETjnvMSYkJENPigTZh1MQi6swh5D",
-    "size_sol": 0.1,
-    "source": "ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy"
-   }
-  ],
-  "krug_001/gate": [
-   {
-    "ts_utc": "2026-10-04T14:06:24Z",
-    "group": "krug_001",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: за сутки уже 3 сделок при пределе 3",
-    "mint": "app94YbUxKePMkd18pdTYtaM9ctbka4wxa2Jh39xm6V",
-    "source_sig": "4HgGbvkp2oJFdUBWCgKN7tvnLAjYCa3ZCr6j8eXY5BCyhKF8zDQZPUCybao7CvdSThHdYCC8NewYY2o6dvM3bf3F",
-    "size_sol": 0.01,
-    "source": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij"
-   },
-   {
-    "ts_utc": "2026-10-04T14:28:08Z",
-    "group": "krug_001",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: за сутки уже 3 сделок при пределе 3",
-    "mint": "DoVAVzViX8Bjy3r15nwikSaSbzE6dV4ovd28aWpJpump",
-    "source_sig": "2V3yH1iwJRgHDoFqpLqqvCnGcjqCB1WXUvGMJd5X7bDX5ABgU57PDnPN8YETgi6fFCdbPbQinoegSKvRht253AkF",
-    "size_sol": 0.01,
-    "source": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij"
-   }
-  ],
   "lane_s0/sent": [
    {
-    "ts_utc": "2026-10-04T14:01:10Z",
+    "ts_utc": "2026-10-04T14:56:58Z",
     "group": "lane_s0",
     "stage": "sent",
     "ok": true,
     "sent": true,
-    "mint": "7vPeJRWqqPchBGPTyLMB6QdE6i9vQ8EgpW8A522mgx8C",
-    "source_sig": "65Yw9EZD35yeTeWxRBxkUUnUxKHBXrCmgLB3YkE7LEvYScGABFnBgkgHsh7nsCPZvm2fepDfKPyFgvLjYAtif7PT",
-    "signature": "4fGArCXMwQYL6pqU3w4498vH9HJR4H6trit9VCunCYmFnpSvf6FeXLAZ2yExtPLGoZ7oGN8tyRofLz7NgpHsUmAr",
-    "size_sol": 0.5,
-    "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy"
-   },
-   {
-    "ts_utc": "2026-10-04T14:24:37Z",
-    "group": "lane_s0",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "JCsKWhELRJ8MhEZjUDdCL49mntw8fx27bKAgCMgSGhcQ",
-    "source_sig": "3sNoEfEqL6V5SYSZMJommh3iV3HqwMcENY5jdrFLB3KkkYbot88zXEQ72XRTJFKxmEhLg8xtdEgZj3J6JjGWUac7",
-    "signature": "4eUna31aYNQaBfB9F35N5LMFZbMsujCrKrYBLH3WXJcjdjXvsS7iQ929WFs1RCGediDZXDwyDjrqtNGEyNT7eeEu",
-    "size_sol": 0.5,
-    "source": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ"
-   },
-   {
-    "ts_utc": "2026-10-04T14:45:36Z",
-    "group": "lane_s0",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "BgNZw6VxzYoS6AHjhpv2S54wGUv5MWeANPkoU2KPTM1G",
-    "source_sig": "3G4pnm8APvbk1KzFH8MbeALHYo6uvks3hwPx7oeW6qoV9VvhQEyFrGVP1kjkt2gNN5aihdX4MRKHt8aHPqSP4Bcy",
-    "signature": "26jhPLrG23BfUkYsQQDUpHRj4iKBV2uMdYQqmvEJebLWuAn9ey52FFqkkMG6G2dZWe3XqZysEHpppy1pSH53YnbA",
+    "mint": "BFwwmAUFcD9pX9BCNEt8vaNwGq79HeYnN3xVpA6VF1AT",
+    "source_sig": "29g5DDiEke5dR2i9Ys3N3Tcev9qb8qynh45bUKFVWx1Hr2jDNZFS937WXUiz8zHvn5L5pUHJpiHRyb8NRJYporVH",
+    "signature": "4d6ZtRGvThFRxyMoCbvp6YAARdM5wLkdRv8kQJhdEM9RW2ZEYkPVhkJ7oE2y3RDvV2Yr4tAemFyYQy4X1a1UDJNM",
     "size_sol": 0.5,
     "source": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm"
    }
-  ],
-  "lane_s0/usdc_signaly_build": [
-   {
-    "ts_utc": "2026-10-04T14:12:27Z",
-    "group": "lane_s0",
-    "stage": "usdc_signaly_build",
-    "ok": false,
-    "sent": false,
-    "why_not": "котировка пула не SOL -- полоса только одношаговая",
-    "mint": "8RfgokotF4CW3BAAd6Pzy4ap9AHiZq236C63oB8J7nre",
-    "source_sig": "4bVBndBgNdVjnV3MQ8cft7xvhYHV4SBGMDtYmERvEtN4o7pFZBXymfFNyhn7oGUgs6gaxnCL76joC4rxM7MSU9YT",
-    "size_sol": 0.5,
-    "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
-    "lane_route_offered": true,
-    "direct_why_not": "котировка пула не SOL -- полоса только одношаговая",
-    "lane_usdc_signaly_godilos": false,
-    "lane_usdc_signaly_why_not": "котировка пула не EPjFWdd5: стороны пула DEW9dSN6/8Rfgokot",
-    "lane_usdc_signaly": {
-     "label": "Raydium CPMM",
-     "kotirovshchik": "rezervy",
-     "leg1_min_out": null,
-     "leg2_amount_in": null,
-     "min_out": null,
-     "expected_out": null,
-     "min_out_from": null,
-     "razvernut": false,
-     "size": null
-    },
-    "lane_usdc_signaly_alt": {
-     "ok": true,
-     "адрес": "B1LxDr9ib1ezCSebbxnF73hCSAsVsy23U5fEwrqkfzXY",
-     "адресов": 47,
-     "why_not": null
-    },
-    "lane_usdc_noga_godilos": false,
-    "lane_usdc_noga_why_not": "котировка пула не EPjFWdd5: стороны пула DEW9dSN6/8Rfgokot",
-    "lane_usdc_noga_potolok_sol": 0.01,
-    "lane_usdc_noga_posadok": 0,
-    "lane_usdc_noga_potolok_snjat": false
-   }
-  ],
-  "sniper_src/gate": [
-   {
-    "ts_utc": "2026-10-04T13:01:16Z",
-    "group": "sniper_src",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "mint": "BgNZw6VxzYoS6AHjhpv2S54wGUv5MWeANPkoU2KPTM1G",
-    "source_sig": "4wR8fvASUthTxVtZ7XznSVyyvnBZu67CMC8cWSNjqARSGkLfTkLUdmMxh1qzomv1fvQ76Vp7yc4yXVUr4oY7B46k",
-    "size_sol": 0.3,
-    "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC"
-   },
-   {
-    "ts_utc": "2026-10-04T13:11:05Z",
-    "group": "sniper_src",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "mint": "BR3TZ9MoNYLXoRW31zuevewjhfchwvr5hVWhZe44GqUj",
-    "source_sig": "67PZPfgVFZ1KmRAri8ryjNBMXGeoyMHFP68cMR9G8kxxL9BCTTnrwonNdyRGW6d2iDBVaDGZsJi4R5u9fYjLomGF",
-    "size_sol": 0.3,
-    "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC"
-   },
-   {
-    "ts_utc": "2026-10-04T13:31:37Z",
-    "group": "sniper_src",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "mint": "2Jrkp1PWkz33BAy5s5MUwqUs5odMgYj1fZYaxC8RygpG",
-    "source_sig": "5RSbErpwyAQYpE4MZvRfAUPCHw1v7Uxjhn7y2m2zMwzVtj3g3FskBKGdKjMRcjPotEteuF5ev62tWvG72f6ugBvf",
-    "size_sol": 0.3,
-    "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC"
-   }
   ]
  },
- "первая_utc": "2026-10-04T13:01:16Z",
- "последняя_utc": "2026-10-04T14:45:36Z",
- "отправлено": 8,
+ "первая_utc": "2026-10-04T14:56:58Z",
+ "последняя_utc": "2026-10-04T14:56:58Z",
+ "отправлено": 1,
  "подписи": [
   {
-   "ts_utc": "2026-10-04T13:01:48Z",
-   "group": "cand3",
-   "signature": "JwBecTmwjwLdMZ2qrDKx172mvS5n3zvtKofyb27VVfx7aTuXJ4rTYvLpHLTSBbErGn6cxQhCqnp5C8AGg44GjeP"
-  },
-  {
-   "ts_utc": "2026-10-04T13:13:26Z",
-   "group": "konveyer",
-   "signature": "54bQB861pAAjNECd8PZH8Qw8WbVHzGNuVZNBRMKxnxdujMNZcTfQYSnrnYzjETjnvMSYkJENPigTZh1MQi6swh5D"
-  },
-  {
-   "ts_utc": "2026-10-04T13:52:48Z",
-   "group": "cand2",
-   "signature": "4ERCGje4heNrF1NFV5mLMZ531GFJbY3dYpmot8uNrg47kQ83rLDb1TyRrpTTas3tgRN5eXcgQSGSD4YjgUyfpCRR"
-  },
-  {
-   "ts_utc": "2026-10-04T14:01:10Z",
+   "ts_utc": "2026-10-04T14:56:58Z",
    "group": "lane_s0",
-   "signature": "4fGArCXMwQYL6pqU3w4498vH9HJR4H6trit9VCunCYmFnpSvf6FeXLAZ2yExtPLGoZ7oGN8tyRofLz7NgpHsUmAr"
-  },
-  {
-   "ts_utc": "2026-10-04T14:02:08Z",
-   "group": "batch5",
-   "signature": "2M8PbcXvDPu7wut8Eex655WJrvZU67Av84JGeMikDwoksxhT5YVRh1k1y9XVn5FYcMie1Qva3oup3jcTSGP5XbQP"
-  },
-  {
-   "ts_utc": "2026-10-04T14:24:37Z",
-   "group": "lane_s0",
-   "signature": "4eUna31aYNQaBfB9F35N5LMFZbMsujCrKrYBLH3WXJcjdjXvsS7iQ929WFs1RCGediDZXDwyDjrqtNGEyNT7eeEu"
-  },
-  {
-   "ts_utc": "2026-10-04T14:43:39Z",
-   "group": "cand1_03",
-   "signature": "5ELCd6Gk43Qs3C89AqVsvaEDyQenmhXwpVDS6y5r2akNMoFpLqYnSLorhn2QyRSQyJavRsCj4gyaungfnta6KT2m"
-  },
-  {
-   "ts_utc": "2026-10-04T14:45:36Z",
-   "group": "lane_s0",
-   "signature": "26jhPLrG23BfUkYsQQDUpHRj4iKBV2uMdYQqmvEJebLWuAn9ey52FFqkkMG6G2dZWe3XqZysEHpppy1pSH53YnbA"
+   "signature": "4d6ZtRGvThFRxyMoCbvp6YAARdM5wLkdRv8kQJhdEM9RW2ZEYkPVhkJ7oE2y3RDvV2Yr4tAemFyYQy4X1a1UDJNM"
   }
  ]
 }
 --- ves zhurnal bez okna ---
 {
- "строк_всего": 198879,
- "попыток_полосы": 258,
- "в_окне": 258,
+ "строк_всего": 199278,
+ "попыток_полосы": 262,
+ "в_окне": 262,
  "с": null,
  "до": null,
  "группа": null,
  "по_этапам": {
-  "sent": 106,
+  "sent": 108,
   "build": 85,
-  "gate": 54,
-  "usdc_signaly_build": 13
+  "gate": 55,
+  "usdc_signaly_build": 14
  },
  "по_группам": {
   "batch5": {
@@ -567,9 +69,9 @@
    "usdc_signaly_build": 3
   },
   "cand1_03": {
-   "sent": 10,
+   "sent": 11,
    "build": 42,
-   "usdc_signaly_build": 1
+   "usdc_signaly_build": 2
   },
   "cand2": {
    "sent": 38,
@@ -598,13 +100,13 @@
    "build": 6
   },
   "lane_s0": {
-   "sent": 29,
+   "sent": 30,
    "build": 5,
    "gate": 11,
    "usdc_signaly_build": 4
   },
   "sniper_src": {
-   "gate": 10
+   "gate": 11
   }
  },
  "причины": {
@@ -636,12 +138,12 @@
     "раз": 18
    },
    {
-    "почему": "предел полосы: за сутки уже 3 сделок при пределе 3",
+    "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
     "раз": 11
    },
    {
-    "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "раз": 10
+    "почему": "предел полосы: за сутки уже 3 сделок при пределе 3",
+    "раз": 11
    },
    {
     "почему": "предел полосы: минт уже открыт",
@@ -655,7 +157,7 @@
   "usdc_signaly_build": [
    {
     "почему": "котировка пула не SOL -- полоса только одношаговая",
-    "раз": 12
+    "раз": 13
    },
    {
     "почему": "строитель: котировка пула не SOL: стороны пула Dz9mQ9Nz/GWTP6M5b",
@@ -716,7 +218,7 @@
    "usdc_signaly_build": [
     {
      "почему": "котировка пула не SOL -- полоса только одношаговая",
-     "раз": 1
+     "раз": 2
     }
    ]
   },
@@ -880,7 +382,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-     "раз": 10
+     "раз": 11
     }
    ]
   }
@@ -1305,6 +807,44 @@
     },
     "lane_usdc_noga_godilos": false,
     "lane_usdc_noga_why_not": "тип пула не в таблице USDC-ноги: 6EF8rrec",
+    "lane_usdc_noga_potolok_sol": 0.01,
+    "lane_usdc_noga_posadok": 0,
+    "lane_usdc_noga_potolok_snjat": false
+   },
+   {
+    "ts_utc": "2026-10-04T14:52:40Z",
+    "group": "cand1_03",
+    "stage": "usdc_signaly_build",
+    "ok": false,
+    "sent": false,
+    "why_not": "котировка пула не SOL -- полоса только одношаговая",
+    "mint": "HYARMuucuFHGMTztgWNh6C8X7n4DBxJMe6c5f3gAAAzw",
+    "source_sig": "2anbSkPgh31AubsMfaYxZuKJg1tGPid1t3QzTRcDHETWwJ6j6cYN27bqFqqpdRLYgzuM54AkN8eD6z9TxvFz2ryv",
+    "size_sol": 0.5,
+    "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+    "lane_route_offered": true,
+    "direct_why_not": "котировка пула не SOL -- полоса только одношаговая",
+    "lane_usdc_signaly_godilos": false,
+    "lane_usdc_signaly_why_not": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/HYARMuuc",
+    "lane_usdc_signaly": {
+     "label": "Raydium LaunchLab",
+     "kotirovshchik": "launchlab",
+     "leg1_min_out": null,
+     "leg2_amount_in": null,
+     "min_out": null,
+     "expected_out": null,
+     "min_out_from": null,
+     "razvernut": false,
+     "size": null
+    },
+    "lane_usdc_signaly_alt": {
+     "ok": true,
+     "адрес": "B1LxDr9ib1ezCSebbxnF73hCSAsVsy23U5fEwrqkfzXY",
+     "адресов": 47,
+     "why_not": null
+    },
+    "lane_usdc_noga_godilos": false,
+    "lane_usdc_noga_why_not": "тип пула не в таблице USDC-ноги: LanMV9sA",
     "lane_usdc_noga_potolok_sol": 0.01,
     "lane_usdc_noga_posadok": 0,
     "lane_usdc_noga_potolok_snjat": false
@@ -2130,8 +1670,8 @@
   ]
  },
  "первая_utc": "2026-10-03T22:02:03Z",
- "последняя_utc": "2026-10-04T14:45:36Z",
- "отправлено": 106,
+ "последняя_utc": "2026-10-04T14:56:58Z",
+ "отправлено": 108,
  "подписи": [
   {
    "ts_utc": "2026-10-03T22:02:03Z",
@@ -2662,13 +2202,23 @@
    "ts_utc": "2026-10-04T14:45:36Z",
    "group": "lane_s0",
    "signature": "26jhPLrG23BfUkYsQQDUpHRj4iKBV2uMdYQqmvEJebLWuAn9ey52FFqkkMG6G2dZWe3XqZysEHpppy1pSH53YnbA"
+  },
+  {
+   "ts_utc": "2026-10-04T14:51:19Z",
+   "group": "cand1_03",
+   "signature": "2vQp1ghypy4Dfta1N7Fx2pgzMPT9t41gtgNa3srkJ1qF6p1irssUP6RxeUHvbE1qUd8aVhVHUhL4RezjcYi8hGQd"
+  },
+  {
+   "ts_utc": "2026-10-04T14:56:58Z",
+   "group": "lane_s0",
+   "signature": "4d6ZtRGvThFRxyMoCbvp6YAARdM5wLkdRv8kQJhdEM9RW2ZEYkPVhkJ7oE2y3RDvV2Yr4tAemFyYQy4X1a1UDJNM"
   }
  ]
 }
 --- gruppa krug_001 po vsemu zhurnalu ---
 {
- "строк_всего": 198879,
- "попыток_полосы": 258,
+ "строк_всего": 199278,
+ "попыток_полосы": 262,
  "в_окне": 22,
  "с": null,
  "до": null,
@@ -2869,7 +2419,7 @@
  ]
 }
 --- tipy pulov i rezhim USDC-nogi po gruppam (zhivoe) ---
-detektor MainPID: 4055394
+detektor MainPID: 4097334
 interpretator: /home/bot/robinhood-chain-alpha/venv/bin/python
 {
  "группы": {
@@ -2906,11 +2456,20 @@ interpretator: /home/bot/robinhood-chain-alpha/venv/bin/python
     "ok": true,
     "why_not": null,
     "имена": [
+     "amm_v4",
+     "bonding",
+     "clmm",
      "cpmm",
-     "pump_amm"
+     "damm2",
+     "dbc",
+     "dlmm",
+     "launchlab",
+     "pump_amm",
+     "whirlpool",
+     "two_step"
     ],
-    "программ_в_наборе": 2,
-    "поле_lane_pools_есть": false
+    "программ_в_наборе": 10,
+    "поле_lane_pools_есть": true
    },
    "usdc": {
     "ok": true,
