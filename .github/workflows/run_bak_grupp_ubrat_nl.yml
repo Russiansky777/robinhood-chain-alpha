@@ -88,21 +88,30 @@ jobs:
           # ЧИСЛО В КОМАНДУ root ИДЁТ ТОЛЬКО ПОСЛЕ ПРОВЕРКИ ВЫШЕ: там отказ на
           # любом знаке кроме цифры, то есть подставляется заведомо число.
           N="$OSTAVIT"
+          # КАТАЛОГ И ШАБЛОН СЧИТАЮТСЯ ЗДЕСЬ, А НЕ НА ХОСТЕ, И ЭТО ПРАВКА ПОСЛЕ
+          # ПУСТОГО ПРОГОНА 37203689250. Там шаблон уезжал как
+          # '$(basename $FILE).bak-*' в ОДИНАРНЫХ кавычках удалённой оболочки:
+          # подстановка внутри них не выполняется, find получал буквальную
+          # строку со скобками и находил ноль копий при тридцати с лишним
+          # настоящих. Теперь на хост уходят готовые литералы.
+          DIR=$(dirname "$FILE")
+          PAT="$(basename "$FILE").bak-*"
           : > "$OUT"
           echo "=== Копии файла групп, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
+          echo "katalog: $DIR | shablon: $PAT" | tee -a "$OUT"
           # ПОРЯДОК -- ПО ВРЕМЕНИ ФАЙЛА, А НЕ ПО ИМЕНИ. Имена копий несут метку
           # времени, но полагаться на разбор имени там, где речь об откате,
           # нельзя: одна копия с другой меткой -- и "последние десять" станут
           # не теми.
           ssh -n $SSH_OPTS root@"$HOST" "
             set -e
-            VSEGO=\$(find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' | wc -l)
+            VSEGO=\$(find '$DIR' -maxdepth 1 -name '$PAT' | wc -l)
             echo \"kopij vsego: \$VSEGO\"
             echo '--- poslednie (ostajutsja) ---'
-            find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' -printf '%T@ %p\n' \
+            find '$DIR' -maxdepth 1 -name '$PAT' -printf '%T@ %p\n' \
               | sort -rn | head -n $N | cut -d' ' -f2-
             echo '--- k udaleniju ---'
-            find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' -printf '%T@ %p\n' \
+            find '$DIR' -maxdepth 1 -name '$PAT' -printf '%T@ %p\n' \
               | sort -rn | tail -n +\$(( $N + 1 )) | cut -d' ' -f2- > /tmp/bak_k_udaleniju.txt
             cat /tmp/bak_k_udaleniju.txt
             echo \"k udaleniju: \$(wc -l < /tmp/bak_k_udaleniju.txt)\"
@@ -126,7 +135,7 @@ jobs:
             done < /tmp/bak_k_udaleniju.txt
             rm -f /tmp/bak_k_udaleniju.txt
             echo \"udaleno: \$UDALENO\"
-            echo 'ostalos kopij:' \$(find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' | wc -l)
+            echo 'ostalos kopij:' \$(find '$DIR' -maxdepth 1 -name '$PAT' | wc -l)
             ls -l $FILE" | tee -a "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
