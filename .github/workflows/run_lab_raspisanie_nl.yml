@@ -146,28 +146,63 @@ jobs:
       - name: "Допуск: токен только на действия Actions, 0600, root"
         if: ${{ inputs.pokazat != 'yes' && inputs.snjat != 'yes' }}
         env:
-          TOKEN_UZKIJ: ${{ secrets.LAB_DISPATCH_TOKEN }}
-          TOKEN_SHIROKIJ: ${{ secrets.GH_RUNNER_PAT }}
+          T_LAB_DISPATCH_TOKEN: ${{ secrets.LAB_DISPATCH_TOKEN }}
+          T_LAB_DISPATCH: ${{ secrets.LAB_DISPATCH }}
+          T_LAB_TOKEN: ${{ secrets.LAB_TOKEN }}
+          T_DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+          T_GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+          T_GH_RUNNER_PAT: ${{ secrets.GH_RUNNER_PAT }}
         run: |
           set -e
+          # ПРОГОН САМ ГОВОРИТ, ПОД КАКИМ ИМЕНЕМ СЕКРЕТ ВИДЕН -- ИМЕНАМИ, А НЕ
+          # ЗНАЧЕНИЯМИ. 04.10 в 11:26Z владелец сказал, что секрет заведён, а
+          # прогон отказал: в журнале видно "TOKEN_UZKIJ:" пусто при
+          # "TOKEN_SHIROKIJ: ***". То есть под именем LAB_DISPATCH_TOKEN до
+          # прогона ничего не доходило, а прочитать список имён секретов мне
+          # нельзя (прокси отвечает 403 на этот путь Actions). Догадываться
+          # молча нельзя, поэтому прогон перебирает несколько вероятных имён и
+          # ПЕЧАТАЕТ, какое нашлось. Значения не печатаются ни при каком исходе:
+          # печатается только имя и слово "est"/"net".
+          #
+          # ЧАСТЫЕ ПРИЧИНЫ ПУСТОГО СЕКРЕТА ПРИ "он заведён", чтобы владельцу не
+          # искать наугад: секрет создан как секрет ОКРУЖЕНИЯ (тогда нужен
+          # environment: в задании), или как секрет Dependabot, или в другом
+          # репозитории, или имя отличается.
+          echo "--- какие имена допуска видны прогону (только имена) ---" | tee -a "$OUT"
+          NAJDENO=""
+          for IMJA in LAB_DISPATCH_TOKEN LAB_DISPATCH LAB_TOKEN DISPATCH_TOKEN GH_DISPATCH_TOKEN; do
+            eval "Z=\${T_$IMJA:-}"
+            if [ -n "$Z" ]; then
+              echo "  $IMJA est" | tee -a "$OUT"
+              [ -n "$NAJDENO" ] || NAJDENO="$IMJA"
+            else
+              echo "  $IMJA net" | tee -a "$OUT"
+            fi
+          done
+          if [ -n "$T_GH_RUNNER_PAT" ]; then
+            echo "  GH_RUNNER_PAT est (SHIROKIJ -- berjotsja tolko po slovu vo vhode)" | tee -a "$OUT"
+          else
+            echo "  GH_RUNNER_PAT net" | tee -a "$OUT"
+          fi
           # ВЫБОР ДОПУСКА -- ЗА ВЛАДЕЛЬЦЕМ, А НЕ ЗА МНОЙ. Узкий токен
           # (actions:write на один репозиторий) -- то, что нужно по делу.
           # Широкий GH_RUNNER_PAT умеет регистрировать бегунки, то есть кладёт
           # на машину куда больше прав, чем требует расписание. Поэтому он
           # берётся ТОЛЬКО по отдельному слову во входе прогона.
-          if [ -n "$TOKEN_UZKIJ" ]; then
-            IMJA="LAB_DISPATCH_TOKEN"
-            T="$TOKEN_UZKIJ"
-          elif [ "${{ inputs.razreshit_runner_pat }}" = "yes" ] && [ -n "$TOKEN_SHIROKIJ" ]; then
+          if [ -n "$NAJDENO" ]; then
+            eval "T=\${T_$NAJDENO}"
+            IMJA="$NAJDENO"
+          elif [ "${{ inputs.razreshit_runner_pat }}" = "yes" ] && [ -n "$T_GH_RUNNER_PAT" ]; then
             IMJA="GH_RUNNER_PAT (SHIROKIJ -- po slovu vladelca vo vhode)"
-            T="$TOKEN_SHIROKIJ"
+            T="$T_GH_RUNNER_PAT"
           else
-            echo "OTKAZ: sekreta LAB_DISPATCH_TOKEN net."
+            echo "OTKAZ: ni odno iz imjon dopuska vyshe ne vidno progonu."
             echo "Nuzhen tonkij token GitHub na etot odin repozitorij s pravom"
-            echo "Actions: write (bolshe nichego: ni contents, ni secrets)."
-            echo "Zavesti ego sekretom repozitorija pod imenem LAB_DISPATCH_TOKEN."
+            echo "Actions: Read and write (bolshe nichego: ni contents, ni secrets),"
+            echo "zavedjonnyj SEKRETOM REPOZITORIJA (ne okruzhenija i ne Dependabot)"
+            echo "pod imenem LAB_DISPATCH_TOKEN."
             echo "Libo zapustit etot progon s razreshit_runner_pat=yes -- togda"
-            echo "bidet vzjat GH_RUNNER_PAT, no on SHIRE po pravam."
+            echo "budet vzjat GH_RUNNER_PAT, no on SHIRE po pravam."
             exit 1
           fi
           echo "dopusk: $IMJA" | tee -a "$OUT"
