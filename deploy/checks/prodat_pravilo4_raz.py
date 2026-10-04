@@ -177,6 +177,19 @@ def продать_раз(*, cid: str | None, mint: str | None, живьём: bo
                   "balans_do": None, "balans_posle": None,
                   "ostatok_minta_do": None, "ostatok_minta_posle": None,
                   "podpis": None, "put": None, "vyruchka_sol": None}
+    # ЧЕЙ МОДУЛЬ ЗАГРУЖЕН -- В ВЫВОД, ДО ВСЯКОЙ ПРОДАЖИ. Версия денежного
+    # модуля здесь решает всё: со старым bloom_seller правила 4 нет вовсе, и
+    # прогон обязан сказать это ЧИСЛОМ И ПУТЁМ, а не падать AttributeError
+    # (так он упал 05.10 в 22:42:56Z и в 22:44:54Z).
+    из_["moduli"] = {"seller": getattr(SL, "__file__", None),
+                      "own_send": getattr(OSW, "__file__", None),
+                      "state": getattr(ST, "__file__", None)}
+    из_["pravilo_est"] = hasattr(SL.Seller, "правило_4_продажа")
+    if продавец is None and not из_["pravilo_est"]:
+        из_["why_not"] = (
+            "загруженный продавец без правила 4: "
+            f"{из_['moduli']['seller']} -- проверьте PYTHONPATH прогона")
+        return из_
     rpc = rpc if rpc is not None else SL.rpc_call
     сост = состояние if состояние is not None else ST.ExecState()
     поз = найти_позицию(сост.positions(), cid=cid, mint=mint,
@@ -264,6 +277,8 @@ def самопроверка() -> int:
     def chk(имя, усл, факт=""):
         проверки.append((имя, bool(усл), факт))
 
+    _рабочее = Path(__file__).read_text(encoding="utf-8").split("def самопроверка")[0]
+
     # --- выбор позиции
     поз = {"a": {"lane": "own_send", "mint": "M1", "state": "bought",
                   "ts_intent": 100.0},
@@ -293,7 +308,9 @@ def самопроверка() -> int:
     # --- живой режим только по своему флагу
     # ПРОВЕРКА СМОТРИТ ТОЛЬКО РАБОЧУЮ ЧАСТЬ ФАЙЛА. Со своим же текстом она была
     # бы красной всегда: строка-образец лежит в ней самой.
-    _рабочее = Path(__file__).read_text(encoding="utf-8").split("def самопроверка")[0]
+    chk("прогон называет ПУТЬ загруженного продавца и наличие правила",
+        '"seller": getattr(SL, "__file__", None)' in _рабочее
+        and 'hasattr(SL.Seller, "правило_4_продажа")' in _рабочее, "")
     chk("код службы в sys.path -- ПОСЛЕДНИМ, иначе он перекроет PYTHONPATH",
         "sys.path.append(str(_службы))" in _рабочее
         and "insert(0, str(_службы))" not in _рабочее, "")

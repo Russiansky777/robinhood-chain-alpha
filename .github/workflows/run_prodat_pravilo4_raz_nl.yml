@@ -102,6 +102,11 @@ jobs:
           LIVE=0
           [ "${{ inputs.live }}" = "yes" ] && LIVE=1
           echo "живой режим: $LIVE (вход live=${{ inputs.live }})"
+          # ПУТЬ ИМПОРТА -- ОТДЕЛЬНЫМ ЗОВОМ, ДО ПРОДАЖИ: со старым модулем
+          # службы правила 4 нет вовсе, и это надо увидеть числом, а не
+          # поймать AttributeError на деньгах. Проверка одной строкой: в
+          # многострочном python -c ломается YAML самого прогона.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $RABOTA && sudo -u bot -E env PYTHONPATH=$RABOTA/kod:$CODE_DIR $VENV/python -c 'import sys,importlib; print(\"sys.path[:4]\", sys.path[:4]); m=importlib.import_module(\"bloom_seller\"); print(\"seller iz\", m.__file__); print(\"pravilo 4 est\", any(a.startswith(\"pravilo\") or \"4\" in a for a in dir(m.Seller) if \"4\" in a))'"
           ssh -n $SSH_OPTS root@$TARGET_HOST "
             cd $RABOTA && sudo -u bot -E env \
               PYTHONPATH=$RABOTA/kod:$CODE_DIR \
