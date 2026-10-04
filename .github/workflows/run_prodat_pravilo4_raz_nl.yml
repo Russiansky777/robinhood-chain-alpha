@@ -1,0 +1,131 @@
+name: "Разовая продажа позиции полосы ПРАВИЛОМ 4 (редакция 05.10)"
+
+# ЗАЧЕМ. Правило 4 новой редакции (две котировки -> больший путь -> граница
+# 90 % от свежей котировки) лежит в ветке, а в службу попадёт только при нуле
+# позиций: так стоит гейт перезапуска. Единственная висящая позиция -- ровно та,
+# которую новое правило и продало бы (D6eyhD2o, вход 0.5 SOL, зависла 04.10 в
+# 19:52:10Z: Jupiter отказывал полом по доле от входа 11.0 %, наш пул давал
+# 63.4 % гарантированных). Деплой ждёт продажи, продажа ждёт деплоя -- этот
+# прогон разрывает круг.
+#
+# ОН НЕ ПИШЕТ СВОЕГО ПУТИ ПРОДАЖИ. Зовётся ровно Seller.правило_4_продажа из
+# ветки: выбор пути, котировки, границы, сборка и подпись -- её. Поэтому числа
+# прогона и числа службы после деплоя одни и те же по построению.
+#
+# ПОДМЕНА МОДУЛЕЙ -- ОСОЗНАННАЯ И ВРЕМЕННАЯ. На хост во временный каталог
+# кладутся ТОЛЬКО изменённые денежные модули ветки, и прогон идёт с
+# PYTHONPATH=<каталог>:<код службы>. Код службы на диске не трогается, служба не
+# перезапускается: она продолжает работать на своей версии до деплоя.
+#
+# ЖИВОЙ РЕЖИМ -- ПО ВХОДУ live=yes. По умолчанию прогон доходит до двух
+# котировок и останавливается ДО подписи.
+on:
+  workflow_dispatch:
+    inputs:
+      cid:
+        description: "client_order_id позиции (пусто -- искать по минту)"
+        required: false
+        default: "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn"
+      mint:
+        description: "минт позиции (если cid пуст)"
+        required: false
+        default: ""
+      live:
+        description: "'yes' -- подписать и отправить продажу"
+        required: false
+        default: "no"
+      zhdat:
+        description: "сколько секунд ждать подтверждения по цепи"
+        required: false
+        default: "90"
+
+concurrency:
+  group: prodat-pravilo4-raz
+  cancel-in-progress: false
+
+env:
+  TARGET_HOST: 127.0.0.1
+  CODE_DIR: /home/bot/bloom_executor
+  RABOTA: /tmp/pravilo4_raz
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin
+  OUT_FILE: data/prodat_pravilo4_raz.json
+
+jobs:
+  prodat:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка прогона ДО всякого хоста"
+        run: python3 deploy/checks/prodat_pravilo4_raz.py --self-test
+
+      - name: "Ключ ssh"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Положить на хост изменённые модули и сам прогон"
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 755 $RABOTA $RABOTA/kod"
+          # МОДУЛЕЙ ПЯТЬ, И КАЖДЫЙ НАЗВАН: правило 4 (bloom_seller), предел
+          # открытых и USDC-нога (bloom_own_send), состояние списания
+          # (bloom_exec_state), опознание пула с названной котировкой
+          # (c2_common) и строитель второй ноги (c3_usdc_noga_signaly).
+          for M in bloom_seller.py bloom_own_send.py bloom_exec_state.py \
+                   c2_common.py c3_usdc_noga_signaly.py; do
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/kod/$M" < "analysis/$M"
+          done
+          ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/prodat.py" < deploy/checks/prodat_pravilo4_raz.py
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $RABOTA; ls -la $RABOTA/kod | head -8"
+
+      - name: "Продажа правилом 4"
+        run: |
+          set -e
+          # ИМЯ ПЕРЕМЕННОЙ ОБОЛОЧКИ -- ТОЛЬКО ЛАТИНИЦЕЙ: кириллическое имя bash
+          # не принимает вовсе, и шаг упал бы до всякой продажи.
+          LIVE=0
+          [ "${{ inputs.live }}" = "yes" ] && LIVE=1
+          echo "живой режим: $LIVE (вход live=${{ inputs.live }})"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            cd $RABOTA && sudo -u bot -E env \
+              PYTHONPATH=$RABOTA/kod:$CODE_DIR \
+              PRODAT_PRAVILO4_LIVE=$LIVE \
+              $VENV/python $RABOTA/prodat.py \
+                --cid '${{ inputs.cid }}' --mint '${{ inputs.mint }}' \
+                --zhdat '${{ inputs.zhdat }}' --vyhod $RABOTA/out.json
+          " 2>&1 | tee /tmp/prodat_vyvod.txt
+          ssh -n $SSH_OPTS root@$TARGET_HOST "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/prodat_out.json || true
+          test -s /tmp/prodat_out.json || echo '{"ok": false, "why_not": "progon ne ostavil fajla"}' > /tmp/prodat_out.json
+          mkdir -p data && cp /tmp/prodat_out.json "$OUT_FILE"
+          python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('put', d.get('put'), 'podpis', d.get('podpis'), 'vyruchka', d.get('vyruchka_sol')); print('kotirovki', json.dumps((d.get('pravilo_4') or {}).get('kotirovki') or (d.get('pravilo_4') or {}).get('котировки'), ensure_ascii=False))" "$OUT_FILE"
+
+      - name: "В докладе не должно быть ключей"
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT_FILE"
+
+      - name: "Убрать каталог прогона с хоста"
+        if: always()
+        run: ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA" || true
+
+      - name: "Положить итог в ветку"
+        if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add "$OUT_FILE" || true
+          git commit -m "Razovaja prodazha pravilom 4 [automated]" || exit 0
+          for i in 1 2 3 4; do
+            git pull --rebase origin claude/nifty-sagan-r0polg && \
+            git push origin HEAD:claude/nifty-sagan-r0polg && break || sleep $((2**i))
+          done
