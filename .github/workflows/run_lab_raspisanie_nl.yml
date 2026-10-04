@@ -143,6 +143,31 @@ jobs:
             echo 'tajmery raspisanij snjaty'
           " 2>&1 | tee -a "$OUT"
 
+      - name: "Какие ИМЕНА допусков видны заданию вообще (без значений)"
+        # ЗАЧЕМ ЭТОТ ШАГ И ПОЧЕМУ ОН ИДЁТ ДАЖЕ ПРИ ПОКАЗЕ. Перебор имён ниже
+        # отвечает только на вопрос "есть ли ЭТО имя", и ответ "нет" ничего не
+        # говорит о том, какое имя там ЕСТЬ. Владелец 04.10 сказал, что секрет
+        # LAB_DISPATCH_TOKEN заведён, а прогон не видит ни одного из пяти имён
+        # (прогоны 37198875680, 37198994037, 37200179744) при видимом
+        # GH_RUNNER_PAT. Список секретов мне не прочитать: прокси отвечает 403 и
+        # на actions/secrets, и на environments. Поэтому список имён печатает
+        # сам прогон.
+        #
+        # ЗНАЧЕНИЯ НЕ ПЕЧАТАЮТСЯ И НЕ СОБИРАЮТСЯ: набор уезжает окружением (не
+        # доводом команды -- довод виден в списке процессов), а скрипт берёт
+        # keys() и выбрасывает остальное. Его самопроверка (12 проверок) это и
+        # проверяет: ни одного значения ни в ответе, ни в тексте отказа, даже
+        # когда разбор JSON упал.
+        if: ${{ inputs.snjat != 'yes' }}
+        env:
+          NABOR_DOPUSKOV: ${{ toJSON(secrets) }}
+        run: |
+          set -e
+          set -o pipefail
+          python3 deploy/checks/imena_dopuskov.py --self-test | tail -1
+          echo "--- imena dopuskov, vidimyh zadaniju (znachenija ne pechatajutsja) ---" | tee -a "$OUT"
+          python3 deploy/checks/imena_dopuskov.py | tee -a "$OUT"
+
       - name: "Допуск: токен только на действия Actions, 0600, root"
         if: ${{ inputs.pokazat != 'yes' && inputs.snjat != 'yes' }}
         env:
