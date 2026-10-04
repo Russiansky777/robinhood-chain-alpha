@@ -97,8 +97,11 @@ jobs:
             echo 'fajlov v kod:' \$(ls -1 $RABOTA/kod/*.py | wc -l)
             grep -c STATE_SPISANA $RABOTA/kod/bloom_exec_state.py > /dev/null \
               || { echo 'SBOY: v bloom_exec_state net STATE_SPISANA'; exit 1; }
-            grep -c 'def pravilo' $RABOTA/kod/bloom_seller.py > /dev/null \
-              || grep -c 'def \xd0\xbf\xd1\x80\xd0\xb0\xd0\xb2\xd0\xb8\xd0\xbb\xd0\xbe_4' $RABOTA/kod/bloom_seller.py > /dev/null \
+            # МЕТКА -- ЛАТИНИЦЕЙ: имя метода у правила кириллическое, а \x..
+            # в двойных кавычках оболочка не разворачивает, и проверка падала
+            # всегда (05.10, 22:50). Имя входа правила -- ASCII и есть только
+            # в новой версии.
+            grep -q BLOOM_LANE_POL_PRODAZHI_PCT $RABOTA/kod/bloom_seller.py \
               || { echo 'SBOY: u prodavca net pravila 4'; exit 1; }
             test \$(ls -1 $RABOTA/kod/*.py | wc -l) -eq 5 \
               || { echo 'SBOY: ne vse pjat modulej priehali'; exit 1; }
