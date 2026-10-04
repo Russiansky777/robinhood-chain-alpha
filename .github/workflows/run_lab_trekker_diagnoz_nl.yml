@@ -124,7 +124,14 @@ jobs:
               # которые трекер всё ещё считает своими. Поле выше печатается
               # обрезанным по 400 знаков, то есть список в него не влезает.
               # ТОЛЬКО ЧТЕНИЕ: ни одной правки, ни перезапуска службы.
-              python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else {});k=[x for x in (\"pozicii\",\"позиции\",\"positions\",\"otkrytye\",\"открытые\") if isinstance(d.get(x),(list,dict))];print(\"spiska pozicij v fajle net; kljuchi:\",sorted(d)) if not k else None;[print(\"kljuch spiska:\",x) for x in k[:1]];r=(d.get(k[0]) if k else None);r=(list(r.values()) if isinstance(r,dict) else (r or []));print(\"pozicij:\",len(r));[print(\" | \".join(str((z or {}).get(c,\"-\"))[:60] for c in (\"mint\",\"минт\",\"vhod_sol\",\"вход_sol\",\"sol_in\",\"kogda_utc\",\"когда_utc\",\"ts_utc\"))) for z in r[:40]]" 2>&1 || true
+              # СТОЛБЦЫ НЕ УГАДЫВАЮТСЯ, А ПЕЧАТАЮТСЯ КАК ЕСТЬ. Первый вариант
+              # этого шага (прогон 37203694345) брал заранее названные поля
+              # ("mint", "vhod_sol", "kogda_utc" и прочие) и напечатал
+              # "pozicij: 2" и две строки из прочерков: имена полей у трекера
+              # другие. Гадать имена в денежном разборе нельзя, поэтому запись
+              # уезжает целиком -- Code-3 разберёт её по своим именам. Позиций
+              # две, то есть объём тут ни при чём.
+              python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else {});k=[x for x in sorted(d) if isinstance(d.get(x),(list,dict)) and \"pozic\" in x.lower()];print(\"spiska pozicij net; kljuchi fajla:\",sorted(d)) if not k else print(\"kljuch spiska:\",k[0]);r=(d.get(k[0]) if k else None);r=(list(r.values()) if isinstance(r,dict) else (r or []));print(\"pozicij:\",len(r));[print(\"POZ\",i,json.dumps(z,ensure_ascii=False)[:700]) for i,z in enumerate(r[:20])]" 2>&1 || true
               echo "=== UZEL: KAKOJ STOIT I CHTO OTVECHAET (adres ne pechataetsja)"
               if [ -n "$BLOOM_TREKKER_RPC" ]; then
                 echo "uzel: svoj, BLOOM_TREKKER_RPC zadan"
