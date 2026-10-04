@@ -63,12 +63,19 @@ jobs:
           python3 deploy/checks/otkazy_6042_iz_zhurnala.py --self-test | tail -1
           python3 analysis/otkazy_6042_po_cepi.py --self-test | tail -1
 
-      - name: "Питон с requests"
+      - name: "Питон с requests и solders"
         run: |
           set -e
+          # SOLDERS НУЖЕН НЕ ДЛЯ ПОДПИСИ, А ДЛЯ РАЗБОРА. Пересчёт ожидания идёт
+          # котировщиком самой службы (c2_swap_build), а он импортирует solders
+          # целиком -- первый прогон 17:15:58Z на этом и встал
+          # ("ModuleNotFoundError: No module named 'solders'"). Ключей кошельков
+          # в прогоне нет и не появляется: пакет берётся ради Pubkey в
+          # разборщике события кривой.
           python3 -m venv "$RUNNER_TEMP/v6042"
-          "$RUNNER_TEMP/v6042/bin/pip" install -q requests
+          "$RUNNER_TEMP/v6042/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/v6042/bin/python" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/v6042/bin/python" -c "import solders, requests; print('solders', solders.__name__, 'na meste')"
 
       - name: "SSH key"
         env:
