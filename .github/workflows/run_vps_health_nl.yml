@@ -283,7 +283,8 @@ jobs:
           for PARA in "$TAJM_DIR/zhivuchest/zhivuchest.json data/zhivuchest_hosta.json" \
                       "/home/bot/data/sources_2026-09-25.json data/sources_live.json" \
                       "$TAJM_DIR/uchet/data/ledger_status.json data/ledger_status_hosta.json" \
-                      "$TAJM_DIR/uborshchik_sutki.json data/uborshchik_sutki_hosta.json"; do
+                      "$TAJM_DIR/uborshchik_sutki.json data/uborshchik_sutki_hosta.json" \
+                      "/home/bot/bloom_executor_live_data/trevogi.jsonl data/trevogi_hosta.jsonl"; do
             OTKUDA=$(echo "$PARA" | cut -d' ' -f1)
             KUDA=$(echo "$PARA" | cut -d' ' -f2)
             if ssh -n $SSH_OPTS root@$HOST "test -s $OTKUDA"; then
@@ -529,6 +530,12 @@ jobs:
           # git add неизменённого файла в diff не попадает, поэтому старые
           # копии образец не тащит.
           git add data/*_hosta.json 2>/dev/null || true
+          # ЖУРНАЛ ТРЕВОГ -- .jsonl, И ПРЕЖНИЙ ШАБЛОН ЕГО НЕ БРАЛ. Ровно на
+          # расхождении списка ЗАБОРА и списка КОММИТА я уже спотыкался 04.10
+          # утром: файл уборщика приезжал на бегунок ("забран" в журнале) и
+          # пропадал вместе с ним. Поэтому шаблон расширен, а не дописан
+          # отдельным именем.
+          git add data/*_hosta.jsonl 2>/dev/null || true
           [ -f data/sources_live.json ] && git add data/sources_live.json
           git add data/sdelki_polosy_*.json 2>/dev/null || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
