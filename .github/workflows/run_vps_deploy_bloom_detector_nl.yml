@@ -218,6 +218,18 @@ jobs:
           "$PY" bloom_exec_state.py --self-test
           "$PY" bloom_api.py --self-test
           "$PY" bloom_seller.py --self-test
+          # ПРАВИЛО 4 ЖИВЁТ В ДВУХ МОДУЛЯХ, А В ГЕЙТЕ СТОЯЛ ТОЛЬКО ОДИН.
+          # Решения всех веток правила 4 -- чистые функции
+          # bloom_vtoroe_mnenie (80 проверок), а нижняя граница по
+          # котировке и порог от входа -- bloom_jupiter_sell (65
+          # проверок). Их самопроверки до доставки не запускались
+          # вовсе: сторож продаж проверяет, что модуль ЗАГРУЖЕН, а не
+          # что он считает верно. То есть ошибка в самом правиле
+          # "по любой цене" доехала бы до хоста молча. Оба модуля на
+          # импорте берут только стандартную библиотеку, так что гейт
+          # от этого не становится зависимым ни от чего нового.
+          "$PY" bloom_vtoroe_mnenie.py --self-test | tail -1
+          "$PY" bloom_jupiter_sell.py --self-test | tail -1
           "$PY" bloom_detector.py --self-test
           "$PY" bloom_executor.py --self-test
           "$PY" bloom_reconcile.py --self-test
