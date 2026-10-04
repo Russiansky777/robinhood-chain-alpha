@@ -41,7 +41,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-ОПЦИИ_TX = {"encoding": "json", "maxSupportedTransactionVersion": 1,
+# РАЗБОР ТРЕБУЕТ jsonParsed, А НЕ json. Прогон 17:27:39Z прочитал всё, кроме
+# пересчёта: с encoding=json счета транзакции приходят индексами, и
+# c2_pool_programs.pool_program не узнаёт программу пула -- отсюда «шаблон: тип
+# пула не покрыт» во всех восьми случаях при живом pool_vault. Боевой разбор
+# тени читает jsonParsed, и разбор обязан читать так же.
+ОПЦИИ_TX = {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 1,
             "commitment": "confirmed"}
 РАЗМЕР_ПАКЕТА = 25
 # Сколько подписей минта читать назад, ища сделки между слотами.
@@ -501,6 +506,11 @@ def _самопроверка() -> int:
             (_раб.count("B.min_out_from_reserves("),
              _раб.count("B.bonding_min_out("),
              _раб.count("B.extract_template(")), (1, 0, 1))
+
+    # КОДИРОВКА ЧТЕНИЯ -- ЧАСТЬ ДЕНЕЖНОГО РАЗБОРА, А НЕ ВКУС. С encoding=json
+    # счета приходят индексами, и программа пула не узнаётся: ровно на этом
+    # прогон 17:27:39Z отдал восемь неразобранных случаев при живом pool_vault.
+    сверить("транзакции читаются jsonParsed", ОПЦИИ_TX["encoding"], "jsonParsed")
 
     # --- вычистка узла из текста
     сверить("адрес узла и ключ не уходят наружу",
