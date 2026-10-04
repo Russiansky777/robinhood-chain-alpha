@@ -111,6 +111,8 @@ jobs:
               ls -la /var/lib/kapital 2>/dev/null || echo "kataloga net"
               echo "=== kapital.json PO POLJAM"
               python3 -c "import json,os;p=\"/var/lib/kapital/kapital.json\";d=(json.load(open(p)) if os.path.exists(p) else None);print(\"fajla net\") if d is None else [print(k,\"=\",str(v)[:400]) for k,v in sorted(d.items())]" 2>&1 || true
+              echo "=== TOCHEK PO OKNAM (tolko chislo, bez samih tochek)"
+              python3 -c "import json,os;p=\"/var/lib/kapital/kapital.json\";d=(json.load(open(p)) if os.path.exists(p) else {});o=d.get(\"okna\") or {};print(\"okon net\") if not o else [print(k,\"tochek =\",len((v or {}).get(\"tochki\") or []),\"okno_sek =\",(v or {}).get(\"okno_sek\"),\"korzina_sek =\",(v or {}).get(\"korzina_sek\")) for k,v in o.items()]" 2>&1 || true
               echo "=== sostojanie.json PO POLJAM"
               python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else None);print(\"fajla net\") if d is None else [print(k,\"=\",str(v)[:400]) for k,v in sorted(d.items())]" 2>&1 || true
               echo "=== UZEL: KAKOJ STOIT I CHTO OTVECHAET (adres ne pechataetsja)"
