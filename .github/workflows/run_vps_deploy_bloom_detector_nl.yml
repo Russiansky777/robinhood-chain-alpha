@@ -95,6 +95,14 @@ on:
         description: "'1' -- вариант пула на долговечном nonce: по транзакции на сервис, только его чаевые (нужен созданный аккаунт nonce)"
         required: false
         default: "0"
+      protokol_env:
+        description: "'yes' -- напечатать значения флагов BLOOM_* и имена всех ключей env (только чтение, секреты не печатаются)"
+        required: false
+        default: "no"
+      sverka_env_s_kopiej:
+        description: "имя файла копии env (env.bak.*) -- сверить остатки и множество 26 ключей; пусто -- не сверять"
+        required: false
+        default: ""
       keep_env:
         description: "env на хосте НЕ трогать: ТОЛЬКО 'yes'. Иное значение требует perepisat_env"
         required: false
@@ -108,7 +116,7 @@ on:
         required: false
         default: "1"
       nochnye:
-        description: "пары ключ=значение через запятую: close_on_sell, tg_format, region_send, lane_max_pool_fee, copiers_file (у workflow_dispatch предел 25 входов, поэтому одной строкой)"
+        description: "пары ключ=значение через запятую: close_on_sell, tg_format, region_send, lane_max_pool_fee, copiers_file, vtoroe_mnenie_pervyj_deploj (у workflow_dispatch предел 25 входов, поэтому одной строкой)"
         required: false
         default: "close_on_sell=0,tg_format=,region_send=0,lane_max_pool_fee=0.05,copiers_file=/home/bot/bloom_executor_live_data/kopirovshchiki.json"
 
@@ -136,6 +144,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: claude/nifty-sagan-r0polg
+
+      - name: "Отчёт прогона: начать с чистого файла (обнуление РОВНО ОДИН раз)"
+        run: |
+          set -e
+          # ZACHEM. Otchjot sobiraetsja shagami cherez tee -a i kommititsja v konce.
+          # Shag "--check-only" pisal v nego cherez tee BEZ -a, to est OBNULJAL fajl
+          # v seredine progona: vsjo, chto shagi vyshe uspeli zapisat, propadalo do
+          # kommita. Imenno tak propal PROTOKOL env -- shag otrabotal uspeshno, a v
+          # fajle ego stroki ne dozhili do konca. Teper obnulenie stoit odin raz i
+          # v nachale, a vse shagi pishut tolko cherez tee -a.
+          : > data/bloom_detector_deploy.txt
+          echo "progon ${{ github.run_number }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> data/bloom_detector_deploy.txt
 
       - name: "ГЕЙТ: переписывать env можно только по явному слову"
         # ЗАЧЕМ (слово владельца 28.09 ночью, п.3): "keep_env=yes сделать
@@ -194,16 +214,29 @@ jobs:
         run: |
           set -e
           cd analysis
+          "$PY" bloom_trevogi.py --self-test
           "$PY" bloom_exec_state.py --self-test
           "$PY" bloom_api.py --self-test
           "$PY" bloom_seller.py --self-test
+          # ПРАВИЛО 4 ЖИВЁТ В ДВУХ МОДУЛЯХ, А В ГЕЙТЕ СТОЯЛ ТОЛЬКО ОДИН.
+          # Решения всех веток правила 4 -- чистые функции
+          # bloom_vtoroe_mnenie (80 проверок), а нижняя граница по
+          # котировке и порог от входа -- bloom_jupiter_sell (65
+          # проверок). Их самопроверки до доставки не запускались
+          # вовсе: сторож продаж проверяет, что модуль ЗАГРУЖЕН, а не
+          # что он считает верно. То есть ошибка в самом правиле
+          # "по любой цене" доехала бы до хоста молча. Оба модуля на
+          # импорте берут только стандартную библиотеку, так что гейт
+          # от этого не становится зависимым ни от чего нового.
+          "$PY" bloom_vtoroe_mnenie.py --self-test | tail -1
+          "$PY" bloom_jupiter_sell.py --self-test | tail -1
           "$PY" bloom_detector.py --self-test
           "$PY" bloom_executor.py --self-test
           "$PY" bloom_reconcile.py --self-test
           # Имена переменных оболочки -- только ASCII. Кириллическое имя Bash
           # не принимает, и деплой падает посреди дела (проверено 11:24Z).
           "$PY" check_shell_ascii.py --self-test
-          python3 check_shell_ascii.py ../.github/workflows
+          python3 check_shell_ascii.py ../.github/workflows ../deploy
           # КАВЫЧКИ В УДАЛЁННЫХ КОМАНДАХ. 25.09 деплой упал ТРИЖДЫ из-за кавычек
           # в комментарии внутри ssh: они закрывали аргумент, и остаток скрипта
           # выполнялся ЛОКАЛЬНО под ghrunner, которому env читать нельзя.
@@ -214,6 +247,17 @@ jobs:
           # она видит сразу и до траты денег.
           "$PY" check_workflow_bash.py --self-test
           python3 check_workflow_bash.py ../.github/workflows
+          # ХОСТОВЫЕ ТАЙМЕРЫ. Самопроверка установщика проверяет не только текст
+          # юнитов, но и ПРОВОДКУ в прогонах: что в деплое продавца строка ключа
+          # кошелька действительно переносится, что в этом деплое установщик
+          # зовётся, и что прогон живучести забирает выгрузку с хоста. Здесь она
+          # идёт на бегунке, где ветка на месте -- на хосте этих файлов нет и
+          # часть проверок там честно помечается пропуском.
+          # БЕЗ | tail: у шага нет pipefail, и конвейер отдал бы код tail, то
+          # есть ноль при провалившейся самопроверке -- ровно тот тихий зелёный,
+          # который мы здесь и ловим.
+          "$PY" ../deploy/hostovye_tajmery.py --self-test
+          "$PY" ../deploy/zhivuchest_na_hoste.py --self-test
 
       - name: "Секреты не пусты (значения не печатаются)"
         env:
@@ -269,12 +313,17 @@ jobs:
           # Модули тени (c2_*) -- замер, не торговля: отправлять транзакции
           # они не умеют. Без них на хосте тень молча выключена, и раздел
           # shadow в признаке жизни всегда пуст.
+          # c2_doklad_format -- ФОРМАТ доклада (BUY, часовая, суточная). Без
+          # него обёртки в bloom_doklad и bloom_detector молча оставляют
+          # ПРЕЖНИЙ вид строки: чат работает, но новый формат не появляется, и
+          # понять это по чату нельзя. Именно на этом деплой 148 и отказал --
+          # проверка списка доставки поймала отсутствие модуля ДО хоста.
           # bloom_own_send -- полоса своей отправки; ей нужны разбор ключа
           # (dbot_rescue) и сверка кошелька с ключом (bloom_jupiter_sell).
           # Без них полоса не подписывает, а без самого модуля детектор
           # честно пишет ModuleNotFoundError в признак жизни -- ровно это и
           # случилось в прогоне 36080386872.
-          for f in bloom_notify.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py bloom_close_on_sell.py bloom_region_send.py bloom_token_name.py bloom_slot_peers.py bloom_copiers.py c2_cl_quote.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_entry_premium.py bloom_lane_jupiter.py bloom_lane_two_step.py bloom_queue_price.py bloom_nogi_shablony.py close_empty_token_accounts.py c2_followers_growth.py c2_dlmm_tochnaya_kotirovka.py podbivka_dlmm_quote.py c2_clmm_stroitel.py c2_whirlpool_stroitel.py c2_dbc_stroitel.py podbivka_clmm_quote.py podbivka_whirlpool_quote.py c2_dlmm_odno_chtenie.py c2_ammv4_stroitel.py c2_nalog_2022.py; do
+          for f in bloom_notify.py bloom_trevogi.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py bloom_close_on_sell.py bloom_region_send.py bloom_token_name.py bloom_slot_peers.py bloom_copiers.py c2_cl_quote.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_entry_premium.py bloom_lane_jupiter.py bloom_lane_two_step.py bloom_queue_price.py bloom_nogi_shablony.py close_empty_token_accounts.py c2_followers_growth.py c2_dlmm_tochnaya_kotirovka.py podbivka_dlmm_quote.py c2_clmm_stroitel.py c2_whirlpool_stroitel.py c2_dbc_stroitel.py podbivka_clmm_quote.py podbivka_dbc_quote.py podbivka_whirlpool_quote.py c2_dlmm_odno_chtenie.py c2_ammv4_stroitel.py c2_nalog_2022.py c2_doklad_format.py c2_itog_po_cepi.py c2_dlmm_bez_chteniy.py c2_usdc_noga.py c3_bilet_ot_rezerva.py vtoroe_mnenie_reestr.py c3_kotirovka_prodazhi.py c3_prodavec_sborka.py c3_usdc_noga_signaly.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # СОВПАЛО -- НЕ ПЕРЕПИСЫВАЕМ. Переписать файл тем же содержимым
@@ -392,6 +441,40 @@ jobs:
             (touch $ENV_DIR/.proba_zapisi && echo 'каталог пишется' && rm -f $ENV_DIR/.proba_zapisi) || echo 'каталог НЕ пишется'
           "
 
+      - name: "ПРОТОКОЛ перед переписью env: значения флагов и множество имён (только чтение)"
+        if: ${{ inputs.protokol_env == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM (poruchenie vladelca 30.09, variant (a) shag 2). Progon
+          # PEREPISAT udaljaet i zapisyvaet zanovo 26 svoih kljuchej. Chtoby
+          # perepisat ih TEMI ZHE znachenijami, znachenija nado snachala
+          # PROCHITAT, a ne vspomnit. Zdes pechatajutsja tolko flagi BLOOM_*,
+          # kotorye progon i pishet: sredi nih sekretov net ni odnogo (sekrety --
+          # HELIUS_API_KEY, DBOT_API_KEY, TELEGRAM_BOT_TOKEN, LIVE_PRIVATE, kljuchi
+          # otpravitelej -- v etot spisok ne vhodjat i ne pechatajutsja).
+          #
+          # Vtoraja polovina: MNOZHESTVO IMJON. Pechatajutsja imena VSEH kljuchej
+          # env (tolko imena), chtoby bylo vidno, chego progon ne kasaetsja.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            echo '--- znachenija flagov, kotorye pishet PEREPISAT ---'
+            for K in BLOOM_MODE BLOOM_TASKS BLOOM_EXEC BLOOM_LIVE_TEST BLOOM_LIVE_BUY \
+                     BLOOM_BUY_SOL BLOOM_OWN_SEND BLOOM_OWN_SEND_LIVE BLOOM_OWN_SEND_SOL \
+                     BLOOM_SENDER_REGION BLOOM_POOL_SEND BLOOM_POOL_NONCE BLOOM_LANE_CONTROL \
+                     BLOOM_SHADOW_LEGS BLOOM_SHADOW_LEGS_CREDITS BLOOM_TELEGRAM_LIVE_TEST \
+                     BLOOM_TELEGRAM_REAL BLOOM_CLOSE_ON_SELL BLOOM_TG_FORMAT BLOOM_REGION_SEND \
+                     BLOOM_LANE_MAX_POOL_FEE BLOOM_COPIERS_FILE BLOOM_TEST_SOURCES \
+                     BLOOM_TEST_MIN_SOL BLOOM_TEST_BUY_SOL BLOOM_TEST_BUY_SOL_BUMP; do
+              echo \"\$(grep -m1 \"^\$K=\" $ENV_DIR/env || echo \"\$K= NET_V_ENV\")\"
+            done
+            echo '--- imena VSEH kljuchej env (tolko imena) ---'
+            grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d '=' | sort
+            echo '--- skolko strok i skolko prisvaivanij ---'
+            wc -l < $ENV_DIR/env
+            grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
+
       - name: "Ночные флаги: разобрать одну строку входа в пять значений"
         env:
           NOCHNYE: ${{ inputs.nochnye }}
@@ -407,6 +490,14 @@ jobs:
           REGION_SEND=0
           LANE_MAX_POOL_FEE=0.05
           COPIERS_FILE=/home/bot/bloom_executor_live_data/kopirovshchiki.json
+          # РАЗОВЫЕ РАЗРЕШЕНИЯ ГЕЙТА -- НЕ ФЛАГИ СЛУЖБЫ. В env они не уходят:
+          # их читает только проверка перед перезапуском. Разбираются ЗДЕСЬ,
+          # потому что этот разбор строгий и падает на любом имени не из
+          # белого списка: до 03.10 vtoroe_mnenie_pervyj_deploj в список не
+          # входил, и названная в самом гейте дверь была непроходима -- прогон
+          # падал здесь, раньше гейта.
+          ZAVISSHIE_FANTOMY=no
+          VTOROE_MNENIE_PERVYJ_DEPLOJ=no
           IFS=,
           for para in $NOCHNYE; do
             imya=${para%%=*}
@@ -420,6 +511,8 @@ jobs:
               region_send)       REGION_SEND=$znach ;;
               lane_max_pool_fee) LANE_MAX_POOL_FEE=$znach ;;
               copiers_file)      COPIERS_FILE=$znach ;;
+              zavisshie_fantomy) ZAVISSHIE_FANTOMY=$znach ;;
+              vtoroe_mnenie_pervyj_deploj) VTOROE_MNENIE_PERVYJ_DEPLOJ=$znach ;;
               *) echo "СБОЙ: имя $imya не из белого списка"; exit 1 ;;
             esac
           done
@@ -428,6 +521,81 @@ jobs:
             echo "$pair" >> "$GITHUB_ENV"
             echo "ночной флаг: $pair"
           done
+          # РАЗРЕШЕНИЯ ГЕЙТА -- ОТДЕЛЬНОЙ СТРОКОЙ И СЛОВАМИ В ЖУРНАЛ: пропуск
+          # проверки, которая про деньги, виден в прогоне, а не прячется.
+          for pair in ZAVISSHIE_FANTOMY=$ZAVISSHIE_FANTOMY VTOROE_MNENIE_PERVYJ_DEPLOJ=$VTOROE_MNENIE_PERVYJ_DEPLOJ; do
+            echo "$pair" >> "$GITHUB_ENV"
+            echo "разовое разрешение гейта: $pair"
+          done
+
+      - name: "ГЕЙТ: четыре ключа отправителей не пусты (иначе PEREPISAT сотрёт их строки)"
+        if: ${{ inputs.protokol_env == 'yes' || (inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT') }}
+        env:
+          BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
+          ASTRALANE_API_KEY: ${{ secrets.ASTRALANE_API_KEY }}
+          ZEROX_API: ${{ secrets.ZEROX_API }}
+          NOZOMI_API_KEY: ${{ secrets.NOZOMI_API_KEY }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. Zhjostkij gejt "sekrety ne pusty" pokryvaet HELIUS_API,
+          # DBOT_API_KEY i VPS_SSH_KEY, no NE chetyre kljucha otpravitelej.
+          # A shag zapisi kljuchej otpravitelej pri pustom sekrete delaet
+          # sed -i '/^NAME=/d' -- to est MOLCHA otkljuchaet otpravitelja ot
+          # pula, ostavljaja odnu strochku v zhurnale progona. Progon,
+          # zadumannyj kak "perepisat temi zhe znachenijami", takim obrazom
+          # menjaet sostav pula. Zdes eto stanovitsja OTKAZOM PROGONA, a ne
+          # strokoj: proverka stoit DO ljuboj pravki env.
+          #
+          # Znachenija ne pechatajutsja: tolko dlina nulevaja ili net.
+          NET=0
+          for imya in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
+            znach="${!imya}"
+            if [ -z "$znach" ]; then
+              # V OTCHJOT TOZHE, a ne tolko v zhurnal progona: protokol dolzhen
+              # byt v fajle, kotoryj kommititsja, inache ego prihoditsja dobyvat
+              # iz zhurnala prognona zadnim chislom.
+              echo "$imya: PUSTO v sekretah repozitorija" | tee -a data/bloom_detector_deploy.txt
+              NET=$((NET+1))
+            else
+              echo "$imya: est v sekretah (dlina ${#znach})" | tee -a data/bloom_detector_deploy.txt
+            fi
+          done
+          # Vtoraja polovina gejta: te zhe chetyre imeni na HOSTE. Rashozhdenie
+          # "sekret est, a v env net" (ili naoborot) tozhe nado videt do pravki.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            for K in BLOCKRAZOR_AUTH_TOKEN ASTRALANE_API_KEY ZEROX_API NOZOMI_API_KEY; do
+              if grep -q \"^\$K=\" $ENV_DIR/env; then echo \"\$K: est v env hosta\"; else echo \"\$K: NET v env hosta\"; fi
+            done" 2>&1 | tee -a data/bloom_detector_deploy.txt
+          if [ "$NET" != "0" ]; then
+            if [ "${{ inputs.perepisat_env }}" = "PEREPISAT" ] && [ "${{ inputs.keep_env }}" != "yes" ]; then
+              echo "OTKAZ: $NET iz 4 kljuchej otpravitelej pusty, a progon sobiralsja pisat env."
+              echo "Bez etih sekretov PEREPISAT udalil by ih stroki i izmenil sostav pula."
+              exit 1
+            fi
+            echo "PROTOKOL: $NET iz 4 pusty. Eto NE otkaz, poka progon nichego ne pishet (keep_env=yes)."
+          fi
+
+      - name: "env: резервная копия ДО любой правки (имя копии -- в журнал)"
+        if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM. Kopija dolzhna snimatsja DO pervoj pravki, inache sverka
+          # "kopija protiv novogo" ejo ne pojmaet. Ranshe cp -a stojal v shage
+          # s kljuchom DBot, a shag s kljuchami otpravitelej idjot RANSHE nego i
+          # uzhe delaet sed -i '/^NAME=/d': otsutstvie sekreta otpravitelja
+          # udaljalo stroku iz env, a v kopii ejo tozhe ne bylo -- sverka
+          # molchala. Teper kopija -- pervoe, chto delaet blok env.
+          IMJA="env.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            cp -a $ENV_DIR/env $ENV_DIR/$IMJA
+            chmod 600 $ENV_DIR/$IMJA
+            ls -l $ENV_DIR/$IMJA
+            grep -cE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/$IMJA" 2>&1 | tee -a data/bloom_detector_deploy.txt
+          echo "KOPIJA_ENV=$IMJA" >> "$GITHUB_ENV"
+          echo "kopija env snjata do pravok: $IMJA"
 
       - name: "env: ключи отправителей пула (значения только через stdin)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
@@ -468,13 +636,12 @@ jobs:
             /home/bot/robinhood-chain-alpha/venv/bin/python -c 'import json, bloom_senders as S; print(json.dumps(S.состояние_пула(), ensure_ascii=False)[:600])'" || \
             echo "состояние пула не прочитано (модуль ещё не доставлен) -- не страшно"
 
-      - name: "env: дописать ключ DBot, если его там нет (бэкап перед правкой)"
+      - name: "env: дописать ключ DBot, если его там нет (копия уже снята выше)"
         if: ${{ inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT' }}
         env:
           DBOT_API_KEY: ${{ secrets.DBOT_API_KEY }}
         run: |
           set -e
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cp -a $ENV_DIR/env $ENV_DIR/env.bak.\$(date -u +%Y%m%dT%H%M%SZ)"
           # Ключ передаётся через stdin, а не аргументом: аргументы видны в ps.
           printf 'DBOT_API_KEY=%s\n' "$DBOT_API_KEY" | ssh $SSH_OPTS root@$TARGET_HOST "
             cat > /tmp/dbot_line
@@ -660,7 +827,59 @@ jobs:
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_detector.py --check-only --config $CODE_DIR/konfig_snapshot.json
             echo '--- исполнитель ---'
             /home/bot/robinhood-chain-alpha/venv/bin/python $CODE_DIR/bloom_executor.py --check-only
-          " 2>&1 | tail -60 | tee data/bloom_detector_deploy.txt
+          " 2>&1 | tail -60 | tee -a data/bloom_detector_deploy.txt
+
+      # АВАРИИ ГРУПП (Правило 16): ЧТЕНИЕ ВСЕГДА, СНЯТИЕ -- ТОЛЬКО ПО ВХОДУ.
+      # Авария ставится службой по признакам ошибки и снимается ТОЛЬКО словом
+      # владельца -- значит у этого слова должно быть место в прогоне, иначе
+      # снимать пришлось бы руками на хосте. Чтение идёт от ПОЛЬЗОВАТЕЛЯ
+      # СЛУЖБЫ: от root файл состояния читается другой, и ответ был бы не про
+      # ту же папку, с которой работает детектор.
+      - name: "АВАРИИ ГРУПП: что стоит, и снятие по слову владельца"
+        run: |
+          set -e
+          # PIPEFAIL ОБЯЗАТЕЛЕН. Первая версия этого шага молча "прошла": ssh
+          # отдал ошибку, но код уходил в tail|tee, и шаг считался успешным --
+          # аварии не прочитались и не снялись, а в отчёте стояло только
+          # "Permission denied".
+          set -o pipefail
+          # КАТАЛОГ СОСТОЯНИЯ -- ПРЯМО, А НЕ ЧЕРЕЗ env. Файл $ENV_DIR/env
+          # читается только root (каталог 711), и `. env` из-под bot падает на
+          # Permission denied -- ровно это и случилось 19:20:15Z. Состоянию
+          # нужен ОДИН ключ, и он известен прогону.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            su -s /bin/sh bot -c 'BLOOM_STATE_DIR=$STATE_DIR \
+              /home/bot/robinhood-chain-alpha/venv/bin/python \
+              $CODE_DIR/bloom_exec_state.py --avarii'
+          " 2>&1 | tail -40 | tee -a data/bloom_detector_deploy.txt
+          # СПИСОК СНЯТИЯ -- ФАЙЛОМ В ДЕРЕВЕ, А НЕ ВХОДОМ ПРОГОНА: у
+          # workflow_dispatch предел 25 входов, и он уже занят. Тот же
+          # порядок, что у правок групп: план лежит в data/, прогон его
+          # применяет, в отчёте видно, что именно сняли. Пустой список --
+          # ничего не снимаем.
+          SNJAT=$(python3 - <<'PY'
+          import json, pathlib
+          п = pathlib.Path("data/avarii_plan.json")
+          try:
+              д = json.loads(п.read_text(encoding="utf-8"))
+          except Exception:
+              д = {}
+          сп = д.get("snjat") or []
+          print(",".join(str(x).strip() for x in сп if str(x).strip()))
+          PY
+          )
+          echo "план снятия аварий: ${SNJAT:-(пусто)}" | tee -a data/bloom_detector_deploy.txt
+          if [ -n "$SNJAT" ]; then
+            ssh -n $SSH_OPTS root@$TARGET_HOST "
+              su -s /bin/sh bot -c 'BLOOM_STATE_DIR=$STATE_DIR \
+                /home/bot/robinhood-chain-alpha/venv/bin/python \
+                $CODE_DIR/bloom_exec_state.py \
+                --avarija-snjat \"$SNJAT\" --kem \"владелец\"'
+            " 2>&1 | tail -40 | tee -a data/bloom_detector_deploy.txt
+          else
+            echo "снятие аварий НЕ запрашивалось -- только чтение" \
+              | tee -a data/bloom_detector_deploy.txt
+          fi
 
       - name: "ГЕЙТ: рубильник читается ОТ ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ, а не от root"
         run: |
@@ -716,6 +935,61 @@ jobs:
             sudo -n -u bot test -w $STATE_DIR || { echo 'СБОЙ: bot не может писать в $STATE_DIR'; exit 1; }
             echo 'каталог состояния пишется службой'
           "
+
+      - name: "СВЕРКА env с копией: весь файл как МНОЖЕСТВО строк (порядок не считается)"
+        if: ${{ inputs.sverka_env_s_kopiej != '' || (inputs.keep_env != 'yes' && inputs.perepisat_env == 'PEREPISAT') }}
+        run: |
+          set -e
+          set -o pipefail
+          # ZACHEM I POCHEMU PEREPISANO (progon 144, 13:35Z).
+          # Progon PEREPISAT nichego ne perezapisyvaet celikom: dlja kazhdogo
+          # svoego kljucha on delaet sed -i '/^KEY=/d' i dopisyvaet znachenie v
+          # KONEC. Znachit PORJADOK STROK menjaetsja zakonno, i ljuboe sravnenie
+          # PO PORJADKU rashoditsja vsegda.
+          #
+          # Pervaja versija etogo shaga uchityvala tolko 26 upravljaemyh kljuchej
+          # BLOOM_*, a progon peredvigaet ESHCHJO PJAT strok: chetyre kljucha
+          # otpravitelej i DBOT_API_KEY. Oni popadali v "ostatki", ostatki
+          # sravnivalis pobajtno -- i shag skazal "izmenilas stroka, kotoruju
+          # progon trogat ne dolzhen" na progone, gde nichego ne propalo.
+          # Eto ta zhe bolezn, chto my lovim v drugih mestah: proverka ruhnula
+          # ne po toj prichine, kotoruju nazvala.
+          #
+          # TEPER SRAVNIVAETSJA VES FAJL KAK MNOZHESTVO STROK. Porjadok ne
+          # uchastvuet vovse, i poterja ili izmenenie LJUBOJ stroki -- vkljuchaja
+          # sekrety i kljuchi koshelkov -- vidna. Dopustimoe razlichie rovno
+          # odno: BLOOM_REGION_SEND.
+          #
+          # ZNACHENIJA NE PECHATAJUTSJA: v vyvod idut tolko IMENA razoshedshihsja
+          # strok (cut -d= -f1). Inache izmenivshijsja sekret popal by v zhurnal
+          # progona i v otchjot.
+          KOPIJA="${{ inputs.sverka_env_s_kopiej }}"
+          [ -n "$KOPIJA" ] || KOPIJA="$KOPIJA_ENV"
+          [ -n "$KOPIJA" ] || { echo "SBOY: imeni kopii net ni vo vhode, ni v KOPIJA_ENV"; exit 1; }
+          echo "sverjaem s kopiej $KOPIJA"
+          case "$KOPIJA" in
+            env.bak.*) ;;
+            *) echo "SBOY: imja kopii dolzhno nachinatsja s env.bak. -- poluchili $KOPIJA"; exit 1 ;;
+          esac
+          case "$KOPIJA" in
+            */*|*..*) echo "SBOY: v imeni kopii ne dolzhno byt putej"; exit 1 ;;
+          esac
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            test -f $ENV_DIR/$KOPIJA || { echo 'SBOY: kopii net na hoste'; exit 1; }
+            umask 077
+            sort $ENV_DIR/$KOPIJA > /tmp/env_do
+            sort $ENV_DIR/env     > /tmp/env_posle
+            echo \"strok v kopii \$(wc -l < /tmp/env_do), v novom \$(wc -l < /tmp/env_posle)\"
+            echo '--- imena strok, kotorye razoshlis (tolko imena) ---'
+            comm -3 /tmp/env_do /tmp/env_posle | sed 's/^[[:space:]]*//' | cut -d= -f1 | sort -u
+            RAZN=\$(comm -3 /tmp/env_do /tmp/env_posle | sed 's/^[[:space:]]*//' | cut -d= -f1 | sort -u | grep -vxc 'BLOOM_REGION_SEND' || true)
+            shred -u /tmp/env_do /tmp/env_posle
+            echo \"imjon, razoshedshihsja NE po BLOOM_REGION_SEND: \$RAZN\"
+            test \"\$RAZN\" = 0 || { echo 'SBOY: razoshlos ne tolko BLOOM_REGION_SEND -- vernut kopiju i doklad'; exit 1; }
+            echo 'sverka proshla: kak mnozhestvo strok fajl otlichaetsja tolko BLOOM_REGION_SEND'
+            grep -c '^BLOOM_REGION_SEND=1' $ENV_DIR/env && echo 'BLOOM_REGION_SEND=1 stoit v env' || echo 'VNIMANIE: BLOOM_REGION_SEND=1 v env NET'" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
 
       - name: "Метка начала стенда (только по явному входу владельца)"
         if: ${{ inputs.mark_stand_start == 'yes' }}
@@ -845,7 +1119,16 @@ jobs:
           # ним: между постановкой прогона в очередь и перезапуском проходят
           # минуты, и за них позиция успевает открыться.
           ssh $SSH_OPTS root@$TARGET_HOST "cat > /tmp/pered_perezapuskom_sluzhby.py" < deploy/checks/pered_perezapuskom_sluzhby.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
+          # РАЗОВОЕ РАЗРЕШЕНИЕ ГЕЙТА -- ИЗ ОДНОСТРОЧНОГО ВХОДА nochnye: у
+          # workflow_dispatch предел 25 входов, и он уже выбран. Разбираем ровно
+          # ту же строку, что и ночные флаги, и ничего не добавляем в список.
+          # ОБА РАЗРЕШЕНИЯ РАЗОБРАНЫ ВЫШЕ, в шаге ночных флагов, и пришли
+          # сюда переменными окружения прогона. Второго разбора той же строки
+          # здесь больше нет: он читал имя, которого белый список не знал, и
+          # прогон до этого шага просто не доходил.
+          echo "razovoe razreshenie gejta vtorogo mnenija: $VTOROE_MNENIE_PERVYJ_DEPLOJ"
+          echo "razovoe razreshenie gejta po zavisshim fantomam: $ZAVISSHIE_FANTOMY"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "VTOROE_MNENIE_PERVYJ_DEPLOJ='$VTOROE_MNENIE_PERVYJ_DEPLOJ' ZAVISSHIE_FANTOMY='$ZAVISSHIE_FANTOMY' python3 /tmp/pered_perezapuskom_sluzhby.py" | tee -a data/bloom_detector_deploy.txt
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -f /tmp/pered_perezapuskom_sluzhby.py"
 
       - name: "Запуск и ЖЁСТКАЯ проверка, что поднялось"
@@ -938,6 +1221,140 @@ jobs:
           ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $STATE_DIR/decisions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
           echo "--- позиций в журнале (должно быть 0: покупать нечем) ---" | tee -a data/bloom_detector_deploy.txt
           ssh -n $SSH_OPTS root@$TARGET_HOST "wc -l < $STATE_DIR/positions.jsonl 2>/dev/null || echo 0" | tee -a data/bloom_detector_deploy.txt
+
+      - name: "ХОСТОВЫЕ ТАЙМЕРЫ: три работы по часам хоста, а не по расписанию GitHub"
+        # ЗАЧЕМ, И ПОВОД ИЗМЕРЕН. За ночь 01->02.10 GitHub пропустил ПЯТЬ
+        # назначенных прогонов учёта, и таблица полосы отставала на шесть часов.
+        # Два cron-а в час (ledger_hourly.yml) беду уменьшили, но не убрали: оба
+        # стоят в одной очереди одного планировщика. Таймер systemd на хосте
+        # стоит в своей, а пропущенный из-за перезагрузки запуск догоняет сам.
+        #
+        # ПОЧЕМУ ШАГ ЗДЕСЬ, А НЕ НОВЫМ ПРОГОНОМ: правило 12 владельца -- новых
+        # workflow не заводить. И почему в деплое детектора, а не продавца: у
+        # workflow_dispatch предел 25 входов, у продавца он не исчерпан, а
+        # установка таймеров входа не требует вовсе -- она идемпотентна и ничего
+        # не покупает, поэтому идёт каждым деплоем без отдельного флага.
+        #
+        # ЧЕГО ХОСТ НЕ УМЕЕТ, И ЭТО НАЗВАНО, А НЕ ОБОЙДЕНО: хост не рабочий клон
+        # нашей ветки и ПУШИТЬ НА ВЕТКУ НЕ МОЖЕТ -- токена записи у него нет, и
+        # заводить его без слова владельца нельзя. Поэтому таймер делает РАБОТУ и
+        # кладёт результат в файл, а копия на ветку приезжает прогоном живучести
+        # (run_vps_health_nl.yml) -- он с хоста файлы и так забирает.
+        run: |
+          set -e
+          set -o pipefail
+          TAJM_DIR=/home/bot/host_tajmery
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            install -d -o bot -g bot -m 755 $TAJM_DIR $TAJM_DIR/uchet $TAJM_DIR/uchet/analysis $TAJM_DIR/uchet/data $TAJM_DIR/vygruzki $TAJM_DIR/zhivuchest $TAJM_DIR/deploy/checks $TAJM_DIR/analysis
+            ls -ld $TAJM_DIR
+          "
+          # ДОСТАВКА СО СВЕРКОЙ sha256 И БЕЗ ЛИШНЕЙ ПЕРЕЗАПИСИ -- как у кода
+          # служб: совпало по сумме, значит mtime не трогаем.
+          # Каталог учёта -- КОРЕНЬ для solana_ledger_run.py: он считает свой
+          # data/ как ../data от себя, поэтому модуль лежит в uchet/analysis.
+          # ВЫГРУЗКА ЛЕЖИТ ЗЕРКАЛОМ ВЕТКИ (deploy/checks + analysis рядом), И
+          # ЭТО НЕ АККУРАТНОСТЬ РАДИ АККУРАТНОСТИ: её самопроверка сверяет
+          # имена полей региона с analysis/bloom_own_send.py и ищет его как
+          # <три каталога вверх>/analysis. Положенная плоско в $TAJM_DIR, она
+          # искала бы /home/analysis, давала 20/21 и код 1 -- то есть ЭТОТ шаг
+          # падал бы на самопроверке КАЖДЫЙ раз, и строки --ustanovit ниже
+          # никогда бы не достигал. Замерено местной симуляцией раскладки.
+          for PARA in "deploy/hostovye_tajmery.py $TAJM_DIR/hostovye_tajmery.py" \
+                      "deploy/zhivuchest_na_hoste.py $TAJM_DIR/zhivuchest_na_hoste.py" \
+                      "deploy/checks/sdelki_polosy_vygruzka.py $TAJM_DIR/deploy/checks/sdelki_polosy_vygruzka.py" \
+                      "analysis/bloom_own_send.py $TAJM_DIR/analysis/bloom_own_send.py" \
+                      "analysis/solana_ledger_run.py $TAJM_DIR/uchet/analysis/solana_ledger_run.py" \
+                      "analysis/close_empty_token_accounts.py $TAJM_DIR/uchet/analysis/close_empty_token_accounts.py" \
+                      "analysis/bloom_exec_state.py $TAJM_DIR/uchet/analysis/bloom_exec_state.py" \
+                      "analysis/bloom_notify.py $TAJM_DIR/uchet/analysis/bloom_notify.py" \
+                      "analysis/bloom_source_groups.py $TAJM_DIR/uchet/analysis/bloom_source_groups.py" \
+                      "data/leader_regions.json $TAJM_DIR/leader_regions.json" \
+                      "data/solana_dbot_realized_ledger.json $TAJM_DIR/uchet/data/solana_dbot_realized_ledger.json"; do
+            OTKUDA=$(echo "$PARA" | cut -d' ' -f1)
+            KUDA=$(echo "$PARA" | cut -d' ' -f2)
+            [ -s "$OTKUDA" ] || { echo "SBOY: lokalnyj $OTKUDA pust ili otsutstvuet"; exit 1; }
+            LOC=$(sha256sum "$OTKUDA" | cut -d' ' -f1)
+            REM=$(ssh -n $SSH_OPTS root@$TARGET_HOST "sha256sum $KUDA 2>/dev/null | cut -d' ' -f1" || true)
+            if [ "$LOC" = "$REM" ]; then echo "$KUDA: uzhe takoj ($LOC), ne perepisan"; continue; fi
+            # BEZ -n: on podmenjaet stdin na /dev/null, i na host uehala by pustota.
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $KUDA" < "$OTKUDA"
+            NEW=$(ssh -n $SSH_OPTS root@$TARGET_HOST "chown bot:bot $KUDA && chmod 644 $KUDA && sha256sum $KUDA | cut -d' ' -f1")
+            [ "$LOC" = "$NEW" ] || { echo "SBOY: sha256 rashoditsja dlja $KUDA ($LOC vs $NEW)"; exit 1; }
+            echo "dostavlen $KUDA sha256 $NEW"
+          done
+          # КЭШ ЦЕПИ -- ТОЛЬКО ЗАСЕВ, И НИКОГДА ПОВЕРХ. Хост наращивает свой
+          # кэш каждый час; копия в ветке её растит прогон GitHub, и перезапись
+          # поверх выбросила бы работу того, кто отстал меньше. Холодный старт
+          # без засева стоил бы кредитов Helius на пересбор 2.5 тысяч транзакций.
+          if ssh -n $SSH_OPTS root@$TARGET_HOST "test -s $TAJM_DIR/uchet/data/chain_tx_cache.json"; then
+            echo "kesh cepi na hoste uzhe est -- ne trogaem"
+          else
+            ssh $SSH_OPTS root@$TARGET_HOST "cat > $TAJM_DIR/uchet/data/chain_tx_cache.json" < data/chain_tx_cache.json
+            ssh -n $SSH_OPTS root@$TARGET_HOST "chown bot:bot $TAJM_DIR/uchet/data/chain_tx_cache.json && wc -c < $TAJM_DIR/uchet/data/chain_tx_cache.json"
+            echo "kesh cepi zasejan iz vetki"
+          fi
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $TAJM_DIR"
+          # САМОПРОВЕРКИ НА ХОСТЕ ТЕМ ПИТОНОМ, КОТОРЫМ ПОЙДЁТ ТАЙМЕР: другой
+          # питон означал бы другие версии и другое поведение на тех же данных.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/hostovye_tajmery.py --self-test
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/zhivuchest_na_hoste.py --self-test
+            sudo -n -u bot /home/bot/robinhood-chain-alpha/venv/bin/python $TAJM_DIR/deploy/checks/sdelki_polosy_vygruzka.py --self-test
+          " 2>&1 | tee -a data/bloom_detector_deploy.txt
+          # БЕЗ tail: обрезанный хвост самопроверки прячет ИМЕННО ту строку, из-за
+          # которой она упала, а pipefail у шага стоит -- падение мы увидим, но
+          # без причины. Полный вывод в отчёте дороже его краткости.
+          # УСТАНОВКА ОТ root: юниты лежат в /etc/systemd/system. Установщик сам
+          # откажется, если часы хоста не UTC -- 06:00 в чужом поясе выстрелит не
+          # в 06:00Z, и окно суток поедет молча.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "python3 $TAJM_DIR/hostovye_tajmery.py --ustanovit --vkljuchit" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
+          # ПЕРВЫЙ НАСТОЯЩИЙ ПРОГОН ЖИВУЧЕСТИ СРАЗУ, А НЕ ЖДАТЬ ТИКА: иначе
+          # неизвестно, пишет ли таймер файл вообще. Ненулевой код службы здесь
+          # ОЖИДАЕМ -- он означает тревогу в докладе, а не сломанный таймер,
+          # поэтому судим по наличию файла.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl start bloom-zhivuchest-chas.service" || \
+            echo "zhivuchest otdala nenulevoj kod -- smotrim fajl doklada"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "test -s $TAJM_DIR/zhivuchest/zhivuchest.json" || {
+            echo "SBOY: tajmer zhivuchesti ne napisal fajl doklada"
+            ssh -n $SSH_OPTS root@$TARGET_HOST "journalctl -u bloom-zhivuchest-chas -n 40 --no-pager"
+            exit 1; }
+          # ИМЕНА ТАЙМЕРОВ -- У САМОГО УСТАНОВЩИКА, А НЕ СПИСКОМ ЗДЕСЬ. Прежде
+          # здесь стояли три имени руками, и два таймера уборщика ренты
+          # (bloom-uborshchik-chas, bloom-uborshchik-itog-sutki), добавленные
+          # 03.10, в проверку не попали вовсе: на хосте их не было, а шаг
+          # печатал зелёные три и молчал. Найдено 03.10 на самопроверке по
+          # списку живых таймеров хоста. Теперь список берётся из модуля, и
+          # забытый таймер виден сразу.
+          # Имена -- из исходника установщика, а не списком руками: своего
+          # машинного вывода (--json) у него нет, а список имён в нём один.
+          IMENA=$(python3 -c "import re,pathlib; print(' '.join(и + '.timer' for и in re.findall(r'\"имя\":\s*\"([a-z0-9-]+)\"', pathlib.Path('deploy/hostovye_tajmery.py').read_text(encoding='utf-8'))))")
+          [ -n "$IMENA" ] || { echo "СБОЙ: имён таймеров из установщика не добыто -- проверять нечего"; exit 1; }
+          echo "таймеры установщика: $IMENA"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers $IMENA --no-pager" \
+            2>&1 | tee -a data/bloom_detector_deploy.txt
+          # И ГЕЙТ: каждое имя обязано быть среди живых таймеров хоста.
+          # ПЕРЕВОДЫ СТРОК В ПРОБЕЛЫ -- БЕЗ ЭТОГО СРАВНЕНИЕ ЛОЖНО ОТКАЗЫВАЕТ.
+          # Найдено 03.10 на прогоне 188: таймеры на хосте стояли все пять
+          # ("5 timers listed" в том же шаге), а гейт объявил, что нет ни
+          # одного. Причина -- в case ищется " имя ", а разделителем в выводе
+          # был перевод строки, и ни одно имя не совпало. Такой гейт хуже
+          # отсутствующего: он красит зелёный деплой красным и учит не верить
+          # проверкам.
+          ZHIVYE=$(ssh -n $SSH_OPTS root@$TARGET_HOST "systemctl list-timers --all --no-pager | awk '{print \$NF}'" 2>/dev/null | tr '\n' ' ' || true)
+          NET=""
+          for T in $IMENA; do
+            case " $ZHIVYE " in *" ${T%.timer}.service "*|*" $T "*) ;; *) NET="$NET $T" ;; esac
+          done
+          if [ -n "$(echo "$NET" | tr -d ' ')" ]; then
+            echo "СБОЙ: установщик объявил таймеры, которых на хосте нет:$NET" \
+              | tee -a data/bloom_detector_deploy.txt
+            exit 1
+          fi
+          echo "все таймеры установщика на хосте есть" | tee -a data/bloom_detector_deploy.txt
+          python3 deploy/checks/bez_klyuchey_v_otchete.py data/bloom_detector_deploy.txt
 
       - name: "Коммит отчёта"
         if: always()
