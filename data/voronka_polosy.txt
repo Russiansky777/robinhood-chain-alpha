@@ -1,77 +1,108 @@
-=== Полоса: воронка по журналу решений, 2026-10-04T12:36:38Z ===
+=== Полоса: воронка по журналу решений, 2026-10-04T14:05:32Z ===
 окно: с '2026-10-04T10:40:00Z' до 'конца журнала'
 {
- "строк_всего": 160648,
- "попыток_полосы": 219,
- "в_окне": 11,
+ "строк_всего": 197631,
+ "попыток_полосы": 251,
+ "в_окне": 43,
  "с": "2026-10-04T10:40:00Z",
  "до": null,
  "по_этапам": {
-  "build": 3,
-  "sent": 3,
-  "usdc_signaly_build": 2,
-  "gate": 3
+  "build": 8,
+  "sent": 16,
+  "usdc_signaly_build": 3,
+  "gate": 16
  },
  "по_группам": {
+  "batch5": {
+   "sent": 2
+  },
   "cand1": {
    "usdc_signaly_build": 1
   },
   "cand2": {
-   "usdc_signaly_build": 1,
-   "sent": 1
+   "usdc_signaly_build": 2,
+   "sent": 5,
+   "build": 3
   },
   "cand2_03": {
-   "build": 2
+   "build": 4
   },
   "cand3": {
-   "sent": 1
+   "sent": 3
   },
   "kandidaty": {
-   "gate": 1
+   "gate": 5
+  },
+  "konveyer": {
+   "sent": 1
+  },
+  "krug_001": {
+   "gate": 2
   },
   "lane_s0": {
    "build": 1,
-   "sent": 1
+   "sent": 5,
+   "gate": 1
   },
   "sniper_src": {
-   "gate": 2
+   "gate": 8
   }
  },
  "причины": {
   "build": [
    {
     "почему": "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)",
-    "раз": 1
+    "раз": 2
    },
    {
     "почему": "тип пула вне полосы: LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",
-    "раз": 1
+    "раз": 2
    },
    {
     "почему": "пул: в транзакции нет хранилища минта с движением против трейдера",
+    "раз": 1
+   },
+   {
+    "почему": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
+    "раз": 1
+   },
+   {
+    "почему": "пул: неоднозначная котировка: 3 встречных счетов (EPjFWd)",
     "раз": 1
    }
   ],
   "gate": [
    {
     "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "раз": 2
+    "раз": 8
    },
    {
     "почему": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+    "раз": 5
+   },
+   {
+    "почему": "предел полосы: минт уже открыт",
+    "раз": 1
+   },
+   {
+    "почему": "предел полосы: открытых позиций полосы 1 при пределе 1",
+    "раз": 1
+   },
+   {
+    "почему": "предел полосы: за сутки уже 3 сделок при пределе 3",
     "раз": 1
    }
   ],
   "usdc_signaly_build": [
    {
     "почему": "котировка пула не SOL -- полоса только одношаговая",
-    "раз": 2
+    "раз": 3
    }
   ]
  },
  "первая_utc": "2026-10-04T10:44:52Z",
- "последняя_utc": "2026-10-04T12:34:23Z",
- "отправлено": 3,
+ "последняя_utc": "2026-10-04T14:02:52Z",
+ "отправлено": 16,
  "подписи": [
   {
    "ts_utc": "2026-10-04T10:44:53Z",
@@ -87,13 +118,78 @@
    "ts_utc": "2026-10-04T12:26:12Z",
    "group": "cand2",
    "signature": "2xz3wDTxiznW8VNUMVkNzZS7M1qHLdeYGszCp73rvQYxxvzqKYZ9q5ZfbeG715BTNiiTozNDnDU3YeCLbRkR7Asd"
+  },
+  {
+   "ts_utc": "2026-10-04T12:37:14Z",
+   "group": "lane_s0",
+   "signature": "n7u95tJUxXp2eof9adqYEYXpzGxzLbzuqASzjL2aJdu22emP9t8xvCSX5WTXGCM4nmq98djyKx2R2CVEy1nLfo2"
+  },
+  {
+   "ts_utc": "2026-10-04T12:38:29Z",
+   "group": "cand2",
+   "signature": "gufDSREWgN6Funwy6cBDuEAySTotwNGfK7iLCanFkiQXwwATtTZvZ6ZhJKRURAjfxV4JzGTxKw7eRcWMTw8HEJk"
+  },
+  {
+   "ts_utc": "2026-10-04T12:42:30Z",
+   "group": "lane_s0",
+   "signature": "3jspLBQS4SQn46fNqdvA7g4wvBPhYXR4xoDNAcKdCUhHHfkvkpvSgtXeeUCEJ3hKcegXtM54BsXrnoVcSgbBHgJF"
+  },
+  {
+   "ts_utc": "2026-10-04T12:44:03Z",
+   "group": "cand2",
+   "signature": "59uEb4DfsNUuMSjZzCN6QRJGBdb7JPTGuqgXNYDWPTsCF7RfgMtQpEgbnzr51zBYXsqkRZLapPSQECwdAdWZoD3T"
+  },
+  {
+   "ts_utc": "2026-10-04T12:44:31Z",
+   "group": "lane_s0",
+   "signature": "4REQ9qwwaKvrkBZ8ZaNxHCpUUtF1Rf9QRJkARs3SvBsmhngPLj8AveXawa1sN2pLVGKLmb5JfncbDkAue6PeJF85"
+  },
+  {
+   "ts_utc": "2026-10-04T12:53:44Z",
+   "group": "cand2",
+   "signature": "1gksBGb6suURsMd8WnQQwWUY1qpNsrCtqd2ghBvLzWvdPwVWoXRnVeXtAvfJcfuUbkmw99e6GkmuM2JNfJ8DtXf"
+  },
+  {
+   "ts_utc": "2026-10-04T12:58:07Z",
+   "group": "cand3",
+   "signature": "5n15hpsM2Tr3P2nEHKaf6eufWdftTkj5C4CjLGPAQJ66ngbpHuXMwNNE6S25TMAZRAPuEd8pks14wuqNX8XuEMR6"
+  },
+  {
+   "ts_utc": "2026-10-04T12:59:47Z",
+   "group": "batch5",
+   "signature": "MKzJT4ibCPShLxjHk6QDt9zV5mmhEH31H9NHAXy6WMN8EFT4ZtngU37yPJJvMtnCmuHodioDsDhijJZLdFC9h1t"
+  },
+  {
+   "ts_utc": "2026-10-04T13:01:48Z",
+   "group": "cand3",
+   "signature": "JwBecTmwjwLdMZ2qrDKx172mvS5n3zvtKofyb27VVfx7aTuXJ4rTYvLpHLTSBbErGn6cxQhCqnp5C8AGg44GjeP"
+  },
+  {
+   "ts_utc": "2026-10-04T13:13:26Z",
+   "group": "konveyer",
+   "signature": "54bQB861pAAjNECd8PZH8Qw8WbVHzGNuVZNBRMKxnxdujMNZcTfQYSnrnYzjETjnvMSYkJENPigTZh1MQi6swh5D"
+  },
+  {
+   "ts_utc": "2026-10-04T13:52:48Z",
+   "group": "cand2",
+   "signature": "4ERCGje4heNrF1NFV5mLMZ531GFJbY3dYpmot8uNrg47kQ83rLDb1TyRrpTTas3tgRN5eXcgQSGSD4YjgUyfpCRR"
+  },
+  {
+   "ts_utc": "2026-10-04T14:01:10Z",
+   "group": "lane_s0",
+   "signature": "4fGArCXMwQYL6pqU3w4498vH9HJR4H6trit9VCunCYmFnpSvf6FeXLAZ2yExtPLGoZ7oGN8tyRofLz7NgpHsUmAr"
+  },
+  {
+   "ts_utc": "2026-10-04T14:02:08Z",
+   "group": "batch5",
+   "signature": "2M8PbcXvDPu7wut8Eex655WJrvZU67Av84JGeMikDwoksxhT5YVRh1k1y9XVn5FYcMie1Qva3oup3jcTSGP5XbQP"
   }
  ]
 }
 --- окno trevogi 10:45-11:16Z otdelno ---
 {
- "строк_всего": 160648,
- "попыток_полосы": 219,
+ "строк_всего": 197631,
+ "попыток_полосы": 251,
  "в_окне": 1,
  "с": "2026-10-04T10:45:00Z",
  "до": "2026-10-04T11:16:00Z",
@@ -120,8 +216,8 @@
 }
 --- do deploja: 09:40-10:43Z (dlja sravnenija) ---
 {
- "строк_всего": 160648,
- "попыток_полосы": 219,
+ "строк_всего": 197631,
+ "попыток_полосы": 251,
  "в_окне": 7,
  "с": "2026-10-04T09:40:00Z",
  "до": "2026-10-04T10:43:00Z",
