@@ -1,27 +1,1574 @@
 {
- "patterns": "HwqyRuZrLca1QGgmY469q7tQtWVu1dCHKkeyF2ALjYBQ",
- "file": "positions",
+ "patterns": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+ "file": "seller",
+ "okno": {
+  "ot": "2026-10-04T19:52:42Z",
+  "do": "2026-10-04T21:07:57Z",
+  "zapisej": 30,
+  "predel": 40,
+  "usecheno": false,
+  "chem_grozit": null
+ },
  "rows": [
   {
-   "schema_version": 2,
-   "client_order_id": "lane-own-3kyxzSngusdZM9CzQoompueVtP8yUfh5m4amQp7o",
-   "state": "intent",
-   "mint": "HwqyRuZrLca1QGgmY469q7tQtWVu1dCHKkeyF2ALjYBQ",
-   "source_sig": "3kyxzSngusdZM9CzQoompueVtP8yUfh5m4amQp7oCU4VfeEbigGrnUqedoCPffJsu6hbRq7CiW2FB57TZd8dJp1b",
-   "source_slot": 453366140,
-   "sol_in": 0.5,
-   "pool": null,
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-   "taxed": null,
-   "tax_bps": null,
-   "mode": "live",
-   "sell_after_s": 28.836,
-   "ts_intent": 1791146308.7618155,
-   "ts_intent_utc": "2026-10-04T20:38:28Z",
-   "wallet": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
-   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
-   "lane": "own_send",
-   "lane_group": "cand1_03"
+   "ts_utc": "2026-10-04T19:52:42Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 12.7 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "63450260",
+      "threshold": "44415182",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 12.7 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 63450260,
+       "threshold": 44415182,
+       "floor_needed": 44415182,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 12.69,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 12.7 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 63450260,
+      "threshold": 44415182,
+      "floor_needed": 44415182,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 12.69,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 12.7 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:52:42Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 12.7 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 63450260,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 12.69,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 12.7 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:52:42Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:52:45Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 13.2 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "65977688",
+      "threshold": "46184381",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 13.2 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 65977688,
+       "threshold": 46184381,
+       "floor_needed": 46184381,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 13.2,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 13.2 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 65977688,
+      "threshold": 46184381,
+      "floor_needed": 46184381,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 13.2,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 13.2 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:52:45Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 13.2 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 65977688,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 13.2,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 13.2 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:52:45Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:53:47Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "55283160",
+      "threshold": "38698212",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 55283160,
+       "threshold": 38698212,
+       "floor_needed": 38698212,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 11.06,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 55283160,
+      "threshold": 38698212,
+      "floor_needed": 38698212,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 11.06,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:53:47Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.1 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 55283160,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 11.06,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.1 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:53:47Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:55:47Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "55262146",
+      "threshold": "38683502",
+      "router": "dflow"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 55262146,
+       "threshold": 38683502,
+       "floor_needed": 38683502,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "dflow",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 717,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 11.05,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 55262146,
+      "threshold": 38683502,
+      "floor_needed": 38683502,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "dflow",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 717,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 11.05,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.1 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:55:47Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.1 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 55262146,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 11.05,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.1 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:55:47Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:59:50Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "54926336",
+      "threshold": "38448435",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 54926336,
+       "threshold": 38448435,
+       "floor_needed": 38448435,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 10.99,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 54926336,
+      "threshold": 38448435,
+      "floor_needed": 38448435,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 10.99,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:59:50Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 54926336,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 10.99,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T19:59:50Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:07:52Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "54926336",
+      "threshold": "38448435",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 54926336,
+       "threshold": 38448435,
+       "floor_needed": 38448435,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 10.99,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 54926336,
+      "threshold": 38448435,
+      "floor_needed": 38448435,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 10.99,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:07:52Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 54926336,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 10.99,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:07:52Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:22:53Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "54926336",
+      "threshold": "38448435",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 54926336,
+       "threshold": 38448435,
+       "floor_needed": 38448435,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 10.99,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 54926336,
+      "threshold": 38448435,
+      "floor_needed": 38448435,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 10.99,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:22:53Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 54926336,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 10.99,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:22:53Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:37:55Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "54926336",
+      "threshold": "38448435",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 54926336,
+       "threshold": 38448435,
+       "floor_needed": 38448435,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 10.99,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 54926336,
+      "threshold": 38448435,
+      "floor_needed": 38448435,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 10.99,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:37:55Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 54926336,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 10.99,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:37:55Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:52:55Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "54830439",
+      "threshold": "38381307",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 54830439,
+       "threshold": 38381307,
+       "floor_needed": 38381307,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 10.97,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 54830439,
+      "threshold": 38381307,
+      "floor_needed": 38381307,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 10.97,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:52:55Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 54830439,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 10.97,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T20:52:55Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T21:07:57Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "Jupiter не продал",
+   "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+   "jupiter": {
+    "ok": false,
+    "steps": [
+     {
+      "step": "api",
+      "ok": true,
+      "api": "swap-v2",
+      "plan": [
+       "swap-v2",
+       "ultra"
+      ],
+      "why_not": "ключ V2 есть, Ultra запасной"
+     },
+     {
+      "step": "key",
+      "ok": true,
+      "pubkey": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+      "why_not": null
+     },
+     {
+      "step": "order",
+      "api": "swap-v2",
+      "ok": true,
+      "why_not": null,
+      "out_amount": "54830439",
+      "threshold": "38381307",
+      "router": "metis"
+     },
+     {
+      "step": "floor",
+      "ok": false,
+      "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+      "checks": {
+       "out_amount": 54830439,
+       "threshold": 38381307,
+       "floor_needed": 38381307,
+       "floor_pct": 70.0,
+       "slippage_bps": 3000,
+       "router": "metis",
+       "in_tx": {
+        "known": true,
+        "bytes_len": 787,
+        "threshold_found": false,
+        "quote_found": true,
+        "slippage_found": true,
+        "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+       },
+       "quote_share_of_entry_pct": 10.97,
+       "entry_lamports": 500000000
+      },
+      "unsold": true
+     }
+    ],
+    "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+    "amount_raw": 1854196564256,
+    "api_plan": [
+     "swap-v2",
+     "ultra"
+    ],
+    "api": "swap-v2",
+    "api_tried": [
+     "swap-v2"
+    ],
+    "api_used": "swap-v2",
+    "floor": {
+     "ok": false,
+     "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+     "checks": {
+      "out_amount": 54830439,
+      "threshold": 38381307,
+      "floor_needed": 38381307,
+      "floor_pct": 70.0,
+      "slippage_bps": 3000,
+      "router": "metis",
+      "in_tx": {
+       "known": true,
+       "bytes_len": 787,
+       "threshold_found": false,
+       "quote_found": true,
+       "slippage_found": true,
+       "note": "минимума прямым числом нет, но в байтах есть котировка и наше проскальзывание: на цепи минимум считается из них, то есть пол обеспечен подписываемыми байтами"
+      },
+      "quote_share_of_entry_pct": 10.97,
+      "entry_lamports": 500000000
+     },
+     "unsold": true
+    },
+    "why_not": "котировка 11.0 % от входа ниже 30 % -- это не продажа, а раздача: UNSOLD и доклад владельцу",
+    "unsold": true
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T21:07:57Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "второе мнение о цене",
+   "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул",
+   "why_not": null,
+   "второе_мнение": {
+    "решение": {
+     "путь": "свой_в_пул",
+     "любая_цена": false,
+     "тревога": false,
+     "порог_pct": 30.0,
+     "вход_lamports": 500000000,
+     "котировка_jupiter_lamports": 54830439,
+     "котировка_пула_lamports": 316975306,
+     "доля_jup_pct": 10.97,
+     "доля_пула_pct": 63.4,
+     "почему": "пул даёт 63.4 % от входа, а Jupiter 11.0 % -- маршрут Jupiter плохой, продаём своим путём в пул"
+    },
+    "пул": {
+     "ok": true,
+     "why_not": null,
+     "lamports": 316975306,
+     "по_кривой": 487654317,
+     "гарантированный": 316975306,
+     "пул": null,
+     "минт_котировки": "So11111111111111111111111111111111111111112",
+     "чтений_резервов": 0,
+     "минимум": {
+      "ok": true,
+      "min_out": 316975306,
+      "откуда": "котировка Code-3: событие сделки кривой (IDL) + кривая продажи"
+     },
+     "путь_котировки": "событие сделки кривой (IDL) + кривая продажи",
+     "способ": "krivaya",
+     "через_c3": true,
+     "имя_типа": "кривая pump.fun"
+    }
+   }
+  },
+  {
+   "ts_utc": "2026-10-04T21:07:57Z",
+   "client_order_id": "lane-own-aFpswb3nBFui8h6fGRPU7rqRAk4MzCowgquYFpVn",
+   "mint": "D6eyhD2oMTc3HvzHMPwDWC1fHimZbQTED1i8kaS5pump",
+   "action": "своим путём не идём: круг 0.01 правила 8",
+   "why_not": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+   "круг_001": {
+    "мешает": true,
+    "почему": "первая продажа этого типа своим путём разрешена только кругом 0.01 -- правило 8; позиция больше круга (0.5 SOL > 0.01 SOL), резать продажу нельзя -- уходим прежним путём",
+    "программа": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "разновидность": null,
+    "ключ": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "обкатан": false,
+    "размер_sol": 0.5,
+    "круг_sol": 0.01,
+    "круг_нужен": true
+   }
   }
  ]
 }
