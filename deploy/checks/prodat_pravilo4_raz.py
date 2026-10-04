@@ -33,8 +33,25 @@ import time
 from pathlib import Path
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent.parent
+
+
+def _есть_каталог(п: Path) -> bool:
+    """Есть ли каталог. ЧУЖОЙ КАТАЛОГ -- ЭТО "НЕТ", А НЕ ИСКЛЮЧЕНИЕ.
+
+    Прогон запускается и бегунком (ghrunner, самопроверка), и пользователем
+    службы (bot, живая продажа). У ghrunner нет права даже на stat
+    /home/bot/bloom_executor, и Path.exists() там роняет PermissionError:
+    самопроверка падала до первой проверки. Для выбора пути импорта "не вижу"
+    и "нет" -- одно и то же.
+    """
+    try:
+        return п.is_dir()
+    except (OSError, PermissionError):
+        return False
+
+
 for _п in (КОРЕНЬ / "analysis", Path("/home/bot/bloom_executor")):
-    if _п.exists() and str(_п) not in sys.path:
+    if _есть_каталог(_п) and str(_п) not in sys.path:
         sys.path.insert(0, str(_п))
 
 ФЛАГ_ЖИВЬЁМ = "PRODAT_PRAVILO4_LIVE"
@@ -264,6 +281,9 @@ def самопроверка() -> int:
         and "ни cid" in (найти_позицию(поз)["why_not"] or ""), "")
 
     # --- живой режим только по своему флагу
+    chk("чужой каталог при выборе пути импорта -- «нет», а не исключение",
+        _есть_каталог(Path("/proc/1/root/etc/shadow_нет_такого")) is False
+        and _есть_каталог(КОРЕНЬ) is True, "")
     chk("по умолчанию прогон НЕ живой", живой_режим({}) is False)
     chk("живой только по своему флагу=1",
         живой_режим({ФЛАГ_ЖИВЬЁМ: "1"}) is True
