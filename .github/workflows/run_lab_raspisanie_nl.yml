@@ -152,6 +152,13 @@ jobs:
           T_DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
           T_GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
           T_GH_RUNNER_PAT: ${{ secrets.GH_RUNNER_PAT }}
+          # ЧАСТАЯ ПОДМЕНА: токен положили в Variables, а не в Secrets. Тогда
+          # secrets.X пуст, а vars.X полон -- и это не видно никак, кроме
+          # прямой проверки. Значение переменной тоже НЕ печатается: только
+          # имя и слово est/net. Переменные не маскируются в журнале, поэтому
+          # печатать их значения нельзя тем более.
+          V_LAB_DISPATCH_TOKEN: ${{ vars.LAB_DISPATCH_TOKEN }}
+          V_LAB_TOKEN: ${{ vars.LAB_TOKEN }}
         run: |
           set -e
           # ПРОГОН САМ ГОВОРИТ, ПОД КАКИМ ИМЕНЕМ СЕКРЕТ ВИДЕН -- ИМЕНАМИ, А НЕ
@@ -170,6 +177,7 @@ jobs:
           # репозитории, или имя отличается.
           echo "--- какие имена допуска видны прогону (только имена) ---" | tee -a "$OUT"
           NAJDENO=""
+          NAJDENO_VARS=""
           for IMJA in LAB_DISPATCH_TOKEN LAB_DISPATCH LAB_TOKEN DISPATCH_TOKEN GH_DISPATCH_TOKEN; do
             eval "Z=\${T_$IMJA:-}"
             if [ -n "$Z" ]; then
@@ -177,6 +185,15 @@ jobs:
               [ -n "$NAJDENO" ] || NAJDENO="$IMJA"
             else
               echo "  $IMJA net" | tee -a "$OUT"
+            fi
+          done
+          for IMJA in LAB_DISPATCH_TOKEN LAB_TOKEN; do
+            eval "Z=\${V_$IMJA:-}"
+            if [ -n "$Z" ]; then
+              echo "  vars.$IMJA est -- token lezhit v Variables, a ne v Secrets" | tee -a "$OUT"
+              [ -n "$NAJDENO_VARS" ] || NAJDENO_VARS="$IMJA"
+            else
+              echo "  vars.$IMJA net" | tee -a "$OUT"
             fi
           done
           if [ -n "$T_GH_RUNNER_PAT" ]; then
@@ -192,6 +209,15 @@ jobs:
           if [ -n "$NAJDENO" ]; then
             eval "T=\${T_$NAJDENO}"
             IMJA="$NAJDENO"
+          elif [ -n "$NAJDENO_VARS" ]; then
+            # БЕРЁМ, НО ГОВОРИМ ВСЛУХ. Переменные окружения Actions НЕ
+            # маскируются в журналах прогонов, то есть токен в Variables
+            # рискует попасть в чей-нибудь вывод. Поэтому прогон его
+            # использует (работа важнее), но прямо просит перенести в Secrets.
+            eval "T=\${V_$NAJDENO_VARS}"
+            IMJA="vars.$NAJDENO_VARS (NE sekret!)"
+            echo "VNIMANIE: token lezhit v Variables, a ne v Secrets." | tee -a "$OUT"
+            echo "Variables NE maskirujutsja v zhurnalah progonov -- perenesti v Secrets." | tee -a "$OUT"
           elif [ "${{ inputs.razreshit_runner_pat }}" = "yes" ] && [ -n "$T_GH_RUNNER_PAT" ]; then
             IMJA="GH_RUNNER_PAT (SHIROKIJ -- po slovu vladelca vo vhode)"
             T="$T_GH_RUNNER_PAT"
