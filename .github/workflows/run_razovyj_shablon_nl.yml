@@ -1,0 +1,176 @@
+name: "Разовый прогон: надёжный шаблон (доставка, изоляция, сухой -> живой)"
+
+# ЗАЧЕМ. 04--05.10 разовые прогоны упали ПЯТЬ раз подряд, и ни разу по делу --
+# падала оснастка: кириллица в имени переменной оболочки; sys.path перекрывал
+# PYTHONPATH, и прогон шёл зелёным по СТАРОМУ коду службы; `ssh cat` в цикле
+# довозил не все файлы; `echo` не разворачивал \x; два прогона делили один
+# каталог. Здесь всё это закрыто один раз и для всех разовых задач.
+#
+# ЧТО ДАЁТ ШАБЛОН:
+#   1. ВХОД ПРОВЕРЯЕТСЯ ДО ПЕРВОГО ЗАПУСКА. Поля идут дальше переменными
+#      окружения, а не подстановкой: строка выполняется на торговом хосте.
+#   2. ДОСТАВКА -- ОДНИМ ПОТОКОМ tar И С КОНТРОЛЬНОЙ СУММОЙ КАЖДОГО ФАЙЛА.
+#      Не доехал один файл -- прогон встанет ЗДЕСЬ, а не внутри задачи.
+#   3. КАТАЛОГ СВОЙ У КАЖДОГО ПРОГОНА: /tmp/razovyj_<номер прогона>.
+#   4. МОДУЛИ ОБЯЗАНЫ БРАТЬСЯ ИЗ НАШЕГО КАТАЛОГА -- проверяется ДО запуска
+#      (deploy/checks/razovyj_predpuskovoj.py), иначе отказ по имени с путём.
+#   5. СУХОЙ ПРОГОН ВСЕГДА, ЖИВОЙ -- ТОЛЬКО ПО СЛОВУ (live=yes).
+#   6. ТОЛЬКО ASCII В ОБОЛОЧКЕ и ни одной двойной кавычки внутри ssh.
+#
+# НИ ОДНОГО КЛЮЧА ЗДЕСЬ НЕ ПЕЧАТАЕТСЯ И НЕ ПЕРЕДАЁТСЯ АРГУМЕНТОМ.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zadacha:
+        description: "prodat_ostatok | prodat_pravilo4 | zakryt_pustye_scheta"
+        required: true
+        default: "prodat_ostatok"
+      dovody:
+        description: "аргументы задачи (только A-Za-z0-9 = , . _ : - и пробел)"
+        required: false
+        default: ""
+      live:
+        description: "'yes' -- живой прогон после сухого; иначе только сухой"
+        required: false
+        default: "no"
+
+concurrency:
+  group: razovyj-shablon
+  cancel-in-progress: false
+
+env:
+  CODE_DIR: /home/bot/bloom_executor
+  TARGET_HOST: 127.0.0.1
+  PY_HOSTA: /home/bot/robinhood-chain-alpha/venv/bin/python
+
+jobs:
+  razovyj:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "VHOD: proverit do pervogo zapuska"
+        env:
+          ZADACHA: ${{ inputs.zadacha }}
+          DOVODY: ${{ inputs.dovody }}
+          LIVE: ${{ inputs.live }}
+        run: |
+          set -e
+          case "$ZADACHA" in
+            prodat_ostatok|prodat_pravilo4|zakryt_pustye_scheta) : ;;
+            *) echo "OTKAZ: zadacha ne iz spiska"; exit 1 ;;
+          esac
+          case "$LIVE" in yes|no) : ;; *) echo "OTKAZ: live -- yes ili no"; exit 1 ;; esac
+          # DOVODY UHODJAT V KOMANDNUJU STROKU NA HOSTE: tolko bezopasnyje znaki.
+          printf '%s' "$DOVODY" | grep -qE '^[A-Za-z0-9=,._:[:space:]-]*$' \
+            || { echo "OTKAZ: v dovodah jest zapreshchjonnyj znak"; exit 1; }
+          RABOTA=/tmp/razovyj_${GITHUB_RUN_ID}
+          {
+            echo "ZADACHA=$ZADACHA"
+            echo "DOVODY=$DOVODY"
+            echo "LIVE=$LIVE"
+            echo "RABOTA=$RABOTA"
+            echo "OUT=data/razovyj_${ZADACHA}.txt"
+          } >> "$GITHUB_ENV"
+          echo "vhod proveren: zadacha=$ZADACHA live=$LIVE rabota=$RABOTA"
+
+      - name: "GEJT: samoproverka osnastki"
+        run: |
+          set -e
+          python3 deploy/checks/razovyj_predpuskovoj.py --self-test | tail -2
+
+      - name: "Skript zadachi jest i nazvan"
+        run: |
+          set -e
+          case "$ZADACHA" in
+            prodat_ostatok) SKRIPT=deploy/checks/prodat_ostatok_raz.py ;;
+            prodat_pravilo4) SKRIPT=deploy/checks/prodat_pravilo4_raz.py ;;
+            zakryt_pustye_scheta) SKRIPT=deploy/checks/zakryt_pustye_scheta_raz.py ;;
+          esac
+          if [ ! -f "$SKRIPT" ]; then
+            echo "OTKAZ: skripta zadachi net: $SKRIPT"
+            echo "Eto ne polomka shablona: zadacha jeshchjo ne napisana."
+            exit 1
+          fi
+          echo "SKRIPT=$SKRIPT" >> "$GITHUB_ENV"
+          echo "skript zadachi: $SKRIPT"
+
+      - name: "Dostavka odnim potokom i manifest summ"
+        run: |
+          set -e
+          set -o pipefail
+          install -d -m 755 "$RABOTA" "$RABOTA/kod"
+          # ODNIM POTOKOM tar, a ne pjatju ssh cat: 05.10 cat v cikle dovjoz ne vse.
+          tar -C analysis -cf - \
+              bloom_seller.py bloom_own_send.py bloom_exec_state.py c2_common.py \
+            | tar -C "$RABOTA/kod" -xf -
+          cp "$SKRIPT" "$RABOTA/zadacha.py"
+          cp deploy/checks/razovyj_predpuskovoj.py "$RABOTA/predpuskovoj.py"
+          # MANIFEST SUMM -- PO KAZHDOMU FAJLU. Odno chislo na katalog ne govorit,
+          # KAKOJ fajl ne dojehal, a 05.10 ne dojehal rovno odin iz shesti.
+          python3 - "$RABOTA/kod" "$RABOTA/summy.json" <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+          kat = Path(sys.argv[1]); out = Path(sys.argv[2])
+          summy = {str(p.relative_to(kat)): hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in sorted(kat.rglob("*")) if p.is_file()}
+          out.write_text(json.dumps(summy, indent=1), encoding="utf-8")
+          print("fajlov v manifeste:", len(summy))
+          PY
+          chown -R bot:bot "$RABOTA" || true
+          ls -1 "$RABOTA/kod" | wc -l
+
+      - name: "PREDPUSKOVAJA: summy, puti modulej, piton, mesto"
+        run: |
+          set -e
+          sudo -u bot -E env PYTHONDONTWRITEBYTECODE=1 \
+            PYTHONPATH="$RABOTA/kod:$CODE_DIR" \
+            "$PY_HOSTA" "$RABOTA/predpuskovoj.py" \
+              --kat "$RABOTA/kod" \
+              --moduli bloom_seller,bloom_own_send,bloom_exec_state \
+              --summy "$RABOTA/summy.json" | tee "$RABOTA/predpuskovoj.json"
+          echo "predpuskovaja proshla"
+
+      - name: "SUHOJ progon"
+        run: |
+          set -e
+          sudo -u bot -E env PYTHONDONTWRITEBYTECODE=1 \
+            PYTHONPATH="$RABOTA/kod:$CODE_DIR" \
+            "$PY_HOSTA" "$RABOTA/zadacha.py" --dry-run $DOVODY \
+            | tee "$RABOTA/suhoj.txt" | tail -40
+
+      - name: "ZHIVOJ progon (tolko po slovu live=yes)"
+        if: inputs.live == 'yes'
+        run: |
+          set -e
+          sudo -u bot -E env PYTHONDONTWRITEBYTECODE=1 \
+            PYTHONPATH="$RABOTA/kod:$CODE_DIR" \
+            "$PY_HOSTA" "$RABOTA/zadacha.py" --live $DOVODY \
+            | tee "$RABOTA/zhivoj.txt" | tail -40
+
+      - name: "Otchjot v vetku"
+        if: always()
+        run: |
+          set -e
+          OUT="${OUT:-data/razovyj_progon.txt}"
+          RABOTA="${RABOTA:-/tmp/net-takogo}"
+          {
+            printf '%s\n' "progon ${GITHUB_RUN_ID}, $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            printf '%s\n' "zadacha=${ZADACHA:-?} live=${LIVE:-?}"
+            [ -f "$RABOTA/predpuskovoj.json" ] && cat "$RABOTA/predpuskovoj.json"
+            [ -f "$RABOTA/suhoj.txt" ] && { printf '%s\n' "--- SUHOJ"; tail -30 "$RABOTA/suhoj.txt"; }
+            [ -f "$RABOTA/zhivoj.txt" ] && { printf '%s\n' "--- ZHIVOJ"; tail -30 "$RABOTA/zhivoj.txt"; }
+          } > "$OUT" 2>&1 || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT" || true
+          git diff --cached --quiet || git commit -m "Razovyj progon: ${ZADACHA:-?} [automated]"
+          git push origin HEAD:claude/stroiteli || true
+
+      - name: "Ubrat za soboj"
+        if: always()
+        run: rm -rf "${RABOTA:-/tmp/net-takogo}" || true
