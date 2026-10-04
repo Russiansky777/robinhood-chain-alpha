@@ -117,7 +117,17 @@ def разобрать(строки, *, с: str | None = None, до: str | None 
 ПОЛЯ_ПРИМЕРА = ("ts_utc", "group", "stage", "ok", "sent", "why_not", "code",
                  "mint", "минт", "sig", "source_sig", "подпись_источника",
                  "signature", "client_order_id", "target_sol", "lane_sol",
-                 "size_sol", "lane_allowed", "slot")
+                 "size_sol", "lane_allowed", "slot", "source",
+                 # USDC-НОГА (вопрос владельца 04.10, п.2). Итоговый why_not
+                 # строки -- это отказ ПРЯМОЙ сборки («котировка пула не SOL»),
+                 # а почему не собралась сама нога, лежит в своих полях. Без них
+                 # по журналу не отличить «выключена флагом» от «не собралась».
+                 "route", "lane_route_offered", "direct_why_not",
+                 "lane_usdc_signaly_godilos", "lane_usdc_signaly_why_not",
+                 "lane_usdc_signaly", "lane_usdc_signaly_alt",
+                 "lane_usdc_noga_godilos", "lane_usdc_noga_why_not",
+                 "lane_usdc_noga_boj_why_not", "lane_usdc_noga_potolok_sol",
+                 "lane_usdc_noga_posadok", "lane_usdc_noga_potolok_snjat")
 
 
 def _пример(р: dict) -> dict:

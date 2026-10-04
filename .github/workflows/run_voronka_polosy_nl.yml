@@ -72,6 +72,7 @@ jobs:
             esac
           done
           python3 deploy/checks/voronka_polosy.py --self-test | tail -1
+          python3 deploy/checks/tipy_i_usdc_po_gruppam.py --self-test | tail -1
 
       - name: "SSH key"
         env:
@@ -117,6 +118,29 @@ jobs:
             python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
               "" "" "$GRUPPA" | tee -a "$OUT"
           fi
+
+      - name: "Живые типы пулов и режим USDC-ноги по группам (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Поля lane_pools в файле групп нет ни у одной группы, значит
+          # набор типов складывается из постоянных двух и флагов окружения -- и
+          # узнать его можно только у ЖИВОГО процесса. То же с режимом
+          # USDC-ноги: vykl / ten / boj решает флаг, а не файл.
+          #
+          # ЗНАЧЕНИЙ ПЕРЕМЕННЫХ НАРУЖУ НЕ УХОДИТ: скрипт читает env процесса в
+          # память и печатает только ИМЕНА типов, имя режима и логическое
+          # «список групп задан». В команде root ни одного знака из входов.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/tipy_i_usdc.py" \
+            < deploy/checks/tipy_i_usdc_po_gruppam.py
+          echo "--- tipy pulov i rezhim USDC-nogi po gruppam (zhivoe) ---" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            PID=\$(systemctl show -p MainPID --value bloom-detector 2>/dev/null || echo 0)
+            echo \"detektor MainPID: \$PID\"
+            nice -n 5 python3 /tmp/tipy_i_usdc.py /home/bot/bloom_executor \
+              lane_s0,krug_001,cand1,cand2,konveyer,batch5 \"\$PID\"
+            rm -f /tmp/tipy_i_usdc.py" | tee -a "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
         if: always()
