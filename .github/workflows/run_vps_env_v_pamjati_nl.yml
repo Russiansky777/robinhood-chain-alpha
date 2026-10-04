@@ -1,0 +1,137 @@
+name: "NL-хост: имена окружения ЖИВОГО процесса против файла (только чтение)"
+
+# ЗАЧЕМ (слово владельца 04.10, 12:30Z, СРОЧНО). Отправок полосы нет с ~10:44Z,
+# а в 10:43:26Z деплой перезапустил детектор. Владелец назвал главную гипотезу
+# прямо: "если причина -- переменная, которая жила только в памяти процесса, --
+# добавить её в обязательный список гейта, как BLOOM_SOURCE_GROUPS".
+#
+# ПОЧЕМУ ПРИЗНАК ЖИЗНИ НА ЭТОТ ВОПРОС НЕ ОТВЕЧАЕТ. Он печатает ВЫВОДЫ службы
+# (сколько групп, какой хеш файла, включён ли own_send), а не то, из чего эти
+# выводы сделаны. Переменная, которой в файле уже нет, но которая была в
+# окружении старого процесса, в признаке жизни не видна вовсе -- ровно до
+# перезапуска, после которого поведение службы меняется молча. Так и вышло
+# 03.10 в 20:2xZ: детектор работал БЕЗ BLOOM_SOURCE_GROUPS, читал умолчание
+# модуля, не находил файла групп и ставил политику off ВСЕМ адресам.
+#
+# ЗНАЧЕНИЙ НЕ ПЕЧАТАЕТСЯ НИ ОДНОГО, И ЭТО УСТРОЙСТВО, А НЕ ОСТОРОЖНОСТЬ.
+# С хоста уезжают ТОЛЬКО имена: их вырезает `grep -oE '^[A-Za-z_][A-Za-z0-9_]*='`
+# прямо на хосте, то есть значение не покидает машину даже на шаг. Разбор
+# (deploy/checks/env_imena_sverka.py, самопроверка 18/18) принять значение не
+# умеет: всё после первого '=' отбрасывается при чтении.
+#
+# ТОЛЬКО ЧТЕНИЕ: ни одной правки на хосте, ни одного перезапуска, env не
+# трогается. Торговые параметры не меняются.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: env-v-pamjati
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  ENV_DIR: /etc/bloom-executor
+  OUT: data/env_imena_v_pamjati.txt
+
+jobs:
+  sverka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка разбора ДО всякого ssh"
+        run: |
+          set -e
+          set -o pipefail
+          python3 deploy/checks/env_imena_sverka.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Имена окружения живых процессов и файла (только имена)"
+        run: |
+          set -e
+          set -o pipefail
+          : > "$OUT"
+          echo "=== NL-хост, имена окружения живых процессов, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
+          for SVC in bloom-detector bloom-seller; do
+            echo "--- $SVC ---" | tee -a "$OUT"
+            # ИМЯ СЛУЖБЫ -- ЛИТЕРАЛ ИЗ ЭТОГО ЦИКЛА, А НЕ ВХОД ПРОГОНА: входов у
+            # этого прогона нет вовсе, и подставлять в команду root нечего.
+            ssh -n $SSH_OPTS root@"$HOST" "
+              set -e
+              PID=\$(systemctl show -p MainPID --value $SVC 2>/dev/null || echo 0)
+              echo \"sluzhba $SVC pid=\$PID\"
+              echo \"zapushchena: \$(systemctl show -p ActiveEnterTimestamp --value $SVC 2>/dev/null)\"
+              if [ \"\$PID\" != \"0\" ] && [ -r /proc/\$PID/environ ]; then
+                tr '\0' '\n' < /proc/\$PID/environ \
+                  | grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' | tr -d = | sort -u \
+                  > /tmp/imena_pamjat_$SVC.txt
+                echo \"imjon v pamjati: \$(wc -l < /tmp/imena_pamjat_$SVC.txt)\"
+                cat /tmp/imena_pamjat_$SVC.txt
+              else
+                echo 'OTKAZ: /proc/PID/environ ne prochitan'
+              fi" | tee "/tmp/pamjat_$SVC.txt" | tee -a "$OUT"
+          done
+          echo "--- imena v fajle okruzhenija ---" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' $ENV_DIR/env | tr -d = | sort -u" \
+            > /tmp/imena_fajl.txt
+          wc -l < /tmp/imena_fajl.txt | sed 's/^/imjon v fajle: /' | tee -a "$OUT"
+          cat /tmp/imena_fajl.txt | tee -a "$OUT"
+          # КОПИЯ ДО ДЕПЛОЯ 10:43Z -- САМАЯ СВЕЖАЯ ИЗ ТЕХ, ЧТО СТАРШЕ ЕГО.
+          # Берётся по времени файла, а не по имени: имена копий включают метку,
+          # но доверять разбору имени нельзя, когда вопрос денежный.
+          echo "--- imena v kopii do deploja (env.bak.* starshe 10:43Z) ---" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "
+            K=\$(find $ENV_DIR -maxdepth 1 -name 'env.bak.*' ! -newermt '2026-10-04 10:43:00 UTC' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+            if [ -n \"\$K\" ]; then
+              echo \"kopija: \$K\"
+              grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' \"\$K\" | tr -d = | sort -u
+            else
+              echo 'kopii starshe 10:43Z net'
+            fi" > /tmp/imena_kopija_syroe.txt
+          cat /tmp/imena_kopija_syroe.txt | tee -a "$OUT"
+          grep -vE '^(kopija:|kopii )' /tmp/imena_kopija_syroe.txt > /tmp/imena_kopija.txt || true
+          for SVC in bloom-detector bloom-seller; do
+            echo "--- SVERKA: $SVC pamjat protiv fajla protiv kopii ---" | tee -a "$OUT"
+            grep -E '^[A-Za-z_][A-Za-z0-9_]*$' "/tmp/pamjat_$SVC.txt" > "/tmp/ch_$SVC.txt" || true
+            python3 deploy/checks/env_imena_sverka.py \
+              "/tmp/ch_$SVC.txt" /tmp/imena_fajl.txt /tmp/imena_kopija.txt \
+              | tee -a "$OUT" || echo "(priznak: najdeno imja, zhivshee tolko v pamjati)" | tee -a "$OUT"
+          done
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "NL-host: imena okruzhenija zhivogo processa [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
