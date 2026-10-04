@@ -151,7 +151,20 @@ jobs:
           # должен лежать и он.
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/deploy/checks/pravka_grupp.py" < deploy/checks/pravka_grupp.py
           ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim/data/konveyer"
-          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/konveyer/$(date -u +%Y-%m-%d).json" < "data/konveyer/$(date -u +%Y-%m-%d).json" 2>/dev/null || echo "живого файла Code-2 за сегодня в ветке нет -- самопроверка скажет это сама"
+          # ОБРАЗЕЦ CODE-2 -- ПО ИМЕНИ ИЗ МОДУЛЯ, А НЕ ПО СЕГОДНЯШНЕЙ ДАТЕ.
+          # Здесь копировался файл за ТЕКУЩИЕ сутки, а самопроверке нужен
+          # НАЗВАННЫЙ ОБРАЗЕЦ: в модуле стоит FAJL_ZHIVOJ = "2026-10-03.json",
+          # и к нему привязаны замеренные числа ZHDEM_ZHIVOGO (48 рядов,
+          # добавить 1, 47 не того раздела). 03.10 дата и образец совпадали,
+          # поэтому прогон был зелёным; с 04.10 он не мог пройти НИКОГДА --
+          # 10 проверок из 111 молча пропускались ("проверок 101, ждали 111").
+          # Имя берётся ИЗ МОДУЛЯ, чтобы третья копия даты здесь не завелась
+          # снова: поменяет Code-3 образец -- прогон поедет за ним сам.
+          OBRAZEC=$(python3 -c "import re,pathlib; m=re.search(r'^FAJL_ZHIVOJ\s*=\s*\"([^\"]+)\"', pathlib.Path('analysis/c3_konveyer_primenitel.py').read_text(encoding='utf-8'), re.M); print(m.group(1) if m else '')")
+          [ -n "$OBRAZEC" ] || { echo "ОТКАЗ: имени образца Code-2 (FAJL_ZHIVOJ) из модуля не добыто"; exit 1; }
+          [ -s "data/konveyer/$OBRAZEC" ] || { echo "ОТКАЗ: образца data/konveyer/$OBRAZEC нет в ветке -- самопроверка без него не полная"; exit 1; }
+          echo "образец Code-2 для самопроверки: $OBRAZEC"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/konveyer/$OBRAZEC" < "data/konveyer/$OBRAZEC"
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_2026-09-25_USTAREL_2809.json" < data/sources_2026-09-25_USTAREL_2809.json
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_live.json" < data/sources_live.json
           mkdir -p data/konveyer
