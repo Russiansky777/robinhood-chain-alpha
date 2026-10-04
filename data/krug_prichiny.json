@@ -1,29 +1,4409 @@
 {
  "журнал": "/home/bot/bloom_executor_live_data/decisions.jsonl",
  "задача": "все",
- "с": "2026-10-04T10:40:00Z",
- "решений": 32020,
- "первое": "2026-10-04T10:40:00Z",
- "последнее": "2026-10-04T12:29:15Z",
+ "с": "2026-10-04T06:00:00Z",
+ "решений": 52020,
+ "первое": "2026-10-04T06:00:28Z",
+ "последнее": "2026-10-04T12:37:14Z",
  "по_коду": {
-  "NOT_A_BUY": 31306,
-  "БЕЗ_КОДА": 489,
-  "TOKEN_RECEIVED_NOT_BOUGHT": 144,
-  "TARGET_AMOUNT_OUT_OF_RANGE": 54,
+  "NOT_A_BUY": 50345,
+  "БЕЗ_КОДА": 817,
+  "TOKEN_RECEIVED_NOT_BOUGHT": 527,
+  "TARGET_AMOUNT_OUT_OF_RANGE": 215,
+  "INSUFFICIENT_BALANCE": 57,
+  "SKIP_TARGET_INCREASE_POSITION": 42,
   "STALE": 13,
-  "INSUFFICIENT_BALANCE": 9,
-  "SKIP_TARGET_INCREASE_POSITION": 4,
-  "THRESHOLD_EDGE": 1
+  "THRESHOLD_EDGE": 4
  },
  "по_виду": {
-  "other": 31243,
-  "без_вида": 489,
-  "received": 144,
-  "sell": 76,
-  "buy": 68
+  "other": 49704,
+  "без_вида": 817,
+  "sell": 654,
+  "received": 527,
+  "buy": 318
  },
- "покупок_источников": 68,
+ "покупок_источников": 318,
  "покупки": [
+  {
+   "ts_utc": "2026-10-04T06:00:56Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "96TSNfnrpvpGxrjfmaMfZ1Tpvr85x6pYkGcrVCt4qQci",
+   "подпись": "4jU6PefvU9sXqWVNEhjHr2fsZPKdx8V9nxNpdn6kFwvAW4Gz3oB83rXzmmZ9MrxnHdVihUvePgnZPf8Jgsc1SJ4o",
+   "трата_sol_экв": 1.3893703419999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "EhTPL8JWZUuZZ8bYWPJmf73XgFwdQgskeS9VZsuwjxzV",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.389 SOL-эквивалента меньше targetMinAmountUI=2.0 (69.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:03:07Z",
+   "источник": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+   "минт": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
+   "подпись": "3ZYTdwepyHtcVA6p9ywiTYFzwSF2h2UpxDg3peEiekcTagEmk1izLkS54471QveAxUUj926MEzCw3FPDdJ25AVjB",
+   "трата_sol_экв": 62.23836607142863,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "4R8CiMnJWDNoes3fQi1ccPFJygPXazaHaWpHrN3rZeNj",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 15346 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:03:28Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "H9kqUVeFEfo5oihWSknpuaKxyiCof4sca8uVTC4vpump",
+   "подпись": "3Z2TpV9PMS89whMvS16DDJDWovbzR32gqMAQod46Pm8nud555RertVa8dxjAWAimD8j5kvGLZWd6qejkyZzrcgsK",
+   "трата_sol_экв": 1.02719821,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.027 SOL-эквивалента меньше targetMinAmountUI=2.0 (51.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:04:04Z",
+   "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+   "минт": "8dBnKHwNYH3hz2fFTJczVwzBTpJFAMtc53k3uA4zpump",
+   "подпись": "4GWeVL2Re5tRup1ogNg1Mf7aXciGtS7a3zBv7b33JzaMvrnreoEwbHW4tF2eHsYeX1NpuWZPRA1RtoAvGzxC27F8",
+   "трата_sol_экв": 8.27828008162527,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Meteora DLMM",
+    "Raydium CLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp, EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 1977 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:04:21Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "3ZtY5iuH7BottzL249JoiQYqdSE9mFLikFYieNAHpump",
+   "подпись": "67JTJeNowoVMfPvcHUzkRF8ZmZSZn8tWViAQHGA5bfS31SHFoXbCm3PJy64yezfgLCxPx1A55p9YohrtndcqVWvw",
+   "трата_sol_экв": 1.3535025239999998,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.354 SOL-эквивалента меньше targetMinAmountUI=2.0 (67.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:05:28Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "49J6Qk4jVJt6vEisEqPGqDF1hcnehi2HUqDMWWYfaV74",
+   "подпись": "3S7wq2ox77rnkSbkJVaz9mP6B2FjTeuD7vvjc5Rn6svR68Y3tWUn9ddnFG546KvSEuGmiJKGXEVtZYmF8coutD1d",
+   "трата_sol_экв": 1.172763974,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.173 SOL-эквивалента меньше targetMinAmountUI=2.0 (58.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:08:14Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "Dhc2ymaZCJipYLuUHKSAAJsaLJUdxt5Bho5N1rNFpump",
+   "подпись": "3XNLSdsBCrA26oPbCREV8vxjUcTRVTr5uw8rzDwyPg6aNVxbC4ipYEArswcBBVTTxrMqsBBs48dtQY9niqTxPBqV",
+   "трата_sol_экв": 4.132924531,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CmMJXtan3jjbESBWgrBBDPqgi3kLEme3ZrbjTjySuTNe",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:08:15Z",
+   "источник": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+   "минт": "BXoHJddsWJLHtAopeiSbKUSELsu8hSFMs8baGMDkpump",
+   "подпись": "5Y3VoRR2kNFCGZb6jHfLRcMNruwZUnsT6QPXQ7xjf4HcHhNJqARDm9uiSGo5pjh9ZneEXrbx9JizGqZQeYtFSSor",
+   "трата_sol_экв": 2.0938852179743104,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (3) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 95803 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:08:15Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "Dhc2ymaZCJipYLuUHKSAAJsaLJUdxt5Bho5N1rNFpump",
+   "подпись": "2qJWtQGwDNB6tMyAdymnCvJLQuULzgnBgx5LTm54vMPhctrarCvP8UqKUbPZKk4mAuM6Qkv5PNHx8xWMQ8enKtDj",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CmMJXtan3jjbESBWgrBBDPqgi3kLEme3ZrbjTjySuTNe",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:08:44Z",
+   "источник": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+   "минт": "BXoHJddsWJLHtAopeiSbKUSELsu8hSFMs8baGMDkpump",
+   "подпись": "4KfvfipJGChuZgzEbJDRqF8rxHw5YMZzTfjMrwU4MaK6YCado51kmE7YNh3q9rPQfsreKGDxPPQQyNErg3JEnMSR",
+   "трата_sol_экв": 27.4559807887402,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": "4s2bzyM1CStvWCUC1r1q8Maoj6UmkqnBqnwBEFtDtpko",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 108 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:08:51Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "DtJ3k3spEtqWiyqjYNQjp2A1Xio8s1L3pbr7jNLLVvkx",
+   "подпись": "4FGPTfkrgyyraoJ547gBDB7yNtaq4Du24sj736JKAfw2SnuSgTikShAxYWZf4QafufkwgpagXW5fZcNRHqqCcXCm",
+   "трата_sol_экв": 1.0872177159999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.087 SOL-эквивалента меньше targetMinAmountUI=2.0 (54.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:08:59Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "Dhc2ymaZCJipYLuUHKSAAJsaLJUdxt5Bho5N1rNFpump",
+   "подпись": "655iBWC63ivVd66hPBmHESfGdbM8ZYm16Bk5xZMVpSZ8pTiz6y8yoQc1pHBGmTmmhfy3WLv3rrwJUoKNY6sNNHvv",
+   "трата_sol_экв": 0.041409591,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CmMJXtan3jjbESBWgrBBDPqgi3kLEme3ZrbjTjySuTNe",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.041 SOL-эквивалента меньше targetMinAmountUI=2.0 (2.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:08:59Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "Dhc2ymaZCJipYLuUHKSAAJsaLJUdxt5Bho5N1rNFpump",
+   "подпись": "3bBEffAPaZGxJuxo2cXyErV4N5ooVHGGUZ69vEjgbMM62sFNqAu56sut2BCgLXmxdUpCALDxFk8VCwKSoY1d62vY",
+   "трата_sol_экв": 0.041409591,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CmMJXtan3jjbESBWgrBBDPqgi3kLEme3ZrbjTjySuTNe",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.041 SOL-эквивалента меньше targetMinAmountUI=2.0 (2.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:09:00Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "Dhc2ymaZCJipYLuUHKSAAJsaLJUdxt5Bho5N1rNFpump",
+   "подпись": "2NUnjh3EiZCuyvrnKihgoowdpE7gs1sS5kPboDRbAQbkd7r2Waq59cPDyM6MUCdzu1vZ4XxsWgZiHLhdn2JorEQT",
+   "трата_sol_экв": 0.082809182,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CmMJXtan3jjbESBWgrBBDPqgi3kLEme3ZrbjTjySuTNe",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:09:00Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "Dhc2ymaZCJipYLuUHKSAAJsaLJUdxt5Bho5N1rNFpump",
+   "подпись": "4b7SH4dFyH1Xj8Fzv23JyL2P5RNxG1WFdANGsxJvXf8PgQxaLNvA7zzmRZSKtRcW5hfTuSu8FjLgDWBUmWWGuNWB",
+   "трата_sol_экв": 0.082809182,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CmMJXtan3jjbESBWgrBBDPqgi3kLEme3ZrbjTjySuTNe",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:09:32Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "BaJqtEAVs3N8R8L8GGNxpQtqv8qD7DX9Q28Z7QgdZ8Xv",
+   "подпись": "dbor8pSjR2bCQUFirgVPaQA8XcMnKv8jPonvhoR2Y8YH8vT8ovgG9osW1Zuo23dVNsJ18aZ56c3q7EwjTCEcuh1",
+   "трата_sol_экв": 4.132924531,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "HoPzvXEDuck9tZeYj1g8LDed6SQ2cogStu2kMt92mSZV",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:09:33Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "BaJqtEAVs3N8R8L8GGNxpQtqv8qD7DX9Q28Z7QgdZ8Xv",
+   "подпись": "5McjfwvWyA5GLh7nPZLbuN5ADfTjZx6EJWMTR5BfegUbtSKzPdq919ouABJ23GivuKSLispT2VjVRvyL6t2fGQ1s",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "HoPzvXEDuck9tZeYj1g8LDed6SQ2cogStu2kMt92mSZV",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:09:37Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "ESs5mvYziVLiFXSbNw76E6Ca2GSmkMf78UnF4MBmpump",
+   "подпись": "3PRKPi5LBqUkfMUym2a2KFtnWgAHkoWJ6CLcegJ7MP159ymJrTqrwnJ3gF6eCYPsiVPKgbQ6gABZWM3d1tcJrSvr",
+   "трата_sol_экв": 1.103368067,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.103 SOL-эквивалента меньше targetMinAmountUI=2.0 (55.2 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:09:37Z",
+   "источник": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+   "минт": "BXoHJddsWJLHtAopeiSbKUSELsu8hSFMs8baGMDkpump",
+   "подпись": "3NRm82W6GC1wKEhF8zFkTrJs6dGc1jKwArGqrDvYhJvPWjPofcKswpbcVH6KVQ5v6Jf2qeELDv6iNVCBYXZrMKB6",
+   "трата_sol_экв": 11.259324301373816,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (3) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 206 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:10:17Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "BaJqtEAVs3N8R8L8GGNxpQtqv8qD7DX9Q28Z7QgdZ8Xv",
+   "подпись": "3HBbv3DEMLEeM8pMgjj2sRqp9jc9T2h5Bvt4VLaKr1wdJsmk4ujzUhafgnhe6aPN2aGEeGUhnTKMkdpa8t6y9151",
+   "трата_sol_экв": 0.082809182,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "HoPzvXEDuck9tZeYj1g8LDed6SQ2cogStu2kMt92mSZV",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:10:17Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "BaJqtEAVs3N8R8L8GGNxpQtqv8qD7DX9Q28Z7QgdZ8Xv",
+   "подпись": "3tzqrEVfxvgVDJ8oG5WYqZQsogfrxjN1SVtKJYMNNatEnRU1xhVCaXG5pfzDS3k4JZetiuECThKS1TThYe2Z8mBX",
+   "трата_sol_экв": 0.082809182,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "HoPzvXEDuck9tZeYj1g8LDed6SQ2cogStu2kMt92mSZV",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:10:46Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "kHxS2YaGvZTko5qYx6DL1YmeYPtjBaDZ3UG7GE7BgEC",
+   "подпись": "2uAgtvx5vXk6RyyXgLkaM5ivkfME7onRELz8TdcG7UVqiGPQxh9SndGYkchq7FLS8dQ2kM6svkdpi3b35FdBcr5g",
+   "трата_sol_экв": 1.491840025,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "6i7SBAW71T6KfpfhsfaZxratv9rCiTTw3Jcd3wAZC8RP",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.492 SOL-эквивалента меньше targetMinAmountUI=2.0 (74.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:14:48Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "AYLavJzDYKaif3gKVa56u2V7iQpMg8kkQRagLJ4bAote",
+   "подпись": "mZHhiqxTyHgYun8UNXCkcaSSMggfnBaTZ5b5BbeGdBS9RxcADTFyyoZ1uwZ7FuodaCcqc9kDbMUcKNdSsH77qcG",
+   "трата_sol_экв": 4.959507437999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "HbELYUXGzgQvcbKCBRdhpGejUWkBLrabLeimh7dQ4Ruj",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:14:48Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "AYLavJzDYKaif3gKVa56u2V7iQpMg8kkQRagLJ4bAote",
+   "подпись": "2WkJPUPHTt3cTNVEwoMjZunzve2yJJGPAc53wGjrytYupa1Xbs6vvDarYSthdXnxoeYhYezb6J8v2DbkMpR6hTPJ",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "HbELYUXGzgQvcbKCBRdhpGejUWkBLrabLeimh7dQ4Ruj",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:17:30Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "4SzWdVbXC7JiAtY5rH5MGc8HJPFAv6sSG97QEsjSpump",
+   "подпись": "5BzgedJJUnu6EYEx4L1q22RDAcXRphb6RAQQkJHjRN3QuYsTftAvv1bLrK1xuXsPMdMqict5tZsgvXQfrUnQjBvx",
+   "трата_sol_экв": 1.6320599539999998,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "5Sp2E7NFbLpkRtMUgo3BfXQGuHLGXrXdh8CXRtt3zCF5",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.632 SOL-эквивалента меньше targetMinAmountUI=2.0 (81.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:18:45Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "CgpsZZNc2JgUTqYxJ3btK8Gq9d4182U1NBbKE6CCCmAH",
+   "подпись": "4eSSXRWB3T9MCvt1f7yKD8xQz5c4qoxxejRXVSrjBfsA5VJN3ymTKJbhHoZR4fuo44HeqyiqVUa5ZWJ92V9ojLiT",
+   "трата_sol_экв": 1.6531758129999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.653 SOL-эквивалента меньше targetMinAmountUI=2.0 (82.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:20:46Z",
+   "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+   "минт": "8dBnKHwNYH3hz2fFTJczVwzBTpJFAMtc53k3uA4zpump",
+   "подпись": "5vV5tfCBVWUCE1wGc8XkbHyfs4tdg3us5wcFpxHhx3EwnSFaozgHKJRcUEKz8PkxG3ffWnPSo5JTbru4yhN3adGg",
+   "трата_sol_экв": 4.144522291835975,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Meteora DLMM",
+    "Raydium CLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp, EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 3770 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:20:55Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "GPvjzJ91XoX4jTv3seyouTvZzq9YXSXjrrp6AJZLpump",
+   "подпись": "675QYhLHDH6DdHJbiouLkkzSAaxfFcNNBDRXEiPHro1DzDEPzdf64bUA2C1UVzkiJyoVFMMuuSUf2XmW3LxFMWbT",
+   "трата_sol_экв": 1.4115612839999998,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "BN38hP1Bm1wZhRREixMYxSiyjaUmSWP6CGgoGHtBZXyk",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.412 SOL-эквивалента меньше targetMinAmountUI=2.0 (70.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:23:19Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "CgpsZZNc2JgUTqYxJ3btK8Gq9d4182U1NBbKE6CCCmAH",
+   "подпись": "63AXnYHWPqb7rx6Pbom53edBpUXq3MqjBktou9GASxX6uif6CD1GGA42Z1ZT6aCAyjMZGqoEJfWr41aNYhP5C8bR",
+   "трата_sol_экв": 1.082689839,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (54.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:23:56Z",
+   "источник": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
+   "минт": "3ZtY5iuH7BottzL249JoiQYqdSE9mFLikFYieNAHpump",
+   "подпись": "4VP7CbmZhbGNxAvTRjuKsJAoBeoSVC7Cz8NDpALkKBubh3ThS5FTEPgbUvT6V6aWSudeFwBYnk59eUSauFzZ75Bk",
+   "трата_sol_экв": 18.398226577862914,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "3Czf9zzuDHbYkziB7Wh65HG2Vg27nK7FZTdYpTGRdN2K",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T06:23:57Z",
+   "источник": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "минт": "3ZtY5iuH7BottzL249JoiQYqdSE9mFLikFYieNAHpump",
+   "подпись": "3rLQXwGx3M9uhoyTtLCadJBCVNyy8irMexhFXRkycPcWTDSQP4wWCT7Z3qxGZG4FPW5317JxHc3J68W7rKSrGN1A",
+   "трата_sol_экв": 5.1,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Jupiter v6",
+    "Pump AMM"
+   ],
+   "наш_пул": "3Czf9zzuDHbYkziB7Wh65HG2Vg27nK7FZTdYpTGRdN2K",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 2
+  },
+  {
+   "ts_utc": "2026-10-04T06:23:57Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "3ZtY5iuH7BottzL249JoiQYqdSE9mFLikFYieNAHpump",
+   "подпись": "3G5u5vJLajLGd2TJ7NsRFx5S8dfX4HDd1X87EL5TNZ1hrEiDAZRf4vPrZSSkpVuimgPbcbEhpuj5iyc2d6zBbz6M",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "3Czf9zzuDHbYkziB7Wh65HG2Vg27nK7FZTdYpTGRdN2K",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:24:35Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+   "подпись": "2QFXUTkuJk8trD5RsUNUk4RbspUGUeWeohmzRBJWJnwzSaQ2EdnJSY9k4svZvC4Q6jYFR2NfcJmBFFLfeDnkhmB9",
+   "трата_sol_экв": 0.41876673101937645,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Raydium CLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.419 SOL-эквивалента меньше targetMinAmountUI=2.0 (20.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:26:43Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7U62Lm4CKa25eRdBdYv3QeTJjJirxTVGJpA3ePkkpump",
+   "подпись": "45QGBBaH9QZnJyVvHG3WWiQJaJesJZkuihBJF3392pzt3WDG4soAZ88E7HKW6ibn3TKhRQEstXomb4g6CK2XJKiG",
+   "трата_sol_экв": 1.0502174629999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "AeUutgE2m57qTzSxk7cEagUx377TSwakLAjrouVXH7Pe",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.050 SOL-эквивалента меньше targetMinAmountUI=2.0 (52.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:27:01Z",
+   "источник": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+   "минт": "3ZtY5iuH7BottzL249JoiQYqdSE9mFLikFYieNAHpump",
+   "подпись": "3uU6T5wwQVGgePw4R8LR7AoKxdyCEuajvLnbGo89gkTxmMZQL2MtN8tuNCFUwGHyjUYdQR92Ui5BhyGFb1F3yx8U",
+   "трата_sol_экв": 0.752890227,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "3Czf9zzuDHbYkziB7Wh65HG2Vg27nK7FZTdYpTGRdN2K",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.753 SOL-эквивалента меньше targetMinAmountUI=2.0 (37.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:27:01Z",
+   "источник": "FLyBjfWGsxH4zDDfoUJHwA9774TmPVpR8kB5B46PtbaZ",
+   "минт": "3ZtY5iuH7BottzL249JoiQYqdSE9mFLikFYieNAHpump",
+   "подпись": "27ibkLpmtdWdkRe1ZSoTChTvDzoUDeGwY8yG7EzoZDvtX1qwei2QgGN3kJuFxoxvroYBa7mtWbxqnDV99DZLSnRp",
+   "трата_sol_экв": 0.881847908,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "3Czf9zzuDHbYkziB7Wh65HG2Vg27nK7FZTdYpTGRdN2K",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.882 SOL-эквивалента меньше targetMinAmountUI=2.0 (44.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:28:14Z",
+   "источник": "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT",
+   "минт": "HGZyP14SR25TYxeveH5Rcx82TGggSXeHqMHzQL99kK4f",
+   "подпись": "XqpjQuc9fbfj3wxjHUYkQ7bLJStNQRsY7967jpV2dH3kKMJcwm9khEfawiVd3STJkANDRU359YBpjKotzUZP1Nr",
+   "трата_sol_экв": 1.256137885,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.256 SOL-эквивалента меньше targetMinAmountUI=2.0 (62.8 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:28:57Z",
+   "источник": "2net6etAtTe3Rbq2gKECmQwnzcKVXRaLcHy2Zy1iCiWz",
+   "минт": "9HanAd4JAvUrSRQqEJU1yK8hcFFRkx52SuokdbJKCumh",
+   "подпись": "jhPNTaFB22xd7NMZ8AFfyvxtvcrbnpVJ1M2jbywpMCc9sF2FTwQwRU1U79fSYNbCw7MWG21BoKZ34woorQFCahb",
+   "трата_sol_экв": 3.012,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:31:24Z",
+   "источник": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
+   "минт": "4mkNDiEALDutn8Py1GmJnvVuTdHVuL9y6AmcL9KTZx7F",
+   "подпись": "2st3tdG5KC1fjMEKh8wCgye2eUSxt32FChTLVBQpAMp4m7UToHd9Ri71i9U8WaL5d3dHm7zNHHgUXvLvP2DZrFje",
+   "трата_sol_экв": 8.281806835826021,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:31:24Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "4mkNDiEALDutn8Py1GmJnvVuTdHVuL9y6AmcL9KTZx7F",
+   "подпись": "5g7TjSkpnXmZux3ZX5thbK323kKoYnkmPjBYaxqCRZ2ghZrj8XSChfzHGer8y1a1Nzxn7ZHGGGW4WQ5CDGo8pxmH",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "Bus8tCJ2b72NzCJrVe5odw8eCCG6VFm3S1Pk4R8RzfvJ",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:31:25Z",
+   "источник": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
+   "минт": "4mkNDiEALDutn8Py1GmJnvVuTdHVuL9y6AmcL9KTZx7F",
+   "подпись": "5AZRaKmLzMeCCWiqcS6MuNghCyvVXE551xALXiPSyqPHQJZzFUswqp3w59UsMjyiNBLmA7Ftmm1q9VzSv45mZ4AR",
+   "трата_sol_экв": 2.025000001,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "Bus8tCJ2b72NzCJrVe5odw8eCCG6VFm3S1Pk4R8RzfvJ",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 177617 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:31:34Z",
+   "источник": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+   "минт": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
+   "подпись": "2cHK9uthrXMrMb5KJ4V1huDaR5DkjtRMAYLJbsxtwDUHPXZhY2iT6xw9scJhjBNSWCVPPuGjbkj2jxwukws8YYmh",
+   "трата_sol_экв": 78.3782330480718,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Meteora DLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 6415 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:31:47Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "88oNFQZTqo7yBxu4HT22uiuaEErbgJxA8iKpT7SmF5Ek",
+   "подпись": "3qzYvmTTQmu5efHPBG6aiZCMyHxZ5cELyZ3QApNzBusmEMQAPw3wdRrxzfZiFZ9ERz69o56rWQfFeE6h39QSLD7L",
+   "трата_sol_экв": 1.1781704429999997,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "98teaiicd6YiTVWaLHTyriW7GYqJoxw4342QJkFfveWF",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.178 SOL-эквивалента меньше targetMinAmountUI=2.0 (58.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:33:21Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "5nQimH8wNuEkwL94DY7QjHJQC6n1ukU2EavhZ63opump",
+   "подпись": "2yZ9h7P5bNcSPGeHxTjqT9vCTEboYNM2nCtPdsG7P971ZCe69kiX1LZydR9U28ebpmtSZpwrgb716ef22EDA7Zk7",
+   "трата_sol_экв": 0.8589515480000001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.859 SOL-эквивалента меньше targetMinAmountUI=2.0 (42.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:34:06Z",
+   "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+   "минт": "DVska6Y1PohdNJD2Gt6DwQD1EypfEvcmrFfdttCiRkbf",
+   "подпись": "hNYhB24zwHWwWhk2UJgSHsZvvD3okgtSwjbrUvaQzi2b6yZ38WRYJA4AsAHzGf9mUKRJVetE8ivDRMiZCNbQqSD",
+   "трата_sol_экв": 12.422146965102726,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": "ARu4n5mFdZogZAravu7CcizaojWnS6oqka37gdLT5SZn",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:34:46Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "6ALx8vSoNyqdhE8gmVn1mk9LwfZfqkh68ps27zuk9tTz",
+   "подпись": "3ub3evoNEvhDDEahh16uJBz1x2BNBzPdYhqLVD9a6QVwqyb78fhG4ghyZcM8Yf2vTGmXW2oyXxBuXZQqpUWF85cj",
+   "трата_sol_экв": 1.426938504,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM",
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.427 SOL-эквивалента меньше targetMinAmountUI=2.0 (71.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:35:26Z",
+   "источник": "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "2HyJbFkjui6VBcyFh2sknR6QwmjrxNNsxpeXPr2ryKHZLnnQJCZJXyVYXqT4sEEXRKfwEw9ZJDxRPEY9J2EqaMPo",
+   "трата_sol_экв": 3.2359001220000003,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:35:51Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "7kd5QBAFWG5ptic67t6msM2LXVbaxNHr3sjsQNyFNhfH",
+   "подпись": "3JHqwAU7UurT7i5kBUHRgC2rgc6K6ACAFxANfcfgy891TjR6hqiDPmfvWUTbkryhMNzDuQ3pnAEkptsWzfudNWNq",
+   "трата_sol_экв": 3.306341625,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:35:51Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "7kd5QBAFWG5ptic67t6msM2LXVbaxNHr3sjsQNyFNhfH",
+   "подпись": "4ahkzPjgYSBS4J2kZtx1do3v5xFvaM9PxKC7UPnCNeUcXGYfCaHFTWV21YHMvZVtk5J2nBYWvxFRqEWXTYtfYeP8",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:36:35Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "5nQimH8wNuEkwL94DY7QjHJQC6n1ukU2EavhZ63opump",
+   "подпись": "2b7wmfNGCFZGtrLwJxjMevCRcr3gZqGhKeQfKG4YXfrw6pyKRdTJw2CLMsaH9isaZdJ9gznfPgRM2VrvKNAZ8Lwc",
+   "трата_sol_экв": 1.137087333,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.137 SOL-эквивалента меньше targetMinAmountUI=2.0 (56.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:37:33Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "4dNocYw7PvMtF7aicwvro1con6BmKa1iHGg9TPi3cGm7rgDow98Ck7gZEzgdzUXgv6Gp15y25cqEY1rtnhdLPyaD",
+   "трата_sol_экв": 3.306341625,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:37:33Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "5mMB4v1eVj94gJ1ooaXpeSLGAw5NR19rBe6nQ5oowwmKEfD6WtxbPuYPG17CAgHDXNdTeDmpr65R8gHqFqF2YqWD",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:37:47Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "3stQ1BBJewYGGg3wrSaqvFV9MdvpNnc23Wx5h7TAcNtqQmCrrbxyEVT6EcPohn5Eb6szeo7JcUpwNZrVYDc6bcEf",
+   "трата_sol_экв": 0.082668291,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:37:48Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "2RDjTJDeDCLNZLH3KAwzepvpyUJ9MKQHVp7BuuhTzHsXyKMSZXEKmkar9efB5Er7bhY1o5UC5o9EyNiYLGDUg4zn",
+   "трата_sol_экв": 0.082668291,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:38:02Z",
+   "источник": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+   "минт": "4mkNDiEALDutn8Py1GmJnvVuTdHVuL9y6AmcL9KTZx7F",
+   "подпись": "uZvDkWNpLVqwpb5fhr6KYtu6MvEnT49xtAavYH9s92LTPgaeTo2WoBvfvvnXEn2UfNDZ3fL6baVno6yEeaer1S7",
+   "трата_sol_экв": 6.225357949782113,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:38:46Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "HK5h6JvgFb6S1g5gsFbtzqsJNyDQQa2CSa2S2cZghAKC",
+   "подпись": "3Uzdma6BFw2HdXbtEhkm5TEdRSSBrQuXXpmAsuyvURkCA9AjXxxZJHAeFMoVhvRAM6v71EH9oX7yi7cS7ERAXs39",
+   "трата_sol_экв": 1.6098689039999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.610 SOL-эквивалента меньше targetMinAmountUI=2.0 (80.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:39:19Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "Kzizy4fWUNE7j3wmkJGcJ47k3NyzCRcKMqrgUx2shGBYAT8jtfLG5dVeMgd3EsKnM2FgyEv9xDK9P8TEyFj9eyB",
+   "трата_sol_экв": 0.082668291,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:39:19Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "nooGQ1ncw7Y2FFRjmvesC8YmBrWMMYrnYtCMbfm3wFNRuJv4eShw1kVb3SUbB42DTnS6nmyRMidXBvEKS5zgtBp",
+   "трата_sol_экв": 0.082668291,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:39:19Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "Xa5M9YewEid2Yqth5PwyN5QTqLq54TpAKjWty4BuLNQKax33DnjtayVPDTGaEouo27RSaPtdEnZDKup5WRvuRcA",
+   "трата_sol_экв": 0.041339145,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.041 SOL-эквивалента меньше targetMinAmountUI=2.0 (2.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:39:20Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM",
+   "подпись": "vj98nycMTeYhFVuMF6jQYuAWQd4VXThE1WsRCHv6biGSHSD2kzyUKwvCNaNS8LQhMmgKYmhTA6fUd2Rjb7HsU69",
+   "трата_sol_экв": 0.041339145,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.041 SOL-эквивалента меньше targetMinAmountUI=2.0 (2.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:39:47Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "подпись": "4MVo8ekkstc5418E1PaFEgkVn4axoRgK29e6RpCrenPRZdJGiRypKR7wFDtgKjRTanQNJdh3YK3RNXukFW95LDuL",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun",
+    "Meteora DLMM"
+   ],
+   "наш_пул": "Ekm4LYkihEdQgZx2UReDMJ3eCDDjExPQLG94WfWmfyWr",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:40:24Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "4Z27KbzjrQo1W5T3TXvo2J8ubMx1bBc248526FfqPDpk",
+   "подпись": "2rKFk53SxKEPAab9eEAheWxK98A8XovRGNhRp4vkp4qhXP4jYYwQjPNo2WEpJZpWAsA3HQs6V1fYNK5uL34D8v9C",
+   "трата_sol_экв": 1.63703355,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "A7WWuBHnFtWTcTh7JNAozKDDMHz78RGCXJ754GuHqwfx",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.637 SOL-эквивалента меньше targetMinAmountUI=2.0 (81.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:40:47Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "4GxL7vcdxZFiS26VZ76AXRRgduov2QSBS4bAzzosegRHyMMiPtCbvqoaLtd5rKteYeYeRupBY5a8PpBkZbzph2M5",
+   "трата_sol_экв": 4.959507437999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:40:47Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "4MqAhXpHc5GdNQihsFTVWeYZVRpfw2jm5skpWfwbAe8BVsfKWzr49HvbLhirDgT8LBgvmuLYLNrnEUJReWopNjsF",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:41:03Z",
+   "источник": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+   "минт": "V9BhQFQ2GHSfCxpjLco1CAnLbwxrzjoVuipeeDvnsYG",
+   "подпись": "24VyQK7YmbREgLDRcg5pNJiDVxppfaSL1XFxKrBvcnB1bCbzCfjipYmTVc2BDwKoGWPWEicEGxeDXDHrgttXcsoP",
+   "трата_sol_экв": 3.0173643,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:42:18Z",
+   "источник": "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "3QehYQd7jbiHK6g7NXnwdyaxZD6CUJfwMmU7oB5H7Qwxxs6MDHmG1n5yuJxZXvD8AzVPr9j2s6UctvqhmLoeJKmL",
+   "трата_sol_экв": 4.55142951348494,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:42:19Z",
+   "источник": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "3NWbooZpAV3Ae57EvPodDw9ARs9KCzYBLV3Z8XrZWbVtMeG1ooLjgDiZEqeRS8Giyvu1UEFMaEJYR5TEoSTeSyeD",
+   "трата_sol_экв": 4.625323237,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Jupiter v6",
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:43:57Z",
+   "источник": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+   "минт": "V9BhQFQ2GHSfCxpjLco1CAnLbwxrzjoVuipeeDvnsYG",
+   "подпись": "2fAR7QAdNHj3F59jLZXqSuVFEu11vHdhVzWpe4gi2nUjHwEsqaHpNAmkpNNcrLmU41mdZAaiDx2bVU19FjeqMbiy",
+   "трата_sol_экв": 3.0174,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 659 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:44:00Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "BLYhFQZR1Yc8aDiw96SsWRudLi6xh4JRKdMwhjjS4qNP",
+   "подпись": "53bSMTJYj69EHSmum5FgNuLwvmJxiroPpLZ4nf6js19qxJVKW4R5Qo1hUDxW1yUE8XZHenkP9TpzFAfMZQ7vTLoD",
+   "трата_sol_экв": 1.2604455369999998,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "AcEUdnj3RWvSiEA62NhSmBXZoChdU29qMd7qr9YTBknD",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.260 SOL-эквивалента меньше targetMinAmountUI=2.0 (63.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:50:14Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "BgNZw6VxzYoS6AHjhpv2S54wGUv5MWeANPkoU2KPTM1G",
+   "подпись": "44m5fwSnw5GE3oc8MixEdbvXE8Psjt5uWboG4EXwvqS4ctxsRtZqR9K1QPJJ3HGAkBRXLgrPq3rS5ciCvwRxrWJA",
+   "трата_sol_экв": 1.405177795,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.405 SOL-эквивалента меньше targetMinAmountUI=2.0 (70.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:53:14Z",
+   "источник": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
+   "минт": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
+   "подпись": "4nTtFHCtvx39y38pT2X8KgzLQu5rCuM1YFeuwXgzFjSQuR1mmNYmMZfx7ZEwNCLx24KQqCQbtcd3LSVUKkH11wHJ",
+   "трата_sol_экв": 91.94371431245878,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Jupiter v6",
+    "Meteora DLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:54:57Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "MmSrSKjcXMTxtUcz8yH9Gcpj8dohqaHvmTM8tkr6jGY",
+   "подпись": "54bsw6qJn7gttdBA3ueqJL2aregQmzYU7bqgNc9C9Gw2wqxEfqGV5VjV9yWJmRmaawXdNM3nj71xZNDGEJPyjQUc",
+   "трата_sol_экв": 1.7809779679999997,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "EUcW6TZ74P4kkTNVTbLG2sLvcaDDLruVdbDbdLeWs8Mu",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.781 SOL-эквивалента меньше targetMinAmountUI=2.0 (89.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:55:48Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "59AXmkn5rQ6WkRpkqNz8JzXKtcpESbuW2Mf8N76ifoY",
+   "подпись": "4aSsmd4dDfwXbuij7eWNfdLouR8JWVr2Rv3gDa3H2Ty4xtWh9v7Kgx3CiBNT9AGnnn1znZFwHPfVZBPvcYx5Lzmr",
+   "трата_sol_экв": 1.769880505,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Orca Whirlpool",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: pSo1f9nQXWgXibFtKf7NWYxb5enAM4qfP6UJSiXRQfL",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.770 SOL-эквивалента меньше targetMinAmountUI=2.0 (88.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:56:46Z",
+   "источник": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "4y8XwAwgxwjLfdBEMpktBoFHF4gWKF2oFmGkis1uuhrVNhJSTevvJU2VMAzGtcFPZUyMTKq4hfLDfiWN7CUGPeXC",
+   "трата_sol_экв": 5.0301,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 3261 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:58:14Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "DMR8s1f1zwqBeXrPSwM37ztM179LcnX5cH7SFJkppump",
+   "подпись": "3qdGoLvWdErQpVQySbbJ6xCEDHzhDCBz4Sv2jrjjY5uWB9iLbAcnHRmaYPNDe5Tgny9J3UwQ9Y3Gs5xQK643kebh",
+   "трата_sol_экв": 1.3102499989999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.310 SOL-эквивалента меньше targetMinAmountUI=2.0 (65.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:58:24Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "BgNZw6VxzYoS6AHjhpv2S54wGUv5MWeANPkoU2KPTM1G",
+   "подпись": "4mdt4ykPtQBHsFNseazownbEQvAjoLxhdTJ4zHHDgK2DGtKoXYU7ciE3JHi37Q7opnxKAmahu9F5vvnx22fjQpHN",
+   "трата_sol_экв": 7.003,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "GJL3SDXtChZf8rJFVPZJwZ6uDYhcRQDZ7ddQVFssY9Qy",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:58:24Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "BgNZw6VxzYoS6AHjhpv2S54wGUv5MWeANPkoU2KPTM1G",
+   "подпись": "4ZqpzctUGkwPsequKVuLsBuqPvj8SorsqVmZufvcCrs2QPKAX6quwBokELXxwDC4cEGDzkLDgVevG9mZHLfSeHJ",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "GJL3SDXtChZf8rJFVPZJwZ6uDYhcRQDZ7ddQVFssY9Qy",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T06:59:37Z",
+   "источник": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "2SmzJCHeqYVfJQeSLNDcyYaZizXVMNdLPHLYqpPkCDd99dAi968BSofEsACgf7ahU1XDuBn2WHrJ7AP35Tf6gyeX",
+   "трата_sol_экв": 2.0121,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 647 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:00:10Z",
+   "источник": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "4T3gUGmSAPGFyb13f2ehwjkRYGatFzVAMFSfYY21NJendydBxF7Cr9UwBzdZZeVkuUhFZza3RFDELPGcVFbazb7g",
+   "трата_sol_экв": 2.0121,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 123 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:00:27Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "GUjBShfwfK5itj1XUucrmEEgNpyQwMzcizCCmPdvwYbF",
+   "подпись": "s4eci5udD4cYCxs4B313jBNbKgJ17JDWvXfSrywSKvyBf8QnxzRFVwfe6hhrZdjMyySfGBmJ9smxGsg3bqkVL91",
+   "трата_sol_экв": 1.5379678769999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.538 SOL-эквивалента меньше targetMinAmountUI=2.0 (76.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:00:49Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "pSo1f9nQXWgXibFtKf7NWYxb5enAM4qfP6UJSiXRQfL",
+   "подпись": "9WRLVxkXXdBubiJKYsr9yqRvFVyV9xoTBVmRW52V5kCqiHGvf63jqtw3ckgymnkpZ45v6BBpUVQjdq5JVqmN3FJ",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM",
+    "Orca Whirlpool"
+   ],
+   "наш_пул": "3XLkRVg69AgwKAbnSjJpm3PB4QgVeXFEjiXfw5shWMBT",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:02:16Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "Ed1ZM5GB39Y7VF2gMX8CNmNNjKg9VtuuHxJ1yPRqeUob",
+   "подпись": "5PumYKCihCMVqgjaEzuvFtt2XQ1A5N3VYpLB37YLhDRwPY83CipAbJz7aLR32heKwhnBjuFcwQBbqU9rkdWa7mdK",
+   "трата_sol_экв": 16.003,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "8P6DE2dJDqndPPdhDV5miF6kmWUJ7ej4Vybn2YuLFB5x",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:02:16Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Ed1ZM5GB39Y7VF2gMX8CNmNNjKg9VtuuHxJ1yPRqeUob",
+   "подпись": "2CuS4aaLcdXD44UnKj1H9XST5kxvrhtvCNkQ3y4B7E1G4A4LC7XRNE8nfeMtsLxQnYgziatCqExMSNmu8KFJgqsL",
+   "трата_sol_экв": 1.5685702769999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "8P6DE2dJDqndPPdhDV5miF6kmWUJ7ej4Vybn2YuLFB5x",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.569 SOL-эквивалента меньше targetMinAmountUI=2.0 (78.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:02:16Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "Ed1ZM5GB39Y7VF2gMX8CNmNNjKg9VtuuHxJ1yPRqeUob",
+   "подпись": "5wpsxKYaNWRJ7rCuWkgWbh44r72ZwwFxhUgE8yXWLWJjUw3B3YoTukw96VNPutGdRShehzqqUy7fxHg6P63fJzx8",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "8P6DE2dJDqndPPdhDV5miF6kmWUJ7ej4Vybn2YuLFB5x",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:03:53Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "H5mBRtgRA2jkAx4ALbF3cEbhYJJVHYcdYDSjE4wUpump",
+   "подпись": "2QXZ8gEvxfWkKcsg2a21kWHFuH2gL8SXQfWZKzCYxeLF41f4Zu83NnMPyr7Xi4VAqWiFH2cGMDX67UgGsNrCnayQ",
+   "трата_sol_экв": 0.83932482,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.839 SOL-эквивалента меньше targetMinAmountUI=2.0 (42.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:04:34Z",
+   "источник": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+   "минт": "H5mBRtgRA2jkAx4ALbF3cEbhYJJVHYcdYDSjE4wUpump",
+   "подпись": "2HMZxrkg2sP41ozyFHk14Av5tfsodk6hkSSxPf6rqeZMkQxjJXPQYraoVHRuu8uV4hryswvfzPxQJ6foH4v6URn8",
+   "трата_sol_экв": 4.605204305557724,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:04:34Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "H5mBRtgRA2jkAx4ALbF3cEbhYJJVHYcdYDSjE4wUpump",
+   "подпись": "4JdmCwjUjcKCC7xGiJGJuzmPFarM53XMFp7SNqK47EEQDJASwiLhhScJZTaLhgQxViBznphDK2ApwNeVa2sbVGZk",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "C2bFGmgQrbvxhVd4ry1yF977NfnYHHdQwPqvMGM7GBoQ",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:10:07Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "CfBdaQ9CAEiVzYY8dJA2WEEdaRMkzgUna18Cou4bSoXb",
+   "подпись": "3n9j1i444GRFjHLjFa1QkHMDfStbKJG2oWUe3hwRx86zivWTedsp7ouoKxfvXpWnoq4ffzDcpqN65Amzcj7imYiu",
+   "трата_sol_экв": 1.2066213799999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.207 SOL-эквивалента меньше targetMinAmountUI=2.0 (60.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:14:03Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "DU3hNXLSF27dfcBoyGaRukMvB2p3Qkz3K64qvXSAfuck",
+   "подпись": "8eDbL4vUpLgDwwZr74mjx4V69cjMcLQyc4DZR78xJdknZ7LtR6Xkb47JjxYEqu3Kg3tCK3E8cZGKQhqWmpyYFX8",
+   "трата_sol_экв": 10.003,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:14:18Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "Ed1ZM5GB39Y7VF2gMX8CNmNNjKg9VtuuHxJ1yPRqeUob",
+   "подпись": "5FhEBqCMjxnFF5Y4yWovEp8xLPxjixnQTzKYFVCWByE4TJ1nh94cSPkc9U8TfuTWaVhkByAPPyj5uVdQn8JGHMXU",
+   "трата_sol_экв": 1.503,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "8P6DE2dJDqndPPdhDV5miF6kmWUJ7ej4Vybn2YuLFB5x",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.503 SOL-эквивалента меньше targetMinAmountUI=2.0 (75.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:15:03Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "DU3hNXLSF27dfcBoyGaRukMvB2p3Qkz3K64qvXSAfuck",
+   "подпись": "4CYjbxxBRREeSvdwRwvHjxehqRBaiNk1bfnWSMwaNxHPcTd95ahfDCK8qCywYxTnekWx6Z8ArdZzRmtcYzcsEM2x",
+   "трата_sol_экв": 3.503,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "J7PydrwRK9wH4vvLEp6tPBX3mBewZoRNG1DxZyXnvZAi",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 222 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:15:54Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "DU3hNXLSF27dfcBoyGaRukMvB2p3Qkz3K64qvXSAfuck",
+   "подпись": "39EjovSvCKhrRH5yfzPRyxMjM5HDdKk7fZwnNC9ibgGJk9NCNbkiSmy8e6bZ9TwFfavVPUdittjEbjLsdbwsxyF3",
+   "трата_sol_экв": 1.503,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "J7PydrwRK9wH4vvLEp6tPBX3mBewZoRNG1DxZyXnvZAi",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.503 SOL-эквивалента меньше targetMinAmountUI=2.0 (75.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:19:35Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "4DVesAFuFueAc229o1yK1WnbaBEWgjhQJ1a9DkeB78Kn",
+   "подпись": "3YcG5n7LWNSatNAkM2xGnSDLGZVQpKRzjd2cbW33D4HoAngtN5SfcbXJUEuunfeqJLK7nMRBRgnJ1TGZsQ16id7V",
+   "трата_sol_экв": 0.8737907380000001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.874 SOL-эквивалента меньше targetMinAmountUI=2.0 (43.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:20:17Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "3YiV4JnxviEXfnaMrAkP69cEWkVjEGcdEmSACb6eisttHDiujQzScZsTkyjytvnTrUwc62iudn9WGo239E6iVJi9",
+   "трата_sol_экв": 0.082668291,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:20:18Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a",
+   "подпись": "Qhp89n6jwhybw2YXL13qtqAGVHKwccvfsDzxMy5zWfCGZjWMQuVEZMhvTqgEcqMzShJqNrHZ3XjeEsv7mPMWqWs",
+   "трата_sol_экв": 0.082668291,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "96pkrdw94K5LgSXNqDnEodkHbMsJCz7xdBARGqt4tpjH",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.083 SOL-эквивалента меньше targetMinAmountUI=2.0 (4.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:21:09Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "2CZJzBoeS17uAQbAdBcrkpEJjPixEcsFvJAhwRV9pump",
+   "подпись": "4W7qTUX2dY3tMvM6EFuZcRwg6GSxAgqayia2pguEvG9CpfNMmvEducNZYemxNCZSEZS7QUmE5KVLcbUGYFWkTbQp",
+   "трата_sol_экв": 1.259016393,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.259 SOL-эквивалента меньше targetMinAmountUI=2.0 (63.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:21:31Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "48WdhwmaUFnJb9gjhTSPNXYoEhmhDgBvf2jVRzuvYLuE",
+   "подпись": "37XKC2bQgQfmas3Pyq2b4HHU4dHWmEN4WBSQfhGtwcUYsNYnAqWiJ4ZSW5GCvnK9PvHjnTy1XfNnPbyb1JyQc3CV",
+   "трата_sol_экв": 1.046964941,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.047 SOL-эквивалента меньше targetMinAmountUI=2.0 (52.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:27:02Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "2SEJhBjWd7rkLRx6rWujKXNGb6W6Nr1DeWAjGiiFZM5W",
+   "подпись": "4Q4uHA4PPV7EXVr1JBrB2HraibUQnf7QoNQdbBeowSLmu5ZjaS569HE8R5k422FRamHy4nUP6rrAfSwVmrA3jerf",
+   "трата_sol_экв": 2.149125556,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:27:02Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "2SEJhBjWd7rkLRx6rWujKXNGb6W6Nr1DeWAjGiiFZM5W",
+   "подпись": "61zqJRUsK1D345mrwAwKzHceScfe6PULc91xHJ5NJXtYxHgq3Sk6PFJjGyBVtk5U1SEe3FLapqKyzPZBJXFa6dQe",
+   "трата_sol_экв": 0.5023462,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.502 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:27:04Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7oXt7LDn6agQQE86AzrWuMTs93V2PV5ruESXj9JNpump",
+   "подпись": "3DwQ1i7Wp3QeGBgufq3iG5QtnWBg1MQPT8uwUG2fRZeM2y4KVCQwQzYu6fFM2aqVXpGFgsXpBpTzQL7EzKW92tzg",
+   "трата_sol_экв": 0.836040031,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.836 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.8 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:28:08Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "7fGpP9DpE2g7VCZTs9uoCioMWzQMKPWh5DMLCjmRpump",
+   "подпись": "5wNgpEy9zeznxvfAzzGEUvMDvbD6BmZaVJeXLvA4fE16LhJMRqyFgqMHC594TzNvp9UAwRe9fPFU1ffgjq1kqwn9",
+   "трата_sol_экв": 12.005623559,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:28:56Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "AvmvBcApa9dNrxXxxVneYzxsFxAqzMiHm6DjQVNnpump",
+   "подпись": "D5T13jEvztMKoip3XT6rN7u31w8MuamEHciWb5e7BmrTEgjTNefZUR8TGJoCVuS9SPyA9NJhPajs5RNVfujmkVg",
+   "трата_sol_экв": 1.3779671489999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.378 SOL-эквивалента меньше targetMinAmountUI=2.0 (68.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:31:13Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "AvmvBcApa9dNrxXxxVneYzxsFxAqzMiHm6DjQVNnpump",
+   "подпись": "u9UTzZWwXGtdhY1wKKNA5yhsZsubG61xpyJhmF5ZfasJgcUUnmqWRPzvadz5dVKNX1c8cumi4PqZdh6Et7xpaxk",
+   "трата_sol_экв": 15.003,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "3PLL4n8D4ZZEUCfeco2gctCrHQFEgq9GCnsDRiCPpzAm",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:31:13Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "AvmvBcApa9dNrxXxxVneYzxsFxAqzMiHm6DjQVNnpump",
+   "подпись": "2b3mnrtK1zawx1WueTWUci4XpRQ1YQiT7fWKKhdBpL3G9ZScXRDWmFXg2QMGW6akjNSVtiXsbULPdUqu6XBShMUJ",
+   "трата_sol_экв": 0.1001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "3PLL4n8D4ZZEUCfeco2gctCrHQFEgq9GCnsDRiCPpzAm",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.100 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:34:47Z",
+   "источник": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+   "минт": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "подпись": "4qPViki35KwAFz8ctTAc1ZhGJdctCEAmcgwGaMKq9uc8BjT9KKMayoCMJgJ33W9HAGLsUaTbc53WBGzTfQLnRHac",
+   "трата_sol_экв": 206.65746334324257,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM",
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:34:47Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "подпись": "5aXTEAFQdSDBYjZMo1MFJqtz1WAtnxJZjQJezpKFsYEJ13qAi8jnMuEHiMa8T6AnB1CPbsiXzYm9yRED5KJAUZGt",
+   "трата_sol_экв": 0.301,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.301 SOL-эквивалента меньше targetMinAmountUI=2.0 (15.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:34:55Z",
+   "источник": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+   "минт": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "подпись": "53oRGyPWZfDoNgLYChZAgA8zg89u6WicDCoHMqTXgh4HxNAitjCeBBSTfcjprAJfRize5ttEdN7SjkmqReMCvTtQ",
+   "трата_sol_экв": 40.504862815275544,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM",
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 30 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:35:33Z",
+   "источник": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+   "минт": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "подпись": "4vQ4ARaRyHiuoz9AR195XZjPUn4ZU57B6eZw47rPvfBgENp5AtQu1tYYCeGoetZ5QegFBhKosh8U2myAckcHqiWF",
+   "трата_sol_экв": 78.5294257409008,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM",
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (4) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 145 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:36:23Z",
+   "источник": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+   "минт": "J63CgnjfNxa47zpfpMqgiSzMrW5np62N5gjKRv17HSjS",
+   "подпись": "5hwweGi7vSzgBgNLK8d2U4pwhQ6H2vwn6xmuGdaSvWj6rjzywEsrjPaCbB5rRRvqeaQfDmmaU1sUak6aJALbiqU3",
+   "трата_sol_экв": 0.50001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "FbcGxUCqVVDErygFVNuM2xaGr42AKyjqTLTJkiSUHEZG",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.500 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:36:43Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "2CZJzBoeS17uAQbAdBcrkpEJjPixEcsFvJAhwRV9pump",
+   "подпись": "4VH5yphuPNrTEAX9PdZMKxBoFTA581c365Q2dLkj9rWZWLLNZBfKNyATi5QHfkRsS8CU193MqwiFqWYRKfrytwNQ",
+   "трата_sol_экв": 5.786090344,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CMBVvFmLNfbTW5ZePwS1NbFcXALQivwFRgy8dsDmWFH4",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:36:43Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "2CZJzBoeS17uAQbAdBcrkpEJjPixEcsFvJAhwRV9pump",
+   "подпись": "PasfPNjZsTB46NJ9Yiang2FP2kGb8UqYFGHbiLnpdPg8sksiQ6uvMGj2PufD9fCrMCfxhQHw8jTyhyRidUxz8QY",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CMBVvFmLNfbTW5ZePwS1NbFcXALQivwFRgy8dsDmWFH4",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:38:01Z",
+   "источник": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+   "минт": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "подпись": "6291PPRWWutPUTprrzTzE4tV24nKs8N6EPJ1YFG2YPs85wGD8AhwyA2A4eJKoWHf7CZEm7tUw7yjaJayWawE2j8H",
+   "трата_sol_экв": 82.66255342017585,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM",
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 555 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:38:12Z",
+   "источник": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+   "минт": "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
+   "подпись": "5ysvWpdAzEMjgGFV4tzRKsd2Qrfm4EKEKBNb7US3UqovAroABHpUwoBQU17xtq5f34B5bwUEnFJj5gUv4KyPdyPe",
+   "трата_sol_экв": 119.86070245098874,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (4) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 42 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:41:01Z",
+   "источник": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "8bjyip1RC5paPrxFpFVYyWbjS35xYT9qT7Qp5JCyakXWerRzw1RpvR6Ag7pPd8GeQMytwNUwqV6QzMzy2hBpiEN",
+   "трата_sol_экв": 0.8205471480813537,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Orca Whirlpool",
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.821 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:42:44Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "FoS1tjFxvTE1ELRY38V6GTtfbJ4QV9XkCf5oyLWvpump",
+   "подпись": "5VdKDnvahQGXD6RfQkGRshi3PxYXmBrotL9whSwsLh5Lhu7UGYzkMxABNj6ZWyGUgVthtzC5Et3GViVS5tiqiJ9D",
+   "трата_sol_экв": 10.003,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium CPMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:42:44Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "FoS1tjFxvTE1ELRY38V6GTtfbJ4QV9XkCf5oyLWvpump",
+   "подпись": "5foHKjLifYGQU8cBG1vscRZiTcmoNVFbzrBwzzDticYeF2kjDTc2WdkejULsguhozrYE6XRYTMvSVGyZHcutCLKb",
+   "трата_sol_экв": 0.001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.001 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T07:43:05Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+   "подпись": "4GWyyYMULmKmW7MK5JMNc6VamvtpCv1pAFY1RwrsEbkLXL2epowPhqpQwpAc12bvs4czKbtqSE52BmCUUN7j2Wjm",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: FoS1tjFxvTE1ELRY38V6GTtfbJ4QV9XkCf5oyLWvpump",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:43:23Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+   "подпись": "3XUg1jc9G8f1pDsGbSP8pZKiZKzCgtryRfJFQLLvCBath4rxouMKeFGFfJTi9H37Q6r15LBoZUwvuf1twUCeKB4x",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: FoS1tjFxvTE1ELRY38V6GTtfbJ4QV9XkCf5oyLWvpump",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:43:23Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+   "подпись": "33KHX43hC5K7E9EU8d9hTjZNQb1J1EtaBzkmyT794tBkrNcnfQeTthaHe53bM9G9M8QyYcTDk1ZdmqthkjQhFvei",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: FoS1tjFxvTE1ELRY38V6GTtfbJ4QV9XkCf5oyLWvpump",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:43:32Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+   "подпись": "3521ooieqztpJ7MkYTDZd8DPxctsuuUiAriB2hwP21ZKhk2UUH6p4wakzWNt73VwZ9wsA2YDLzqGwubyJRsS6jP6",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: FoS1tjFxvTE1ELRY38V6GTtfbJ4QV9XkCf5oyLWvpump",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:47:32Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7MK1KMamq3edSkNSa9sYhzJcKBJSkDkPa6SXPK3Upump",
+   "подпись": "2w3phCijqU8MWhykhAJs7rWnBGdp1WjiPF9njjJ7JaLf991vyiB8P1Gxr45PYwtPTPBNm7DGYX5TSAvmrjUHtUsG",
+   "трата_sol_экв": 0.938616271,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.939 SOL-эквивалента меньше targetMinAmountUI=2.0 (46.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:49:30Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "8F8fMV166QPDsAGyj9XuvK85VpF4Mpk32qYWy9KkM7aq",
+   "подпись": "4oxFjRM3qHxtusHEyPyjkdoNr4cjJkyZqDbaFNBo6YD7dYFWBVcM9YC9vXKvr3UHLXycqKhyHXiYVEhTPiSwxNPy",
+   "трата_sol_экв": 1.3912278329999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.391 SOL-эквивалента меньше targetMinAmountUI=2.0 (69.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:54:12Z",
+   "источник": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+   "минт": "2CZJzBoeS17uAQbAdBcrkpEJjPixEcsFvJAhwRV9pump",
+   "подпись": "2YbNyF26NRZd9GsSb6woF8jJuKHfa7FFcZWJ1v17yitt2scbEbseUzKvGczYHoTfXt1kUPjTX9smDFCuCCJiTHrp",
+   "трата_sol_экв": 26.003,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CMBVvFmLNfbTW5ZePwS1NbFcXALQivwFRgy8dsDmWFH4",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:54:12Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "2CZJzBoeS17uAQbAdBcrkpEJjPixEcsFvJAhwRV9pump",
+   "подпись": "S8BRLXNGGUiqV7cKryrndhjZz88Kfn2Zt3ALmwf1rSLTHGNwGa2Tx61imDnP82aiqX5fftsiaVUB2cKZXbL1u4T",
+   "трата_sol_экв": 0.101,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CMBVvFmLNfbTW5ZePwS1NbFcXALQivwFRgy8dsDmWFH4",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:55:26Z",
+   "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+   "минт": "Bf9i7oG8We16XBtgeAnNB9rDBnmCZPW37P7b6a9Hpump",
+   "подпись": "4QKTEdCHYXTRMR5bU9TkYLmcbEpWhFJWpMZ4qzTa7jy3DxU6YNexcEFvzKLGbewmpsu3vtnjE2EkfV5QDn4MJebT",
+   "трата_sol_экв": 1.6561511656022987,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CbzKGHsTui4uwb5gwKUHZ53VwA1VdwWoXjZbUzk7MgvQ",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.656 SOL-эквивалента меньше targetMinAmountUI=2.0 (82.8 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T07:59:09Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "BJeRatnAaFtKhwL4YfvPKxVLsrtWqd1XYAQcZN4pump",
+   "подпись": "3iMu3kHLqWYrSEou1o7kEfDByULd1UkP1Fkx9Ayv9ST9JAEpYj2DmkweeEt8WjrJME7cbFVJD84s4pqCXQ8EhPk3",
+   "трата_sol_экв": 0.845452666,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.845 SOL-эквивалента меньше targetMinAmountUI=2.0 (42.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T08:02:14Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "2SEJhBjWd7rkLRx6rWujKXNGb6W6Nr1DeWAjGiiFZM5W",
+   "подпись": "4Br2Z9fkpwAxjDJcXFfkwckUKa3bDHwXPvjDRayLHTz9sYzkmYfFA6gHGXdAxj4AYD6wvTPmW2BetcomkHoxyEfa",
+   "трата_sol_экв": 1.30721241,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.307 SOL-эквивалента меньше targetMinAmountUI=2.0 (65.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T08:03:38Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "DYXyn2V5Qn8QxGpJtV95LmuuBBSGvLWQkkwWUP8Fpump",
+   "подпись": "e3GNt6own1GKMoUHp7PuUK7xpQXxqSr68M6bWV8L58vU4rhP1cuKZqZJgAHEPUtD62fd6TU3p6J6g3cprcThzeX",
+   "трата_sol_экв": 0.847214196,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.847 SOL-эквивалента меньше targetMinAmountUI=2.0 (42.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:05:56Z",
+   "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+   "минт": "8dBnKHwNYH3hz2fFTJczVwzBTpJFAMtc53k3uA4zpump",
+   "подпись": "4peijkABKvWdxK2BXzqo5eQamrF4csceWctkR5AfymBf8ky2sS9QRdvSXmtszmGyhdP9i8gLrvMjjVop2pvHq5tH",
+   "трата_sol_экв": 4.134088701177023,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Raydium CLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": "GqEfwUaJ3Pz6nRuAuGNP194SsrFwjdtpgTRARPFG4LJo",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 23660 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:16:00Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "J63CgnjfNxa47zpfpMqgiSzMrW5np62N5gjKRv17HSjS",
+   "подпись": "618JRM1tqRKYBih3zmbxSR7E5v6wSd6qEDFchVkLdZRXYd5cfrRhjf6KxCrVNVwLBYtgFwdve7KnnVr4sMrXc6Qa",
+   "трата_sol_экв": 4.138159957713902,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 205713 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:22:40Z",
+   "источник": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+   "минт": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "подпись": "3Cc5xSpjmH3WpyUPfaFqwxXizvW41xuwks1rS9uD1oZAwxTZFwD2hnLWe66PNWMsDBPskwMvD3HKSSzgUDhcHJwy",
+   "трата_sol_экв": 56.0,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Jupiter v6",
+    "Orca Whirlpool",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:22:49Z",
+   "источник": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+   "минт": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "подпись": "4RV2DorDToASpLLyDkNsok1Ad5FSctyHZvNSLAAQdHuxaA158VXWzH7JQ2pDCfsGmfgsEgeX6pHbdcHtUUc5XKLZ",
+   "трата_sol_экв": 45.53991636786948,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Raydium CLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 34 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:22:53Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "BodouiyKFVXswNr6sQR8hxEs3jgNLM1M4MnbGxmopump",
+   "подпись": "3mtNqEMgyNEpnCTXf1b12CucqrvXQYZteFYcR4JTAFmGMhQhKAjbZykeWc1mQgAhubY8KuaJMRQkugAZCgashBwe",
+   "трата_sol_экв": 1.4705,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.470 SOL-эквивалента меньше targetMinAmountUI=2.0 (73.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:22:58Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "75gGuxuqKhQQiHae8JKDQaetK3XguKf1rUJ1csispump",
+   "подпись": "52Y7HPvEs9aRvXE8RLRSNXLqbppmhtACrFKUVEgrY88ihtvknj6x9nx3i4MyyQD7Cs5EG7iWtXUsWS5DU5buGvdU",
+   "трата_sol_экв": 1.4270124819999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.427 SOL-эквивалента меньше targetMinAmountUI=2.0 (71.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:23:41Z",
+   "источник": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "минт": "BodouiyKFVXswNr6sQR8hxEs3jgNLM1M4MnbGxmopump",
+   "подпись": "4hNPvy5Xq8oEtFmuCAp9JmVTT3PhHfkSrxTbsWTQZ8TkEALRhf1jrAmc63TcGaTX7UcNGu9DKt8yyvQoXcT5SsNM",
+   "трата_sol_экв": 1.6530638199999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.653 SOL-эквивалента меньше targetMinAmountUI=2.0 (82.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:25:14Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "EMZGhHQWyu3GF1NnJSVdKzMVGYmtceiH8QZqFw3Gpump",
+   "подпись": "BicZwD6ZhvBRjdUrBx7ymEWzpTAUkk3yM19sPV1h9nXdqPC7PgzdEis1jEtPWoHX99wmPS4WbxNDPqpzj6P6HLn",
+   "трата_sol_экв": 4.623287767881541,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:25:14Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "EMZGhHQWyu3GF1NnJSVdKzMVGYmtceiH8QZqFw3Gpump",
+   "подпись": "33aycfnwhabiMJ7jLpmL9ZWkY5CXRNU5NXpEWkXD9DA9ZzSYbxyJYW7u3jKjnJySeCEZZiQEGKdeZrs5zzLbpNJX",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "HRbRh9h6gx9utkejdYbFjcsSFCcKp4cyKgLYr3CTPCFA",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:25:32Z",
+   "источник": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+   "минт": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "подпись": "47SbSxUXVGhjBmAkRcJfgeGP3R4iogLcR6QfoN1ZfBNNeRtNtnMaCCwyeuBLiKick1EAHYa2HFW7GQy5RDWdV4gB",
+   "трата_sol_экв": 49.695706733084556,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Raydium CLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 611 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:25:40Z",
+   "источник": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+   "минт": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "подпись": "5FLEB7cn8MgmjRmivgQrFEkyHjVnWgQULtCJGWdkL6k9EX49HnNU3zhE9mzuEz4xzrFtsDRxPYFyCjaDpXaHHvoF",
+   "трата_sol_экв": 13.0,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Meteora DLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 29 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:26:54Z",
+   "источник": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+   "минт": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "подпись": "2jHxbitoJMVyvL9jULufx6sA9CzWwgi7pEKiK8XwCwNS7UugBdy7Xj7ytvYVuKUny32GMQ8Xnig8RdhBCpRgX8H9",
+   "трата_sol_экв": 27.0,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Orca Whirlpool",
+    "Meteora DLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 277 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:29:27Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "AA42ScSgqQA1C8ScvH4Hkbrjs3JbhqZDA2X3gXi7qsM4",
+   "подпись": "4KxXthrMou3QaJN2Hgzru66nQGAH4pVjz625yGa1C7kYDQtPVh2tTyjxmJ12TKDqvqzKmogxi9G3fXCahJcfvzvw",
+   "трата_sol_экв": 0.002912212,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.003 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:29:29Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "3iHXHw6vkiDQAhbZxS5CHeUaoEJBfj7w6rBdVe8QPzhUkgJyCZyjUpBFft3XWG3qkP7LogBFKMgMpD2Q91E5bfqf",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: AA42ScSgqQA1C8ScvH4Hkbrjs3JbhqZDA2X3gXi7qsM4",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:29:30Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "5D4J2iEGt5xihan48jS6u1fYeDdhjTx44Upsy1JkVCfXpSV3hbq5SNSkNrgxL2G5bZKQf3AXJbCa5maY4W9xarSa",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: AA42ScSgqQA1C8ScvH4Hkbrjs3JbhqZDA2X3gXi7qsM4",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:29:35Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "2uomAcnWQ1CXLN9Ejx6v3ELEr6fYqRREWhqbuenTF6zz2qM3VvV8W2wJYuAmNPP7qoTF7RVwnNhz8fFkVNdKdfd6",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: AA42ScSgqQA1C8ScvH4Hkbrjs3JbhqZDA2X3gXi7qsM4",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:29:59Z",
+   "источник": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+   "минт": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+   "подпись": "5aFEbBU3bLkLybNKZ8zLiyFM5vQh1YeNfggHgNW2X6tw79UjniZoQqL4pwrGXf6fgC7ZaZn8GyrqyNiXf6o7kfRo",
+   "трата_sol_экв": 35.0,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Meteora DLMM",
+    "Raydium CLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 696 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:33:07Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "DJRQfCMWYDgtFuMxDxNUXczAd1jMr655mbY1E65ppump",
+   "подпись": "rHg9xNCLeEk4kL3HKDaFuDro6CuUHA29gKetq42HYnqH7w1EB3n6aDNZ9nzuxLCuUupS1tkQ58QCs2mkJfJRKUN",
+   "трата_sol_экв": 1.239564551,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "2z6qrSwFDS6iKL3WZxjXSaP8HBJKsaMVm4Gynq2bwDxW",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.240 SOL-эквивалента меньше targetMinAmountUI=2.0 (62.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:35:45Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "75gGuxuqKhQQiHae8JKDQaetK3XguKf1rUJ1csispump",
+   "подпись": "65CTxQAqK2QeK5p6pHpgaLRykC5Hds1aA35zg5X6D16Aspy58gu85tLoLGs2HbytZK4woLooREwWdYrTcakzLgVJ",
+   "трата_sol_экв": 2.4844924993047517,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:40:18Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "75gGuxuqKhQQiHae8JKDQaetK3XguKf1rUJ1csispump",
+   "подпись": "z7F7J68nj9RqLz3MhHYn2buNKxF3N6DDE5JCeMMmkY2F88EBgaDq2Na75FrHsxMFRzCY4iBQzHte6JTrHNLVkNC",
+   "трата_sol_экв": 1.656269547873978,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.656 SOL-эквивалента меньше targetMinAmountUI=2.0 (82.8 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:41:42Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "5rfN5RBoAYJApnXvhCrh9xcapQGEJNG8sd9zyJDkpump",
+   "подпись": "4GSbgC7gsmLbNy6ML8Ety2kt5aZ6mBLwVk5NaRyJz3xqxexv6aqnQ8NwtDwUzdrzpshwUUnZhX7mwNuku4aCcapv",
+   "трата_sol_экв": 1.958,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "THRESHOLD_EDGE",
+   "причина": "вход источника 1.958 SOL-эквивалента -- 97.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:42:17Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "54iVa5c26DZH66isFtx4QYpyQtink5zEuTszD9dHeNAh",
+   "подпись": "MTERX77Lwpjsx83HvYbmJN6iKHrTFq2ozqooUzbEXFT9qb6D9U4FKQNYQ7bMtrdqPtbUyPNbqQG1ZANynVcoS2g",
+   "трата_sol_экв": 1.1810754899999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "CJ9mJUggMvHyqPSV9yRuwQZoRuD5bwvBYsMmoecQE9An",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.181 SOL-эквивалента меньше targetMinAmountUI=2.0 (59.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:44:00Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "2SEJhBjWd7rkLRx6rWujKXNGb6W6Nr1DeWAjGiiFZM5W",
+   "подпись": "3ZJnsh8cLKiw6KcX2XUdDNsMFEumNRxqA7nYGrcbdLEhmXBhQUUhY85Q33GaKrTVbwwym4G4PeeJxymS8AYEUPbL",
+   "трата_sol_экв": 1.350837676,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "A253oYztMmf84ziqUPxBiX3zDixnphDc17coga4KbHXh",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.351 SOL-эквивалента меньше targetMinAmountUI=2.0 (67.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:45:13Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "5gsyx7Si7bNTdx5Ryz9jKmsmBLe3D9XXiKC7SZakXkxTrNMYthCpXivyEtha1iA69tPw2xjrdw4j46Zk6GoPKzSk",
+   "трата_sol_экв": 3.008,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:45:46Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "3X3ip3V3rkoUc7dLxXaULZ7g7dq8Bfjxodrg1Dia2nMB3vSjyJWv9hm2YCySKGsktdp73LFcXtCKuermJf5z42wf",
+   "трата_sol_экв": 0.033,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.033 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:47:27Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Gd28K8mXV6AsDyjpHnREdC6zetL3XVrLY2yk1urZpump",
+   "подпись": "Tgg9WWv8fexVdeuKhwewSKpu1aKJrXr8nzjXBaz5co9une4P5AeMPSjc6inVCHTdoS8EZJ7SwCpVo6XuAZKQW5S",
+   "трата_sol_экв": 1.361580219,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "9xVi3514hnzQa8VCq3VfLeRqsyqd3havAu1efdnLxNoB",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.362 SOL-эквивалента меньше targetMinAmountUI=2.0 (68.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:51:17Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "75gGuxuqKhQQiHae8JKDQaetK3XguKf1rUJ1csispump",
+   "подпись": "4hN8Kpbh3FwcP7Y1ir2pwueH3T2rKGAenGA1UvB7iVKnUw3dgqMoLaw1YoQeMRQDwwGzU9qMmegGGn1r3qfsvAWJ",
+   "трата_sol_экв": 0.8387110110000001,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "2QGRoYSrgEEPNC3GESizBikCkdV7fqsT86StY4D8xNdn",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.839 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:55:21Z",
+   "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "3RqW3VuMeXGURihdsZ6AiCUjgTa3MSjKz7TiTrPfRAmCoggTX3w8q8DBkkJqyMoFmNsxKrNQhz7WJm2pW2Ajjf1X",
+   "трата_sol_экв": 8.287212572735644,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (3) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 474996 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:55:31Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Ha3ZhCPTqtBfsgjwhcRpwuwVeWNmC8ss3wbFeTnxHFZ7",
+   "подпись": "5EFuYnJ3tSoyuVMsky3fMmej5pGq2DLg7gTyrGd2gRo85iJRZfAoNoAvxwEJtfPhmF8u9RK2rsu31BU12Rt1Gfus",
+   "трата_sol_экв": 1.6710482759999998,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "UnuCdCHvWTro3A2N5EBK7vrRXLjEfqtGHTgf2E1Zn1j",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.671 SOL-эквивалента меньше targetMinAmountUI=2.0 (83.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:56:14Z",
+   "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "4eMi5xuEsMga7FJaHC7Z7w4A24fEE6gJXALkJHKHjvRxjQDk1swpMJmXKAU3tXEedyAtHvAy3WSHdwc7ANBvdkqg",
+   "трата_sol_экв": 41.43555642463274,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (3) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 201 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:56:25Z",
+   "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "35kw1VVXTyRZTnDNxwspGHT79rDh1qUmJ5PwgtbkDfiMi1P1YZZAzuU3FS3wwhdrjENJiz269UAWKxvPb1n94m8b",
+   "трата_sol_экв": 16.5742225698531,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 42 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:57:05Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "75gGuxuqKhQQiHae8JKDQaetK3XguKf1rUJ1csispump",
+   "подпись": "5gGHgPNcUAQL52UuMe8B8GJyrfin1xfmjhCYz7mSTtofNv2P6VKD8K2PD1ByFFz45ifzAQ8nNGs27jEpE6WGMrhW",
+   "трата_sol_экв": 1.6574222569853099,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.657 SOL-эквивалента меньше targetMinAmountUI=2.0 (82.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:57:05Z",
+   "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "4iFcU44g1hP7RHQSRbfuGJNcWQvg3ZDQxyYuosRSzAEph88G3qxz9EdYows9rGEPqVNMBEtYuA1h5nioGS4UynCY",
+   "трата_sol_экв": 33.1484451397062,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (3) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 144 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T08:58:08Z",
+   "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "3cFnwLFqz9Smivy6dvW4SSanA1pCaEyvQB7TUfWshmspPouBnjHhF6hGBSw9utmFgMkGZDZLqf17njsY7a4gCGxu",
+   "трата_sol_экв": 41.31809540806642,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 232 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:58:16Z",
+   "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "25FR11vjfAgpTjtQ1Uj5zCdA6MPP4hje3beivPobpxjad2qAAMXjK9TwzLfPgPtWKxbbxmyrtnTyPeNBaMN7Uexb",
+   "трата_sol_экв": 41.31809540806642,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": "FtiotJckV2ZG4S1YgJDJLiXKKDAnKWXgQxo7vxsjPwPe",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 31 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T08:58:42Z",
+   "источник": "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv",
+   "минт": "C1mBfBoDkwWfd6uTFZp62ARHLjeVp3bDpCDMfMZtPngE",
+   "подпись": "24GtV5FJHWMcQYK7ZXCSRRo6X173t3xhaPmRqL1BANAFwzjGsM6YwFFGYnavFLLcYE72ELobod6Y1cG5qneBi8Ro",
+   "трата_sol_экв": 8.263619081613285,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 97 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:00:04Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "53yyGHWn2YX3vrTKapw8d8AqokAi9BnJuhbZP9iwd19KEyKtRnswmbykVFqFg9vS35eQJZbcmNbAczGR3HxsxyJq",
+   "трата_sol_экв": 1.958,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "THRESHOLD_EDGE",
+   "причина": "вход источника 1.958 SOL-эквивалента -- 97.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:00:20Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "3RRGi7ZcodyqNRNDJEySgCuteuE9AV5MsYjXiZLQpCJH",
+   "подпись": "4xPkqXnr8o2Y1NbUCGQAhQDbJr983Y6mLZawnJnsRHzjwT32xsMEe6Yr3MqgTECZhacaPX34dXRb7NsCL5JKL5hm",
+   "трата_sol_экв": 1.9443564709999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "5u3ems9P4MwZ7p7pYnMAXM5jzHyoRMZGnKTiXgVqoy7K",
+   "почему_не_пул": null,
+   "код": "THRESHOLD_EDGE",
+   "причина": "вход источника 1.944 SOL-эквивалента -- 97.2 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:00:42Z",
+   "источник": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
+   "минт": "8oMvxgcBJtDGNSc8kogCEEFxSvvi7x6jHRfSWaiWpump",
+   "подпись": "551L5ji5qunyhwbTbgdrjRXAsKiWSd5rVJWviuYe9GK63iz3PkZxNvTaLjxEKu3ubERPkjwMaayLrBNoHJAwmkDd",
+   "трата_sol_экв": 8.27518930129074,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:00:42Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "8oMvxgcBJtDGNSc8kogCEEFxSvvi7x6jHRfSWaiWpump",
+   "подпись": "3mCEUYDBgUwWH8mahR8bdNwYBveEcnagPozHAeDQFvcXrnrZyAxixeaNP3qgQufpaY7dnzy4whdXFXj7oxUS2rHp",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "dH12Ke1gyoxqcujh9oYkNMwJkNNNuGvBszZnBrmVpWh",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:00:42Z",
+   "источник": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
+   "минт": "8oMvxgcBJtDGNSc8kogCEEFxSvvi7x6jHRfSWaiWpump",
+   "подпись": "4qdxKkscXh2ikWyMKfQC8XUGK1pYFEaL4aThZhfkfEi4PwMFcfanfNzdKy51uxmf9DipQW1ayc8nVxqjyTBMBkBo",
+   "трата_sol_экв": 2.025000001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "dH12Ke1gyoxqcujh9oYkNMwJkNNNuGvBszZnBrmVpWh",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:01:55Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "4L8ckhBmUFgDjFuXBzM5rzqnDQT6DK5v7Mh9S5qz12vV",
+   "подпись": "QmhNYBp9fZ8WP15aoQUPHEPoTwQSqN6twBiYtfooaEgwANWypACFQRHy7PVhGE3T884HKvvePcwDagxxQf385dM",
+   "трата_sol_экв": 0.8275040307070268,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "9MP8UjJasurFtUUgVrw4EwmPDcoBAvC1tUNR6E78M456",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.828 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:02:27Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7X9YuhfvC9MZV3RBAuZfPj6Ve2zkuosjWhu5oqAGENT",
+   "подпись": "5h4uVDMT2B2tTcao6hJ5A16aB7onuvnMGZ1zbw3cs6jiiaL5k9hd3cgQhEgtAVsAgne4jQkLpmWkHPGswZiQWxta",
+   "трата_sol_экв": 1.0295399109999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "9SvDkMsDDH8yF9oUq9w9yz2cvKh7sAL7zgh5PZnLM1fw",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.030 SOL-эквивалента меньше targetMinAmountUI=2.0 (51.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:05:59Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "oSHjyKBhDSRAFXHASevJRb9HijR263rMu8Hg3Nt6GauZU9xPjGVQi6hCe9r3nhbZw1UrS22GBXVe8ntKCKKuj4x",
+   "трата_sol_экв": 1.008,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.008 SOL-эквивалента меньше targetMinAmountUI=2.0 (50.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:06:59Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "3EgsxSdLrcmDQLk6Jh61CR5k35VnQtjH9xXpJmcoTMXG5hmgXSmj12xwJmYQYN7YJYiURWu9SbgzaVDYLmuCzRmY",
+   "трата_sol_экв": 0.033,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.033 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:09:04Z",
+   "источник": "2net6etAtTe3Rbq2gKECmQwnzcKVXRaLcHy2Zy1iCiWz",
+   "минт": "9HanAd4JAvUrSRQqEJU1yK8hcFFRkx52SuokdbJKCumh",
+   "подпись": "mpF4etRdgT4K2Z27fNqEk9Tv3UspFkvQJrFqvf68K6ZkdGvSxcuDwBqcJAurFs1KbGz9Vizs7xJ9J72KxFiDNvU",
+   "трата_sol_экв": 0.50001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.500 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:09:44Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "hq6sdMKEnxme7XBcAnodFGnkHqGgRE2XDkDKS7iFo8Ure52UxdiLWziihdPXSQtKEJqW2WM7W4PeVcWqvcHDirb",
+   "трата_sol_экв": 0.033,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.033 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:11:33Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "4hkWfS3tjseKi3Sq5WnYdLDnEsxeVUdxpJKANkz2LZ8CVAYaXZWo3BgmNMAvz8AdrhkP3MQpLDSK3atyTVh8JV5U",
+   "трата_sol_экв": 0.033,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.033 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:13:20Z",
+   "источник": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+   "минт": "F4K2SbLNgyz9gzNqT8bPeLpRkxy4oMA9twaffUDdZtB6",
+   "подпись": "bf39KWCkC3ScUUF3PHStGX6orMjcn1UP4UmB8gAUsLxihKJRbir6cWofuLRaMFv6trNem3DiNHgrrvRfBEu8BCm",
+   "трата_sol_экв": 4.140000681885882,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Meteora DLMM",
+    "Orca Whirlpool"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 534218 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:13:31Z",
+   "источник": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+   "минт": "9aqmJjCnnMQv42TXLk921ceUkN35nea2QP969n1caqjj",
+   "подпись": "2NsJbUUhw7foXP57fJt2UzMvtArwxe7RsnTaYA331GHaktwSmJ8j7S2JZ3zDrCHPtZusHpUmznKmiWJrNKT8WENx",
+   "трата_sol_экв": 25.009999999999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "7Nj7mBE7iVmjvnBHNvjgaz6G3ZktTHFNbf7aQDfZ7iNR",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:13:31Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "9aqmJjCnnMQv42TXLk921ceUkN35nea2QP969n1caqjj",
+   "подпись": "hBHaGPQ6iTpjmHf6fJCEy6XBskC5Us3QRg7gsScK7TDc5ppyn3hUamBPeU3tmdqiFL9iG9ndJ3XWvDsgoztqmaF",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "7Nj7mBE7iVmjvnBHNvjgaz6G3ZktTHFNbf7aQDfZ7iNR",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:13:32Z",
+   "источник": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+   "минт": "9aqmJjCnnMQv42TXLk921ceUkN35nea2QP969n1caqjj",
+   "подпись": "4tdoWK9MRq9Vafo3FE1ndq984hVEB1SSRfGz3pFM3D2wr56wAxje2xFLbCVuenjacwBTBFtrPhDCmurH4NUQkrdy",
+   "трата_sol_экв": 25.01,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "7Nj7mBE7iVmjvnBHNvjgaz6G3ZktTHFNbf7aQDfZ7iNR",
+   "почему_не_пул": null,
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 2 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:13:51Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "EHyJ1SwMo9Yafds22aJYSraNr992ZS8nbmBQFF55h62F",
+   "подпись": "44mMog3Jha7ZcBFTDwpEWvy7ikCjEzgkcgrP3bEYPfoobVHU91Yko67WZMYnBV76orUqLAzsV8fF7EdyiBoTxAbJ",
+   "трата_sol_экв": 1.6560002727543526,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.656 SOL-эквивалента меньше targetMinAmountUI=2.0 (82.8 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:14:00Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "5QC1XHgu4sRRKWoSabeXS2jVBYj3sBkn1N7YetT4ySyU9z43U1M7FC5MS1yK8irCNVU4ifen85NqR3pNrqDHmzhM",
+   "трата_sol_экв": 0.00010000000000000005,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T09:14:03Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "5mDZufWY4zvnBTkvEmzMt5gtkoqEDdm9qwaQA4DLKPsihiiNosVExpWrjEh1yxvwd8Yi2MkFPCFdHHiTV1i75mAp",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:14:26Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "3ZzxPJvgTTm8HDwtWZtmuseaTujzrqw2iRZscPadgZt1mr3Boh7nPJhZ9eR6R8Vi9JcHk5eCKnQr5iZYkbBeNqww",
+   "трата_sol_экв": 0.033,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.033 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:16:26Z",
+   "источник": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+   "минт": "9aqmJjCnnMQv42TXLk921ceUkN35nea2QP969n1caqjj",
+   "подпись": "2J2YdKtknTHLsD4SLyHLMARhH3q4cLqBb4BzgUAZz5es6awmfykLEPoq2ki79Jz4J2FFGqXmUY7YcMfehz1AHVph",
+   "трата_sol_экв": 1.01,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "7Nj7mBE7iVmjvnBHNvjgaz6G3ZktTHFNbf7aQDfZ7iNR",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.010 SOL-эквивалента меньше targetMinAmountUI=2.0 (50.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:16:59Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "2uKaFB8H6N1QxZ19bJGw7PhQkcUPpe8VsifMBG5SHopE",
+   "подпись": "3S6iFTZN1JNJFTvuMKoHiXvDP2FB6QfTQXu3R3BEQRgJnZa2orvpwpYTRydPjsCJogDCp7cLs5KfQ1TSr2KVtcL",
+   "трата_sol_экв": 0.00010000000000000005,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:17:21Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "3twrCZzkqwUXnP43H5gmK46QNwagxvZWUVx1F98JpiV16W5BoVFphwMg6yE9aw6gfNpeBFuDuvLikwVHPZrk2HnQ",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 2uKaFB8H6N1QxZ19bJGw7PhQkcUPpe8VsifMBG5SHopE",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:17:36Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "3AiZXTy92c7uiiyPANJ8JgRf5gnMtUukWCdD55pG6nhnhfA6vRpHz12X4rCxnAm1o8sLXazryKibrkNMfxGvTAB1",
+   "трата_sol_экв": 1.008,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.008 SOL-эквивалента меньше targetMinAmountUI=2.0 (50.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:17:48Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "4RAWu2xrGe9t8KXkMqW1A6Z8DveGx5qHhNAmbuqQe5VSQuZJPsEwCEZCqFxKffG6frigUVL1QrynGAToNNP5t9vi",
+   "трата_sol_экв": 0.033,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.033 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:17:57Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "H9UXqmP1ivwSTbby8PnmwjG5oY9HnjrV6ZGCkjcMLwsB",
+   "подпись": "2EBkMGKG9u56UJye2YSmEgudoeGp4KVAcCBWaRu8g3qaoKUPiFQodyUdq45JUfBaQjwcFdVVZdZDUgyRCbpunLfM",
+   "трата_sol_экв": 0.00694789,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.007 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:18:08Z",
+   "источник": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+   "минт": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+   "подпись": "5rtGTKYLNRSNEAqbxtaQTbF9yvDVWXSoQeZRiLZvtZSgF3Qa8N8sdnWG64o7pBEsKnMgkLgGBf6svRbwbd2KNu45",
+   "трата_sol_экв": 0.033,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.033 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:18:08Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "4EiShgwp4RXYYCK6ceQDwiTPhX4gGLpJsMvBNkV4URSfFnqZokJ9BcFGRCQaQQ4oYMnXK4FECAyiFwCafo4XviyH",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: H9UXqmP1ivwSTbby8PnmwjG5oY9HnjrV6ZGCkjcMLwsB",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:18:08Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "4iDAbooCqpXjQfBwJPzcqBnYet9WzCDfuAUU3sCZuHqRHkG7djgbyz52JZVUorqmJQ3sV4MfoTqbPRNFTVJZQUgs",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: H9UXqmP1ivwSTbby8PnmwjG5oY9HnjrV6ZGCkjcMLwsB",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:18:21Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "4TDnppvnDS2bxMwCGz7adfY2TizrkuzW16patD5KuZyW1rfqukDf2UewJ9epNBgjt7F5PGf1YoE3RcAybnZSWVWm",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: H9UXqmP1ivwSTbby8PnmwjG5oY9HnjrV6ZGCkjcMLwsB",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:18:28Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "6VsnbKz6erJRTPiiD34Msq7eWmmgZHDnh4Bxan4MpGjm",
+   "подпись": "3SM2xWrV1WXuWT7G2ssS4qnHCXJLL4m2Q3Du2PXpbQpKiEjtvNweyYi9x314yLs2PqiTD9GoBoPzPWGA1tUSKiUZ",
+   "трата_sol_экв": 1.116956256,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировки в кандидатах нет",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.117 SOL-эквивалента меньше targetMinAmountUI=2.0 (55.8 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:24:04Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "7X9YuhfvC9MZV3RBAuZfPj6Ve2zkuosjWhu5oqAGENT",
+   "подпись": "27HXj2qsfYBu9Z8DSPGHLYPEpjd7TAFzPkCnWQHhzqdB7RZwgvsToCRVYo88jibA9eHNgQ7a3xJ5GHNCsBc72zK3",
+   "трата_sol_экв": 2.48177845048812,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Meteora DLMM",
+    "Orca Whirlpool",
+    "Pump AMM"
+   ],
+   "наш_пул": "9SvDkMsDDH8yF9oUq9w9yz2cvKh7sAL7zgh5PZnLM1fw",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:24:05Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "7X9YuhfvC9MZV3RBAuZfPj6Ve2zkuosjWhu5oqAGENT",
+   "подпись": "5fu7vUTnD6bLQA232hwHD6yFVbPrxXTENU58cYHVdEa4DThgz8bYdgr9T4JXSornzeGPQeCTQNV5NN4KyQosGjEp",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "9SvDkMsDDH8yF9oUq9w9yz2cvKh7sAL7zgh5PZnLM1fw",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:27:18Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "WWZY3dw85kRYULfpxfYbA5jSzUzhsvb5JdExmVBpump",
+   "подпись": "3yWYcgPJEkFQkDaXwEbbSGQnmQfrbXDet9dU6co33kBpkWKtjUm5VPoTLYtqgTxKWtkhAhwgDS9xXcdWGusUr75m",
+   "трата_sol_экв": 1.007069934,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.007 SOL-эквивалента меньше targetMinAmountUI=2.0 (50.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:33:30Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Ha3ZhCPTqtBfsgjwhcRpwuwVeWNmC8ss3wbFeTnxHFZ7",
+   "подпись": "3Rri55wVutn1gYvCJuhiCuBZ6TsyMDfdfyPyP2UvTzfSUKQ3QSAfXkAzNnvqxYTszbBj4W8T6jUQCvn4WmgEVpQh",
+   "трата_sol_экв": 1.408648687,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "UnuCdCHvWTro3A2N5EBK7vrRXLjEfqtGHTgf2E1Zn1j",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.409 SOL-эквивалента меньше targetMinAmountUI=2.0 (70.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:38:32Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "K43T8WRCMSa8hVpZDMRN91P2N1nMBXYCBP2SnZBpump",
+   "подпись": "4d7J34YduEh3sqzpiX4TycdrNoF3LRibEsv7DsE4onEuXjYFTbQamRCgY1rwKtvSSwNaX8joDzM2bEUSBrjxEsJr",
+   "трата_sol_экв": 1.107179126,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.107 SOL-эквивалента меньше targetMinAmountUI=2.0 (55.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:40:34Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "ESQW2VwbNVXpRcxAyHkKjJEibh4HGW6WkDKPemFPpump",
+   "подпись": "5mVG1WtgT2TxLptPzog1ZMwYKVwi7RxXcqAUCpwFJGn1RYsg7EVQGsjqgtoZpSRrWadR43n4bPEgsdeg2rHgxCfQ",
+   "трата_sol_экв": 1.411648289,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировки в кандидатах нет",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.412 SOL-эквивалента меньше targetMinAmountUI=2.0 (70.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:43:13Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "AJPertGGMDmM75fb6jiB8MPfFu61ouLDtW6UBvf3pump",
+   "подпись": "3k6VbNUtrfc2hx3goJi8W4W1SmPYDFbP8vQU3mWs6r3Zb1yj65xvePCvu8MWdSouTF3B7xNhZLhnrFvaLU2z7qNg",
+   "трата_sol_экв": 1.6869386769999999,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "H7pt7KK8pB8xHwpF9DHrgdZsZb6yBjZHhGiUkigyaXwZ",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.687 SOL-эквивалента меньше targetMinAmountUI=2.0 (84.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:44:24Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "6qW1PpRFGdunJ5J68XUkJj5RXbsjaoEcnwiWeM9Me6fp",
+   "подпись": "4GLhjmv5snLhjd9iBKr26hXsq9RRkp7Lxr5efmdEBM8guqvbVcrb4fjdD1X5pX6tXuHm4BEWCggCjiR5x5zZCw3j",
+   "трата_sol_экв": 0.84522729,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.845 SOL-эквивалента меньше targetMinAmountUI=2.0 (42.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:45:33Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "48Auyz4t4zxaxhW2VdQ2zX2fNrKymDoGXMna1ReSpump",
+   "подпись": "4otjup6dA2DmGmST5D1nWaB7yiBgFzssm9phTJ39J67SFwR1WBZP1LoWuq9WCBSYJRACnYJ1tyzfrFcFb2wvF6fz",
+   "трата_sol_экв": 1.200445268,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.200 SOL-эквивалента меньше targetMinAmountUI=2.0 (60.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:47:59Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "48Auyz4t4zxaxhW2VdQ2zX2fNrKymDoGXMna1ReSpump",
+   "подпись": "8ZteGTvEX91dFr27X5qBMBmjnKPad3H2p6u3Rf7bekyab2GqwYUamGq6AgYLehxsTJvKAnJ5uymhVMaeo6w2V2w",
+   "трата_sol_экв": 1.063019566,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.063 SOL-эквивалента меньше targetMinAmountUI=2.0 (53.2 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:54:14Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7WJad2HYabohk5wpFWPAmNK5AiNkvnh9JyL6WAHkHjSk",
+   "подпись": "4TAGVK3AyNDnz8H15TT4KtSjsg6NcAYZrHW242iJjhuBuNo2dgEu1xhZ9x2xobt671Z1bZT3vfnzTWvDibHG4eZj",
+   "трата_sol_экв": 1.2002473299999998,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.200 SOL-эквивалента меньше targetMinAmountUI=2.0 (60.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:56:02Z",
+   "источник": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
+   "минт": "48Auyz4t4zxaxhW2VdQ2zX2fNrKymDoGXMna1ReSpump",
+   "подпись": "3u4e9EvhUcZ6ntv8H3n3EBzQbF9MosjBPtW1y1e5ygqGQX7YUSeLEQtfF1g183RS4DtpXf2V6wDKNHAiqZwXNz5z",
+   "трата_sol_экв": 4.126634263715334,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:56:02Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "48Auyz4t4zxaxhW2VdQ2zX2fNrKymDoGXMna1ReSpump",
+   "подпись": "4dzuXFfSREUdpTjoHaUVEZxm1Sw8w9uN6i3rx6zFxLtovuLMg6L4yZjw896maaXsXYi36hgh8JPuf8YGnAo5pCwa",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "98XJL5svaf5H6eogGyJzHDN4LfVWy7J2K259uCqTsCse",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:56:03Z",
+   "источник": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
+   "минт": "48Auyz4t4zxaxhW2VdQ2zX2fNrKymDoGXMna1ReSpump",
+   "подпись": "5vcu47yDq31AThjkbJqbY8Xn5RrzGXsASuoSF4xQbTKktfg3SQVfirFpiTWp2iLkxfx6uef6wdLZpvMUnogSFd9C",
+   "трата_sol_экв": 2.025000001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "98XJL5svaf5H6eogGyJzHDN4LfVWy7J2K259uCqTsCse",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T09:57:34Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "Evqf8gwQ9iW3fAqrrf6ZC8fT99t6Ybm7f5GQCm6Qpump",
+   "подпись": "2gT7uk1c7bA8UXM4byUREDY2wvx3zF5Bn7wSHpZiPAM15ZKUnCZCDeUKye6tpuBNY5uRFGBMiz58m51AZwDdPvgB",
+   "трата_sol_экв": 2.3138092555413468,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:01:39Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7CvnbepCAba4M4qVUMS66dyUgySdcwLM6Ebfx8z3br9e",
+   "подпись": "5PSGo418Rnwf59G83yRjVzLebCGxqUaCN6do4tKVKJSBPjsP69cXBoVPJpezHD23QqbTBNYaQeGhn1WAKrPCMEFs",
+   "трата_sol_экв": 1.54967181,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "7Cpm8TaMZXcxc6PuBfdW7i5rZeZwvUBSpo5jwfQ5zgeN",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.550 SOL-эквивалента меньше targetMinAmountUI=2.0 (77.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:08:41Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7f7Yg9QujujMrDT7tTioEKD1hFNV1iu5HDQyDRVujdPS",
+   "подпись": "gnfoGRmwGkcVAkaQTYLiP8zLmn6nTQADdAurceF1f1G4mFTYLPQXAc9LK8fvFB7qLZ6im4hEhZ81uRwRpBdP6xk",
+   "трата_sol_экв": 0.013169808,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.013 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.7 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:09:59Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "2vD2x3AbdJn16cBwie4HhPtMdahYa4CrfmUhre2KVjNnY6NRHUNvsa4DDeyAmcBjiwHij2g2HSHd6tv4QDGmC5rB",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 7f7Yg9QujujMrDT7tTioEKD1hFNV1iu5HDQyDRVujdPS",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:10:22Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "5iVDKbs6GnBbV7JNM5kZRW1S6hNFnkCcuduyTUcuXfYtBE1Rykn37EFRuXgpDcgfgPNpbVhvDH8mmYuo8ij7Cwng",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 7f7Yg9QujujMrDT7tTioEKD1hFNV1iu5HDQyDRVujdPS",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:10:50Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Cb2pMbsRRvaeZoxpRqnTP6k6hLziSUf5pnqW9Jx5T3Wz",
+   "подпись": "3joMAv2o9CH2B3kn2XhHFHUGFe89LbtvDkvSfKrMEBwjyYi3oHgp2wFi5AMVdVH2RtmcfQ6yW6b6tmWw5YnMHape",
+   "трата_sol_экв": 0.039144533,
+   "первый_вход": false,
+   "докупка": false,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.039 SOL-эквивалента меньше targetMinAmountUI=2.0 (2.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:11:19Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+   "подпись": "41DpeLgWUuMP2TULtTmysnmwKUXrp3TP6RHpWkzHcBtfRZ1aJkZvUSWp2wAs5NTRvg7KuWhVEMAuEtsHsRBjd8Gi",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Cb2pMbsRRvaeZoxpRqnTP6k6hLziSUf5pnqW9Jx5T3Wz",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:11:25Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "5HuN9f7u5CLZDhTTxpNBf9HBEi8SU5QHGMsNXgN245eu",
+   "подпись": "bsNZeBkorxaykJbbB5yziV2Ljpmf4tJbfG65mdjHp4LBwTf7ffc7JaHSGoWkxnoU58ZiXSo6nUtZnhgKbzXxGZF",
+   "трата_sol_экв": 1.147952278,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.148 SOL-эквивалента меньше targetMinAmountUI=2.0 (57.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:11:51Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7f7Yg9QujujMrDT7tTioEKD1hFNV1iu5HDQyDRVujdPS",
+   "подпись": "2LqPoD9mQtmfsvA1GKKxXbgd1mi6P5fq1ASpCcTb1gcTQ8niEY3JuR7xagG3SbsMZYwW57VXenTWmU3rtaviETNa",
+   "трата_sol_экв": 0.043611236,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.044 SOL-эквивалента меньше targetMinAmountUI=2.0 (2.2 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:11:55Z",
+   "источник": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE",
+   "минт": "AH826KkLLCfUR9qqX21pG1nvQKPzH9agKxDSAcyXpump",
+   "подпись": "snxVMfjYnYA1KMGaPwRWMsz8MBgWLHsHhsazkE8dMtgod7YYnwVSrtyvMZoM6GZY7Cfjh5SehB45qN3aAtFJcge",
+   "трата_sol_экв": 0.877,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.877 SOL-эквивалента меньше targetMinAmountUI=2.0 (43.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:12:05Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+   "подпись": "5U4M4AyZmf5BWk8PeVeUF43kLwVCud2EzXqisB4TsANbgBK4hYDafqWd3TxbX5YJFSi65uG8fwFMwydbgCJhXNTb",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Cb2pMbsRRvaeZoxpRqnTP6k6hLziSUf5pnqW9Jx5T3Wz",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:12:06Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "подпись": "tf97qdUgBx3cpA1FQxDEwSLSj147vHmEv5xRDtmcHS2Q9VpRVAArg5RdNQwyddW5vq16pmTPuUbZjj6Zv8AKGXT",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 7f7Yg9QujujMrDT7tTioEKD1hFNV1iu5HDQyDRVujdPS",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:12:12Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "3uq5bZtUndaAryJS64nSze93QPQFWaayi7qhFLBApump",
+   "подпись": "55WeZmESm1uU7C6bPQZsNsxrZbnxwvLFEdrqanPkjANXq2sAGjjfDXh9VzoPb3inD8Qsj5brBK7L4GT4teCkDwht",
+   "трата_sol_экв": 1.410215516983231,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: BLKKYfF41c6xRPrtX1rdYbxLE1xxEdZUnxQsB5hcZ8Nf, EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.410 SOL-эквивалента меньше targetMinAmountUI=2.0 (70.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:12:16Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "BLKKYfF41c6xRPrtX1rdYbxLE1xxEdZUnxQsB5hcZ8Nf",
+   "подпись": "2uKCBtfm4av13eiqEbqZ3rqy7KGmDGP23Xs7EzPUYfFkGhkbbYjF3zwQKSnH5gjj8U2vyaUjvRj8ZL9fEEMqbncw",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Pump AMM",
+    "Raydium CLMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 3uq5bZtUndaAryJS64nSze93QPQFWaayi7qhFLBApump, EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:17:14Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "9NHvesjXXun1qBjmYRbnuP4hLTEoEkLeck3UUaDJSTNK",
+   "подпись": "65iaC7FLxyNfzXRn6wqe275xmoDqkPEd2Rf2dxhB2G9UsNYBArVWpbnRdREjJ4BmrgCNuMZvYq1YAWq3Svmquikj",
+   "трата_sol_экв": 0.032091257,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.032 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.6 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:17:24Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "9HdjHymM9nDRfYANhDhXTR1vEqKomDdPvf6wJc88RCUg",
+   "подпись": "5MgCzj6cyZPYNNpotnedqkPpYHj4SXuo8cMqAu9V4YY9pxiZS2S1zjF8dE4QLDcX16YjwN84q3epMFimcFjqwXhN",
+   "трата_sol_экв": 0.828908371,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "5GmVFacVerzSeYRNXHNUyL1iTFXKGPCajXgsrSbZh2e5",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.829 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.4 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:19:51Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "7AkwtnApnQkvQhRubx4bG7SKVHXc4jt4fsatDbHMYWfY",
+   "подпись": "2XXGmXh4hH1yHR46jgwcN5ZwbfdpM4CfChveq3z3HM7iTjv9URLCHY527i653i1nU1RMVWqYHY2mPrcTxFKpZPk5",
+   "трата_sol_экв": 0.018275727,
+   "первый_вход": true,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.018 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.9 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:19:55Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+   "подпись": "Vr2PAXHvyReoubXa6MGkaGvZFcZdGEMwj8v9mzprTMn5PsfNmdDYEjdbGJ1mAk333dYDtPm7fJkwGJSZTRZkSrw",
+   "трата_sol_экв": 0.0003,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 9NHvesjXXun1qBjmYRbnuP4hLTEoEkLeck3UUaDJSTNK",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:20:31Z",
+   "источник": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
+   "минт": "BgDXbCte2gp163wwYSXTnMcb4hzYQmY4AMcG2zkV2YAN",
+   "подпись": "58wxnzwz8Bw3t5qP2Nv8sBUW9Pw1p6yBfHHuPVsFsa9WghAv7EQmFNPLYzT1HHxezojc9kph3MZJiCk3XTwdmnQd",
+   "трата_sol_экв": 8.242858593717633,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Orca Whirlpool",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:20:31Z",
+   "источник": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+   "минт": "BgDXbCte2gp163wwYSXTnMcb4hzYQmY4AMcG2zkV2YAN",
+   "подпись": "5fzyUkbsmsQr62G3A1bXJS2Bm2yQpKMEivZzZiquB7sdkMj6Xe3bmSLcJP9XHqXZyNL3QQQNfUpvWJ7LTmiNjLg4",
+   "трата_sol_экв": 5.1,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Jupiter v6",
+    "Orca Whirlpool",
+    "Raydium LaunchLab"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:21:44Z",
+   "источник": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+   "минт": "36mewNdQikpBxuNwRtJ82uy3aeuMtyXJBUGtVE2ypump",
+   "подпись": "5cezYBegZfmouU88AM7fY4Emq6QZ6e4yfnCESbpsC7xJQdx7BcyzSa6A5bikHHrdB3iTCEofSNEkqRPxGBK2q6iv",
+   "трата_sol_экв": 2.32590791713733,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T10:21:44Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "36mewNdQikpBxuNwRtJ82uy3aeuMtyXJBUGtVE2ypump",
+   "подпись": "5fQUPTBLqaU8T9LVv17at6VZQFoxLRCm9ayafW5TRXEwK8yQjpwn1ZY4sArBAkkEjyszeyPKHkpY6HzoNeVi2VU4",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "5gZfWRhAcAUyrV14SGRbsAZed1tCvguKUU5rirY1Yexy",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:24:53Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "98sMhvDwXj1RQi5c5Mndm3vPe9cBqPrbLaufMXFNMh5g",
+   "подпись": "AAoX9AHXzV9kjRYZjSVhSyvNAUPSX1hH1CBVirRB4TA9pPbPnxBDPAWR9N8rns4Ax44vH1pcVWrjRyL9uriWiM8",
+   "трата_sol_экв": 0.0001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: 7AkwtnApnQkvQhRubx4bG7SKVHXc4jt4fsatDbHMYWfY",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.000 SOL-эквивалента меньше targetMinAmountUI=2.0 (0.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:33:34Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "2c1ZzpZZZr7xnKWwuv5tfDU9jC1V3NjY3BoXQ6wPpump",
+   "подпись": "2yfSQTY5iMCEc7TjufwS7WGof17tbdojqYFJVvwswLSpzxQo5Fjbrj1obp45SqcCX1L2ML8ocWxGZ5QVq7S9vZxp",
+   "трата_sol_экв": 1.626608312,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "F4SzQnUM4FpcV5KmQ3UdTYg1AjTMcw6UEPR8wZd1dn5R",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 1.627 SOL-эквивалента меньше targetMinAmountUI=2.0 (81.3 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:33:59Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "G96rxj3WSfEpNWZazTn2MPTJYuC5u5ycBZVSRweopump",
+   "подпись": "5Lnci8AARW5YRW5X9AonyEqvwUAYGRwQ7BtViabmXAwwQB6CZaeScVJU5uBGHcaZFsR9no8MvVVJ23WwXRvSuKti",
+   "трата_sol_экв": 0.8304466149999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "5m5WCgfFCr77itnfG8GhAUajrignm5k8ygWRcZYWZDdc",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.830 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T10:35:58Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "2Hn4LJ6gmTv4Tqrd1MTHcqMZzxA9uZETgRYEmoFopump",
+   "подпись": "53VUefBSCeKEjk14bK2Si1achFb8ezDXDiNQVhEqzbXyNCfKSCwVo7iy4Z5ptZzp1dHX6e3CRv2ArqucGm8dNGoM",
+   "трата_sol_экв": 0.962370081,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "в транзакции нет владельца с хранилищами двух минтов, один из которых наш",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.962 SOL-эквивалента меньше targetMinAmountUI=2.0 (48.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:36:32Z",
+   "источник": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7",
+   "минт": "BgDXbCte2gp163wwYSXTnMcb4hzYQmY4AMcG2zkV2YAN",
+   "подпись": "52CePX6YFPm3yTqQUepb7JERgvdNBqDXCs5rqaz4Zwy6hV1SQeeZZMxJpo9ZqtsbbKz1mSY7LeerJh2s31WSYPBZ",
+   "трата_sol_экв": 8.252081848410356,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Orca Whirlpool",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v, Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 3612 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:39:17Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "HpSEVrzNGL9ESACpW5rdzQ4VRKpT5Cq1tx3waA8jUyWg",
+   "подпись": "4zW6P93jUnsDu9GndRtd4yGuwQENvehYFsUgeXZgtRjfjfntTvqEosmJ3t6jC7mGzhEab7o7mFKU6rbrD7tr5pLM",
+   "трата_sol_экв": 0.021940815,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.022 SOL-эквивалента меньше targetMinAmountUI=2.0 (1.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:39:55Z",
+   "источник": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+   "минт": "4iSjtJhbZx7CFV8Qngb1zvebsy25SzYxnoQAvc6jpump",
+   "подпись": "98deCt89iGefQSKa8ddpWLcfh9xm28ALp7b9vXNeBa6yznuXAUUCs934UATJkmZ87puuKjRbD193vjdjvcmd4AD",
+   "трата_sol_экв": 4.127085934385587,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "E7g99f9F3zbWgv456Z6MYexjgUinJc1VoTt7WqvrHVet",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:39:56Z",
+   "источник": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "минт": "4iSjtJhbZx7CFV8Qngb1zvebsy25SzYxnoQAvc6jpump",
+   "подпись": "2HzC8bmzqxTjgeZJcLRXq6A8aEn1d7frQDcyvFdiM5fKVP84SjsEmwWF5wCdxjmmvQmuFz3ECUi2K2yAc4UowqHr",
+   "трата_sol_экв": 0.82996744,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "E7g99f9F3zbWgv456Z6MYexjgUinJc1VoTt7WqvrHVet",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.830 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.5 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T10:39:56Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "4iSjtJhbZx7CFV8Qngb1zvebsy25SzYxnoQAvc6jpump",
+   "подпись": "2XwMC2H6bCVh62TGrgx819MEgHYj4WMrZwN58dCrJSW7AEvdn4ZrW5EiFhHqBQa2Q1dH72n8p5g1N19sitCHE1gD",
+   "трата_sol_экв": 0.10099999999999999,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "E7g99f9F3zbWgv456Z6MYexjgUinJc1VoTt7WqvrHVet",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.101 SOL-эквивалента меньше targetMinAmountUI=2.0 (5.0 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
   {
    "ts_utc": "2026-10-04T10:40:08Z",
    "источник": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
@@ -1262,57 +5642,248 @@
    "причина": "вход источника 0.823 SOL-эквивалента меньше targetMinAmountUI=2.0 (41.1 % от порога)",
    "действие": "skip",
    "лаг_слотов": 1
+  },
+  {
+   "ts_utc": "2026-10-04T12:30:14Z",
+   "источник": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij",
+   "минт": "5tCju6YNxHq5zrA6tGndr6F7TK42mpUFmeE31cSFpump",
+   "подпись": "2s2AK41zrLkiyJGtnBeBU7wLnHVWghxGFmvN8CtDCbL8L7164uTv2np82uK5sX1X3BCc8wzc36ZXai42M3ZVJVYc",
+   "трата_sol_экв": 19.9986538,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Jupiter v6",
+    "Meteora DLMM",
+    "Pump AMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "кандидатов с WSOL больше одного (2) -- какой пул наш, неясно",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 132938 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:32:38Z",
+   "источник": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC",
+   "минт": "DoVAVzViX8Bjy3r15nwikSaSbzE6dV4ovd28aWpJpump",
+   "подпись": "5ovR4iqUeDaQWh6KNDM7a1bYbJinCAyanAgVD5rdAfJoe821WaKTLLjLXxRqhVx4W8qYgEdqhKNhCBEXgDiNwTGR",
+   "трата_sol_экв": 4.00001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump.fun"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:34:23Z",
+   "источник": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+   "минт": "68AGsjomsgTtiTaDhF6XGCeVJDnFeh415ngYYgVxGzns",
+   "подпись": "5q9a9LNqSsSep9pxiTXqPRjbjrn5hF8t991pxUnKn2LL4PHu1QW8KnsKjrEyubPghinHpmFsRmkNCbtVcXLeorHV",
+   "трата_sol_экв": 25.001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:34:23Z",
+   "источник": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+   "минт": "68AGsjomsgTtiTaDhF6XGCeVJDnFeh415ngYYgVxGzns",
+   "подпись": "2iUpzRyHzG9m3KW2TT4KcRZNuiDqDjLdFoW12MEBRCqFoG8CwnbzjLw9Yh3X3L5Decs7e8FPoueuUAkGHHaWt1Rn",
+   "трата_sol_экв": 25.001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 2 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:34:24Z",
+   "источник": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+   "минт": "68AGsjomsgTtiTaDhF6XGCeVJDnFeh415ngYYgVxGzns",
+   "подпись": "2FMY7iXswgZAyR19DYBHZrDQUohJcZLoQJoMcxX61RsRvMje2NzseWSHbJbKcmHRKGZzNTtiGAXKxpxekkh8z92L",
+   "трата_sol_экв": 25.001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 2 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:34:24Z",
+   "источник": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+   "минт": "68AGsjomsgTtiTaDhF6XGCeVJDnFeh415ngYYgVxGzns",
+   "подпись": "3N6r13iQg5CWs52jsnEiw4HTk5MCYmsWmx2LzExdUStkagZP5MmNLd9zgvLAuLaZPWLEGDWm86hD9VX9BnRj3M1B",
+   "трата_sol_экв": 25.001,
+   "первый_вход": false,
+   "докупка": true,
+   "пулы": [
+    "Raydium CLMM",
+    "Raydium CPMM"
+   ],
+   "наш_пул": null,
+   "почему_не_пул": "ни один кандидат не парный к WSOL или все отклонены; котировка: Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+   "код": "SKIP_TARGET_INCREASE_POSITION",
+   "причина": "источник докупает тот же токен в окне докупки: источник уже покупал этот минт (разница 2 слотов) -- берём только первую покупку пары",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:36:56Z",
+   "источник": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC",
+   "минт": "uxt27m7DDEc4EmMEN2Lkt6bLWxdunVKNeT8NDEtpump",
+   "подпись": "2BbRyaNF1XVe6bzan1cfPTMVUykZP7rWmXoXBg2BaghnQsfJW9k4P3NXmZv73QMvKDq4AGvBAAsyyyLd3PtBxqfD",
+   "трата_sol_экв": 9.000010000000001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "9W58z89eCDgFvHdFQEMGz1MkjgkwGeDLQLh86VMr184H",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:37:10Z",
+   "источник": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
+   "минт": "DaUFkgZjwJCsM9QDWCsxtZS2omgHS3Fn9GHgTX5wwpcX",
+   "подпись": "2DLrQ2a5R9Y2WnVhGknBNkszy7WnTR72YLBqEGS9z75JEBN8SKznyeHz24DNLJoYaY1WMnjPirVjfJysKN5KxF3c",
+   "трата_sol_экв": 8.237164301928651,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Jupiter v6",
+    "Pump AMM"
+   ],
+   "наш_пул": "GZasA7MtFFabe7hDrE99mC9CU4xSizTLiVQNnfZqCCSS",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:37:10Z",
+   "источник": "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x",
+   "минт": "DaUFkgZjwJCsM9QDWCsxtZS2omgHS3Fn9GHgTX5wwpcX",
+   "подпись": "5xBeWWmTUyXtqYMLeru6BQrt2L6cyMPctmDBaH5CzuUnMjAUcz3JzTNmwp9RnLbVPBoy3VeRVTcYXwVGHxa6ggu1",
+   "трата_sol_экв": 0.501,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "GZasA7MtFFabe7hDrE99mC9CU4xSizTLiVQNnfZqCCSS",
+   "почему_не_пул": null,
+   "код": "TARGET_AMOUNT_OUT_OF_RANGE",
+   "причина": "вход источника 0.501 SOL-эквивалента меньше targetMinAmountUI=2.0 (25.1 % от порога)",
+   "действие": "skip",
+   "лаг_слотов": 0
+  },
+  {
+   "ts_utc": "2026-10-04T12:37:10Z",
+   "источник": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
+   "минт": "DaUFkgZjwJCsM9QDWCsxtZS2omgHS3Fn9GHgTX5wwpcX",
+   "подпись": "3geBF4xmMxPH4CJ53ZytdJNT4GKG6WKkVjrJAk5YzRZ3WNm2NABviiz7r8qvghQYT1hymkUiSXE3edZYFd2D193N",
+   "трата_sol_экв": 2.025000001,
+   "первый_вход": true,
+   "докупка": false,
+   "пулы": [
+    "Pump AMM"
+   ],
+   "наш_пул": "GZasA7MtFFabe7hDrE99mC9CU4xSizTLiVQNnfZqCCSS",
+   "почему_не_пул": null,
+   "код": "INSUFFICIENT_BALANCE",
+   "причина": "баланса не хватает: 0.0000 SOL при нужных 0.2200 (вход 0.2 + резерв на комиссии 0.02)",
+   "действие": "skip",
+   "лаг_слотов": 0
   }
  ],
- "адресов_со_сигналами": 48,
+ "адресов_со_сигналами": 52,
  "по_источнику": {
-  "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT": 18924,
-  "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC": 12152,
-  "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr": 99,
-  "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij": 83,
-  "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE": 34,
-  "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da": 19,
-  "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns": 19,
-  "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ": 17,
-  "HYh78tNpGBUcxoHgPU9v7VeP2wqSbkapuTzrfYHjfyLo": 16,
-  "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": 15,
-  "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy": 14,
-  "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2": 13,
-  "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw": 13,
-  "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC": 13,
-  "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6": 13,
-  "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87": 11,
-  "ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy": 11,
-  "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1": 10,
-  "2kv8X2a9bxnBM8NKLc6BBTX2z13GFNRL4oRotMUJRva9": 9,
-  "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x": 8,
-  "AxtZoNYhAxvpv416hW7yzpTdcJeY45t8JyGUYMJXL9G": 8,
-  "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb": 8,
-  "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy": 7,
-  "DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o": 7,
-  "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2": 7,
-  "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt": 7,
-  "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu": 7,
-  "9zZCjLr9xfXfp3qdqvPh6YeaEaagepz21khLhca69B18": 7,
-  "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ": 6,
-  "2net6etAtTe3Rbq2gKECmQwnzcKVXRaLcHy2Zy1iCiWz": 6,
-  "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN": 5,
-  "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit": 4,
-  "8xL8S7P4QLdTGRquHas8NP5EVjp2qUGbmSgrkh97mvmq": 4,
-  "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk": 4,
-  "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd": 4,
-  "AuPp4YTMTyqxYXQnHc5KUc6pUuCSsHQpBJhgnD45yqrf": 4,
+  "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC": 26453,
+  "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT": 22019,
+  "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd": 484,
+  "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr": 457,
+  "FLyBjfWGsxH4zDDfoUJHwA9774TmPVpR8kB5B46PtbaZ": 363,
+  "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2": 268,
+  "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij": 223,
+  "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw": 134,
+  "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy": 108,
+  "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x": 82,
+  "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6": 76,
+  "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE": 68,
+  "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": 62,
+  "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87": 55,
+  "498g1rVnFcnjBjpfw1xyqA1WvgQXUU8RWuELjxkjAayQ": 45,
+  "2net6etAtTe3Rbq2gKECmQwnzcKVXRaLcHy2Zy1iCiWz": 40,
+  "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da": 39,
+  "HYh78tNpGBUcxoHgPU9v7VeP2wqSbkapuTzrfYHjfyLo": 38,
+  "2kv8X2a9bxnBM8NKLc6BBTX2z13GFNRL4oRotMUJRva9": 38,
+  "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt": 36,
+  "DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o": 36,
+  "ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy": 32,
+  "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb": 31,
+  "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy": 28,
+  "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ": 28,
+  "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm": 27,
+  "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7": 27,
+  "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC": 27,
+  "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy": 26,
+  "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1": 26,
+  "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk": 24,
+  "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns": 23,
+  "BCrTEXmWutwPz8qv6w1S5gDbaLnSLpXKM5kSGVWyyfxu": 22,
+  "9CNyLECt2j8tnDhqxtjYk5HUhZ2b8Nwnyb7sfYN7vND2": 21,
+  "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv": 20,
+  "AxtZoNYhAxvpv416hW7yzpTdcJeY45t8JyGUYMJXL9G": 15,
+  "BA3nKHc4DoSANRrx4FcCupExzs6cWzw1wkPpqjnqJaCN": 11,
+  "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit": 10,
+  "AuPp4YTMTyqxYXQnHc5KUc6pUuCSsHQpBJhgnD45yqrf": 9,
+  "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS": 9,
+  "9zZCjLr9xfXfp3qdqvPh6YeaEaagepz21khLhca69B18": 8,
+  "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv": 5,
+  "8xL8S7P4QLdTGRquHas8NP5EVjp2qUGbmSgrkh97mvmq": 5,
+  "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG": 4,
+  "Fvkc2thk1YcAASdR2gi8uf9n67JW9Dqqr9iRd99MDhoB": 3,
   "5opd5KBmodmoNuAThQ5cmXKbRxHbQDfomWGKAs3uEUP9": 3,
-  "Ak6gsstZwaRDYKnzdyNg2HvCXDFvv21afjVix9VGRMQv": 3,
+  "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm": 2,
+  "7txcAXw9t7jRiW93tt6mbJ7cDA5EUSiVSRRfPyzH1DMa": 2,
+  "83Y8aqfDxz8XSerVACBubyinHm8rQ6REg9j5YXvT8b57": 2,
   "8RCEq8RrBJ1G6eji9vZqjtjQgkDjUHMysPtynZENWo7S": 2,
-  "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG": 2,
-  "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7": 2,
-  "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS": 2,
-  "F5MYbjEATQFD6rxwdS2zXzEHBGuUhSGvJkUhLFAcr4hv": 1,
-  "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy": 1,
   "5VRgqb2qbVqaWVGsM2k1b2bnPJk7up2xYbn4ziEjFgNt": 1,
-  "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm": 1,
-  "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8": 1,
-  "83Y8aqfDxz8XSerVACBubyinHm8rQ6REg9j5YXvT8b57": 1
+  "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8": 1
  }
 }
