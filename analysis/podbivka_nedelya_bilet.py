@@ -64,6 +64,32 @@ K_ДОЛИ = (0.01, 0.02, 0.03)
 N_МИН = 20
 
 
+def итог_сделки(r: dict) -> tuple[float | None, str]:
+    """Итог сделки полосы -- кириллическое `итог_po_cepi_sol`; нет его -- `итог_sol`, и это
+    помечается. Латинское `itog_po_cepi_sol` -- ВОЗВРАТ, а не итог (слово владельца 03.10),
+    поэтому оно не берётся ни при каких условиях. Одно место на все страницы подбивки.
+    """
+    if r.get("итог_po_cepi_sol") is not None:
+        return float(r["итог_po_cepi_sol"]), "цепь"
+    if r.get("итог_sol") is not None:
+        return float(r["итог_sol"]), "поля"
+    return None, "нет"
+
+
+def сутки_мадрид(r: dict) -> str | None:
+    """Сутки по Мадриду по времени ПОКУПКИ (поле utc выгрузки -- время покупки)."""
+    т = r.get("utc")
+    if not т:
+        return None
+    try:
+        from datetime import datetime, timezone  # noqa: PLC0415
+        from zoneinfo import ZoneInfo  # noqa: PLC0415
+        d = datetime.strptime(т, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return d.astimezone(ZoneInfo(МАДРИД)).strftime("%Y-%m-%d")
+    except Exception:  # noqa: BLE001
+        return т[:10]
+
+
 def сутки(ts: float) -> str:
     return time.strftime("%Y-%m-%d", time.gmtime(ts))
 
@@ -201,31 +227,6 @@ def main() -> int:
             for r in json.loads(f.read_text(encoding="utf-8")).get("ряды") or []:
                 по_cid[r["cid"]] = r
         сырые = list(по_cid.values())
-
-    def итог_сделки(r: dict) -> tuple[float | None, str]:
-        """Итог -- кириллическое `итог_po_cepi_sol`; нет его -- `итог_sol`, и это помечается.
-
-        Латинское `itog_po_cepi_sol` -- возврат, а не итог (слово владельца 03.10), поэтому
-        оно не берётся ни при каких условиях.
-        """
-        if r.get("итог_po_cepi_sol") is not None:
-            return float(r["итог_po_cepi_sol"]), "цепь"
-        if r.get("итог_sol") is not None:
-            return float(r["итог_sol"]), "поля"
-        return None, "нет"
-
-    def сутки_мадрид(r: dict) -> str | None:
-        """Сутки по Мадриду по времени ПОКУПКИ (поле utc выгрузки -- время покупки)."""
-        т = r.get("utc")
-        if not т:
-            return None
-        try:
-            from datetime import datetime, timezone  # noqa: PLC0415
-            from zoneinfo import ZoneInfo  # noqa: PLC0415
-            d = datetime.strptime(т, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-            return d.astimezone(ZoneInfo(МАДРИД)).strftime("%Y-%m-%d")
-        except Exception:  # noqa: BLE001
-            return т[:10]
 
     живые = []
     счёт_живых = collections.Counter()
@@ -503,6 +504,17 @@ def main() -> int:
                       + ", ".join((x.get("по_сервисам") or {})) + " | "
                       + (f"`{x['buy_sig']}`" if x.get("buy_sig") else "—") + " |")
         md += [""]
+    # добавка владельца 04.10: DBot против полосы на одних и тех же источниках.
+    # Раздел считает podbivka_dbot_protiv_polosy.py и кладёт готовым куском -- здесь он только
+    # подклеивается, чтобы документ был один.
+    дбот = П / "dbot_protiv_polosy_razdel.md"
+    if дбот.exists():
+        md += ["", дбот.read_text(encoding="utf-8").rstrip()]
+    else:
+        md += ["", "## DBot против полосы на одних и тех же источниках", "",
+               "Раздела нет: не найден `data/podbivka/dbot_protiv_polosy_razdel.md` "
+               "(его пишет `analysis/podbivka_dbot_protiv_polosy.py`).", ""]
+
     md += ["", "Ничего не рекомендуется -- решает владелец.", ""]
     out_m = КОРЕНЬ / "docs" / f"podbivka_{а.metka}_nedelya_bilet.md"
     out_m.write_text("\n".join(md) + "\n", encoding="utf-8")
