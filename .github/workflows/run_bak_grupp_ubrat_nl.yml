@@ -1,0 +1,151 @@
+name: "Файл групп: оставить последние 10 копий .bak, остальные убрать"
+
+# ЗАЧЕМ (слово владельца 04.10, 12:30Z: ".bak-копии файла групп: оставить
+# последние 10, остальные убрать -- да"). Каждая правка файла групп кладёт
+# рядом копию (deploy/checks/pravka_grupp.py делает shutil.copy2 перед
+# записью), и их никто не чистил -- к 04.10 набралось около 33.
+#
+# ПОЧЕМУ ИМЕННО КОПИИ, А НЕ САМ ФАЙЛ. Копия -- это откат правки: именно из неё
+# скрипт возвращает файл, когда самопроверка денежного пути не сошлась.
+# Поэтому последние десять остаются НЕПРИКОСНОВЕННЫМИ, а сам файл групп и
+# тем более env здесь не трогаются вовсе.
+#
+# ПОЧЕМУ ЭТО БЕЗОПАСНО ДЛЯ ТОРГОВЛИ. Детектор перечитывает САМ файл групп по
+# mtime и копии не открывает никогда. Удаление старой копии службу не
+# затрагивает: ни перезапуска, ни правки env, ни одного торгового параметра.
+#
+# ПО УМОЛЧАНИЮ -- ТОЛЬКО ПОКАЗАТЬ. Удаление идёт лишь по явному слову
+# pokazat=no: список к удалению сперва печатается, и только потом удаляется.
+on:
+  workflow_dispatch:
+    inputs:
+      pokazat:
+        description: "'yes' -- только показать, что удалилось бы (по умолчанию)"
+        required: false
+        default: "yes"
+      ostavit:
+        description: "сколько последних копий оставить (по слову владельца 10)"
+        required: false
+        default: "10"
+
+concurrency:
+  group: bak-grupp-ubrat
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  FILE: /home/bot/data/sources_2026-09-25.json
+  OUT: data/bak_grupp_ubrat.txt
+
+jobs:
+  uborka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "ВХОД: число -- только цифры, и не меньше трёх"
+        env:
+          OSTAVIT: ${{ inputs.ostavit }}
+        run: |
+          set -e
+          case "$OSTAVIT" in
+            ""|*[!0-9]*) echo "OTKAZ: ostavit -- tolko cifry, dano: $OSTAVIT"; exit 1;;
+          esac
+          # НИЖНЯЯ ГРАНИЦА -- ЧТОБЫ ОПЕЧАТКА НЕ СНЕСЛА ВСЕ ОТКАТЫ. Ноль или
+          # единица в этом входе означали бы "откатываться некуда", а это
+          # денежный путь: из копии файл возвращается при несошедшейся
+          # самопроверке.
+          if [ "$OSTAVIT" -lt 3 ]; then
+            echo "OTKAZ: ostavit menshe 3 -- eto snesli by otkaty pravki grupp"
+            exit 1
+          fi
+          echo "ostavljaem poslednih: $OSTAVIT"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Показать и, по слову, убрать"
+        env:
+          POKAZAT: ${{ inputs.pokazat }}
+          OSTAVIT: ${{ inputs.ostavit }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЧИСЛО В КОМАНДУ root ИДЁТ ТОЛЬКО ПОСЛЕ ПРОВЕРКИ ВЫШЕ: там отказ на
+          # любом знаке кроме цифры, то есть подставляется заведомо число.
+          N="$OSTAVIT"
+          : > "$OUT"
+          echo "=== Копии файла групп, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
+          # ПОРЯДОК -- ПО ВРЕМЕНИ ФАЙЛА, А НЕ ПО ИМЕНИ. Имена копий несут метку
+          # времени, но полагаться на разбор имени там, где речь об откате,
+          # нельзя: одна копия с другой меткой -- и "последние десять" станут
+          # не теми.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            VSEGO=\$(find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' | wc -l)
+            echo \"kopij vsego: \$VSEGO\"
+            echo '--- poslednie (ostajutsja) ---'
+            find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' -printf '%T@ %p\n' \
+              | sort -rn | head -n $N | cut -d' ' -f2-
+            echo '--- k udaleniju ---'
+            find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' -printf '%T@ %p\n' \
+              | sort -rn | tail -n +\$(( $N + 1 )) | cut -d' ' -f2- > /tmp/bak_k_udaleniju.txt
+            cat /tmp/bak_k_udaleniju.txt
+            echo \"k udaleniju: \$(wc -l < /tmp/bak_k_udaleniju.txt)\"
+            echo '--- sam fajl grupp (NE tronut) ---'
+            ls -l $FILE" | tee -a "$OUT"
+          if [ "$POKAZAT" = "yes" ]; then
+            echo "POKAZ: nichego ne udaleno (pokazat=yes)" | tee -a "$OUT"
+            exit 0
+          fi
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            UDALENO=0
+            while IFS= read -r F; do
+              [ -n \"\$F\" ] || continue
+              # ГЕЙТ НА КАЖДЫЙ ФАЙЛ: удаляем только то, что и правда копия
+              # ЭТОГО файла. Без него опечатка в шаблоне стоила бы чужих данных.
+              case \"\$F\" in
+                $FILE.bak-*) rm -f \"\$F\" && UDALENO=\$((UDALENO + 1));;
+                *) echo \"PROPUSK (ne kopija etogo fajla): \$F\";;
+              esac
+            done < /tmp/bak_k_udaleniju.txt
+            rm -f /tmp/bak_k_udaleniju.txt
+            echo \"udaleno: \$UDALENO\"
+            echo 'ostalos kopij:' \$(find \$(dirname $FILE) -maxdepth 1 -name '\$(basename $FILE).bak-*' | wc -l)
+            ls -l $FILE" | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Fajl grupp: uborka kopij .bak [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
