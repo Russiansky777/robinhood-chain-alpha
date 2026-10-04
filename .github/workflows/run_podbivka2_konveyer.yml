@@ -15,6 +15,15 @@ name: "Podbivka-2: konveyer (Pravilo 18) -- po taymeru, bez shtaba"
 #
 # Svoya gruppa concurrency: ne vstayot poverh ocheredi zadach (podbivka2-zadacha)
 # i ne otmenyaet eyo. Helius ne nuzhen: tolko arhiv PumpApi.
+# VAZHNO (04.10): raspisaniya GitHub Actions rabotayut TOLKO s vetki po
+# umolchaniyu repozitoriya (claude/robinhood-copytrading-hypothesis-awjj0g), a
+# etot fayl lezhit na claude/podbivka -- poetomu cron nizhe NIKOGDA ne
+# srabatyvaet (progona konv_2026-10-03T17 v 07:17Z 04.10 ne bylo, v spiske
+# workflows repozitoriya etogo prokhoda net). Nochnoy konveyer vedyotsya
+# routine'om Code-2 "CODE-2: konveyer (Pravilo 18) -- nochnoy prohod"
+# (22 7 * * *): on stavit marker zadacha_konveyer.json v ochered
+# podbivka2-zadacha i schitaet pravilo oflayn. Cron ostavlen kak est: esli
+# fayl kogda-nibud poyavitsya na vetke po umolchaniyu, on zarabotaet sam.
 on:
   schedule:
     - cron: "17 7 * * *"      # posle sutochnogo progona 06:30Z
