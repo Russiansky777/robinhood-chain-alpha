@@ -115,6 +115,16 @@ jobs:
               python3 -c "import json,os;p=\"/var/lib/kapital/kapital.json\";d=(json.load(open(p)) if os.path.exists(p) else {});o=d.get(\"okna\") or {};print(\"okon net\") if not o else [print(k,\"tochek =\",len((v or {}).get(\"tochki\") or []),\"okno_sek =\",(v or {}).get(\"okno_sek\"),\"korzina_sek =\",(v or {}).get(\"korzina_sek\")) for k,v in o.items()]" 2>&1 || true
               echo "=== sostojanie.json PO POLJAM"
               python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else None);print(\"fajla net\") if d is None else [print(k,\"=\",str(v)[:400]) for k,v in sorted(d.items())]" 2>&1 || true
+              echo "=== POZICII TREKKERA: minT, vhod, kogda (slovo vladelca 04.10, 12:30Z)"
+              # ЗАЧЕМ. Трекер говорит капитал 6.391157, кошелёк полосы --
+              # 6.260165036, разница 0.129987 SOL ПРИ НУЛЕ ОТКРЫТЫХ ПОЗИЦИЙ у
+              # полосы. Владелец назвал вероятную причину: трекер не увидел
+              # продажу застрявшей позиции разовым прогоном (10:30:51Z). Чтобы
+              # это проверил Code-3, нужен не сам капитал, а СПИСОК позиций,
+              # которые трекер всё ещё считает своими. Поле выше печатается
+              # обрезанным по 400 знаков, то есть список в него не влезает.
+              # ТОЛЬКО ЧТЕНИЕ: ни одной правки, ни перезапуска службы.
+              python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else {});k=[x for x in (\"pozicii\",\"позиции\",\"positions\",\"otkrytye\",\"открытые\") if isinstance(d.get(x),(list,dict))];print(\"spiska pozicij v fajle net; kljuchi:\",sorted(d)) if not k else None;[print(\"kljuch spiska:\",x) for x in k[:1]];r=(d.get(k[0]) if k else None);r=(list(r.values()) if isinstance(r,dict) else (r or []));print(\"pozicij:\",len(r));[print(\" | \".join(str((z or {}).get(c,\"-\"))[:60] for c in (\"mint\",\"минт\",\"vhod_sol\",\"вход_sol\",\"sol_in\",\"kogda_utc\",\"когда_utc\",\"ts_utc\"))) for z in r[:40]]" 2>&1 || true
               echo "=== UZEL: KAKOJ STOIT I CHTO OTVECHAET (adres ne pechataetsja)"
               if [ -n "$BLOOM_TREKKER_RPC" ]; then
                 echo "uzel: svoj, BLOOM_TREKKER_RPC zadan"
