@@ -27,10 +27,18 @@ on:
         description: "ровно PEREZAPUSTIT -- иначе только чтение и сверка, без перезапуска"
         required: false
         default: ""
-      dopusk:
-        description: "допуск сверки в SOL (слово владельца 0.001)"
+      hesh:
+        description: "ожидаемый sha256 модуля на хосте (9b3a77e0 -- 1b8f4ccf...)"
         required: false
-        default: "0.001"
+        default: "1b8f4ccfd0a3d10954f238ba7527cc0b238d519f0fb4c0f0ea72eff162c7aa3a"
+      razbor:
+        description: "сколько опросов --razbor (слово владельца 5)"
+        required: false
+        default: "5"
+      razbor_pauza:
+        description: "пауза между опросами разбора, секунд (слово владельца 10)"
+        required: false
+        default: "10"
 
 concurrency:
   group: lab-trekker-perezapusk
@@ -54,13 +62,21 @@ jobs:
 
       - name: "ВХОД и самопроверка сверки ДО всякого ssh"
         env:
-          DOPUSK: ${{ inputs.dopusk }}
+          HESH: ${{ inputs.hesh }}
+          RAZBOR: ${{ inputs.razbor }}
+          RAZBOR_PAUZA: ${{ inputs.razbor_pauza }}
         run: |
           set -e
           set -o pipefail
-          case "$DOPUSK" in
-            ""|*[!0-9.]*) echo "OTKAZ: dopusk -- tolko cifry i tochka: $DOPUSK"; exit 1;;
-          esac
+          printf '%s' "$HESH" | grep -qE '^[0-9a-f]{64}$' \
+            || { echo "OTKAZ: hesh -- 64 shestnadcatichnyh znaka"; exit 1; }
+          for V in "$RAZBOR" "$RAZBOR_PAUZA"; do
+            case "$V" in
+              ""|*[!0-9]*) echo "OTKAZ: chislo -- tolko cifry: $V"; exit 1;;
+            esac
+          done
+          [ "$RAZBOR" -ge 1 ] && [ "$RAZBOR" -le 50 ] \
+            || { echo "OTKAZ: razbor vne 1..50"; exit 1; }
           python3 deploy/checks/trekker_svodka.py --self-test | tail -1
 
       - name: "Ключ лаборатории"
@@ -90,19 +106,42 @@ jobs:
             *) echo "OTKAZ: eto ne lab-miami ($IMJA)"; exit 1 ;;
           esac
 
-      - name: "ДО: капитал, позиции, баланс кошелька"
+      - name: "ХЭШ модуля на хосте -- тот ли это файл из 9b3a77e0"
+        env:
+          HESH: ${{ inputs.hesh }}
         run: |
           set -e
           set -o pipefail
           : > "$OUT"
-          echo "=== Трекер: перезапуск и сверка, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
+          echo "=== Трекер: хэш, сверка, разбор, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
+          # ХЭШ СЧИТАЕТ ХОСТ, А СРАВНИВАЕТ БЕГУНОК. Доверять сравнению на
+          # хосте нельзя: если туда попал не тот файл, то и сравнение там
+          # ничего не стоит.
+          NA_HOSTE=$(ssh -n $SSH_OPTS root@"$HOST" \
+            "sha256sum /opt/kapital/c3_kapital_trekker.py | cut -d' ' -f1")
+          echo "hesh na hoste: $NA_HOSTE" | tee -a "$OUT"
+          echo "hesh ozhidaemyj: $HESH" | tee -a "$OUT"
+          if [ "$NA_HOSTE" = "$HESH" ]; then
+            echo "HESH SOSHELSJA: na lab-miami lezhit fajl iz 9b3a77e0" | tee -a "$OUT"
+          else
+            echo "OTKAZ: hesh NE soshelsja -- na hoste drugoj fajl" | tee -a "$OUT"
+            exit 1
+          fi
+
+      - name: "ДО: chasti.sol против getBalance В ТУ ЖЕ МИНУТУ"
+        run: |
+          set -e
+          set -o pipefail
+          # ОБА ЧИСЛА СНИМАЮТСЯ ОДНОЙ КОМАНДОЙ НА ХОСТЕ -- иначе "в ту же
+          # минуту" не гарантировано ничем: кошелёк полосы живой, и между
+          # двумя ssh успевает пройти покупка.
           ssh -n $SSH_OPTS root@"$HOST" "
             set -e
             . /etc/kapital.env
             U=\"\${BLOOM_TREKKER_RPC:-https://api.mainnet-beta.solana.com}\"
-            echo 'DO_KAPITAL' \$(python3 -c \"import json,os;p='/var/lib/kapital/kapital.json';d=(json.load(open(p)) if os.path.exists(p) else {});print(d.get('kapital_sol', d.get('капитал_sol','net')))\")
-            echo 'DO_POZICIJ' \$(python3 -c \"import json,os;p='/var/lib/kapital/sostojanie.json';d=(json.load(open(p)) if os.path.exists(p) else {});r=d.get('pozicii') or {};print(len(r))\")
-            echo 'DO_KOSHELEK' \$(curl -s -m 20 -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$KOSHELEK\"]}' \"\$U\" | python3 -c \"import json,sys;print((json.load(sys.stdin).get('result') or {}).get('value','net'))\")
+            python3 -c \"import json,os,time;p='/var/lib/kapital/kapital.json';d=(json.load(open(p)) if os.path.exists(p) else {});c=(d.get('chasti') or {});print('DO_SOL',c.get('sol','net'));print('DO_WSOL',c.get('wsol','net'));print('DO_POZICII',c.get('pozicii','net'));print('DO_RENTA',c.get('renta','net'));print('DO_SCHETOV',d.get('schetov','net'));print('DO_SCHETOV_PUSTYH',d.get('schetov_pustyh','net'));print('DO_BEZ_VHODA',d.get('bez_vhoda','net'));print('DO_POZICIJ',d.get('pozicij','net'));print('DO_RJAD_UTC',d.get('rjad_utc','net'));print('DO_SNJATO_UTC',int(time.time()))\"
+            echo DO_BALANS_UTC \$(date -u +%s)
+            echo DO_BALANS \$(curl -s -m 20 -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$KOSHELEK\"]}' \"\$U\" | python3 -c \"import json,sys;print((json.load(sys.stdin).get('result') or {}).get('value','net'))\")
             " | tee -a "$OUT"
 
       - name: "Перезапуск трекера (только по слову PEREZAPUSTIT)"
@@ -128,9 +167,7 @@ jobs:
             done
             echo 'OTKAZ: svezhego tika ne doshdalis za 120 s'; exit 1" | tee -a "$OUT"
 
-      - name: "ПОСЛЕ: капитал, позиции, баланс и ВЕРДИКТ"
-        env:
-          DOPUSK: ${{ inputs.dopusk }}
+      - name: "ПОСЛЕ: chasti.sol против getBalance и ВЕРДИКТ"
         run: |
           set -e
           set -o pipefail
@@ -138,29 +175,45 @@ jobs:
             set -e
             . /etc/kapital.env
             U=\"\${BLOOM_TREKKER_RPC:-https://api.mainnet-beta.solana.com}\"
-            python3 -c \"import json,os;p='/var/lib/kapital/kapital.json';d=(json.load(open(p)) if os.path.exists(p) else {});print(d.get('kapital_sol', d.get('капитал_sol','net')))\"
-            python3 -c \"import json,os;p='/var/lib/kapital/sostojanie.json';d=(json.load(open(p)) if os.path.exists(p) else {});r=d.get('pozicii') or {};print(len(r))\"
-            curl -s -m 20 -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$KOSHELEK\"]}' \"\$U\" | python3 -c \"import json,sys;print((json.load(sys.stdin).get('result') or {}).get('value','net'))\"
+            python3 -c \"import json,os;p='/var/lib/kapital/kapital.json';d=(json.load(open(p)) if os.path.exists(p) else {});c=(d.get('chasti') or {});print(c.get('sol',''));print(d.get('rjad_utc',''))\"
+            date -u +%s
+            curl -s -m 20 -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$KOSHELEK\"]}' \"\$U\" | python3 -c \"import json,sys;print((json.load(sys.stdin).get('result') or {}).get('value',''))\"
             " > /tmp/posle.txt
-          KAP=$(sed -n 1p /tmp/posle.txt)
-          POZ=$(sed -n 2p /tmp/posle.txt)
-          BAL=$(sed -n 3p /tmp/posle.txt)
-          echo "POSLE_KAPITAL $KAP" | tee -a "$OUT"
-          echo "POSLE_POZICIJ $POZ" | tee -a "$OUT"
-          echo "POSLE_KOSHELEK $BAL" | tee -a "$OUT"
-          # ВЕРДИКТ СЧИТАЕТ МОДУЛЬ С САМОПРОВЕРКОЙ (20 проверок), а не этот
-          # шаг: граница "+- 0.001" включительная, и в дробных числах она
-          # работает не так, как сказана -- сверка идёт в лампортах.
+          SOL=$(sed -n 1p /tmp/posle.txt)
+          RJAD=$(sed -n 2p /tmp/posle.txt)
+          BAL_UTC=$(sed -n 3p /tmp/posle.txt)
+          BAL=$(sed -n 4p /tmp/posle.txt)
+          echo "POSLE_CHASTI_SOL $SOL" | tee -a "$OUT"
+          echo "POSLE_RJAD_UTC $RJAD" | tee -a "$OUT"
+          echo "POSLE_BALANS $BAL (snjat $BAL_UTC)" | tee -a "$OUT"
+          # ВЕРДИКТ СЧИТАЕТ МОДУЛЬ С САМОПРОВЕРКОЙ (18 проверок). Поправка
+          # штаба: сверяется chasti.sol с getBalance ДО ЛАМПОРТА, а не капитал
+          # с кошельком -- капитал больше на ренту и открытые позиции.
           set +e
-          python3 deploy/checks/trekker_svodka.py "$KAP" "$BAL" "$POZ" "$DOPUSK" | tee -a "$OUT"
+          python3 deploy/checks/trekker_svodka.py "$SOL" "$BAL" "$RJAD" "$BAL_UTC" | tee -a "$OUT"
           RC=$?
           set -e
           case "$RC" in
-            0) echo "ITOG: SOSHLOS" | tee -a "$OUT";;
+            0) echo "ITOG: SOSHLOS do lamporta" | tee -a "$OUT";;
             1) echo "ITOG: NE SOSHLOS" | tee -a "$OUT";;
-            *) echo "ITOG: VERDIKTA NET (pozicij ne nol libo chislo neizvestno)" | tee -a "$OUT";;
+            *) echo "ITOG: VERDIKTA NET (metki razoshlis libo chislo neizvestno)" | tee -a "$OUT";;
           esac
           rm -f /tmp/posle.txt
+
+      - name: "РАЗБОР: части по опросам (только чтение)"
+        env:
+          RAZBOR: ${{ inputs.razbor }}
+          RAZBOR_PAUZA: ${{ inputs.razbor_pauza }}
+        run: |
+          set -e
+          set -o pipefail
+          echo "--- razbor $RAZBOR oprosov, pauza $RAZBOR_PAUZA s ---" | tee -a "$OUT"
+          # ЧИСЛА УЖЕ ПРОВЕРЕНЫ ВХОДНЫМ ШАГОМ: tolko cifry, 1..50. Разбор --
+          # только чтение: модуль ничего не пишет ни в ряд, ни в состояние, ни
+          # в страницу.
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "python3 /opt/kapital/c3_kapital_trekker.py --razbor $RAZBOR --razbor-pauza $RAZBOR_PAUZA --kat /var/lib/kapital" \
+            | tee -a "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
         if: always()
