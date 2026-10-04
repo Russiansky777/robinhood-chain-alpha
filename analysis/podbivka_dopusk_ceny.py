@@ -89,11 +89,14 @@ def стат(ряды: list, суток: float) -> dict:
     if not ряды:
         return {"n": 0}
     пп = [r["пп"] for r in ряды]
-    sol = sum(r["пп"] / 100 * r["билет"] for r in ряды)
+    в_sol = sorted((r["пп"] / 100 * r["билет"] for r in ряды), reverse=True)
+    sol = sum(в_sol)
     return {"n": len(ряды), "медиана_пп": round(statistics.median(пп), 2),
             "среднее_пп": round(statistics.mean(пп), 2),
             "в_плюсе": round(100 * sum(1 for x in пп if x > 0) / len(пп)),
-            "итог_sol": round(sol, 6), "sol_в_сутки": round(sol / суток, 6) if суток else None}
+            "итог_sol": round(sol, 6), "sol_в_сутки": round(sol / суток, 6) if суток else None,
+            # хвост: корзины выше 20 % держатся на одной-двух сделках, это надо видеть
+            "итог_без_верхних_2_sol": round(sum(в_sol[2:]), 6) if len(в_sol) > 2 else None}
 
 
 def main() -> int:
@@ -102,55 +105,62 @@ def main() -> int:
     р.add_argument("--metka", default=time.strftime("%Y-%m-%d", time.gmtime()))
     р.add_argument("--shablony", default=",".join(ШАБЛОНЫ))
     р.add_argument("--otdelno", default="6qudAN2k", help="источник отдельным разрезом (начало адреса)")
+    р.add_argument("--iz-json", action="store_true",
+                   help="перестроить страницу по data/podbivka/dopusk_ceny.json, без чтения архива")
     а = р.parse_args()
 
-    адр = json.loads((П / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
-    торгующие = set(json.loads((П / "istochniki_torguyuschie.json").read_text(encoding="utf-8"))["адреса"])
-    файлы: list = []
-    for ш in а.shablony.split(","):
-        файлы += sorted(glob.glob(str(П / "arhiv_den" / ш.strip())))
+    if а.iz_json:
+        готовое = json.loads((П / "dopusk_ceny.json").read_text(encoding="utf-8"))
+        ряды, счёт = готовое["ряды"], готовое["счёт"]
+        сутки, файлы = set(готовое["сутки"]), [None] * готовое["файлов"]
+    else:
+        адр = json.loads((П / "arhiv_adresa.json").read_text(encoding="utf-8"))["адреса"]
+        торгующие = set(json.loads(
+            (П / "istochniki_torguyuschie.json").read_text(encoding="utf-8"))["адреса"])
+        файлы = []
+        for ш in а.shablony.split(","):
+            файлы += sorted(glob.glob(str(П / "arhiv_den" / ш.strip())))
+        ряды, сутки = [], set()
+        счёт = {"сигналов": 0, "торгующих": 0, "нет_состояний": 0, "нет_пп": 0,
+                "нет_группы": 0, "не_wsol": 0, "дублей_подписи": 0}
+        видели: set = set()
+        for f in файлы:
+            д = json.loads(gzip.open(f).read())
+            for с in д.get("сигналы") or []:
+                счёт["сигналов"] += 1
+                t = с.get("trader")
+                if t not in торгующие:
+                    continue
+                счёт["торгующих"] += 1
+                if с.get("signature") in видели:      # окна файлов перекрываются
+                    счёт["дублей_подписи"] += 1
+                    continue
+                видели.add(с.get("signature"))
+                if с.get("quoteMint") != WSOL:
+                    счёт["не_wsol"] += 1
+                    continue
+                г = группа_источника(адр, t)
+                if not г:
+                    счёт["нет_группы"] += 1
+                    continue
+                у = уход_пп(с)
+                if у is None:
+                    счёт["нет_состояний"] += 1
+                    continue
+                к = корзина(у)
+                if к is None:
+                    continue
+                б = БИЛЕТ_ГРУППЫ[г]
+                пп = B.пп_по_состояниям(с, б, "S1", ВЫХОД)
+                if пп is None:
+                    счёт["нет_пп"] += 1
+                    continue
+                д_ = time.strftime("%Y-%m-%d", time.gmtime((с.get("timestamp") or 0) / 1000))
+                сутки.add(д_)
+                ряды.append({"источник": t, "группа": г, "билет": б, "пул": с.get("pool"),
+                             "уход_пп": round(у, 2), "корзина": к, "пп": пп, "сутки": д_,
+                             "подпись": с.get("signature"), "sol": с.get("sol")})
 
-    ряды: list = []
-    сутки: set = set()
-    счёт = {"сигналов": 0, "торгующих": 0, "нет_состояний": 0, "нет_пп": 0,
-            "нет_группы": 0, "не_wsol": 0, "дублей_подписи": 0}
-    видели: set = set()
-    for f in файлы:
-        д = json.loads(gzip.open(f).read())
-        for с in д.get("сигналы") or []:
-            счёт["сигналов"] += 1
-            t = с.get("trader")
-            if t not in торгующие:
-                continue
-            счёт["торгующих"] += 1
-            if с.get("signature") in видели:      # окна файлов перекрываются
-                счёт["дублей_подписи"] += 1
-                continue
-            видели.add(с.get("signature"))
-            if с.get("quoteMint") != WSOL:
-                счёт["не_wsol"] += 1
-                continue
-            г = группа_источника(адр, t)
-            if not г:
-                счёт["нет_группы"] += 1
-                continue
-            у = уход_пп(с)
-            if у is None:
-                счёт["нет_состояний"] += 1
-                continue
-            к = корзина(у)
-            if к is None:
-                continue
-            б = БИЛЕТ_ГРУППЫ[г]
-            пп = B.пп_по_состояниям(с, б, "S1", ВЫХОД)
-            if пп is None:
-                счёт["нет_пп"] += 1
-                continue
-            д_ = time.strftime("%Y-%m-%d", time.gmtime((с.get("timestamp") or 0) / 1000))
-            сутки.add(д_)
-            ряды.append({"источник": t, "группа": г, "билет": б, "пул": с.get("pool"),
-                         "уход_пп": round(у, 2), "корзина": к, "пп": пп, "сутки": д_,
-                         "подпись": с.get("signature"), "sol": с.get("sol")})
 
     if not ряды:
         print("нет рядов: нечего считать", flush=True)
@@ -190,14 +200,17 @@ def main() -> int:
         м = [f"### {заг}", "",
              f"Сделок {р_['всего'].get('n', 0)} за {р_['суток']} суток; итог "
              f"{ф(р_['всего'], 'итог_sol', '+.4f')} SOL, {ф(р_['всего'], 'sol_в_сутки', '+.6f')} SOL в сутки.",
-             "", "| корзина ухода | n | медиана, п.п. | среднее, п.п. | в плюсе | итог SOL | SOL в сутки |",
-             "|---|---|---|---|---|---|---|"]
+             "", "| корзина ухода | n | медиана, п.п. | среднее, п.п. | в плюсе | итог SOL "
+             "| итог без верхних 2 сделок, SOL | SOL в сутки |",
+             "|---|---|---|---|---|---|---|---|"]
         for _, _, имя in КОРЗИНЫ:
             v = р_["по_корзинам"][имя]
             м.append(f"| {имя} % | {v.get('n', 0)} | {ф(v, 'медиана_пп', '+.2f')} "
                      f"| {ф(v, 'среднее_пп', '+.2f')} "
                      f"| {ф(v, 'в_плюсе', 'd') + '%' if v.get('n') else '—'} "
-                     f"| {ф(v, 'итог_sol', '+.4f')} | {ф(v, 'sol_в_сутки', '+.6f')} |")
+                     f"| {ф(v, 'итог_sol', '+.4f')} "
+                     f"| {ф(v, 'итог_без_верхних_2_sol', '+.4f')} "
+                     f"| {ф(v, 'sol_в_сутки', '+.6f')} |")
         м += ["", "| допуск (берём сделки с уходом ≤) | n | медиана, п.п. | итог SOL | SOL в сутки |",
               "|---|---|---|---|---|"]
         for к_, v in р_["допуски"].items():
@@ -236,7 +249,12 @@ def main() -> int:
            f"{ф(тек, 'sol_в_сутки', '+.6f')} при нынешних 35 % — разница "
            f"{разн:+.6f} SOL в сутки; корзина 35--50 % даёт "
            f"{ф(к3550, 'итог_sol', '+.4f')} SOL при n {к3550.get('n', 0)} "
-           f"(медиана {ф(к3550, 'медиана_пп', '+.2f')} п.п.).", "",
+           f"(медиана {ф(к3550, 'медиана_пп', '+.2f')} п.п.), а без двух верхних сделок "
+           f"{ф(к3550, 'итог_без_верхних_2_sol', '+.4f')} SOL.", "",
+           "Хвост: корзины выше 20 % стоят на одной-двух сделках — без двух верхних каждая из "
+           "них уходит в минус (столбец «итог без верхних 2 сделок»), поэтому разница между "
+           "допусками 35 % и «все» меньше разброса хвоста. Кривая и Pump AMM расходятся: у "
+           "кривой лучший допуск низкий, у Pump AMM итог растёт с допуском.", "",
            "Ничего не меняется и не рекомендуется — решает владелец.", ""]
     стр = КОРЕНЬ / "docs" / f"podbivka_{а.metka}_dopusk_ceny.md"
     стр.write_text("\n".join(md) + "\n", encoding="utf-8")
