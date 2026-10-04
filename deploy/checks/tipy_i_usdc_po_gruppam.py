@@ -83,14 +83,34 @@ def usdc_режим(UN, группа: str | None) -> dict:
             "flag": UN.FLAG, "flag_groups": UN.FLAG_GROUPS}
 
 
+def путь_из_pythonpath(env: dict) -> list:
+    """Каталоги из PYTHONPATH процесса -- СПИСКОМ, чтобы добавить их в sys.path.
+
+    ЗАЧЕМ ОТДЕЛЬНО. Первый прогон этой проверки упал на ModuleNotFoundError:
+    модули тени (c2_swap_build и родня) лежат НЕ рядом с bloom_own_send, а там,
+    куда их кладёт PYTHONPATH службы. Положить PYTHONPATH в os.environ уже
+    поздно: sys.path собирается при старте интерпретатора и от переменной
+    потом не меняется. Значит каталоги надо добавить руками.
+    """
+    сырое = (env or {}).get("PYTHONPATH") or ""
+    return [к for к in (ч.strip() for ч in сырое.split(os.pathsep)) if к]
+
+
 def свод(группы: list, *, code_dir: str, env: dict) -> dict:
     """Живой свод. Чистая функция относительно env и пути к коду."""
     из_: dict = {"группы": {}, "why_not": None,
-                 "flag_groups_zadan": None}
+                 "flag_groups_zadan": None, "putej_iz_pythonpath": 0}
     if code_dir and code_dir not in sys.path:
         sys.path.insert(0, code_dir)
     for имя, знач in (env or {}).items():
         os.environ[имя] = знач
+    # КАТАЛОГИ КОДА -- ИЗ PYTHONPATH ЖИВОГО ПРОЦЕССА. Это не значение секрета:
+    # это пути на диске, и наружу уходит только ИХ ЧИСЛО.
+    _пути = путь_из_pythonpath(env)
+    из_["putej_iz_pythonpath"] = len(_пути)
+    for к in _пути:
+        if к not in sys.path:
+            sys.path.insert(0, к)
     try:
         import bloom_own_send as OSW  # noqa: PLC0415
     except Exception as сбой:  # noqa: BLE001
@@ -210,6 +230,18 @@ def _самопроверка() -> int:
     # ЗНАЧЕНИЕ ФЛАГА НАРУЖУ НЕ УХОДИТ НИ ОДНИМ ПОЛЕМ.
     сверить("в ответе про USDC нет ни одного значения переменной",
             [к for к in у if к in ("znachenie", "value", "env")], [])
+
+    # --- PYTHONPATH: каталоги кода из env процесса (первый прогон упал здесь) ---
+    сверить("каталоги PYTHONPATH разбираются по разделителю, пустые отбрасываются",
+            путь_из_pythonpath({"PYTHONPATH":
+                                 f"/a{os.pathsep}{os.pathsep} /b "}),
+            ["/a", "/b"])
+    сверить("нет PYTHONPATH -- пустой список, а не падение",
+            путь_из_pythonpath({}), [])
+    сверить("наружу уходит только ЧИСЛО каталогов, не сами пути",
+            sorted(к for к in свод([], code_dir="", env={})
+                    if "pythonpath" in к.lower()),
+            ["putej_iz_pythonpath"])
     print(f"проверок {проверок}, прошло {прошло}, "
           f"не прошло {проверок - прошло}")
     return 0 if прошло == проверок else 1
