@@ -143,30 +143,45 @@ jobs:
             echo 'tajmery raspisanij snjaty'
           " 2>&1 | tee -a "$OUT"
 
-      - name: "Какие ИМЕНА допусков видны заданию вообще (без значений)"
-        # ЗАЧЕМ ЭТОТ ШАГ И ПОЧЕМУ ОН ИДЁТ ДАЖЕ ПРИ ПОКАЗЕ. Перебор имён ниже
-        # отвечает только на вопрос "есть ли ЭТО имя", и ответ "нет" ничего не
-        # говорит о том, какое имя там ЕСТЬ. Владелец 04.10 сказал, что секрет
-        # LAB_DISPATCH_TOKEN заведён, а прогон не видит ни одного из пяти имён
-        # (прогоны 37198875680, 37198994037, 37200179744) при видимом
-        # GH_RUNNER_PAT. Список секретов мне не прочитать: прокси отвечает 403 и
-        # на actions/secrets, и на environments. Поэтому список имён печатает
-        # сам прогон.
+      - name: "Окружения репозитория: есть ли они вообще (имена, без значений)"
+        # ЗАЧЕМ. Владелец сказал 04.10, что секрет LAB_DISPATCH_TOKEN заведён
+        # (fine-grained, один репозиторий, Actions: Read and write), а прогон не
+        # видит ни одного из пяти вероятных имён (прогоны 37198875680,
+        # 37198994037, 37200179744) при видимом GH_RUNNER_PAT.
         #
-        # ЗНАЧЕНИЯ НЕ ПЕЧАТАЮТСЯ И НЕ СОБИРАЮТСЯ: набор уезжает окружением (не
-        # доводом команды -- довод виден в списке процессов), а скрипт берёт
-        # keys() и выбрасывает остальное. Его самопроверка (12 проверок) это и
-        # проверяет: ни одного значения ни в ответе, ни в тексте отказа, даже
-        # когда разбор JSON упал.
+        # ЧТО ЭТОТ ШАГ ПРОВЕРЯЕТ И ЧЕГО НЕ ПРОВЕРЯЕТ. Имён секретов он НЕ
+        # печатает: на это нужен допуск с правом secrets:read, а у GITHUB_TOKEN
+        # его нет и быть не должно. Он проверяет ОДНУ частую подмену, которую
+        # перебор имён поймать не может: секрет заведён как секрет ОКРУЖЕНИЯ.
+        # Тогда secrets.X в задании пуст ВСЕГДА, пока у задания нет
+        # environment:, -- и со стороны это выглядит ровно как "секрета нет".
+        # Есть окружения -- значит эту причину надо проверять первой; нет ни
+        # одного -- значит она исключена, и остаются другие репозиторий, другое
+        # имя или секрет Dependabot.
+        #
+        # ПОЧЕМУ НЕ ЧЕРЕЗ toJSON(secrets). Так напечатать список имён можно, и я
+        # это сделал (правка 972d4c89), но GitHub ПОСТАВИЛ ТАКОЙ ПРОГОН НА
+        # ОДОБРЕНИЕ: прогон 37200403600 вернулся action_required, ни один шаг не
+        # пошёл, а одобрить его может только владелец. Деплой, пущенный в ту же
+        # минуту, при этом прошёл -- то есть дело именно в этом выражении.
+        # Одобрения ради справки я просить не стал и путь убрал.
         if: ${{ inputs.snjat != 'yes' }}
         env:
-          NABOR_DOPUSKOV: ${{ toJSON(secrets) }}
+          GH_TOKEN_RO: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          set -o pipefail
-          python3 deploy/checks/imena_dopuskov.py --self-test | tail -1
-          echo "--- imena dopuskov, vidimyh zadaniju (znachenija ne pechatajutsja) ---" | tee -a "$OUT"
-          python3 deploy/checks/imena_dopuskov.py | tee -a "$OUT"
+          echo "--- okruzhenija repozitorija (tolko imena) ---" | tee -a "$OUT"
+          KOD=$(curl -sS -o /tmp/okr.json -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN_RO" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/environments" || echo 000)
+          if [ "$KOD" != "200" ]; then
+            echo "  spisok okruzhenij ne prochitan: HTTP $KOD" | tee -a "$OUT"
+          else
+            python3 -c "import json;d=json.load(open('/tmp/okr.json'));e=d.get('environments') or [];print('  okruzhenij: '+str(d.get('total_count')));[print('  - '+str(x.get('name'))) for x in e]" | tee -a "$OUT"
+            python3 -c "import json;d=json.load(open('/tmp/okr.json'));print('  VYVOD: okruzhenij net -- prichina \"sekret okruzhenija\" isklyuchena' if not (d.get('total_count') or 0) else '  VYVOD: okruzhenija EST -- sekret mog byt zavedjon v odnom iz nih; togda nuzhen environment: v zadanii')" | tee -a "$OUT"
+          fi
+          rm -f /tmp/okr.json
 
       - name: "Допуск: токен только на действия Actions, 0600, root"
         if: ${{ inputs.pokazat != 'yes' && inputs.snjat != 'yes' }}
