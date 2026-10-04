@@ -138,7 +138,14 @@ jobs:
             set -e
             PID=\$(systemctl show -p MainPID --value bloom-detector 2>/dev/null || echo 0)
             echo \"detektor MainPID: \$PID\"
-            nice -n 5 python3 /tmp/tipy_i_usdc.py /home/bot/bloom_executor \
+            # ИНТЕРПРЕТАТОР -- venv СЛУЖБЫ, а не системный python3. Первый
+            # прогон сказал ModuleNotFoundError: модули тени на месте, но часть
+            # их зависимостей стоит только в venv -- ExecStart службы идёт
+            # именно им. Системный python3 остаётся запасным путём.
+            PY=/home/bot/robinhood-chain-alpha/venv/bin/python
+            [ -x \"\$PY\" ] || PY=python3
+            echo \"interpretator: \$PY\"
+            nice -n 5 \"\$PY\" /tmp/tipy_i_usdc.py /home/bot/bloom_executor \
               lane_s0,krug_001,cand1,cand2,konveyer,batch5 \"\$PID\"
             rm -f /tmp/tipy_i_usdc.py" | tee -a "$OUT"
 

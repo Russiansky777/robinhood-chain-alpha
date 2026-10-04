@@ -108,24 +108,31 @@ def свод(группы: list, *, code_dir: str, env: dict) -> dict:
     # это пути на диске, и наружу уходит только ИХ ЧИСЛО.
     _пути = путь_из_pythonpath(env)
     из_["putej_iz_pythonpath"] = len(_пути)
+    из_["interpretator"] = sys.executable
     for к in _пути:
         if к not in sys.path:
             sys.path.insert(0, к)
     try:
         import bloom_own_send as OSW  # noqa: PLC0415
     except Exception as сбой:  # noqa: BLE001
-        из_["why_not"] = f"bloom_own_send не загрузился: {type(сбой).__name__}"
+        # ИМЯ НЕДОСТАЮЩЕГО МОДУЛЯ -- В ПРИЧИНУ, как это делает сам детектор:
+        # первый прогон сказал только "ModuleNotFoundError", и какого именно
+        # модуля не хватает, было не узнать. Имена модулей -- не секрет.
+        из_["why_not"] = (f"bloom_own_send не загрузился: "
+                           f"{type(сбой).__name__}: {str(сбой)[:160]}")
         return из_
     try:
         _, _, _, B = OSW._модули()
     except Exception as сбой:  # noqa: BLE001
-        из_["why_not"] = f"сборщик не загрузился: {type(сбой).__name__}"
+        из_["why_not"] = (f"сборщик не загрузился: {type(сбой).__name__}: "
+                           f"{str(сбой)[:160]}")
         return из_
     try:
         import c2_usdc_noga as UN  # noqa: PLC0415
     except Exception as сбой:  # noqa: BLE001
         UN = None
-        из_["usdc_why_not"] = f"c2_usdc_noga не загрузился: {type(сбой).__name__}"
+        из_["usdc_why_not"] = (f"c2_usdc_noga не загрузился: "
+                                f"{type(сбой).__name__}: {str(сбой)[:160]}")
     if UN is not None:
         # ЛОГИЧЕСКОЕ, А НЕ СОДЕРЖИМОЕ: задан ли список групп флага.
         из_["flag_groups_zadan"] = bool(
