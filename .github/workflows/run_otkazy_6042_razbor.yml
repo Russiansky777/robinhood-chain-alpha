@@ -1,0 +1,162 @@
+name: "Отказы по допуску цены (6042 кривой и 6040 Pump AMM): уход против допуска и задержка (только чтение)"
+
+# ЗАЧЕМ (слово владельца 04.10, вечер). Два отказа 6042
+# BuySlippageBelowMinTokensOut подряд на cand1_03 / 6qudAN2k. Нужно: сколько
+# таких отказов за сутки полосы по группам и источникам и какая это доля
+# попыток покупки на кривой; по последним случаям -- слоты, чужие сделки между
+# ними, уход цены от состояния, по которому считался min_tokens_out, и допуск
+# группы.
+#
+# ПОЧЕМУ ДВА ШАГА. Выжимка из журналов идёт НА ХОСТЕ (ключ узла там для этого не
+# нужен), а цепь спрашивается с бегунка ключом HELIUS_API. Так уже сделан разбор
+# не севших отправок, и второго способа изобретать не надо.
+#
+# ТОЛЬКО ЧТЕНИЕ. Ни одной правки на хосте, ни перезапуска, ни деплоя; env не
+# трогается, торговые параметры не меняются. Наружу уходят только числа:
+# адрес узла и ключ вычищаются из любого текста.
+on:
+  workflow_dispatch:
+    inputs:
+      sutki_s:
+        description: "начало ЭТИХ суток полосы UTC (полночь Мадрида -- 22:00Z)"
+        required: false
+        default: "2026-10-03T22:00:00Z"
+      sutki_proshlye_s:
+        description: "начало ПРОШЛЫХ суток полосы UTC"
+        required: false
+        default: "2026-10-02T22:00:00Z"
+      vecher_s:
+        description: "начало «вечера» UTC (для «участились ли вечером»)"
+        required: false
+        default: "2026-10-04T16:00:00Z"
+      posle_deploev_s:
+        description: "начало окна «после сегодняшних деплоев» UTC"
+        required: false
+        default: "2026-10-04T14:56:00Z"
+      sluchaev:
+        description: "сколько последних отказов разбирать по цепи"
+        required: false
+        default: "8"
+
+concurrency:
+  group: otkazy-6042-razbor
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/otkazy_dopuska_razbor.json
+
+jobs:
+  razbor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "ВХОД, окна файлом и самопроверки ДО всякой сети"
+        env:
+          S1: ${{ inputs.sutki_s }}
+          S0: ${{ inputs.sutki_proshlye_s }}
+          V: ${{ inputs.vecher_s }}
+          D: ${{ inputs.posle_deploev_s }}
+          N: ${{ inputs.sluchaev }}
+        run: |
+          set -e
+          set -o pipefail
+          # Время -- только цифры, дефисы, T, двоеточия и Z; число -- цифры.
+          for X in "$S1" "$S0" "$V" "$D"; do
+            case "$X" in
+              ""|*[!0-9T:Z-]*) echo "OTKAZ: vo vremeni lishnie znaki"; exit 1;;
+            esac
+          done
+          case "$N" in
+            ""|*[!0-9]*) echo "OTKAZ: sluchaev -- ne chislo"; exit 1;;
+          esac
+          python3 deploy/checks/otkazy_dopuska_iz_zhurnala.py --self-test | tail -1
+          python3 analysis/otkazy_dopuska_po_cepi.py --self-test | tail -1
+          # ОКНА -- ФАЙЛОМ, И СОБИРАЕТ ЕГО printf, А НЕ ТЕЛО СКРИПТА В ШАГЕ.
+          # В этом доме скрипты едут файлами из дерева; здесь скрипта и не
+          # нужно -- это пять пар времён, уже проверенных выше на знаки. В
+          # команду root на хост уедет только путь к файлу.
+          printf '{"okna":{"sutki_eti":["%s",""],"sutki_proshlye":["%s","%s"],"vecher_segodnya":["%s",""],"do_deploev_segodnya":["%s","%s"],"posle_deploev_segodnya":["%s",""]}}\n' \
+            "$S1" "$S0" "$S1" "$V" "$S1" "$D" "$D" > /tmp/okna_6042.json
+          python3 -c "import json;d=json.load(open('/tmp/okna_6042.json'));print('okon:', len(d['okna']), sorted(d['okna']))"
+
+      - name: "Питон с requests и solders"
+        run: |
+          set -e
+          # SOLDERS НУЖЕН НЕ ДЛЯ ПОДПИСИ, А ДЛЯ РАЗБОРА. Пересчёт ожидания идёт
+          # котировщиком самой службы (c2_swap_build), а он импортирует solders
+          # целиком -- первый прогон 17:15:58Z на этом и встал
+          # ("ModuleNotFoundError: No module named 'solders'"). Ключей кошельков
+          # в прогоне нет и не появляется: пакет берётся ради Pubkey в
+          # разборщике события кривой.
+          python3 -m venv "$RUNNER_TEMP/v6042"
+          "$RUNNER_TEMP/v6042/bin/pip" install -q requests solders
+          echo "PY=$RUNNER_TEMP/v6042/bin/python" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/v6042/bin/python" -c "import solders, requests; print('solders', solders.__name__, 'na meste')"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Выжимка из журналов хоста (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/otkazy_dopuska_iz_zhurnala.py" \
+            < deploy/checks/otkazy_dopuska_iz_zhurnala.py
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/okna_6042.json" < /tmp/okna_6042.json
+          # В КОМАНДЕ root НИ ОДНОГО ЗНАКА ИЗ ВХОДОВ: только литералы и путь.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            nice -n 15 python3 /tmp/otkazy_dopuska_iz_zhurnala.py \
+              --state-dir '$STATE_DIR' --okna /tmp/okna_6042.json \
+              --out /tmp/otkazy_dopuska.json
+            rm -f /tmp/otkazy_dopuska_iz_zhurnala.py /tmp/okna_6042.json"
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/otkazy_dopuska.json" > /tmp/otkazy_dopuska.json
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/otkazy_dopuska.json"
+          wc -c /tmp/otkazy_dopuska.json
+
+      - name: "Разбор по цепи"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "SBOY: HELIUS_API ne zadan"; exit 1; }
+          $PY analysis/otkazy_dopuska_po_cepi.py \
+            --vyzhimka /tmp/otkazy_dopuska.json \
+            --sluchaev "${{ inputs.sluchaev }}" --out "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Otkazy po dopusku ceny: uhod protiv dopuska i zaderzhka [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

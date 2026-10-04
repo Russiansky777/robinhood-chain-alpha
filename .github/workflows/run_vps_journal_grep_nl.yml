@@ -15,7 +15,7 @@ on:
         description: "фиксированные строки через запятую (подпись, минт, адрес)"
         required: true
       file:
-        description: "'decisions' (по умолчанию) или 'positions'"
+        description: "'decisions' (по умолчанию), 'positions' или 'seller' (журнал продавца)"
         required: false
         default: "decisions"
       fields:
@@ -81,6 +81,11 @@ jobs:
           set -o pipefail
           case "${{ inputs.file }}" in
             positions) SRC="$STATE_DIR/positions.jsonl" ;;
+            # ЖУРНАЛ ПРОДАВЦА -- ТРЕТИЙ ФАЙЛ СОСТОЯНИЯ. Решения детектора и
+            # записи позиций не отвечают на вопрос "что делал продавец с этой
+            # позицией и послал ли он строку владельцу": это seller.jsonl.
+            # 04.10 вечером разбор списания упёрся ровно в это.
+            seller)    SRC="$STATE_DIR/seller.jsonl" ;;
             *)         SRC="$STATE_DIR/decisions.jsonl" ;;
           esac
           # ОБРАЗЦЫ -- ФАЙЛОМ, А НЕ СПИСКОМ -e. Здесь стояло

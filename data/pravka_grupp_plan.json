@@ -1,12 +1,13 @@
 {
- "zachem": "Слово владельца 03.10 (вечер), п.4: krug_001 за день не открыл ни одной позиции -- дать ему самый частый адрес из log_only (не из торгующих групп), билет 0.01, sell_own_first.",
- "pochemu_etot_adres": "Замер по журналу решений хоста за окно 02.10 22:00:19Z -> 03.10 16:57:25Z (прогон run_vps_journal_stats_nl.yml, новая сводка signals_by_source): из адресов НЕ торгующих групп самый частый -- 5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij, 443 сигнала (второй HmBmSYwY -- 195). Размер его покупок по журналу: 14 записей с числом, медиана 10.0 SOL-экв, от 4.0 до 20.0, все 14 выше порога входа группы 2.0 -- то есть дверь группы этот источник проходит, и обкатка получит сделку.",
- "chto_ne_menyaetsya": "Политика krug_001 НЕ трогается: билет 0.01 (lane_sol и lane_size уже 0.01), sell_own_first уже 1, предел открытых 1, per_day 20, порог входа 2.0 -- всё остаётся как стоит. Правка одна и только перенос адреса. Адрес AFmiexHw остаётся в группе.",
+ "zachem": "Слово владельца 04.10 (вечер), п.1: дать krug_001 пулы как у lane_s0 живым значением, чтобы кривая pump.fun проходила -- 5 из 6 отказов группы по типу пула были на ней (6EF8rrec), шестой на cpamdpZC.",
+ "otkuda_znachenie": "ЖИВОЙ замер 04.10 (прогон run_voronka_polosy_nl.yml 37210485507, шаг «типы пулов и режим USDC-ноги по группам»): у lane_s0 поле lane_pools в файле ЕСТЬ и даёт ровно 11 имён -- amm_v4, bonding, clmm, cpmm, damm2, dbc, dlmm, launchlab, pump_amm, whirlpool, two_step. У krug_001 поля нет вовсе, поэтому действовали только постоянные два типа: cpmm и pump_amm. Старый план 30.09 для сверки не брался -- значение взято у живого процесса.",
+ "pochemu_svodka_etogo_ne_pokazyvala": "Показ групп (pravka_grupp.py --pokazat) печатает только СКАЛЯРНЫЕ поля политики (if not isinstance(v, (list, dict))), поэтому lane_pools в сводке не виден ни у одной группы. По сводке я сперва решил, что поля нет ни у кого -- живой замер это опроверг.",
+ "chto_ne_menyaetsya": "Политика krug_001 трогается ОДНИМ полем. Остаются как стоят: lane_sol и lane_size 0.01, per_day 3, lane_open_max 1, sell_own_first 1, min_target_sol 2.0, hold_slots 108, адрес 5YRgrP3m. Другие группы и env не трогаются вовсе.",
  "pravki": [
   {
-   "perenesti": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij",
-   "v": "krug_001",
-   "pometka": "слово владельца 03.10 вечером, п.4: самый частый адрес log_only (443 сигнала за окно 02.10 22:00Z -> 03.10 16:57Z), покупки 4.0-20.0 SOL-экв при медиане 10.0 -- для обкатки круга 0.01 своей продажей"
+   "gruppa": "krug_001",
+   "pole": "lane_pools",
+   "znachenie": "amm_v4,bonding,clmm,cpmm,damm2,dbc,dlmm,launchlab,pump_amm,whirlpool,two_step"
   }
  ]
 }

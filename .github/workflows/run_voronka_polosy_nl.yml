@@ -23,6 +23,10 @@ on:
         description: "до какого времени UTC, ISO с Z (пусто -- до конца)"
         required: false
         default: ""
+      gruppa:
+        description: "одна группа источников -- отдельный разбор по всему журналу (пусто -- без него)"
+        required: false
+        default: ""
 
 concurrency:
   group: voronka-polosy
@@ -48,8 +52,16 @@ jobs:
         env:
           S: ${{ inputs.s }}
           DO: ${{ inputs.do }}
+          GRUPPA: ${{ inputs.gruppa }}
         run: |
           set -e
+          # ИМЯ ГРУППЫ -- только буквы, цифры, подчёркивание и дефис. Оно идёт
+          # доводом питону на бегунке, а не в команду root, но проверить
+          # дешевле, чем доверять.
+          case "$GRUPPA" in
+            "") : ;;
+            *[!A-Za-z0-9_-]*) echo "OTKAZ: v imeni gruppy lishnie znaki"; exit 1;;
+          esac
           # Время -- только цифры, дефисы, T, двоеточия и Z. В команду root оно
           # всё равно не попадает (разбор идёт на бегунке), но проверить дешевле,
           # чем доверять.
@@ -60,6 +72,7 @@ jobs:
             esac
           done
           python3 deploy/checks/voronka_polosy.py --self-test | tail -1
+          python3 deploy/checks/tipy_i_usdc_po_gruppam.py --self-test | tail -1
 
       - name: "SSH key"
         env:
@@ -77,6 +90,7 @@ jobs:
         env:
           S: ${{ inputs.s }}
           DO: ${{ inputs.do }}
+          GRUPPA: ${{ inputs.gruppa }}
         run: |
           set -e
           set -o pipefail
@@ -90,15 +104,50 @@ jobs:
           echo "=== Полоса: воронка по журналу решений, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
           echo "окно: с '$S' до '${DO:-конца журнала}'" | tee -a "$OUT"
           python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl "$S" "$DO" | tee -a "$OUT"
-          # ОКНО ТРЕВОГИ ОТДЕЛЬНО: владелец назвал его прямо -- "отправленных
-          # покупок НОЛЬ за 30 минут" в 11:15:38Z. Считаем ровно его, чтобы
-          # ответ был про тот же отрезок, а не про похожий.
-          echo "--- окno trevogi 10:45-11:16Z otdelno ---" | tee -a "$OUT"
-          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
-            "2026-10-04T10:45:00Z" "2026-10-04T11:16:00Z" | tee -a "$OUT"
-          echo "--- do deploja: 09:40-10:43Z (dlja sravnenija) ---" | tee -a "$OUT"
-          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
-            "2026-10-04T09:40:00Z" "2026-10-04T10:43:00Z" | tee -a "$OUT"
+          # ВЕСЬ ЖУРНАЛ БЕЗ ОКНА -- отдельной строкой. Журнал держит около 16
+          # часов (измерено 04.10: 03.10 22:00:02Z -> 04.10 14:02:48Z), и это
+          # ЕДИНСТВЕННОЕ окно, которое по нему вообще можно посчитать; спрошенное
+          # владельцем 03.10 18:23Z в журнале уже не существует.
+          echo "--- ves zhurnal bez okna ---" | tee -a "$OUT"
+          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl "" "" | tee -a "$OUT"
+          # ОДНА ГРУППА ПО ВСЕМУ ЖУРНАЛУ. Общий свод по этапам на вопрос "что
+          # получила именно эта группа" не отвечает: 16 отказов гейта за окно
+          # принадлежали шести группам, и по своду их было не разделить.
+          if [ -n "$GRUPPA" ]; then
+            echo "--- gruppa $GRUPPA po vsemu zhurnalu ---" | tee -a "$OUT"
+            python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
+              "" "" "$GRUPPA" | tee -a "$OUT"
+          fi
+
+      - name: "Живые типы пулов и режим USDC-ноги по группам (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Поля lane_pools в файле групп нет ни у одной группы, значит
+          # набор типов складывается из постоянных двух и флагов окружения -- и
+          # узнать его можно только у ЖИВОГО процесса. То же с режимом
+          # USDC-ноги: vykl / ten / boj решает флаг, а не файл.
+          #
+          # ЗНАЧЕНИЙ ПЕРЕМЕННЫХ НАРУЖУ НЕ УХОДИТ: скрипт читает env процесса в
+          # память и печатает только ИМЕНА типов, имя режима и логическое
+          # «список групп задан». В команде root ни одного знака из входов.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/tipy_i_usdc.py" \
+            < deploy/checks/tipy_i_usdc_po_gruppam.py
+          echo "--- tipy pulov i rezhim USDC-nogi po gruppam (zhivoe) ---" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            PID=\$(systemctl show -p MainPID --value bloom-detector 2>/dev/null || echo 0)
+            echo \"detektor MainPID: \$PID\"
+            # ИНТЕРПРЕТАТОР -- venv СЛУЖБЫ, а не системный python3. Первый
+            # прогон сказал ModuleNotFoundError: модули тени на месте, но часть
+            # их зависимостей стоит только в venv -- ExecStart службы идёт
+            # именно им. Системный python3 остаётся запасным путём.
+            PY=/home/bot/robinhood-chain-alpha/venv/bin/python
+            [ -x \"\$PY\" ] || PY=python3
+            echo \"interpretator: \$PY\"
+            nice -n 5 \"\$PY\" /tmp/tipy_i_usdc.py /home/bot/bloom_executor \
+              lane_s0,krug_001,cand1,cand2,konveyer,batch5 \"\$PID\"
+            rm -f /tmp/tipy_i_usdc.py" | tee -a "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
         if: always()

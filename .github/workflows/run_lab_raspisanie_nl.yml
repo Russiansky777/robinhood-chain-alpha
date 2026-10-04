@@ -314,22 +314,34 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          # ПОЧАСОВЫЕ -- СРАЗУ, КОНВЕЙЕР -- ТОЖЕ, НО ОН ДОЛГИЙ. Конвейер идёт
-          # около двух часов, поэтому его служба запускается БЕЗ ожидания
-          # (--no-block): иначе ssh висел бы два часа и прогон упал бы по
-          # своему пределу, а работа при этом шла бы.
-          ssh -n $SSH_OPTS root@"$HOST_LAB" "
-            set -e
-            for T in lab-uchjot-chas lab-zdorovje-chas; do
-              echo \"--- pervyj zapusk \$T\"
-              systemctl start \$T.service || echo \"\$T: start otdal oshibku\"
-              journalctl -u \$T.service -n 25 --no-pager -o cat || true
-            done
-            echo '--- pervyj zapusk lab-konveyer-sutki (bez ozhidanija: on idjot okolo dvuh chasov)'
-            systemctl start --no-block lab-konveyer-sutki.service || echo 'konveyer: start otdal oshibku'
-            sleep 20
-            journalctl -u lab-konveyer-sutki.service -n 20 --no-pager -o cat || true
-          " 2>&1 | tee -a "$OUT"
+          # НИ ОДНОГО ЗАПУСКА С ОЖИДАНИЕМ, И ЭТО ПРАВКА ПОСЛЕ ПРОГОНА
+          # 37206601235. Там почасовые службы запускались ОБЫЧНЫМ systemctl
+          # start, то есть ssh держал канал всё время их работы. А работа эта
+          # -- дождаться чужого прогона GitHub: скрипт часов ждёт до 10800 с.
+          # Канал умер на первой же службе: "client_loop: send disconnect:
+          # Broken pipe", и прогон упал, хотя таймеры уже стояли и были
+          # активны. Поэтому теперь ВСЕ три службы пускаются --no-block, а
+          # состояние спрашивается КОРОТКИМИ ssh-вызовами.
+          for T in lab-uchjot-chas lab-zdorovje-chas lab-konveyer-sutki; do
+            echo "--- pervyj zapusk $T (bez ozhidanija)" | tee -a "$OUT"
+            ssh -n $SSH_OPTS root@"$HOST_LAB" \
+              "systemctl start --no-block $T.service && echo 'start otpravlen'" \
+              2>&1 | tee -a "$OUT"
+          done
+          # ПОДТВЕРЖДЕНИЕ -- ЧТО СЛУЖБА И ПРАВДА ПОШЛА, а не что "start не
+          # отдал ошибки": --no-block возвращается сразу и об исходе ничего не
+          # говорит. Ждём появления ActiveEnterTimestamp и печатаем хвост
+          # журнала. Дальше работа идёт сама, и её исход читается по прогонам
+          # GitHub, а не по этому каналу.
+          sleep 30
+          for T in lab-uchjot-chas lab-zdorovje-chas lab-konveyer-sutki; do
+            echo "--- sostojanie $T" | tee -a "$OUT"
+            ssh -n $SSH_OPTS root@"$HOST_LAB" "
+              systemctl show $T.service -p ActiveState -p SubState -p ActiveEnterTimestamp -p ExecMainStatus --no-pager
+              journalctl -u $T.service -n 12 --no-pager -o cat 2>/dev/null || true" \
+              2>&1 | tee -a "$OUT"
+          done
+          echo "pervye zapuski otpravleny; ishod chitaetsja po progonam GitHub" | tee -a "$OUT"
 
       - name: "Ключей в отчёте быть не должно"
         if: always()
