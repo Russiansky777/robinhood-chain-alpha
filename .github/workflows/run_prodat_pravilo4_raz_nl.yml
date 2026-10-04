@@ -78,17 +78,32 @@ jobs:
       - name: "Положить на хост изменённые модули и сам прогон"
         run: |
           set -e
+          set -o pipefail
           ssh -n $SSH_OPTS root@$TARGET_HOST "rm -rf $RABOTA; install -d -m 755 $RABOTA $RABOTA/kod"
-          # МОДУЛЕЙ ПЯТЬ, И КАЖДЫЙ НАЗВАН: правило 4 (bloom_seller), предел
-          # открытых и USDC-нога (bloom_own_send), состояние списания
-          # (bloom_exec_state), опознание пула с названной котировкой
-          # (c2_common) и строитель второй ноги (c3_usdc_noga_signaly).
-          for M in bloom_seller.py bloom_own_send.py bloom_exec_state.py \
-                   c2_common.py c3_usdc_noga_signaly.py; do
-            ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/kod/$M" < "analysis/$M"
-          done
+          # ОДНИМ ПОТОКОМ, А НЕ ПЯТЬЮ ssh С ПЕРЕНАПРАВЛЕНИЕМ. Пять отдельных
+          # `ssh "cat > файл" < файл` в цикле доехали НЕ ВСЕ: 05.10 в 22:48:26Z
+          # в каталоге оказался только bloom_seller.py, а bloom_exec_state.py
+          # взялся из каталога службы -- и прогон упал на ImportError
+          # STATE_SPISANA. tar -- один поток и один код возврата.
+          tar -C analysis -cf - bloom_seller.py bloom_own_send.py \
+              bloom_exec_state.py c2_common.py c3_usdc_noga_signaly.py \
+            | ssh $SSH_OPTS root@$TARGET_HOST "tar -C $RABOTA/kod -xf -"
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/prodat.py" < deploy/checks/prodat_pravilo4_raz.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $RABOTA; ls -la $RABOTA/kod | head -8"
+          ssh -n $SSH_OPTS root@$TARGET_HOST "chown -R bot:bot $RABOTA"
+          # ПРИЕХАЛО ЛИ ТО, ЧТО НАДО -- ПРОВЕРКОЙ, А НЕ НА ВЕРУ. Числа: пять
+          # файлов, метка списания в состоянии и само правило 4 у продавца.
+          ssh -n $SSH_OPTS root@$TARGET_HOST "
+            set -e
+            echo 'fajlov v kod:' \$(ls -1 $RABOTA/kod/*.py | wc -l)
+            grep -c STATE_SPISANA $RABOTA/kod/bloom_exec_state.py > /dev/null \
+              || { echo 'SBOY: v bloom_exec_state net STATE_SPISANA'; exit 1; }
+            grep -c 'def pravilo' $RABOTA/kod/bloom_seller.py > /dev/null \
+              || grep -c 'def \xd0\xbf\xd1\x80\xd0\xb0\xd0\xb2\xd0\xb8\xd0\xbb\xd0\xbe_4' $RABOTA/kod/bloom_seller.py > /dev/null \
+              || { echo 'SBOY: u prodavca net pravila 4'; exit 1; }
+            test \$(ls -1 $RABOTA/kod/*.py | wc -l) -eq 5 \
+              || { echo 'SBOY: ne vse pjat modulej priehali'; exit 1; }
+            echo 'moduli na meste'
+          "
 
       - name: "Продажа правилом 4"
         run: |
