@@ -1,13 +1,11 @@
 {
- "zachem": "Слово владельца 04.10 (вечер), п.1: дать krug_001 пулы как у lane_s0 живым значением, чтобы кривая pump.fun проходила -- 5 из 6 отказов группы по типу пула были на ней (6EF8rrec), шестой на cpamdpZC.",
- "otkuda_znachenie": "ЖИВОЙ замер 04.10 (прогон run_voronka_polosy_nl.yml 37210485507, шаг «типы пулов и режим USDC-ноги по группам»): у lane_s0 поле lane_pools в файле ЕСТЬ и даёт ровно 11 имён -- amm_v4, bonding, clmm, cpmm, damm2, dbc, dlmm, launchlab, pump_amm, whirlpool, two_step. У krug_001 поля нет вовсе, поэтому действовали только постоянные два типа: cpmm и pump_amm. Старый план 30.09 для сверки не брался -- значение взято у живого процесса.",
- "pochemu_svodka_etogo_ne_pokazyvala": "Показ групп (pravka_grupp.py --pokazat) печатает только СКАЛЯРНЫЕ поля политики (if not isinstance(v, (list, dict))), поэтому lane_pools в сводке не виден ни у одной группы. По сводке я сперва решил, что поля нет ни у кого -- живой замер это опроверг.",
- "chto_ne_menyaetsya": "Политика krug_001 трогается ОДНИМ полем. Остаются как стоят: lane_sol и lane_size 0.01, per_day 3, lane_open_max 1, sell_own_first 1, min_target_sol 2.0, hold_slots 108, адрес 5YRgrP3m. Другие группы и env не трогаются вовсе.",
+ "zachem": "Слово владельца 05.10 (дополнение к правилу продажи), п.4: krug_001 выключить (lane_trades=false) -- круг своей продажи больше не нужен. Правило 4 новой редакции снимает дверь «обкатано» с пути ПРОДАЖИ (п.6 того же слова), то есть первая продажа нового типа своим путём больше не требует отдельной группы с билетом 0.01.",
+ "chto_ne_menyaetsya": "У krug_001 всё остальное остаётся как стоит: lane_sol и lane_size 0.01, per_day 3, lane_open_max 1, sell_own_first 1, min_target_sol 2.0, 11 типов пулов, адрес 5YRgrP3m. Группа не удаляется и адрес никуда не переносится -- снимается только признак торговли полосой. Другие группы и env не трогаются вовсе.",
  "pravki": [
   {
    "gruppa": "krug_001",
-   "pole": "lane_pools",
-   "znachenie": "amm_v4,bonding,clmm,cpmm,damm2,dbc,dlmm,launchlab,pump_amm,whirlpool,two_step"
+   "pole": "lane_trades",
+   "znachenie": "0"
   }
  ]
 }
