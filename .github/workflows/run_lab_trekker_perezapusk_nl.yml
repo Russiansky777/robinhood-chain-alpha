@@ -80,18 +80,19 @@ jobs:
           python3 deploy/checks/trekker_svodka.py --self-test | tail -1
 
       - name: "Ключ лаборатории"
+        # ИМЯ СЕКРЕТА -- VPS_SSH_KEY_MIAMI, КАК У ОСТАЛЬНЫХ ПРОГОНОВ
+        # ЛАБОРАТОРИИ. Я сперва написал здесь LAB_SSH_KEY с откатом на
+        # VPS_SSH_KEY: прогон 37206880963 упал на доказательстве "это
+        # лаборатория", потому что в лабораторию поехал КЛЮЧ ТОРГОВОГО ХОСТА и
+        # не вошёл. Откат убран совсем: подставлять торговый ключ туда, где
+        # нужен лабораторный, нечем оправдать -- либо тот ключ, либо отказ.
         env:
-          LAB_SSH_KEY: ${{ secrets.LAB_SSH_KEY }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
         run: |
           set -e
+          [ -n "$KLJUCH_MIAMI" ] || { echo "OTKAZ: sekreta VPS_SSH_KEY_MIAMI net"; exit 1; }
           install -d -m 700 ~/.ssh
-          if [ -n "$LAB_SSH_KEY" ]; then
-            printf '%s\n' "$LAB_SSH_KEY" > ~/.ssh/lab_key
-          else
-            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/lab_key
-          fi
-          [ -s ~/.ssh/lab_key ] || { echo "SBOY: klyucha laboratorii net"; exit 1; }
+          printf '%s\n' "$KLJUCH_MIAMI" > ~/.ssh/lab_key
           chmod 600 ~/.ssh/lab_key
           ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
