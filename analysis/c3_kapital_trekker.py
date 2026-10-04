@@ -70,6 +70,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 КОШЕЛЕК = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
 WSOL = "So11111111111111111111111111111111111111112"
+# КОТИРОВОЧНЫЕ ВАЛЮТЫ -- НЕ ПОЗИЦИИ (слово владельца 04.10). Полоса ходит в
+# токен не только прямо за SOL: у неё есть нога через USDC, и в ОДНОЙ
+# транзакции покупки растут ДВА минта -- купленный токен и остаток котировки
+# (живой пример в репозитории: 3YafSwQYD8W3…, минты EPjFWd… +562451 и
+# AY7Xbo… +713336074593 при уходе 0.10498188 SOL). Котировка -- это
+# ПЕРЕВАЛОЧНАЯ валюта, а не купленная позиция: считать её позицией значит
+# держать в капитале вход, которого нет, и не отпускать его никогда, потому
+# что пыль котировки (0.0011 USDC на хосте) с кошелька не уходит.
+USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+КОТИРОВОЧНЫЕ_МИНТЫ = (WSOL, USDC, USDT)
+ИМЕНА_КОТИРОВОК = {WSOL: "WSOL", USDC: "USDC", USDT: "USDT"}
 ПРОГ_ТОКЕНА = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 ПРОГ_ТОКЕНА_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 ЛАМПОРТОВ_В_SOL = 1_000_000_000
@@ -245,8 +257,11 @@ def kapital(sol_lamports: int, scheta: list, pozicii: dict) -> dict:
         if not int(с.get("amount") or 0):
             из_["schetov_pustyh"] += 1
     for минт, вход in (pozicii or {}).items():
-        if минт == WSOL:
-            # WSOL -- не позиция: он уже посчитан завёрнутым. Иначе двойной счёт.
+        if минт in КОТИРОВОЧНЫЕ_МИНТЫ:
+            # КОТИРОВКА -- НЕ ПОЗИЦИЯ. WSOL уже посчитан завёрнутым (иначе
+            # двойной счёт), а USDC и USDT -- перевалочная валюта ноги, а не
+            # купленный токен. Сторож стоит и здесь, и в rjad(), и в приёмке
+            # транзакции: деньги -- то место, где одной проверки мало.
             continue
         из_["pozicii"] += int(вход or 0)
         из_["pozicij"] += 1
@@ -797,10 +812,48 @@ def prinjat_tranzakciju(sostojanie: dict, tx: dict,
     if int(р.get("zakryto_schetov") or 0):
         sostojanie["zakryto_schetov"] = int(
             sostojanie.get("zakryto_schetov") or 0) + int(р["zakryto_schetov"])
+    # КОТИРОВКИ ВЫБРАСЫВАЮТСЯ ДО ВСЯКОГО СЧЁТА. Рост USDC в транзакции
+    # покупки -- это сдача ноги, а не вторая покупка; убыль USDC в транзакции
+    # продажи -- это оплата, а не продажа позиции. Пока они считались
+    # минтами, покупка через ногу выглядела как «два минта выросли», то есть
+    # транзакция становилась непонятной и позиция не открывалась ВОВСЕ, а
+    # пыль котировки навсегда оставалась «позицией» в состоянии.
     куплено = [(м, д) for м, д in (р["tokeny"] or {}).items()
-               if д > 0 and м != WSOL]
+               if д > 0 and м not in КОТИРОВОЧНЫЕ_МИНТЫ]
     продано = [(м, д) for м, д in (р["tokeny"] or {}).items()
-               if д < 0 and м != WSOL]
+               if д < 0 and м not in КОТИРОВОЧНЫЕ_МИНТЫ]
+    котировки = sorted(ИМЕНА_КОТИРОВОК.get(м, м[:6])
+                       for м in (р["tokeny"] or {})
+                       if м in КОТИРОВОЧНЫЕ_МИНТЫ)
+    котировка_выросла = sorted(ИМЕНА_КОТИРОВОК.get(м, м[:6])
+                               for м, д in (р["tokeny"] or {}).items()
+                               if м in КОТИРОВОЧНЫЕ_МИНТЫ and д > 0)
+    котировка_убыла = sorted(ИМЕНА_КОТИРОВОК.get(м, м[:6])
+                             for м, д in (р["tokeny"] or {}).items()
+                             if м in КОТИРОВОЧНЫЕ_МИНТЫ and д < 0)
+    # ВЫРУЧКА, УШЕДШАЯ В КОТИРОВКУ, -- НЕ НОЛЬ, И ВЫДАВАТЬ ЕЁ ЗА НОЛЬ НЕЛЬЗЯ.
+    # Если токен продан, а в той же транзакции ВЫРОСЛА котировка, то чистый
+    # поток SOL близок к нулю (ушла одна комиссия), и запись сделки дала бы
+    # итог «минус весь вход» -- выдуманный убыток на целый билет. То же в
+    # другую сторону: если при покупке котировка УБЫЛА, платили ею, а не SOL,
+    # и вход в SOL придумывать нечем. Обе транзакции называются непонятными и
+    # позиций не трогают.
+    if продано and котировка_выросла:
+        sostojanie["neopoznannyh"] = int(
+            sostojanie.get("neopoznannyh") or 0) + 1
+        sostojanie["prodazh_v_kotirovku"] = int(
+            sostojanie.get("prodazh_v_kotirovku") or 0) + 1
+        из_["pochemu"] = (f"продажа {len(продано)} минтов, а выручка ушла в "
+                          f"{', '.join(котировка_выросла)} -- в SOL пришла "
+                          f"только комиссия, итог считать нечем")
+        return из_
+    if куплено and котировка_убыла:
+        sostojanie["neopoznannyh"] = int(
+            sostojanie.get("neopoznannyh") or 0) + 1
+        из_["pochemu"] = (f"покупка {len(куплено)} минтов оплачена "
+                          f"{', '.join(котировка_убыла)}, а не SOL -- входа в "
+                          f"SOL у неё нет")
+        return из_
     # --- ТОКЕН В ТОКЕН ОДНОЙ ТРАНЗАКЦИЕЙ НЕ РАСКЛАДЫВАЕТСЯ, И ДЕЛИТЬ НАУГАД
     # НА ДЕНЬГАХ НЕЛЬЗЯ. У транзакции ОДНО число `polucheno` (чистый поток
     # SOL), а здесь две стороны сразу: продажа A и покупка B. Посчитать итог
@@ -859,6 +912,20 @@ def prinjat_tranzakciju(sostojanie: dict, tx: dict,
         else:
             позиции.pop(минт, None)
     # --- ПОКУПКА: ровно один минт, иначе делить потраченное нечем.
+    if len(куплено) == 1 and int(р.get("potracheno") or 0) <= 0:
+        # ПОЗИЦИЯ -- ЭТО ТОКЕН, КУПЛЕННЫЙ ЗА SOL (слово владельца 04.10).
+        # Если из системы «кошелёк плюс наши токен-счета» SOL не уходил,
+        # платили не им: это или нога за котировку, или чужой перевод токена
+        # (дарёная пыль). Открыть позицию с входом НОЛЬ значит потом принять
+        # её продажу за чистый заработок, а до продажи держать в капитале
+        # минт, за который мы не платили.
+        sostojanie["neopoznannyh"] = int(
+            sostojanie.get("neopoznannyh") or 0) + 1
+        из_["pochemu"] = (f"минт {куплено[0][0][:6]}… вырос, но SOL из системы "
+                          f"не уходил (потрачено 0"
+                          + (f", котировки: {', '.join(котировки)}" if котировки else "")
+                          + ") -- это не покупка за SOL, позиция не открыта")
+        return из_
     if len(куплено) == 1:
         минт, дельта = куплено[0]
         п = позиции.get(минт)
@@ -904,10 +971,19 @@ def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = 
     # состояния, которой на цепи уже нет, в капитал не идёт: иначе капитал
     # помнил бы проданное.
     остатки: dict = {}
+    котировок_с_остатком = 0
     for с in счета:
-        if int(с.get("amount") or 0) > 0 and str(с.get("mint")) != WSOL:
-            остатки[str(с["mint"])] = (остатки.get(str(с["mint"]), 0)
-                                       + int(с["amount"]))
+        if int(с.get("amount") or 0) <= 0:
+            continue
+        минт_с = str(с.get("mint"))
+        if минт_с in КОТИРОВОЧНЫЕ_МИНТЫ:
+            # КОТИРОВКА НЕ ПОЗИЦИЯ И НЕ «БЕЗ ВХОДА». Пыль USDC (0.0011 на
+            # хосте) жила тут позицией с входом 0 и попадала в «позиций без
+            # цены входа» -- строкой «капитал занижен», которой не было.
+            # Рента её счёта в капитале остаётся: это наши лампорты.
+            котировок_с_остатком += 1
+            continue
+        остатки[минт_с] = остатки.get(минт_с, 0) + int(с["amount"])
     позиции_вход: dict = {}
     без_входа = []
     for минт in остатки:
@@ -943,6 +1019,7 @@ def rjad(rpc_call, *, koshelek: str = КОШЕЛЕК, sostojanie: dict | None = 
                                  for с in (сост.get("sdelki") or [])),
             "neopoznannyh": int(сост.get("neopoznannyh") or 0)}
     из_["bez_vhoda_minty"] = без_входа[:5]
+    из_["kotirovok_s_ostatkom"] = котировок_с_остатком
     из_["scheta_vozrast_sek"] = возраст
     return из_
 
@@ -1378,6 +1455,7 @@ def vygruzka(rjady: list, sostojanie: dict, *, sejchas: float | None = None) -> 
             "schetov_pustyh": int(последний.get("schetov_pustyh") or 0),
             "bez_vhoda": int(последний.get("bez_vhoda") or 0),
             "bez_vhoda_minty": последний.get("bez_vhoda_minty") or [],
+            "kotirovok_s_ostatkom": int(последний.get("kotirovok_s_ostatkom") or 0),
             "neopoznannyh": int(последний.get("neopoznannyh") or 0),
         })
     # СДЕЛОК ВСЕГО -- ОТДЕЛЬНЫМ СЧЁТЧИКОМ, А НЕ ДЛИНОЙ СПИСКА: список режется
@@ -1396,6 +1474,8 @@ def vygruzka(rjady: list, sostojanie: dict, *, sejchas: float | None = None) -> 
     из_["zastrjali_na_sig"] = ((sostojanie.get("zastrjali") or {}).get("sig")
                                or None)
     из_["sbros_sostojanija_utc"] = sostojanie.get("sbros_sostojanija_utc")
+    из_["prodazh_v_kotirovku"] = int(
+        sostojanie.get("prodazh_v_kotirovku") or 0)
     из_["rashodov"] = int(sostojanie.get("rashodov") or 0)
     из_["rashodov_lamports"] = int(sostojanie.get("rashodov_lamports") or 0)
     из_["kredity_sutki"] = dict(sostojanie.get("kredity") or {})
@@ -1857,6 +1937,14 @@ function нарисовать() {
   if (данные.neopoznannyh) {
     сл.push("непонятных транзакций: " + данные.neopoznannyh);
   }
+  if (данные.kotirovok_s_ostatkom) {
+    сл.push("котировок с остатком (USDC/USDT/WSOL): " + данные.kotirovok_s_ostatkom
+            + " -- их стоимость в капитал НЕ входит, только рента их счетов");
+  }
+  if (данные.prodazh_v_kotirovku) {
+    сл.push("продаж, выручка которых ушла в котировку: "
+            + данные.prodazh_v_kotirovku + " -- итог таких сделок не посчитан");
+  }
   if (данные.upjorlis_v_predel) {
     сл.push("окно подписей упёрлось в предел -- часть транзакций могла не "
             + "попасть в разбор");
@@ -2180,6 +2268,69 @@ def progon(kat: str | Path | None = None, *, rpc_call=None,
     return из_
 
 
+def razbor(rpc_call=None, *, koshelek: str = КОШЕЛЕК, oprosov: int = 3,
+           pauza: float = 5.0, kat: str | Path | None = None,
+           spat=None) -> dict:
+    """НЕСКОЛЬКО ОПРОСОВ ПОДРЯД, КАПИТАЛ ПО ЧАСТЯМ. ТОЛЬКО ЧТЕНИЕ.
+
+    Зачем отдельный ход, а не «посмотреть в журнал». 04.10 капитал трекера
+    разошёлся с кошельком и расхождение РОСЛО, а назвать растущую часть было
+    нечем. Этот ход спрашивает цепь столько раз, сколько сказано, и печатает
+    КАЖДУЮ часть и её изменение между опросами:
+
+        SOL (getBalance) + WSOL + позиции по входу + рента токен-счетов
+
+    Ничего не пишет на диск -- ни ряда, ни состояния, ни страницы: состояние
+    берётся готовым (если каталог дан), иначе пустое, и в нём только читают.
+    Секрета здесь нет вовсе: он к отдаче, а не к чтению цепи.
+    """
+    сост = pustoe_sostojanie(koshelek)
+    к = Path(kat) if kat else None
+    if к and (к / ФАЙЛ_СОСТОЯНИЯ).exists():
+        try:
+            прежнее = json.loads((к / ФАЙЛ_СОСТОЯНИЯ).read_text(encoding="utf-8"))
+            if isinstance(прежнее, dict):
+                сост = прежнее
+        except (ValueError, OSError):
+            pass
+    if rpc_call is None:
+        url = uzel_iz_okruzheniya()
+        if not url:
+            return {"ok": False, "why_not": WHY_NET_UZLA}
+        rpc_call = rpc_iz_url(url)
+    из_ = {"ok": True, "koshelek": koshelek, "uzel": zateret(uzel_iz_okruzheniya()),
+            "oprosy": [], "rastjot": None}
+    спать = spat if spat else time.sleep
+    for и in range(max(1, int(oprosov))):
+        if и:
+            спать(max(0.0, float(pauza)))
+        try:
+            р = rjad(rpc_call, koshelek=koshelek, sostojanie=сост,
+                     schitat_scheta=True)
+        except (ОшибкаТрекера, OSError, ValueError) as сбой:
+            из_["oprosy"].append({"why_not": f"{type(сбой).__name__}: "
+                                              f"{zateret(str(сбой))[:160]}"})
+            continue
+        из_["oprosy"].append({k: р.get(k) for k in (
+            "utc", "slot", "kapital", "sol", "wsol", "pozicii", "renta",
+            "schetov", "schetov_pustyh", "pozicij", "bez_vhoda",
+            "kotirovok_s_ostatkom")})
+    годные = [о for о in из_["oprosy"] if о.get("kapital") is not None]
+    if len(годные) >= 2:
+        # РАСТЁТ ИЛИ НЕТ -- НАЗЫВАЕТСЯ ЧАСТЬЮ, А НЕ ВПЕЧАТЛЕНИЕМ.
+        из_["rastjot"] = {ч: int(годные[-1].get(ч) or 0) - int(годные[0].get(ч) or 0)
+                          for ч in ("kapital", "sol", "wsol", "pozicii",
+                                     "renta", "schetov")}
+        из_["sekund_mezhdu"] = int((годные[-1].get("utc") or 0)
+                                   - (годные[0].get("utc") or 0))
+        # ТОЖДЕСТВО ЧАСТЕЙ ПРОВЕРЯЕТСЯ ТУТ ЖЕ: капитал обязан быть ровно
+        # суммой своих частей, иначе растёт что-то пятое.
+        из_["chasti_sxodjatsja"] = all(
+            int(о["kapital"]) == int(о["sol"]) + int(о["wsol"])
+            + int(о["pozicii"]) + int(о["renta"]) for о in годные)
+    return из_
+
+
 # ------------------------------------------------------------------- отдача
 
 def sekret_iz_okruzheniya() -> str:
@@ -2353,8 +2504,25 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
             из_["sboev"] += (not р.get("ok"))
             # ТИХИМ СБОЙ НЕ БЫВАЕТ: каждая неудача тика печатается строкой, её
             # видно в journalctl, и по ней считается пропуск в ряде.
+            # КАПИТАЛ ПЕЧАТАЕТСЯ ПО ЧАСТЯМ, А НЕ ОДНИМ ЧИСЛОМ. 04.10 капитал
+            # разошёлся с кошельком и расхождение росло, а по журналу нельзя
+            # было сказать ДАЖЕ ТОГО, какая часть растёт: в строке тика стоял
+            # один итог. Теперь в каждой строке стоят все четыре части, число
+            # счетов и число позиций -- этого хватает, чтобы назвать виновную
+            # часть по одному journalctl, без правки кода и без лишних чтений
+            # цепи (все числа уже посчитаны этим же тиком).
+            рр = р.get("rjad") or {}
             print(json.dumps({"тик": из_["tikov"], "ok": bool(р.get("ok")),
                               "капитал_sol": р.get("kapital_sol"),
+                              "sol": рр.get("sol"), "wsol": рр.get("wsol"),
+                              "позиции": рр.get("pozicii"),
+                              "рента": рр.get("renta"),
+                              "счетов": рр.get("schetov"),
+                              "счетов_пустых": рр.get("schetov_pustyh"),
+                              "позиций": рр.get("pozicij"),
+                              "без_входа": рр.get("bez_vhoda"),
+                              "котировок_с_остатком": рр.get("kotirovok_s_ostatkom"),
+                              "возраст_счетов_сек": рр.get("scheta_vozrast_sek"),
                               "why_not": р.get("why_not"),
                               "счета_читали": р.get("scheta_chitali"),
                               "вызовов_за_сутки": (р.get("vyzovov_za_sutki")
@@ -2372,7 +2540,7 @@ def sluzhba(kat: str | Path | None = None, *, koshelek: str = КОШЕЛЕК,
 
 # ЧИСЛО ПРОВЕРОК ОБЪЯВЛЕНО ЗАРАНЕЕ: меньше -- значит что-то пропущено молча, и
 # это считается провалом, а не мелочью.
-ZHDEM_PROVEROK = 92
+ZHDEM_PROVEROK = 101
 # СУТОЧНЫЕ ИТОГИ УЧЁТА ПОЛОСЫ -- ЗАМЕР ПО ФАЙЛУ data/sdelki_polosy_vse_s_2709.json
 # (снят 03.10T17:07Z, 578 рядов), поле «итог_po_cepi_sol» КИРИЛЛИЦЕЙ. Числа
 # объявлены, чтобы смена файла была видна числом, а не молчанием.
@@ -2416,6 +2584,13 @@ ZHDEM_PROVEROK = 92
 ЖДЁМ_ВЕРСИЙ = {"0": 119, "1": 22, "legacy": 2}
 # Первый образец версии 1 по порядку файлов: CPMM, подпись hwWsyoRR3Med7Zbw…
 ЖДЁМ_ОБРАЗЦА_В1 = {"vid": "своп", "chistoe": -0.007601397}
+# ТОЧНОСТЬ СВЕРКИ ЧАСТЕЙ -- 0.001 SOL (слово владельца 04.10, проверка «б»).
+ТОЧНОСТЬ_СВЕРКИ_ЛАМПОРТОВ = 1_000_000
+# ЖИВАЯ ПОКУПКА ПОЛОСЫ ЧЕРЕЗ НОГУ USDC -- в репозитории одна, и она названа.
+ФАЙЛ_ЖИВОЙ_НОГИ = "solana_raw_tx_dump_vyvod.json"
+# Ушло 0.10498188 SOL, рента двух новых счетов 2 976 880 -> вход 102 005 000.
+ЖДЁМ_НОГИ = {"mint": "AY7Xbo4VKm7BF5FzbnbTpG3jZMdQueVXpBBryoe3ory",
+             "vhod": 102_005_000}
 
 
 def _tx(*, kljuchi: list, do: list, posle: list, token_do=None,
@@ -2470,6 +2645,13 @@ def _poddelnyj_uzel(*, sol: int, scheta: list, podpisi=None, tranzakcii=None):
 
     _зов.зовы = зовы
     return _зов
+
+
+def все_части_названы(опрос: dict) -> bool:
+    """Все четыре части капитала и счётчики стоят в опросе числом."""
+    return all(isinstance(опрос.get(ч), int) for ч in (
+        "kapital", "sol", "wsol", "pozicii", "renta", "schetov", "pozicij",
+        "bez_vhoda", "kotirovok_s_ostatkom"))
 
 
 def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
@@ -3596,6 +3778,188 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
             "транзакций даёт пилу на целый билет",
             зовы_п and set(подтв.values()) == {ПОДТВЕРЖДЕНИЕ}, подтв)
 
+
+        # ------------------------- 16. КАПИТАЛ НЕ РАСТЁТ САМ: ТРИ ПРОВЕРКИ,
+        #                              КОТОРЫХ НЕ ХВАТИЛО 04.10
+        # (а) БЕЗ НОВЫХ ТРАНЗАКЦИЙ ПОВТОРНЫЕ ОПРОСЫ ДАЮТ ОДИН И ТОТ ЖЕ КАПИТАЛ.
+        # Ровно это и спросили у трекера, когда он за час ушёл от кошелька на
+        # 0.44 SOL: «что-то копится на каждом опросе». Проверка стоит на том
+        # самом пути, которым ходит служба -- progon -> rjad -> kapital.
+        СОЛЬ_ХОСТА = 6_260_165_036          # кошелёк полосы на 04.10 12:54Z
+        счета_х = [{"mint": USDC, "lamports": 2_039_280, "amount": 1100,
+                     "adres": "ataUSDC"}]
+        счета_х += [{"mint": f"M{и:043d}", "lamports": 1_488_440, "amount": 0,
+                      "adres": f"a{и}"} for и in range(200)]
+        узел_х = _poddelnyj_uzel(sol=СОЛЬ_ХОСТА, scheta=счета_х, podpisi=[],
+                                  tranzakcii={})
+        кат_х = врем / "bez_novyh"
+        кат_х.mkdir(parents=True, exist_ok=True)
+        сост_х = pustoe_sostojanie(КОШ)
+        # Состояние -- как на хосте: пыль USDC «позицией» с входом 0.
+        сост_х["pozicii"] = {USDC: {"vhod": 0, "ostatok": 1100, "sig": "32zc4hbC",
+                                     "utc": 1_759_352_869, "slot": 452403752,
+                                     "dobavok": 1}}
+        сост_х["poslednjaja_sig"] = "staraja"
+        (кат_х / ФАЙЛ_СОСТОЯНИЯ).write_text(
+            json.dumps(сост_х, ensure_ascii=False), encoding="utf-8")
+        кэш_х: list = []
+        капиталы = []
+        части_х = []
+        for и in range(5):
+            р_х = progon(кат_х, rpc_call=узел_х, koshelek=КОШ,
+                         sejchas=1_759_580_000 + 20 * и, rjady_kesh=кэш_х)
+            рр_х = р_х.get("rjad") or {}
+            капиталы.append(рр_х.get("kapital"))
+            части_х.append((рр_х.get("sol"), рр_х.get("wsol"),
+                            рр_х.get("pozicii"), рр_х.get("renta")))
+        chk("(а) БЕЗ НОВЫХ ТРАНЗАКЦИЙ пять опросов подряд дают ОДИН И ТОТ ЖЕ "
+            "капитал -- и по частям тоже: ничего не копится на опросе",
+            len(set(капиталы)) == 1 and капиталы[0] is not None
+            and len(set(части_х)) == 1,
+            (капиталы, части_х[:2]))
+        # (б) ПРИ НУЛЕ ПОЗИЦИЙ КАПИТАЛ = SOL + WSOL + РЕНТА, точность 0.001 SOL.
+        последний_х = (кэш_х[-1] if кэш_х else {})
+        сумма_частей = (int(последний_х.get("sol") or 0)
+                        + int(последний_х.get("wsol") or 0)
+                        + int(последний_х.get("renta") or 0))
+        расхождение = abs(int(последний_х.get("kapital") or 0) - сумма_частей)
+        chk("(б) при НУЛЕ позиций капитал равен SOL + WSOL + рента токен-счетов "
+            f"с точностью 0.001 SOL (расхождение {расхождение} лампортов)",
+            последний_х.get("pozicij") == 0
+            and последний_х.get("pozicii") == 0
+            and расхождение <= ТОЧНОСТЬ_СВЕРКИ_ЛАМПОРТОВ,
+            (последний_х.get("pozicij"), последний_х.get("pozicii"),
+             расхождение))
+        # (в) ПЫЛЬ КОТИРОВКИ НЕ СТАНОВИТСЯ ПОЗИЦИЕЙ -- ни из состояния, ни из
+        # новой транзакции, ни «позицией без входа».
+        chk("(в) пыль USDC с входом 0 НЕ позиция и НЕ «позиция без цены входа»: "
+            "котировка считается числом отдельно, а рента её счёта остаётся "
+            "в капитале -- это наши лампорты",
+            последний_х.get("pozicij") == 0
+            and последний_х.get("bez_vhoda") == 0
+            and последний_х.get("kotirovok_s_ostatkom") == 1
+            and последний_х.get("renta") == 2_039_280 + 200 * 1_488_440,
+            (последний_х.get("pozicij"), последний_х.get("bez_vhoda"),
+             последний_х.get("kotirovok_s_ostatkom"),
+             последний_х.get("renta")))
+        # И ТО ЖЕ -- НА ЖИВОЙ ТРАНЗАКЦИИ ПОЛОСЫ С ДВУМЯ ВЫРОСШИМИ МИНТАМИ.
+        # 3YafSwQYD8W3… : ушло 0.10498188 SOL, выросли USDC (+562451) и токен
+        # AY7Xbo… (+713336074593). Раньше это считалось «двумя покупками» и
+        # позиция не открывалась вовсе; теперь котировка -- нога, а позиция
+        # открывается на купленный токен.
+        п_нога = КОРЕНЬ / "data" / ФАЙЛ_ЖИВОЙ_НОГИ
+        tx_нога = None
+        if п_нога.exists():
+            найденные: list = []
+
+            def _собрать(о):
+                if isinstance(о, dict):
+                    if isinstance(о.get("meta"), dict) and isinstance(
+                            о.get("transaction"), dict):
+                        найденные.append(о)
+                        return
+                    for з in о.values():
+                        _собрать(з)
+                elif isinstance(о, list):
+                    for з in о:
+                        _собрать(з)
+            _собрать(json.loads(п_нога.read_text(encoding="utf-8")))
+            for т in найденные:
+                р_н = razbor_tranzakcii(т, КОШЕЛЕК)
+                if (р_н.get("ok") and USDC in (р_н.get("tokeny") or {})
+                        and len(р_н["tokeny"]) == 2):
+                    tx_нога = т
+                    break
+        chk(f"живая транзакция полосы с ногой через USDC на месте: "
+            f"data/{ФАЙЛ_ЖИВОЙ_НОГИ}", tx_нога is not None, str(п_нога))
+        if tx_нога is not None:
+            сост_н = pustoe_sostojanie(КОШЕЛЕК)
+            п_прин = prinjat_tranzakciju(сост_н, tx_нога, КОШЕЛЕК)
+            позиции_н = сост_н.get("pozicii") or {}
+            chk("ЖИВАЯ ПОКУПКА ЧЕРЕЗ НОГУ USDC открывает позицию НА ТОКЕН, а "
+                f"котировка позицией не становится: вход {ЖДЁМ_НОГИ['vhod']} "
+                "лампортов",
+                п_прин["ok"] and len(позиции_н) == 1
+                and USDC not in позиции_н
+                and ЖДЁМ_НОГИ["mint"] in позиции_н
+                and позиции_н[ЖДЁМ_НОГИ["mint"]]["vhod"] == ЖДЁМ_НОГИ["vhod"]
+                and сост_н["neopoznannyh"] == 0,
+                (sorted(позиции_н), сост_н["neopoznannyh"],
+                 [z.get("vhod") for z in позиции_н.values()]))
+        # ПРОДАЖА, ВЫРУЧКА КОТОРОЙ УШЛА В КОТИРОВКУ, -- НЕ УБЫТОК НА ВЕСЬ ВХОД.
+        МИНТ_Н = "MintNogi1111111111111111111111111111111111"
+        сост_к = pustoe_sostojanie(КОШ)
+        tx_пок_н = _tx(kljuchi=[КОШ, "ata-n", "pool"], do=[SOL0, 0, 0],
+                       posle=[SOL0 - БИЛЕТ, РЕНТА, 0], token_do=[],
+                       token_posle=[(1, КОШ, МИНТ_Н, 500)],
+                       programmy=["Pump1111111111111111111111111111111111111111"],
+                       sig="pok-nogi")
+        prinjat_tranzakciju(сост_к, tx_пок_н, КОШ)
+        tx_прод_к = _tx(kljuchi=[КОШ, "ata-n", "ata-usdc"],
+                        do=[SOL0 - БИЛЕТ, РЕНТА, РЕНТА],
+                        posle=[SOL0 - БИЛЕТ - 5000, РЕНТА, РЕНТА],
+                        token_do=[(1, КОШ, МИНТ_Н, 500), (2, КОШ, USDC, 0)],
+                        token_posle=[(1, КОШ, МИНТ_Н, 0), (2, КОШ, USDC, 330_000)],
+                        programmy=["Pump1111111111111111111111111111111111111111"],
+                        sig="prod-v-usdc")
+        п_к = prinjat_tranzakciju(сост_к, tx_прод_к, КОШ)
+        chk("продажа, выручка которой ушла в USDC, НЕ пишет выдуманный убыток "
+            "на весь вход: в SOL пришла одна комиссия, итог считать нечем",
+            not сост_к["sdelki"] and сост_к["prodazh_v_kotirovku"] == 1
+            and (сост_к["pozicii"].get(МИНТ_Н) or {}).get("vhod") == БИЛЕТ - РЕНТА
+            and "выручка ушла в USDC" in (п_к.get("pochemu") or ""),
+            (сост_к["sdelki"], сост_к.get("prodazh_v_kotirovku"),
+             п_к.get("pochemu")))
+        # ПОКУПКА, ОПЛАЧЕННАЯ КОТИРОВКОЙ, -- НЕ ПОКУПКА ЗА SOL.
+        сост_оп = pustoe_sostojanie(КОШ)
+        tx_за_usdc = _tx(kljuchi=[КОШ, "ata-b", "ata-usdc"],
+                         do=[SOL0, 0, РЕНТА],
+                         posle=[SOL0 - 5000, РЕНТА, РЕНТА],
+                         token_do=[(2, КОШ, USDC, 330_000)],
+                         token_posle=[(1, КОШ, МИНТ_Б, 900), (2, КОШ, USDC, 0)],
+                         programmy=["Pump1111111111111111111111111111111111111111"],
+                         sig="pok-za-usdc")
+        п_оп = prinjat_tranzakciju(сост_оп, tx_за_usdc, КОШ)
+        chk("покупка, оплаченная USDC, позицией с входом в SOL не становится: "
+            "входа в SOL у неё нет, и придумывать его нечем",
+            not сост_оп["pozicii"] and сост_оп["neopoznannyh"] == 1
+            and "оплачена USDC" in (п_оп.get("pochemu") or ""),
+            (сост_оп["pozicii"], п_оп.get("pochemu")))
+
+        # РАЗБОР: НЕСКОЛЬКО ОПРОСОВ ПОДРЯД, И НИ ОДНОЙ ЗАПИСИ НА ДИСК.
+        кат_р = врем / "razbor"
+        кат_р.mkdir(parents=True, exist_ok=True)
+        было_в_кат = sorted(x.name for x in кат_р.iterdir())
+        р_раз = razbor(узел_х, koshelek=КОШ, oprosov=3, pauza=0.0,
+                       kat=кат_р, spat=lambda _с: None)
+        стало_в_кат = sorted(x.name for x in кат_р.iterdir())
+        chk("разбор делает названное число опросов, считает КАЖДУЮ часть, "
+            "сходится в тождестве и НИЧЕГО не пишет на диск",
+            р_раз["ok"] and len(р_раз["oprosy"]) == 3
+            and р_раз["chasti_sxodjatsja"] is True
+            and р_раз["rastjot"]["kapital"] == 0
+            and р_раз["rastjot"]["renta"] == 0
+            and все_части_названы(р_раз["oprosy"][0])
+            and было_в_кат == стало_в_кат == [],
+            (len(р_раз["oprosy"]), р_раз.get("rastjot"), стало_в_кат))
+
+        # ПОКУПКА БЕЗ УШЕДШЕГО SOL -- НЕ ПОКУПКА. Дарёная пыль (кто-то прислал
+        # токен и сам заплатил ренту) не имеет права стать позицией с входом 0.
+        МИНТ_ДАР = "MintPodarok11111111111111111111111111111111"
+        tx_дар = _tx(kljuchi=[КОШ, "ata-dar", "chuzhoj"],
+                     do=[SOL0, 0, 10 * ЛАМПОРТОВ_В_SOL],
+                     posle=[SOL0, РЕНТА, 10 * ЛАМПОРТОВ_В_SOL - РЕНТА],
+                     token_do=[], token_posle=[(1, КОШ, МИНТ_ДАР, 777)],
+                     programmy=[ПРОГ_ТОКЕНА], fee=0, sig="podarok")
+        сост_д = pustoe_sostojanie(КОШ)
+        п_д = prinjat_tranzakciju(сост_д, tx_дар, КОШ)
+        chk("токен, за который SOL из системы НЕ уходил (чужой прислал и сам "
+            "заплатил ренту), позицией не становится -- иначе его продажа "
+            "легла бы чистым заработком",
+            not сост_д["pozicii"] and сост_д["neopoznannyh"] == 1
+            and "не уходил" in (п_д.get("pochemu") or ""),
+            (сост_д["pozicii"], п_д.get("pochemu")))
+
     finally:
         shutil.rmtree(врем, ignore_errors=True)
 
@@ -3662,12 +4026,22 @@ def main() -> int:
                    help="сколько тиков службы сделать и выйти (0 -- навсегда)")
     p.add_argument("--port", type=int, default=8787)
     p.add_argument("--adres", default="127.0.0.1")
+    p.add_argument("--razbor", type=int, default=0,
+                   help="СТОЛЬКО опросов подряд, капитал по частям, только "
+                        "чтение (ничего не пишет на диск)")
+    p.add_argument("--razbor-pauza", type=float, default=5.0,
+                   help="пауза между опросами разбора, секунд")
     p.add_argument("--stranica", default=None,
                    help="записать страницу в этот файл и выйти")
     p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
     if a.self_test:
         return self_test()
+    if a.razbor:
+        р = razbor(koshelek=a.koshelek, oprosov=a.razbor,
+                   pauza=a.razbor_pauza, kat=a.kat)
+        print(json.dumps(р, ensure_ascii=False, indent=1))
+        return 0 if р.get("ok") else 2
     if a.stranica:
         Path(a.stranica).write_text(stranica(), encoding="utf-8")
         print(f"страница записана: {a.stranica}")
