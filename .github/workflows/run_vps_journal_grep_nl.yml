@@ -15,7 +15,7 @@ on:
         description: "фиксированные строки через запятую (подпись, минт, адрес)"
         required: true
       file:
-        description: "'decisions' (по умолчанию) или 'positions'"
+        description: "'decisions' (по умолчанию), 'positions' или 'seller' (журнал продавца)"
         required: false
         default: "decisions"
       fields:
@@ -30,18 +30,30 @@ on:
         description: "'yes' -- искать и в ротированных .gz (история за прошлые сутки)"
         required: false
         default: "no"
+      runner:
+        description: "'nl' -- свой бегунок на хосте (по умолчанию), 'cloud' -- запасной облачный"
+        required: false
+        default: "nl"
 
 concurrency:
   group: journal-grep-nl
   cancel-in-progress: false
 
+# СВОЙ БЕГУНОК, А НЕ ОБЛАЧНЫЙ (слово владельца 02.10, п.6). Ночью 02->03.10
+# чужая сессия заняла облачные бегунки счёта одиннадцатью параллельными
+# работами, и служебные прогоны -- учёт, живучесть, выборка из журнала -- встали
+# в очередь на час. Служебное чтение не должно зависеть от чужой очереди.
+# Облачный путь остаётся запасным: вход runner=cloud.
 env:
-  HOST: 45.59.170.76
   STATE_DIR: /home/bot/bloom_executor_live_data
 
 jobs:
   grep:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'cloud' && 'ubuntu-latest' || fromJSON('["self-hosted","nl-host"]') }}
+    # АДРЕС ХОСТА ЗАВИСИТ ОТ БЕГУНКА: со своего бегунка он сам себе loopback
+    # (так же, как у прогонов деплоя), из облака -- публичный адрес.
+    env:
+      HOST: ${{ inputs.runner == 'cloud' && '45.59.170.76' || '127.0.0.1' }}
     timeout-minutes: 20
     permissions:
       contents: write
@@ -62,22 +74,52 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Выборка потоком с хоста"
+        env:
+          OBRAZCY: ${{ inputs.patterns }}
         run: |
           set -e
           set -o pipefail
           case "${{ inputs.file }}" in
             positions) SRC="$STATE_DIR/positions.jsonl" ;;
+            # ЖУРНАЛ ПРОДАВЦА -- ТРЕТИЙ ФАЙЛ СОСТОЯНИЯ. Решения детектора и
+            # записи позиций не отвечают на вопрос "что делал продавец с этой
+            # позицией и послал ли он строку владельцу": это seller.jsonl.
+            # 04.10 вечером разбор списания упёрся ровно в это.
+            seller)    SRC="$STATE_DIR/seller.jsonl" ;;
             *)         SRC="$STATE_DIR/decisions.jsonl" ;;
           esac
-          # Образцы -- ФИКСИРОВАННЫЕ строки (grep -F): подпись или адрес не
-          # регулярное выражение, и толковать их как образец значит искать не
-          # то. Каждый образец уходит отдельным -e.
-          ARGS=""
-          for P in $(echo "${{ inputs.patterns }}" | tr ',' ' '); do
-            [ -n "$P" ] && ARGS="$ARGS -e $P"
-          done
-          [ -n "$ARGS" ] || { echo "СБОЙ: образцов нет"; exit 1; }
+          # ОБРАЗЦЫ -- ФАЙЛОМ, А НЕ СПИСКОМ -e. Здесь стояло
+          # `for P in $(echo "$patterns" | tr ',' ' ')`, и образец со ПРОБЕЛОМ
+          # распадался на два: «предел полосы» искалось как «предел» ИЛИ
+          # «полосы». Выборка при этом выглядела полной -- ровно limit строк, --
+          # и по ней можно было посчитать что угодно. Теперь образцы делятся
+          # ТОЛЬКО по запятой, уезжают на хост файлом через stdin и читаются
+          # `grep -F -f`: ни пробелы, ни кавычки, ни кириллица больше ничего не
+          # ломают, а каждый образец печатается в журнал прогона, чтобы видеть,
+          # что именно искали.
           mkdir -p /tmp/jgrep
+          : > /tmp/jgrep/patterns.txt
+          # ДЕЛИМ ТОЛЬКО ПО ЗАПЯТОЙ: IFS=, оставляет пробелы внутри образца на
+          # месте. Без этого «предел полосы» распадалось на два образца.
+          STAR_IFS=$IFS
+          IFS=','
+          set -- $OBRAZCY
+          IFS=$STAR_IFS
+          for P in "$@"; do
+            P=$(printf '%s' "$P" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+            [ -n "$P" ] && printf '%s\n' "$P" >> /tmp/jgrep/patterns.txt
+          done
+          [ -s /tmp/jgrep/patterns.txt ] || { echo "СБОЙ: образцов нет"; exit 1; }
+          echo "--- образцы (по строке на образец) ---"
+          cat -A /tmp/jgrep/patterns.txt | sed 's/\$$//'
+          # ПУСТОЙ ОБРАЗЕЦ СОВПАЛ БЫ С КАЖДОЙ СТРОКОЙ, и выборка выглядела бы
+          # полной. Такой образец -- отказ, а не "нашли всё".
+          if grep -qx "" /tmp/jgrep/patterns.txt; then
+            echo "СБОЙ: среди образцов есть пустой -- он совпал бы с каждой строкой"
+            exit 1
+          fi
+          ssh $SSH_OPTS root@$HOST "umask 077; cat > /tmp/jgrep_patterns.txt" < /tmp/jgrep/patterns.txt
+          ssh -n $SSH_OPTS root@$HOST "wc -l < /tmp/jgrep_patterns.txt"
           # nice/ionice: детектор на этом же хосте торгует, и замер не должен
           # его тормозить. Вывод идёт потоком сразу в файл на бегунке.
           # Сначала ФАКТ о файле: есть ли он и какого размера. Без этого пустая
@@ -97,16 +139,30 @@ jobs:
           # выборку по подписи 21:07Z и выглядело как "записи нет".
           ROT=""
           [ "${{ inputs.rotated }}" = "yes" ] && ROT="yes"
+          # ПОРЯДОК ПОТОКА РЕШАЕТ, ЧТО ОСТАВИТ tail. Здесь текущий журнал шёл
+          # ПЕРВЫМ, а ротированные -- после него, и `tail -n limit` оставлял
+          # самые СТАРЫЕ совпадения, хотя вход называется "сколько ПОСЛЕДНИХ".
+          # Живой счёт 03.10: выборка по трём источникам упёрлась в предел 4000
+          # и вернула окно 24-28.09 вместо последних трёх суток -- то есть по
+          # ней можно было посчитать "за 72 часа" и получить числа почти
+          # недельной давности, и ничто бы об этом не сказало. Теперь поток идёт
+          # ПО ВРЕМЕНИ: сперва ротированные от самого старого, текущий -- последним.
+          #
+          # ПОРЯДОК РОТИРОВАННЫХ. logrotate нумерует .1 самым СВЕЖИМ, поэтому
+          # обратная сортировка версий (10, 9, ... 1) и даёт хронологию.
           ssh -n $SSH_OPTS root@$HOST \
             "ION=\$(command -v ionice >/dev/null 2>&1 && echo 'ionice -c3' || true); \
-             { nice -n 15 \$ION grep -F $ARGS $SRC; \
-               if [ -n \"$ROT\" ]; then \
-                 for G in $SRC.*.gz; do [ -e \"\$G\" ] || continue; \
-                   nice -n 15 \$ION zgrep -F $ARGS \"\$G\" || true; done; \
-               fi; } | tail -n ${{ inputs.limit }}" \
+             { if [ -n \"$ROT\" ]; then \
+                 for G in \$(ls -1 $SRC.*.gz 2>/dev/null | sort -V -r); do \
+                   [ -e \"\$G\" ] || continue; \
+                   nice -n 15 \$ION zgrep -F -f /tmp/jgrep_patterns.txt \"\$G\" || true; done; \
+               fi; \
+               nice -n 15 \$ION grep -F -f /tmp/jgrep_patterns.txt $SRC; } \
+             | tail -n ${{ inputs.limit }}" \
             > /tmp/jgrep/hits.jsonl && RC=0 || RC=$?
           # grep без совпадений отдаёт 1 -- это не сбой, это ответ "нет такого".
           # Любой другой код -- сбой, и он виден, а не съеден.
+          ssh -n $SSH_OPTS root@$HOST "rm -f /tmp/jgrep_patterns.txt" || true
           echo "выборка завершилась кодом $RC"
           case "$RC" in 0|1) ;; *) echo "СБОЙ выборки"; exit "$RC" ;; esac
           echo "совпало строк: $(wc -l < /tmp/jgrep/hits.jsonl)"
@@ -117,6 +173,7 @@ jobs:
           FIELDS: ${{ inputs.fields }}
           PATTERNS: ${{ inputs.patterns }}
           SRCFILE: ${{ inputs.file }}
+          LIMIT: ${{ inputs.limit }}
         run: |
           set -e
           python3 - <<'PY'
@@ -133,13 +190,30 @@ jobs:
               except json.JSONDecodeError:
                   continue
               строки.append({к: з.get(к) for к in поля} if поля else з)
+          # ОКНО И УСЕЧЕНИЕ -- В САМОЙ ВЫБОРКЕ, А НЕ В ГОЛОВЕ ЧИТАТЕЛЯ. Выборка,
+          # упёршаяся в предел, выглядит точно так же, как полная: ровно limit
+          # записей и ни слова о том, что осталось за краем. По такой выборке
+          # 03.10 можно было посчитать "за 72 часа" по данным 24-28.09. Теперь
+          # рядом с записями лежат границы окна и честный признак усечения.
+          предел = int(os.environ.get("LIMIT") or 0)
+          вр = sorted(з.get("ts_utc") for з in строки if з.get("ts_utc"))
+          усечено = bool(предел) and len(строки) >= предел
+          окно = {"ot": (вр[0] if вр else None), "do": (вр[-1] if вр else None),
+                   "zapisej": len(строки), "predel": предел or None,
+                   "usecheno": усечено,
+                   "chem_grozit": ("предел достигнут -- за краем остались записи "
+                                    "СТАРШЕ границы 'ot'; окно считать по этим "
+                                    "границам, а не по задуманному"
+                                    if усечено else None)}
           pathlib.Path("data").mkdir(exist_ok=True)
           pathlib.Path("data/journal_grep.json").write_text(
               json.dumps({"patterns": os.environ.get("PATTERNS", ""),
                           "file": os.environ.get("SRCFILE", ""),
+                          "okno": окно,
                           "rows": строки}, ensure_ascii=False, indent=1),
               encoding="utf-8")
           print(f"записей разобрано: {len(строки)}")
+          print("окно: " + json.dumps(окно, ensure_ascii=False))
           for з in строки[-40:]:
               print(json.dumps(з, ensure_ascii=False)[:1200])
           PY
