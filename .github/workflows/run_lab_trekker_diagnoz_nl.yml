@@ -111,8 +111,32 @@ jobs:
               ls -la /var/lib/kapital 2>/dev/null || echo "kataloga net"
               echo "=== kapital.json PO POLJAM"
               python3 -c "import json,os;p=\"/var/lib/kapital/kapital.json\";d=(json.load(open(p)) if os.path.exists(p) else None);print(\"fajla net\") if d is None else [print(k,\"=\",str(v)[:400]) for k,v in sorted(d.items())]" 2>&1 || true
+              echo "=== TOCHEK PO OKNAM (tolko chislo, bez samih tochek)"
+              python3 -c "import json,os;p=\"/var/lib/kapital/kapital.json\";d=(json.load(open(p)) if os.path.exists(p) else {});o=d.get(\"okna\") or {};print(\"okon net\") if not o else [print(k,\"tochek =\",len((v or {}).get(\"tochki\") or []),\"okno_sek =\",(v or {}).get(\"okno_sek\"),\"korzina_sek =\",(v or {}).get(\"korzina_sek\")) for k,v in o.items()]" 2>&1 || true
               echo "=== sostojanie.json PO POLJAM"
               python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else None);print(\"fajla net\") if d is None else [print(k,\"=\",str(v)[:400]) for k,v in sorted(d.items())]" 2>&1 || true
+              echo "=== POZICII TREKKERA: minT, vhod, kogda (slovo vladelca 04.10, 12:30Z)"
+              # ЗАЧЕМ. Трекер говорит капитал 6.391157, кошелёк полосы --
+              # 6.260165036, разница 0.129987 SOL ПРИ НУЛЕ ОТКРЫТЫХ ПОЗИЦИЙ у
+              # полосы. Владелец назвал вероятную причину: трекер не увидел
+              # продажу застрявшей позиции разовым прогоном (10:30:51Z). Чтобы
+              # это проверил Code-3, нужен не сам капитал, а СПИСОК позиций,
+              # которые трекер всё ещё считает своими. Поле выше печатается
+              # обрезанным по 400 знаков, то есть список в него не влезает.
+              # ТОЛЬКО ЧТЕНИЕ: ни одной правки, ни перезапуска службы.
+              # СТОЛБЦЫ НЕ УГАДЫВАЮТСЯ, А ПЕЧАТАЮТСЯ КАК ЕСТЬ. Первый вариант
+              # этого шага (прогон 37203694345) брал заранее названные поля
+              # ("mint", "vhod_sol", "kogda_utc" и прочие) и напечатал
+              # "pozicij: 2" и две строки из прочерков: имена полей у трекера
+              # другие. Гадать имена в денежном разборе нельзя, поэтому запись
+              # уезжает целиком -- Code-3 разберёт её по своим именам. Позиций
+              # две, то есть объём тут ни при чём.
+              # КЛЮЧ СЛОВАРЯ ПЕЧАТАЕТСЯ ОТДЕЛЬНО. Второй прогон (37203868692)
+              # отдал запись БЕЗ минта: {"vhod": 0, "ostatok": 1100, ...}.
+              # Минт у трекера -- это КЛЮЧ словаря позиций, а list(values())
+              # его терял, то есть ровно то, что Code-3 и нужно (какой токен),
+              # в таблицу не попадало.
+              python3 -c "import json,os;p=\"/var/lib/kapital/sostojanie.json\";d=(json.load(open(p)) if os.path.exists(p) else {});k=[x for x in sorted(d) if isinstance(d.get(x),(list,dict)) and \"pozic\" in x.lower()];print(\"spiska pozicij net; kljuchi fajla:\",sorted(d)) if not k else print(\"kljuch spiska:\",k[0]);r=(d.get(k[0]) if k else None);r=(sorted(r.items()) if isinstance(r,dict) else [(\"\",z) for z in (r or [])]);print(\"pozicij:\",len(r));[print(\"POZ\",i,\"kljuch=\",kl,json.dumps(z,ensure_ascii=False)[:700]) for i,(kl,z) in enumerate(r[:20])]" 2>&1 || true
               echo "=== UZEL: KAKOJ STOIT I CHTO OTVECHAET (adres ne pechataetsja)"
               if [ -n "$BLOOM_TREKKER_RPC" ]; then
                 echo "uzel: svoj, BLOOM_TREKKER_RPC zadan"

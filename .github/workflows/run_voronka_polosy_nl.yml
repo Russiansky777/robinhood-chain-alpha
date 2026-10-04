@@ -1,0 +1,122 @@
+name: "Полоса: воронка gate/build/sent по группам и верхние причины (только чтение)"
+
+# ЗАЧЕМ (слово владельца 04.10, 12:30Z, СРОЧНО): "воронка gate / build / sent
+# по группам с 10:40Z и верхние 5 причин отказов".
+#
+# ПОЧЕМУ ЭТОГО НЕ ДАЁТ ПРИЗНАК ЖИЗНИ. Счётчики own_send (by_stage, starts,
+# sent) обнуляются ПЕРЕЗАПУСКОМ службы. Деплой 10:43:26Z обнулил их, деплой
+# 11:57:30Z обнулил снова -- и окно 10:44-11:57, про которое спрашивает
+# владелец, в признаке жизни не существует вовсе. Журнал решений лежит на диске
+# и перезапуск переживает, поэтому воронка считается по нему.
+#
+# ТОЛЬКО ЧТЕНИЕ: журнал копируется на бегунок и разбирается ТАМ. На хосте ни
+# одной правки, ни одного перезапуска, env не трогается, торговые параметры не
+# меняются. Разбор -- deploy/checks/voronka_polosy.py, самопроверка 16/16.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "с какого времени UTC, ISO с Z (пусто -- весь журнал)"
+        required: false
+        default: "2026-10-04T10:40:00Z"
+      do:
+        description: "до какого времени UTC, ISO с Z (пусто -- до конца)"
+        required: false
+        default: ""
+
+concurrency:
+  group: voronka-polosy
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  OUT: data/voronka_polosy.txt
+
+jobs:
+  voronka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "ВХОД: проверить ДО всякого ssh"
+        env:
+          S: ${{ inputs.s }}
+          DO: ${{ inputs.do }}
+        run: |
+          set -e
+          # Время -- только цифры, дефисы, T, двоеточия и Z. В команду root оно
+          # всё равно не попадает (разбор идёт на бегунке), но проверить дешевле,
+          # чем доверять.
+          for V in "$S" "$DO"; do
+            case "$V" in
+              "") : ;;
+              *[!0-9T:Z-]*) echo "OTKAZ: vo vremeni lishnie znaki: $V"; exit 1;;
+            esac
+          done
+          python3 deploy/checks/voronka_polosy.py --self-test | tail -1
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Журнал решений -- на бегунок, разбор ТАМ"
+        env:
+          S: ${{ inputs.s }}
+          DO: ${{ inputs.do }}
+        run: |
+          set -e
+          set -o pipefail
+          # ХВОСТ, А НЕ ВЕСЬ ФАЙЛ: журнал решений растёт на сотни тысяч строк в
+          # сутки, и тащить его целиком незачем -- окно вопроса начинается
+          # сегодня. 400 000 строк с запасом покрывают сутки.
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "tail -n 400000 $STATE_DIR/decisions.jsonl" > /tmp/decisions.jsonl
+          wc -l < /tmp/decisions.jsonl | sed 's/^/strok zabrano: /'
+          : > "$OUT"
+          echo "=== Полоса: воронка по журналу решений, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
+          echo "окно: с '$S' до '${DO:-конца журнала}'" | tee -a "$OUT"
+          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl "$S" "$DO" | tee -a "$OUT"
+          # ОКНО ТРЕВОГИ ОТДЕЛЬНО: владелец назвал его прямо -- "отправленных
+          # покупок НОЛЬ за 30 минут" в 11:15:38Z. Считаем ровно его, чтобы
+          # ответ был про тот же отрезок, а не про похожий.
+          echo "--- окno trevogi 10:45-11:16Z otdelno ---" | tee -a "$OUT"
+          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
+            "2026-10-04T10:45:00Z" "2026-10-04T11:16:00Z" | tee -a "$OUT"
+          echo "--- do deploja: 09:40-10:43Z (dlja sravnenija) ---" | tee -a "$OUT"
+          python3 deploy/checks/voronka_polosy.py /tmp/decisions.jsonl \
+            "2026-10-04T09:40:00Z" "2026-10-04T10:43:00Z" | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Polosa: voronka gate/build/sent [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

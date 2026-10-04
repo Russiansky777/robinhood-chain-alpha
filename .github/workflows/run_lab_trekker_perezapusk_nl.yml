@@ -1,0 +1,184 @@
+name: "Лаборатория Miami: перезапуск трекера и сверка капитала с кошельком"
+
+# ЗАЧЕМ (слово владельца 04.10, 13:20Z): "когда Code-3 запушит исправление
+# трекера -- перезапустить трекер на lab-miami и сверить: при нуле позиций
+# капитал трекера = кошелёк +- 0.001. Больше ничего."
+#
+# БОЛЬШЕ НИЧЕГО -- БУКВАЛЬНО. Прогон перезапускает ОДНУ службу kapital-trekker
+# на лаборатории и читает три числа. Он не правит код трекера, не трогает его
+# окружение, не чистит его состояние и на торговый хост не ходит вовсе.
+#
+# ПЕРЕЗАПУСК -- ПО ЯВНОМУ СЛОВУ, А НЕ ПО УМОЛЧАНИЮ. Вход podtverzhdenie должен
+# быть ровно PEREZAPUSTIT: это запись на машине, и запускать её случайным
+# нажатием нельзя. Без слова прогон только читает и сверяет.
+#
+# "ПРИ НУЛЕ ПОЗИЦИЙ" -- ЧАСТЬ ПРОВЕРКИ, А НЕ ПРИМЕЧАНИЕ. Пока у трекера есть
+# открытая позиция, его капитал И НЕ ДОЛЖЕН совпадать с кошельком: часть денег
+# лежит в токене. Поэтому при ненулевых позициях вердикта НЕТ ВОВСЕ, и это
+# говорится словами, а не подменяется словом "не сошлось".
+#
+# ИЗМЕРЕНО 04.10 ДО ИСПРАВЛЕНИЯ: капитал 6.391157 -> 6.512875 -> 6.560856 ->
+# 6.702118 за час при кошельке полосы 6.26; единственная позиция трекера --
+# USDC EPjFWdd5... с входом 0 и остатком 1100.
+on:
+  workflow_dispatch:
+    inputs:
+      podtverzhdenie:
+        description: "ровно PEREZAPUSTIT -- иначе только чтение и сверка, без перезапуска"
+        required: false
+        default: ""
+      dopusk:
+        description: "допуск сверки в SOL (слово владельца 0.001)"
+        required: false
+        default: "0.001"
+
+concurrency:
+  group: lab-trekker-perezapusk
+  cancel-in-progress: false
+
+env:
+  HOST: 169.128.191.158
+  KOSHELEK: 4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x
+  OUT: data/lab_trekker_perezapusk.txt
+
+jobs:
+  perezapusk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "ВХОД и самопроверка сверки ДО всякого ssh"
+        env:
+          DOPUSK: ${{ inputs.dopusk }}
+        run: |
+          set -e
+          set -o pipefail
+          case "$DOPUSK" in
+            ""|*[!0-9.]*) echo "OTKAZ: dopusk -- tolko cifry i tochka: $DOPUSK"; exit 1;;
+          esac
+          python3 deploy/checks/trekker_svodka.py --self-test | tail -1
+
+      - name: "Ключ лаборатории"
+        env:
+          LAB_SSH_KEY: ${{ secrets.LAB_SSH_KEY }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          install -d -m 700 ~/.ssh
+          if [ -n "$LAB_SSH_KEY" ]; then
+            printf '%s\n' "$LAB_SSH_KEY" > ~/.ssh/lab_key
+          else
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/lab_key
+          fi
+          [ -s ~/.ssh/lab_key ] || { echo "SBOY: klyucha laboratorii net"; exit 1; }
+          chmod 600 ~/.ssh/lab_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "ЭТО ТОЧНО ЛАБОРАТОРИЯ, А НЕ ТОРГОВЫЙ ХОСТ"
+        run: |
+          set -e
+          IMJA=$(ssh -n $SSH_OPTS root@"$HOST" "hostname")
+          echo "hostname: $IMJA"
+          case "$IMJA" in
+            miami-code2) echo "mashina ta" ;;
+            *) echo "OTKAZ: eto ne lab-miami ($IMJA)"; exit 1 ;;
+          esac
+
+      - name: "ДО: капитал, позиции, баланс кошелька"
+        run: |
+          set -e
+          set -o pipefail
+          : > "$OUT"
+          echo "=== Трекер: перезапуск и сверка, $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            . /etc/kapital.env
+            U=\"\${BLOOM_TREKKER_RPC:-https://api.mainnet-beta.solana.com}\"
+            echo 'DO_KAPITAL' \$(python3 -c \"import json,os;p='/var/lib/kapital/kapital.json';d=(json.load(open(p)) if os.path.exists(p) else {});print(d.get('kapital_sol', d.get('капитал_sol','net')))\")
+            echo 'DO_POZICIJ' \$(python3 -c \"import json,os;p='/var/lib/kapital/sostojanie.json';d=(json.load(open(p)) if os.path.exists(p) else {});r=d.get('pozicii') or {};print(len(r))\")
+            echo 'DO_KOSHELEK' \$(curl -s -m 20 -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$KOSHELEK\"]}' \"\$U\" | python3 -c \"import json,sys;print((json.load(sys.stdin).get('result') or {}).get('value','net'))\")
+            " | tee -a "$OUT"
+
+      - name: "Перезапуск трекера (только по слову PEREZAPUSTIT)"
+        if: ${{ inputs.podtverzhdenie == 'PEREZAPUSTIT' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            systemctl restart kapital-trekker
+            sleep 5
+            systemctl is-active kapital-trekker
+            systemctl show kapital-trekker -p ActiveEnterTimestamp --value --no-pager" | tee -a "$OUT"
+          # ЖДЁМ СВЕЖИЙ ТИК, А НЕ ПРОСТО "служба поднялась". Капитал трекер
+          # пишет тиком раз в ~20 с; сверять по файлу, который остался с
+          # прошлого запуска, значило бы проверить вчерашнее число.
+          ssh -n $SSH_OPTS root@"$HOST" "
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              sleep 10
+              if journalctl -u kapital-trekker --since '-1 min' --no-pager 2>/dev/null | grep -q 'тик'; then
+                echo 'svezhij tik est'; exit 0
+              fi
+            done
+            echo 'OTKAZ: svezhego tika ne doshdalis za 120 s'; exit 1" | tee -a "$OUT"
+
+      - name: "ПОСЛЕ: капитал, позиции, баланс и ВЕРДИКТ"
+        env:
+          DOPUSK: ${{ inputs.dopusk }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            . /etc/kapital.env
+            U=\"\${BLOOM_TREKKER_RPC:-https://api.mainnet-beta.solana.com}\"
+            python3 -c \"import json,os;p='/var/lib/kapital/kapital.json';d=(json.load(open(p)) if os.path.exists(p) else {});print(d.get('kapital_sol', d.get('капитал_sol','net')))\"
+            python3 -c \"import json,os;p='/var/lib/kapital/sostojanie.json';d=(json.load(open(p)) if os.path.exists(p) else {});r=d.get('pozicii') or {};print(len(r))\"
+            curl -s -m 20 -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$KOSHELEK\"]}' \"\$U\" | python3 -c \"import json,sys;print((json.load(sys.stdin).get('result') or {}).get('value','net'))\"
+            " > /tmp/posle.txt
+          KAP=$(sed -n 1p /tmp/posle.txt)
+          POZ=$(sed -n 2p /tmp/posle.txt)
+          BAL=$(sed -n 3p /tmp/posle.txt)
+          echo "POSLE_KAPITAL $KAP" | tee -a "$OUT"
+          echo "POSLE_POZICIJ $POZ" | tee -a "$OUT"
+          echo "POSLE_KOSHELEK $BAL" | tee -a "$OUT"
+          # ВЕРДИКТ СЧИТАЕТ МОДУЛЬ С САМОПРОВЕРКОЙ (20 проверок), а не этот
+          # шаг: граница "+- 0.001" включительная, и в дробных числах она
+          # работает не так, как сказана -- сверка идёт в лампортах.
+          set +e
+          python3 deploy/checks/trekker_svodka.py "$KAP" "$BAL" "$POZ" "$DOPUSK" | tee -a "$OUT"
+          RC=$?
+          set -e
+          case "$RC" in
+            0) echo "ITOG: SOSHLOS" | tee -a "$OUT";;
+            1) echo "ITOG: NE SOSHLOS" | tee -a "$OUT";;
+            *) echo "ITOG: VERDIKTA NET (pozicij ne nol libo chislo neizvestno)" | tee -a "$OUT";;
+          esac
+          rm -f /tmp/posle.txt
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT"
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Treker: perezapusk i sverka kapitala [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1

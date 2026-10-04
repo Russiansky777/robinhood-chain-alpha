@@ -232,8 +232,41 @@ jobs:
               | tee -a data/vps_health_nl.txt
             exit 0
           fi
-          ssh -n $SSH_OPTS root@$HOST "systemctl list-timers 'bloom-uchet-chas.timer' 'bloom-zhivuchest-chas.timer' 'bloom-vygruzka-sutki.timer' --no-pager" \
+          # ИМЕНА ТАЙМЕРОВ БЕРУТСЯ ИЗ УСТАНОВЩИКА, А НЕ ИЗ ЭТОГО ФАЙЛА.
+          # Здесь руками стояли три имени, а установщик ставит ПЯТЬ: два
+          # таймера уборщика ренты (bloom-uborshchik-chas и
+          # bloom-uborshchik-itog-sutki) эта проверка не смотрела вовсе.
+          # В ночь 04.10 я увидел в отчёте "3 timers listed" и чуть не доложил
+          # пропажу таймеров как тревогу -- а пропали они только из списка.
+          # Проверка, которая смотрит не все таймеры и молчит об остальных,
+          # хуже отсутствующей: она даёт ложное спокойствие. Поэтому имена
+          # выводятся из deploy/hostovye_tajmery.py -- одного источника с
+          # установщиком и с гейтом деплоя.
+          IMENA=$(python3 -c "import re,pathlib; print(' '.join(\"'\" + и + \".timer'\" for и in re.findall(r'\"имя\":\s*\"([a-z0-9-]+)\"', pathlib.Path('deploy/hostovye_tajmery.py').read_text(encoding='utf-8'))))")
+          [ -n "$IMENA" ] || { echo "ОТКАЗ: имён таймеров из установщика не добыто"; exit 1; }
+          echo "имена таймеров из установщика: $IMENA" | tee -a data/vps_health_nl.txt
+          ssh -n $SSH_OPTS root@$HOST "systemctl list-timers --all $IMENA --no-pager" \
             2>&1 | tee -a data/vps_health_nl.txt
+          # СКОЛЬКО ЖДАЛИ, СТОЛЬКО И ДОЛЖНО БЫТЬ. Иначе "N timers listed"
+          # читается как норма при любом N.
+          #
+          # СПРАШИВАЕМ КАЖДЫЙ ТАЙМЕР ПО ИМЕНИ, А НЕ РАЗБИРАЕМ ТАБЛИЦУ.
+          # В list-timers последняя колонка -- ACTIVATES, то есть имя
+          # .service, а не .timer. Я на этом уже спотыкался в гейте деплоя 188:
+          # сравнение имени .timer с колонкой .service не совпадает НИКОГДА, и
+          # проверка роняла зелёный деплой при живых таймерах. Здесь было бы
+          # наоборот -- вечное "таймеров нет". Поэтому systemctl show по имени:
+          # LoadState=loaded значит юнит есть, not-found значит его нет.
+          ZHDALI=$(printf '%s\n' $IMENA | wc -l | tr -d ' ')
+          SPISOK=$(printf '%s' "$IMENA" | tr -d "'")
+          SOST=$(ssh -n $SSH_OPTS root@$HOST "for T in $SPISOK; do echo \"\$T \$(systemctl show \$T -p LoadState --value) \$(systemctl show \$T -p ActiveState --value)\"; done" 2>&1 || true)
+          printf '%s\n' "$SOST" | tee -a data/vps_health_nl.txt
+          NET=$(printf '%s\n' "$SOST" | awk '$2 != "loaded" {printf " %s", $1}')
+          if [ -n "$NET" ]; then
+            echo "ТАЙМЕРОВ НЕТ НА ХОСТЕ (ждали $ZHDALI):$NET" | tee -a data/vps_health_nl.txt
+          else
+            echo "все $ZHDALI таймеров установщика на месте (LoadState=loaded)" | tee -a data/vps_health_nl.txt
+          fi
           # ДОКЛАД ЖИВУЧЕСТИ И СВЕЖИЙ ФАЙЛ УЧЁТА -- ПОД СВОИМИ ИМЕНАМИ.
           # ledger_status.json в ветке пишет прогон ledger_hourly.yml; затирать
           # его копией хоста нельзя -- это два разных счёта, и молча подменять
@@ -249,7 +282,9 @@ jobs:
           # отчёте быть не должно" проверяет это у всего, что прогон коммитит.
           for PARA in "$TAJM_DIR/zhivuchest/zhivuchest.json data/zhivuchest_hosta.json" \
                       "/home/bot/data/sources_2026-09-25.json data/sources_live.json" \
-                      "$TAJM_DIR/uchet/data/ledger_status.json data/ledger_status_hosta.json"; do
+                      "$TAJM_DIR/uchet/data/ledger_status.json data/ledger_status_hosta.json" \
+                      "$TAJM_DIR/uborshchik_sutki.json data/uborshchik_sutki_hosta.json" \
+                      "/home/bot/bloom_executor_live_data/trevogi.jsonl data/trevogi_hosta.jsonl"; do
             OTKUDA=$(echo "$PARA" | cut -d' ' -f1)
             KUDA=$(echo "$PARA" | cut -d' ' -f2)
             if ssh -n $SSH_OPTS root@$HOST "test -s $OTKUDA"; then
@@ -483,10 +518,25 @@ jobs:
           # заводить его без слова владельца нельзя), поэтому его файлы
           # коммитятся отсюда. Суточные выгрузки берутся по образцу, а не
           # поимённо: их имя содержит дату.
-          for F in data/zhivuchest_hosta.json data/ledger_status_hosta.json \
-                   data/sources_live.json; do
-            [ -f "$F" ] && git add "$F"
-          done
+          # СПИСОК КОММИТА -- ОБРАЗЦОМ, А НЕ ПОИМЁННО. Здесь стояли три
+          # имени, а шаг забора выше возит уже четыре файла. 04.10 в 09:25Z
+          # я добавил в забор журнал уборщика ренты, не заглянув в этот
+          # список: файл приезжал на бегунок (278 байт в логе) и исчезал
+          # вместе с ним, а в ветке его не было. Половина правки была
+          # мёртвой, и отчёт при этом честно писал "забран" -- то есть лог
+          # говорил правду, а проверить по ветке было нечего.
+          # Образец data/*_hosta.json накрывает всё, что цикл забора
+          # складывает под своим именем, включая то, что я добавлю позже.
+          # git add неизменённого файла в diff не попадает, поэтому старые
+          # копии образец не тащит.
+          git add data/*_hosta.json 2>/dev/null || true
+          # ЖУРНАЛ ТРЕВОГ -- .jsonl, И ПРЕЖНИЙ ШАБЛОН ЕГО НЕ БРАЛ. Ровно на
+          # расхождении списка ЗАБОРА и списка КОММИТА я уже спотыкался 04.10
+          # утром: файл уборщика приезжал на бегунок ("забран" в журнале) и
+          # пропадал вместе с ним. Поэтому шаблон расширен, а не дописан
+          # отдельным именем.
+          git add data/*_hosta.jsonl 2>/dev/null || true
+          [ -f data/sources_live.json ] && git add data/sources_live.json
           git add data/sdelki_polosy_*.json 2>/dev/null || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "NL-хост: проверка живучести служб [automated]"

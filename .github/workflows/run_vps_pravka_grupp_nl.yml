@@ -130,37 +130,67 @@ jobs:
           set -e
           set -o pipefail
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pravka_grupp.py" < deploy/checks/pravka_grupp.py
-          ARGS="--file $FILE"
-          # СПИСОК ПРАВОК ОДНИМ ФАЙЛОМ. Слово владельца приходит списком из
-          # нескольких правок сразу; по одной на прогон это десяток прогонов и
-          # десяток шансов ошибиться половиной. План лежит в репозитории, то
-          # есть виден в истории, и уезжает на хост тем же ssh.
+          # НИ ОДНОГО ЗНАКА ИЗ ВХОДОВ В КОМАНДЕ, ИДУЩЕЙ root-ом НА ХОСТ.
+          #
+          # ЧТО БЫЛО СЛОМАНО (слово владельца 04.10 вечером, п.2). Здесь строка
+          # ARGS собиралась из шести входов ВООБЩЕ без кавычек, а три значения
+          # уезжали в одинарных кавычках на удалённой стороне:
+          #     --znachenie '$ZNACHENIE' --politika '$POLITIKA' --pometka '$POMETKA'
+          # Пробел в любом из первых шести или апостроф в любом из этих трёх --
+          # и это уже чужая команда от root на ТОРГОВОМ хосте. Пометка по смыслу
+          # поля свободный текст, то есть апостроф там вопрос времени.
+          #
+          # ЧЕМ ЗАКРЫТО. Правка собирается ПЛАНОМ -- тем же файлом, которым
+          # прогон уже умеет применять список правок, -- и уезжает по stdin.
+          # В команде остаются только неизменяемые литералы: --file, --plan и
+          # при показе --pokazat. Новой ветки в модуле не завелось: одиночная
+          # правка и план сходятся там в ОДИН И ТОТ ЖЕ список операций с теми же
+          # именами полей (deploy/checks/pravka_grupp.py:415-425).
+          #
+          # ПЛАН СОБИРАЕТ python ИЗ ОКРУЖЕНИЯ, а не оболочка из подстановок:
+          # os.environ не разбирается как код ни при каком значении.
+          PLAN_FAJL=""
           if [ "$PLAN" = "yes" ]; then
             [ -f data/pravka_grupp_plan.json ] || { echo "SBOY: net data/pravka_grupp_plan.json"; exit 1; }
             python3 -c "import json,sys; d=json.load(open('data/pravka_grupp_plan.json')); assert d.get('pravki'), 'net spiska pravki'; print('pravok v plane:', len(d['pravki']))"
-            ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pravka_plan.json" < data/pravka_grupp_plan.json
-            ARGS="$ARGS --plan /tmp/pravka_plan.json"
+            PLAN_FAJL=data/pravka_grupp_plan.json
+          else
+            # СБОРЩИК -- ФАЙЛОМ ИЗ ДЕРЕВА, А НЕ heredoc'ом, И ПРИЧИНА НЕ В ТОМ,
+            # ЧТО heredoc СЛОМАН. Я сперва написал это heredoc'ом, решил, что он
+            # не работает из-за отступа тела, и проверил -- оказалось, работает:
+            # YAML снимает общий отступ блочного скаляра, и бегунок получает
+            # тело python и терминатор в нулевой колонке. Мой первый тест был
+            # построен неверно (строки с отступом руками).
+            # Файл оставлен по двум настоящим поводам: у него СВОЯ самопроверка
+            # (11 проверок, среди них проход апострофа и точки с запятой как
+            # данных), и в этом репозитории правило прежнее -- скрипт едет
+            # файлом из дерева, а не телом внутри шага.
+            python3 deploy/checks/pravka_grupp_plan_iz_okruzhenija.py --self-test | tail -1
+            python3 deploy/checks/pravka_grupp_plan_iz_okruzhenija.py > /tmp/pravka_odna.json
+            python3 -c "import json;d=json.load(open('/tmp/pravka_odna.json'));print('pravok sobrano:', len(d['pravki']))"
+            PLAN_FAJL=/tmp/pravka_odna.json
           fi
-          if [ "$POKAZAT" = "yes" ]; then ARGS="$ARGS --pokazat"; fi
-          [ -n "$GRUPPA" ] && ARGS="$ARGS --gruppa $GRUPPA"
-          [ -n "$POLE" ] && ARGS="$ARGS --pole $POLE"
-          [ -n "$SOZDAT" ] && ARGS="$ARGS --sozdat $SOZDAT"
-          [ -n "$PERENESTI" ] && ARGS="$ARGS --perenesti $PERENESTI"
-          [ -n "$V" ] && ARGS="$ARGS --v $V"
-          [ -n "$OTKLYUCHIT" ] && ARGS="$ARGS --otklyuchit $OTKLYUCHIT"
-          echo "аргументы без значений в кавычках: $ARGS"
-          # Значения со пробелами и JSON уезжают отдельными аргументами через
-          # одинарные кавычки на удалённой стороне -- их пишем прямо в команду.
-          ssh -n $SSH_OPTS root@"$HOST" "
-            set -e
-            nice -n 5 python3 /tmp/pravka_grupp.py $ARGS \
-              --znachenie '$ZNACHENIE' --politika '$POLITIKA' --pometka '$POMETKA'
-            rc=\$?
-            rm -f /tmp/pravka_grupp.py /tmp/pravka_plan.json
-            chown bot:bot $FILE
-            chmod 644 $FILE
-            ls -l $FILE
-            exit \$rc" | tee "$OUT"
+          # ПУСТОЙ ПЛАН НА ХОСТ НЕ ЕДЕТ: модуль с --plan и пустым списком
+          # отказывает кодом 10, а прежнее поведение при пустых входах -- это
+          # сводка групп. Поэтому пустой план превращается в простой показ.
+          PUSTO=$(python3 -c "import json;print(0 if json.load(open('$PLAN_FAJL'))['pravki'] else 1)")
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pravka_plan.json" < "$PLAN_FAJL"
+          echo "plan uehal fajlom; v komande root ni odnogo znaka iz vhodov"
+          if [ "$POKAZAT" = "yes" ] || [ "$PUSTO" = "1" ]; then
+            ssh -n $SSH_OPTS root@"$HOST" "
+              set -e
+              nice -n 5 python3 /tmp/pravka_grupp.py --file $FILE --pokazat
+              rm -f /tmp/pravka_grupp.py /tmp/pravka_plan.json" | tee "$OUT"
+          else
+            ssh -n $SSH_OPTS root@"$HOST" "
+              nice -n 5 python3 /tmp/pravka_grupp.py --file $FILE --plan /tmp/pravka_plan.json
+              rc=\$?
+              rm -f /tmp/pravka_grupp.py /tmp/pravka_plan.json
+              chown bot:bot $FILE
+              chmod 644 $FILE
+              ls -l $FILE
+              exit \$rc" | tee "$OUT"
+          fi
 
       - name: "Ключей в отчёте быть не должно"
         if: always()

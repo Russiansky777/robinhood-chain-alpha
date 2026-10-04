@@ -1,0 +1,192 @@
+=== Полоса: воронка по журналу решений, 2026-10-04T12:36:38Z ===
+окно: с '2026-10-04T10:40:00Z' до 'конца журнала'
+{
+ "строк_всего": 160648,
+ "попыток_полосы": 219,
+ "в_окне": 11,
+ "с": "2026-10-04T10:40:00Z",
+ "до": null,
+ "по_этапам": {
+  "build": 3,
+  "sent": 3,
+  "usdc_signaly_build": 2,
+  "gate": 3
+ },
+ "по_группам": {
+  "cand1": {
+   "usdc_signaly_build": 1
+  },
+  "cand2": {
+   "usdc_signaly_build": 1,
+   "sent": 1
+  },
+  "cand2_03": {
+   "build": 2
+  },
+  "cand3": {
+   "sent": 1
+  },
+  "kandidaty": {
+   "gate": 1
+  },
+  "lane_s0": {
+   "build": 1,
+   "sent": 1
+  },
+  "sniper_src": {
+   "gate": 2
+  }
+ },
+ "причины": {
+  "build": [
+   {
+    "почему": "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)",
+    "раз": 1
+   },
+   {
+    "почему": "тип пула вне полосы: LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",
+    "раз": 1
+   },
+   {
+    "почему": "пул: в транзакции нет хранилища минта с движением против трейдера",
+    "раз": 1
+   }
+  ],
+  "gate": [
+   {
+    "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+    "раз": 2
+   },
+   {
+    "почему": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+    "раз": 1
+   }
+  ],
+  "usdc_signaly_build": [
+   {
+    "почему": "котировка пула не SOL -- полоса только одношаговая",
+    "раз": 2
+   }
+  ]
+ },
+ "первая_utc": "2026-10-04T10:44:52Z",
+ "последняя_utc": "2026-10-04T12:34:23Z",
+ "отправлено": 3,
+ "подписи": [
+  {
+   "ts_utc": "2026-10-04T10:44:53Z",
+   "group": "lane_s0",
+   "signature": "4TeGgTq4BoTspgvbsJBsM357Ka8mPEKko7QHsQgvP2UJ4UMX6mFr6pB3jit2V4P8kzphmmWRDA2xvMW13dghexf6"
+  },
+  {
+   "ts_utc": "2026-10-04T12:03:57Z",
+   "group": "cand3",
+   "signature": "2xPUsPTBqafh4uX7ajMSNbTY9TbNhaYuo656bdTzndbLHqcakmNiERbJC5cyDZnxj2a9T1tYMNhoCQjc7xBRACtB"
+  },
+  {
+   "ts_utc": "2026-10-04T12:26:12Z",
+   "group": "cand2",
+   "signature": "2xz3wDTxiznW8VNUMVkNzZS7M1qHLdeYGszCp73rvQYxxvzqKYZ9q5ZfbeG715BTNiiTozNDnDU3YeCLbRkR7Asd"
+  }
+ ]
+}
+--- окno trevogi 10:45-11:16Z otdelno ---
+{
+ "строк_всего": 160648,
+ "попыток_полосы": 219,
+ "в_окне": 1,
+ "с": "2026-10-04T10:45:00Z",
+ "до": "2026-10-04T11:16:00Z",
+ "по_этапам": {
+  "usdc_signaly_build": 1
+ },
+ "по_группам": {
+  "cand2": {
+   "usdc_signaly_build": 1
+  }
+ },
+ "причины": {
+  "usdc_signaly_build": [
+   {
+    "почему": "котировка пула не SOL -- полоса только одношаговая",
+    "раз": 1
+   }
+  ]
+ },
+ "первая_utc": "2026-10-04T11:14:51Z",
+ "последняя_utc": "2026-10-04T11:14:51Z",
+ "отправлено": 0,
+ "подписи": []
+}
+--- do deploja: 09:40-10:43Z (dlja sravnenija) ---
+{
+ "строк_всего": 160648,
+ "попыток_полосы": 219,
+ "в_окне": 7,
+ "с": "2026-10-04T09:40:00Z",
+ "до": "2026-10-04T10:43:00Z",
+ "по_этапам": {
+  "gate": 2,
+  "sent": 3,
+  "build": 1,
+  "usdc_signaly_build": 1
+ },
+ "по_группам": {
+  "cand2": {
+   "build": 1,
+   "sent": 2
+  },
+  "kandidaty": {
+   "gate": 1
+  },
+  "lane_s0": {
+   "gate": 1,
+   "sent": 1,
+   "usdc_signaly_build": 1
+  }
+ },
+ "причины": {
+  "build": [
+   {
+    "почему": "пул: неоднозначная котировка: 2 встречных счетов (EPjFWd)",
+    "раз": 1
+   }
+  ],
+  "gate": [
+   {
+    "почему": "предел полосы: минт уже открыт",
+    "раз": 1
+   },
+   {
+    "почему": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+    "раз": 1
+   }
+  ],
+  "usdc_signaly_build": [
+   {
+    "почему": "котировка пула не SOL -- полоса только одношаговая",
+    "раз": 1
+   }
+  ]
+ },
+ "первая_utc": "2026-10-04T09:56:03Z",
+ "последняя_utc": "2026-10-04T10:39:59Z",
+ "отправлено": 3,
+ "подписи": [
+  {
+   "ts_utc": "2026-10-04T09:56:06Z",
+   "group": "lane_s0",
+   "signature": "43zeERwLQfoHD6Ukty2jbAk2CStmteV6rzNfXnomopjCb9Yd3jMfTB1iN1xJaWp1oWRoooFya6RmtYJVHZAkKcm3"
+  },
+  {
+   "ts_utc": "2026-10-04T10:21:48Z",
+   "group": "cand2",
+   "signature": "7qHD9fEVgdjijjS6CRcq13usVQ8HZvvTeidXYWsYUQfb8tihwtNEFo2S1vCfvV5VKUTQqecZBiiLUUtCKcjRSnK"
+  },
+  {
+   "ts_utc": "2026-10-04T10:39:59Z",
+   "group": "cand2",
+   "signature": "J1JNribUzp2dQv2Mz9DpdrenZtW2s4mkhFR51SvF8Rd5nE9NzDCFMXKfc4hFPDfUrsNPzr1kgB1KnxuQ3ZGTpsV"
+  }
+ ]
+}

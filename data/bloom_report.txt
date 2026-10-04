@@ -1,647 +1,1433 @@
-=== Bloom: доклад 2026-10-02T06:27:50Z (формат 2) ===
-журнал: новых записей 164891, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 1378
-решений в окне: 163513 -- боевые источники 163513, стенд 0
+=== Bloom: доклад 2026-10-04T11:19:44Z (формат 2) ===
+журнал: новых записей 136578, прежнего формата 0 (не учтены), нечитаемых 0, до начала окна 0
+решений в окне: 136578 -- боевые источники 136578, стенд 0
 по кодам (боевые источники):
-  160928  NOT_A_BUY
-    851  STALE
-    750  TOKEN_RECEIVED_NOT_BOUGHT
-    689  TARGET_AMOUNT_OUT_OF_RANGE
-    156  INSUFFICIENT_BALANCE
-    117  SKIP_TARGET_INCREASE_POSITION
-     14  THRESHOLD_EDGE
-      8  AMBIGUOUS_TX
+  131954  NOT_A_BUY
+   1798  ?
+    903  TOKEN_RECEIVED_NOT_BOUGHT
+    893  TARGET_AMOUNT_OUT_OF_RANGE
+    639  STALE
+    211  INSUFFICIENT_BALANCE
+    167  SKIP_TARGET_INCREASE_POSITION
+     12  THRESHOLD_EDGE
+      1  WS_BREAK
 
 --- откуда разбор (группы не смешиваются) ---
-PARSE_VIA_MSG: решений 163513, доля 1.0, к покупке 0
-    отставание слотов: {'n': 163513, 'min': -6, 'median': 0, 'max': 16}
-    слот сети минус слот источника: {'n': 163513, 'min': -6, 'median': 0, 'max': 16}
-    задержка решения, мс: {'n': 163513, 'min': 0.2, 'median': 0.6, 'max': 782.3}
+PARSE_VIA_MSG: решений 134779, доля 0.9868, к покупке 0
+    отставание слотов: {'n': 134779, 'min': -3, 'median': 0, 'max': 20}
+    слот сети минус слот источника: {'n': 134779, 'min': -3, 'median': 0, 'max': 20}
+    задержка решения, мс: {'n': 134779, 'min': 0.1, 'median': 0.4, 'max': 589.1}
+неизвестно: решений 1799, доля 0.0132, к покупке 0
+    отставание слотов: None
+    слот сети минус слот источника: None
+    задержка решения, мс: None
   примечание: PARSE_VIA_RPC структурно поздний: getTransaction поддерживает только confirmed, это 1-2 слота
 
 --- версия транзакции против пути разбора ---
-  версия 0: PARSE_VIA_MSG=1658
-  версия 1: PARSE_VIA_MSG=161229
-  версия legacy: PARSE_VIA_MSG=626
+  версия 0: PARSE_VIA_MSG=2727
+  версия 1: PARSE_VIA_MSG=130542
+  версия legacy: PARSE_VIA_MSG=1510
+  версия НЕТ_ПОЛЯ: неизвестно=1799
   вывод: медленного пути в записях с версией нет -- проверять гипотезу не на чем
 
---- первые 20 решений: слоты и время ---
+--- первые 15 решений: слоты и время ---
 подпись               задача   слот источника  получено             решение,мс  слот сети  возраст,с  отставание  разбор         версия  итог
-5mjdWVCzuYZQAK38NoHi  cand1    452415490       2026-10-01T22:00:16Z 0.8         452415490  0.023      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-2vExUAfdCDiqAkHc1Ein  cand1    452415505       2026-10-01T22:00:20Z 0.6         452415505  0.053      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-qTViNRB4MpkGZoE24dn5  cand1    452415511       2026-10-01T22:00:21Z 0.7         452415511  0.047      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-3X4A3DpXUfcqoZB6vk6U  cand1    452415559       2026-10-01T22:00:34Z 0.7         452415559  0.049      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-3iNmYA4CHJDhiFWM57xt  cand1    452415564       2026-10-01T22:00:36Z 0.6         452415564  0.027      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-3iVGMoRjiak6ywBfzRjf  BATCH-5  452415565       2026-10-01T22:00:36Z 0.8         452415565  0.116      0           PARSE_VIA_MSG  0       skip/TOKEN_RECEIVED_NOT_BOUGHT
-4qCNujn6MKHDJDafxCXL  cand1    452415571       2026-10-01T22:00:38Z 0.6         452415571  0.214      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-3dw11gxPXPVRmEssosTr  BATCH-5  452415573       2026-10-01T22:00:38Z 1.0         452415573  0.12       0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-377GzC99YudhugCxagGt  cand1    452415577       2026-10-01T22:00:39Z 0.6         452415577  0.099      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-4XcTQ25zLRwv5v4qRBEW  cand1    452415585       2026-10-01T22:00:41Z 0.8         452415585  0.056      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-qrmn4JzbjddgWH2JcCrg  BATCH-5  452415588       2026-10-01T22:00:42Z 3.6         452415588  0.049      0           PARSE_VIA_MSG  1       skip/TOKEN_RECEIVED_NOT_BOUGHT
-2Uwkj7eqtGiU21jZ1wLX  BATCH-3  452415599       2026-10-01T22:00:45Z 0.8         452415599  0.244      0           PARSE_VIA_MSG  0       skip/TOKEN_RECEIVED_NOT_BOUGHT
-4mr3FY9DwYWkCmL67Zdd  BATCH-5  452415600       2026-10-01T22:00:46Z 0.7         452415600  0.058      0           PARSE_VIA_MSG  1       skip/TOKEN_RECEIVED_NOT_BOUGHT
-2RxK1dfYdeTyT6bJjmWY  cand1    452415607       2026-10-01T22:00:47Z 0.9         452415607  0.065      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-3AAR7zPsQ9ZjtDqvXWRm  batch5   452415608       2026-10-01T22:00:48Z 0.8         452415608  0.115      0           PARSE_VIA_MSG  0       skip/TOKEN_RECEIVED_NOT_BOUGHT
-5tb5xjeBVa6wBdu4YQcR  cand1    452415625       2026-10-01T22:00:52Z 0.7         452415625  0.076      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
-2miS73mHfFZsQC8bikej  cand1    452415626       2026-10-01T22:00:53Z 0.5         452415626  0.198      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-2H1uncju1UEW9nHfbzL8  cand1    452415634       2026-10-01T22:00:55Z 3.4         452415634  0.125      0           PARSE_VIA_MSG  1       skip/TOKEN_RECEIVED_NOT_BOUGHT
-3A2vrNgqnZbWP3eCFgEv  cand1    452415635       2026-10-01T22:00:55Z 2.3         452415635  0.058      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
-4fzP4X1MD2e9Do1ujuyk  cand1    452415637       2026-10-01T22:00:55Z 1.0         452415637  0.221      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
+5mKWoBursbwugdrMUu9P  konveyer 453061524       2026-10-03T22:00:02Z 1.1         453061524  0.003      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
+47wkDiUw8N2SqcHETCQj  cand3    453061524       2026-10-03T22:00:02Z 10.4        453061524  0.145      0           PARSE_VIA_MSG  1       skip/TARGET_AMOUNT_OUT_OF_RANGE
+47wkDiUw8N2SqcHETCQj  -        -               -                    -           -          -          -           -              None    -/-
+53uZ5GxVE4kQzPC3jR21  konveyer 453061524       2026-10-03T22:00:02Z 3.8         453061524  0.152      0           PARSE_VIA_MSG  1       skip/TARGET_AMOUNT_OUT_OF_RANGE
+53uZ5GxVE4kQzPC3jR21  -        -               -                    -           -          -          -           -              None    -/-
+2s4nuZhZ5FyF1iJ2G2KQ  krug_001 453061538       2026-10-03T22:00:06Z 0.4         453061538  0.018      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
+5XH2Ys3iKHM7oUnJn6Jz  krug_001 453061559       2026-10-03T22:00:11Z 0.5         453061559  0.16       0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
+5gWByayEVAV64xaMhRYi  krug_001 453061561       2026-10-03T22:00:12Z 0.5         453061561  0.199      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
+5BQ1fBVf9sBBLK3AyeiW  cand1_03 453061582       2026-10-03T22:00:17Z 0.6         453061582  0.156      0           PARSE_VIA_MSG  0       skip/NOT_A_BUY
+2tWgeHxHQNYzTzmLSBfN  krug_001 453061620       2026-10-03T22:00:27Z 0.7         453061620  0.111      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
+5utNgJcsB2HbbxGa7U6c  lane_s0  453061651       2026-10-03T22:00:36Z 2.0         453061651  0.162      0           PARSE_VIA_MSG  legacy  skip/TARGET_AMOUNT_OUT_OF_RANGE
+5utNgJcsB2HbbxGa7U6c  -        -               -                    -           -          -          -           -              None    -/-
+52mrRiPibGhqFiBmLBpV  konveyer 453061657       2026-10-03T22:00:38Z 0.7         453061657  0.147      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
+1SCy7WsVZYXVc9RaGt49  konveyer 453061658       2026-10-03T22:00:38Z 0.4         453061658  0.04       0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
+L8JBAKvzv1tbGSu1ZtzG  konveyer 453061658       2026-10-03T22:00:38Z 0.4         453061658  0.187      0           PARSE_VIA_MSG  1       skip/NOT_A_BUY
 
 --- маршруты наших покупок --- покупок 0, маршрут известен 0, многохоповых 0 (доля None), отброшено за промежуточный токен 0
 
---- вплотную к порогу (THRESHOLD_EDGE): 14 ---
-  2026-10-01T23:43:22Z lane_s0 AeQkfC7oca87 вход 1.8901194519999998 SOL-экв (1.8901194519999998 So111111) -- вход источника 1.890 SOL-эквивалента -- 94.5 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T00:28:19Z lane_s0 7r1v5rZcGnyz вход 1.820964067 SOL-экв (1.820964067 So111111) -- вход источника 1.821 SOL-эквивалента -- 91.0 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T00:48:28Z cand1_03 DsdxT28jZ223 вход 1.850762758 SOL-экв (1.850762758 So111111) -- вход источника 1.851 SOL-эквивалента -- 92.5 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T02:13:52Z cand1 DthCpSdb1zsB вход 1.9774999999999998 SOL-экв (1.9774999999999998 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T02:23:04Z cand1 DthCpSdb1zsB вход 1.9775 SOL-экв (1.9775 So111111) -- вход источника 1.978 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T02:31:10Z cand1 At3dpfoDCzZ8 вход 1.9774999999999998 SOL-экв (1.9774999999999998 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T03:04:59Z cand1 ApJsssRWgEGc вход 1.9774999999999998 SOL-экв (1.9774999999999998 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T03:11:34Z cand1 4tJx3Rp9Rxta вход 1.9774999999999998 SOL-экв (1.9774999999999998 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T04:09:08Z cand1 EZNiGBtGYBGJ вход 1.9774999999999998 SOL-экв (1.9774999999999998 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T04:30:49Z cand1 Cvj1Da3w98Av вход 1.9775 SOL-экв (1.9775 So111111) -- вход источника 1.978 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T04:49:29Z cand1 9F8Pade7JTGE вход 1.9774999999999998 SOL-экв (1.9774999999999998 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
-  2026-10-02T05:12:44Z cand1 HUCtCWNZLgKy вход 1.9774999999999998 SOL-экв (1.9774999999999998 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+--- вплотную к порогу (THRESHOLD_EDGE): 12 ---
+  2026-10-03T22:19:07Z cand1_03 kcctXZinvqRC вход 1.8427668601029383 SOL-экв (220.368232 EPjFWdd5) -- вход источника 1.843 SOL-эквивалента -- 92.1 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-03T23:19:11Z lane_s0 3JMpdC7tXi5W вход 1.9767112119999999 SOL-экв (1.9767112119999999 So111111) -- вход источника 1.977 SOL-эквивалента -- 98.8 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-03T23:24:40Z lane_s0 3qzYCubmyhht вход 1.889235046 SOL-экв (1.889235046 So111111) -- вход источника 1.889 SOL-эквивалента -- 94.5 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T02:15:23Z cand2 73XcPAwBvE75 вход 1.951063133 SOL-экв (1.951063133 So111111) -- вход источника 1.951 SOL-эквивалента -- 97.6 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T03:23:56Z cand2 6hjaMcRPvB4D вход 1.9791661459999998 SOL-экв (1.9791661459999998 So111111) -- вход источника 1.979 SOL-эквивалента -- 99.0 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T04:36:39Z cand2 582qXnuvygV4 вход 1.9728547159999998 SOL-экв (1.9728547159999998 So111111) -- вход источника 1.973 SOL-эквивалента -- 98.6 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T05:02:03Z cand2 6bGHd2A3CznX вход 1.898910484 SOL-экв (1.898910484 So111111) -- вход источника 1.899 SOL-эквивалента -- 94.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T05:31:07Z cand1 7SnxWr4KDeVN вход 1.958 SOL-экв (1.958 So111111) -- вход источника 1.958 SOL-эквивалента -- 97.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T05:55:34Z cand2 5YmMGJ76T7jo вход 1.912741933 SOL-экв (1.912741933 So111111) -- вход источника 1.913 SOL-эквивалента -- 95.6 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T08:41:42Z cand1 5rfN5RBoAYJA вход 1.958 SOL-экв (1.958 So111111) -- вход источника 1.958 SOL-эквивалента -- 97.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T09:00:04Z cand1 8tn3sa36jaDi вход 1.958 SOL-экв (1.958 So111111) -- вход источника 1.958 SOL-эквивалента -- 97.9 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
+  2026-10-04T09:00:20Z cand2 3RRGi7Zcodyq вход 1.9443564709999999 SOL-экв (1.9443564709999999 So111111) -- вход источника 1.944 SOL-эквивалента -- 97.2 % от порога 2.0: у самой границы, но ниже. Покупки нет; случай виден отдельной строкой сверки
   код THRESHOLD_EDGE не покупает: он только называет случай. Допуск к порогу не вводится без слова владельца -- это прямое расширение того, что мы копируем
---- остановлено НАШИМ лимитом: 156 ---
-    156  INSUFFICIENT_BALANCE
+--- остановлено НАШИМ лимитом: 211 ---
+    211  INSUFFICIENT_BALANCE
 
 --- живая сверка с DBot (нарастающим итогом) ---
-  сигналов, где фильтры задачи пройдены (dbot_бы_купил): 156 из 30 нужных
-  сопоставлено с записями DBot: 14, записи не нашлось: 962
-  совпадений: 14, совпадение 1.0 (порог 0.9)
+  сигналов, где фильтры задачи пройдены (dbot_бы_купил): 211 из 30 нужных
+  сопоставлено с записями DBot: 58, записи не нашлось: 1225
+  совпадений: 58, совпадение 1.0 (порог 0.9)
   DBot купил, мы нет: 0 (должно быть 0)
-  DBot купил, а решения у нас НЕТ ВООБЩЕ: 1 (должно быть 0)
-      2026-10-02T02:04:37Z источник DAejzMs5cUeC минт 7cYaQc21w9dz запись mu7p7wkz0a4070_muqblg4p2j361u
+  DBot купил, а решения у нас НЕТ ВООБЩЕ: 0 (должно быть 0)
   мы бы купили, DBot отказал: 0
-  пропущено по НАШЕМУ лимиту, DBot купил: 7 (в числитель расхождений не идёт)
-  не сравнивалось (источник не покупал): 162537
-  записей DBot загружено: 3397 (источников 20, с полем follow 3397), окно записей 2026-09-19T01:41:01Z -- 2026-10-02T06:06:34Z
-  коды DBot в загруженных записях: {'FOLLOW_ORDER_IS_ONLY_PNL_MODE': 1267, 'TARGET_AMOUNT_OUT_OF_RANGE': 940, 'SKIP_TARGET_INCREASE_POSITION': 582, 'ПРОШЛО': 306, 'DUPLICATE_TOKEN_BUY': 291, 'MAX_BUY_TIMES_PER_TOKEN_REACHED': 11}
-    не сошлось 28jNtxW8p1vu5TAT (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
-    не сошлось 3EKzzUvGajYMYD56 (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
-    не сошлось 5xRo4y4vCQpc4Uqg (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
-    не сошлось 5q4NZJr1jkC5FTDL (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
-    не сошлось 3iP9yTKo1hsAxZRw (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
+  пропущено по НАШЕМУ лимиту, DBot купил: 11 (в числитель расхождений не идёт)
+  не сравнивалось (источник не покупал): 133496
+  записей DBot загружено: 3528 (источников 20, с полем follow 3528), окно записей 2026-09-19T01:41:01Z -- 2026-10-04T09:13:20Z
+  коды DBot в загруженных записях: {'FOLLOW_ORDER_IS_ONLY_PNL_MODE': 1351, 'TARGET_AMOUNT_OUT_OF_RANGE': 899, 'SKIP_TARGET_INCREASE_POSITION': 623, 'ПРОШЛО': 344, 'DUPLICATE_TOKEN_BUY': 298, 'MAX_BUY_TIMES_PER_TOKEN_REACHED': 13}
+    не сошлось 47wkDiUw8N2SqcHE (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
+    не сошлось 53uZ5GxVE4kQzPC3 (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
+    не сошлось 5utNgJcsB2HbbxGa (TARGET_AMOUNT_OUT_OF_RANGE): источника нет в записях DBot
+    не сошлось 5AexMsxwVRha15Sa (SKIP_TARGET_INCREASE_POSITION): источника нет в записях DBot
+    не сошлось 2M1Myfpg4J1drGbV (INSUFFICIENT_BALANCE): источника нет в записях DBot
   примечание: записи follow не несут подписи транзакции источника, поэтому сопоставление идёт по тройке источник+минт+время в окне 180 с
 
 --- пары А/Б --- наших отправленных покупок 0 из 50; из них малым размером 0
   пары с входом меньше 0.2 SOL идут в зачёт слотов, но не разницы результата: объёмы разные
 
---- только мы --- сигналов 149: у DBot нет ни покупки, ни отказа. В гейт мы/DBot НЕ входят
-  с известным итогом 0, без итога 149; медиана - %, сумма - п.п., - SOL
-    2026-10-01T22:12:38Z минт GhQYDYJP9F6G код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:13:06Z минт 9quMLTSDn62t код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:18:34Z минт quNxJesoKwZj код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:21:52Z минт bnkdo6gJz4FT код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:22:09Z минт BpRnvNz2UciE код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:22:40Z минт 4R81MHPN5QNu код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:24:39Z минт HMYTneKUfAH1 код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:27:06Z минт EDpWvkguT5GC код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:37:02Z минт 53rZTtfGghxq код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:43:37Z минт DiPky5GshZvH код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:45:12Z минт 3VJjpNWzZN1E код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:46:41Z минт Ake2xFaB6A1v код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:47:52Z минт FtQtgA7gWuQe код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:51:04Z минт Bb7jqcShVKxA код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:54:33Z минт Ake2xFaB6A1v код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:54:40Z минт 8geyFDTLUGsW код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:54:41Z минт AdrraUFfMch7 код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:55:10Z минт HXxJdaQbrYRv код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T22:58:51Z минт CdhZy8wrRxNx код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:00:09Z минт DW4BwZuQ6ndE код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:01:54Z минт CnjApQrNKcew код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:02:23Z минт 5LnHjZpmYPMz код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:03:53Z минт 8KhWvQFdfeGa код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:04:41Z минт AptbUquXpMF1 код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:20:44Z минт pwfAeX3kpWpk код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:21:53Z минт 7PVRdjifEfC6 код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:27:18Z минт 9tqAqeoxxJwf код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:27:23Z минт 86Eev7RJLnxz код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:27:54Z минт NgGhiiGFR2bF код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:29:04Z минт D7Tpbucj5Mte код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:32:16Z минт 6anmKB79WynW код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:33:09Z минт Cj2CVoXyAN4m код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:33:58Z минт BPR9g4oZ7Tqx код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:41:59Z минт 5zxzU6duesnf код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:42:49Z минт J4Zhp9qvfLmD код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:45:25Z минт Dh4EMF5SdYBX код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:48:42Z минт 7SZUgRmABrak код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:53:18Z минт 6wP4HSQzmNhE код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:53:26Z минт Fh9wRZe64Rfy код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:55:03Z минт 6D7KHzQWUueM код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:56:45Z минт 2JEgrpxwznaN код INSUFFICIENT_BALANCE итог - %
-    2026-10-01T23:59:29Z минт Bcxcb9CKyYjT код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:00:35Z минт 5ZZMSwizk41w код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:06:02Z минт 3cSgs5UdXZjK код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:06:36Z минт 2J2U14Dj7jwG код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:10:56Z минт 9Y4afMW81vqd код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:15:18Z минт xz5s11PrMFiC код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:18:28Z минт 2GfbS9n2HzM6 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:18:56Z минт 2GfbS9n2HzM6 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:22:28Z минт EHCNC1xAZmkJ код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:24:34Z минт 6V9MFhHrTz6f код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:24:34Z минт 6V9MFhHrTz6f код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:26:29Z минт pa8tAF9eiij4 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:29:54Z минт 27XVtvjVVwBg код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:33:20Z минт EgBkHjAYuFmX код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:41:42Z минт BZFYNPeQAEW3 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:43:26Z минт 9gHh3PEiEX5Y код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:46:59Z минт 6eVNUEfqLhnE код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:48:03Z минт 4Zc91NH2BhDD код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:49:16Z минт 9gHh3PEiEX5Y код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:52:29Z минт GyTy9NX22wdr код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T00:57:35Z минт 9TWhfpJbLLso код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:01:21Z минт 3R1jPUfPVLaX код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:03:27Z минт 9pJWJdpPebyA код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:06:37Z минт BZFYNPeQAEW3 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:06:37Z минт BZFYNPeQAEW3 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:07:46Z минт SadFNaxi3Foc код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:10:22Z минт AZ9NHodnyb6w код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:13:19Z минт 3HQQBXLCg5Tf код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:17:12Z минт 9Vke8MJboctW код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:30:24Z минт 9Vke8MJboctW код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:31:09Z минт 8svf3G1X4mnA код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:36:06Z минт FrU6ZfKR8oco код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:36:34Z минт FrU6ZfKR8oco код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:36:48Z минт 4r5wjiKspKyc код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:38:04Z минт 55V5DeSmcxjE код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:45:46Z минт 9Vke8MJboctW код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:52:16Z минт CRwv4LBK1gX1 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T01:57:22Z минт Gu5rBKhDjHri код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:05:32Z минт 8HJY9GTiEGgP код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:08:37Z минт 7cYaQc21w9dz код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:11:56Z минт EqZzW22mR2KQ код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:12:29Z минт D98LJdpf4XRx код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:13:52Z минт 8jjRE5D2pUnE код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:16:40Z минт Gu5rBKhDjHri код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:18:11Z минт 7cYaQc21w9dz код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:26:40Z минт 8E4cF7coT6u1 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:37:08Z минт GYxr3zCt9jvC код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:38:17Z минт CnbDp3n7CoqX код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T02:40:08Z минт FeqpXfiJdaWa код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:01:43Z минт HdHPy6VMNQZb код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:10:04Z минт 6D58X4EAD2yj код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:14:44Z минт HRaHqH8d9eWC код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:16:10Z минт 5m7vGLSJLywp код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:24:21Z минт GAwhcphCqCv5 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:24:50Z минт AS5mTg4AaXuk код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:24:50Z минт AS5mTg4AaXuk код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:27:12Z минт 7KEPApdbBMBy код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:37:12Z минт HfbdLsFm9tZW код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:38:11Z минт F11gNXT3vdCp код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:43:23Z минт 9RcvjFss6ePC код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:44:15Z минт AFBFgVcJsRTT код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:45:35Z минт Aaan4fxwhKtU код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:46:33Z минт Aaan4fxwhKtU код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:53:45Z минт efbKNyGvdrJA код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T03:54:55Z минт 7XoR4H5FGMtb код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:00:30Z минт 2SH2XDNRfBjT код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:02:01Z минт 2m9TUqGExYTd код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:05:38Z минт BmyvkjZyYQu9 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:07:08Z минт CgLa9nmRmRg5 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:18:42Z минт 2ssq4zcKrxEK код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:19:28Z минт 4CQFXEjsucbP код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:21:23Z минт 4CQFXEjsucbP код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:22:56Z минт 4AT4FHoc8LE5 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:25:19Z минт GAwhcphCqCv5 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:26:26Z минт F3S4WDfKUhe7 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:33:43Z минт 4LjJL18pN6oM код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:35:40Z минт AZDn3jxUHGyk код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:35:58Z минт CpFFKkCPsiiv код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:36:18Z минт GAwhcphCqCv5 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:36:22Z минт GAwhcphCqCv5 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:37:00Z минт 6sCEG5jEaa2S код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:37:36Z минт 2mABZ3Dsgk46 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:37:37Z минт 2mABZ3Dsgk46 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:38:06Z минт HbKMc3siukxp код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:38:29Z минт 2mABZ3Dsgk46 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:40:39Z минт 5ekhBCzJa5Tf код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:42:09Z минт 2mABZ3Dsgk46 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:43:30Z минт 4E5SUG74yBb6 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:43:59Z минт 2Fjyt6UJrKnB код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:48:59Z минт 7VertkgF9KLh код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:50:54Z минт 7VertkgF9KLh код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:52:38Z минт 6d82cCtC1Lkt код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:55:03Z минт 7VertkgF9KLh код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T04:58:56Z минт GAwhcphCqCv5 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:01:05Z минт 4KQi1VC612iL код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:04:55Z минт 4sH3EC1Vqvia код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:08:45Z минт 4KQi1VC612iL код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:24:01Z минт CNohWHNTurS7 код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:25:13Z минт GhAP9Tb8RADF код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:25:13Z минт GhAP9Tb8RADF код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:38:53Z минт 6tpfCENhKozj код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:39:06Z минт 8nnaeWCw8mUy код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:50:40Z минт GhAP9Tb8RADF код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:52:34Z минт 739dnZEG4yaB код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T05:55:01Z минт 8nnaeWCw8mUy код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T06:00:12Z минт BUMwwEkkta5A код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T06:20:23Z минт DM75oYGVPNFR код INSUFFICIENT_BALANCE итог - %
-    2026-10-02T06:23:31Z минт DSmp1qi6fAGn код INSUFFICIENT_BALANCE итог - %
+--- только мы --- сигналов 200: у DBot нет ни покупки, ни отказа. В гейт мы/DBot НЕ входят
+  с известным итогом 0, без итога 200; медиана - %, сумма - п.п., - SOL
+    2026-10-03T22:02:03Z минт 5e1LBhXxc3Y2 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:04:01Z минт 2gYkDCywok7n код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:06:51Z минт GJfqrVHYehQP код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:08:48Z минт CscZaq5twomh код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:13:59Z минт BXoHJddsWJLH код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:17:39Z минт 4Z27KbzjrQo1 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:21:08Z минт 2gafU5vS2nVK код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:27:18Z минт DPhwYPHWwsfy код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:28:39Z минт 3xs7FhZcKok5 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:29:26Z минт rHhYhfXkFQMs код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:33:33Z минт 9oqzNEygdCBK код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:35:59Z минт GZnAMJ7DSCa3 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:36:04Z минт 5t9rie78rVLP код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:39:00Z минт 6VsnbKz6erJR код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:39:01Z минт Bd9thw3PAeyH код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:41:31Z минт 5KdMFVsopJfF код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:41:49Z минт kcctXZinvqRC код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:47:22Z минт CpRkPw9M2iMD код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:47:50Z минт FeUawxmAjK9E код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:49:05Z минт GZnAMJ7DSCa3 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:49:07Z минт 3uq5bZtUndaA код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:50:15Z минт 4FEouBgLRfLF код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:51:34Z минт DdXwmzYRGmQE код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:52:26Z минт 6VsnbKz6erJR код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:55:43Z минт 4ujHWhzJwwAa код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:55:56Z минт 7YzL96mPwGwZ код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:56:05Z минт suPuzxdog9A6 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:56:05Z минт suPuzxdog9A6 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:56:44Z минт FE7fDJnXB2ss код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:57:18Z минт 5WWgS1LPpiXZ код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:57:18Z минт 5WWgS1LPpiXZ код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T22:57:33Z минт C3XMbfacf2Lc код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:00:14Z минт 7bC8ugu1ZJn2 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:02:22Z минт DHd11UbMASvq код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:03:03Z минт 2oapHRrNrACn код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:03:22Z минт BXoHJddsWJLH код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:10:33Z минт Wu6fhJJKg29i код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:12:22Z минт CdwZKQ4MfQM7 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:13:53Z минт Ep5nF7XgTBSu код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:18:46Z минт 3qZj9FZ1UoyC код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:19:46Z минт CmSbr2prvnPw код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:20:29Z минт 6StMkk2nyQHV код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:20:35Z минт ATm1DuMTH9f1 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:20:44Z минт ExY678iDsPqu код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:22:55Z минт CdwZKQ4MfQM7 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:32:25Z минт 37MQPXbaNsAt код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:39:41Z минт 4DVesAFuFueA код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:41:21Z минт 4DVesAFuFueA код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:43:23Z минт 6gGxnf1dDBwK код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:43:30Z минт RD6MFzzsFYA2 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:43:43Z минт 6hTLdzZaaCjm код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:46:51Z минт BHZW8bWz9RYG код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:50:02Z минт 73XcPAwBvE75 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:50:15Z минт FdUN875D9Ue8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:50:51Z минт 73XcPAwBvE75 код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:51:49Z минт Di232arcxDgJ код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:53:57Z минт 2Y73VNFP2HtJ код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:55:20Z минт 4smeQ1tioyTw код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:55:47Z минт 3UJj3Xx9i4gn код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:55:59Z минт 9DdHxVe1BSPa код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:57:32Z минт 3EWybYLdHSUu код INSUFFICIENT_BALANCE итог - %
+    2026-10-03T23:58:10Z минт 536XttnvgJaX код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:00:47Z минт C6XqPRUbSLqy код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:01:35Z минт BaeoPyGhDLCY код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:03:32Z минт Geb69EBttATH код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:05:31Z минт Geb69EBttATH код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:07:12Z минт 4smeQ1tioyTw код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:14:06Z минт 2YdWfp7W98FG код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:14:18Z минт 7bC8ugu1ZJn2 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:14:18Z минт 7bC8ugu1ZJn2 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:16:44Z минт EMZGhHQWyu3G код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:33:00Z минт CpRkPw9M2iMD код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:34:00Z минт EKJQb4Te8jk7 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:35:11Z минт 4SKVVMaesazT код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:38:41Z минт BXoHJddsWJLH код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:40:33Z минт 53ubsAu1noYN код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:40:41Z минт 9DdHxVe1BSPa код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:41:20Z минт 2CxvU4vdX1Ta код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:43:52Z минт AVYKJvzfXem7 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:45:17Z минт AzebDBNxh237 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:46:00Z минт 8d7Ru5nJQJvx код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:46:01Z минт Fa1As1BjL8Ez код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:48:55Z минт EqVbsF6d8qAn код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:49:08Z минт 8V2jTnUbfTDk код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:50:55Z минт Fa1As1BjL8Ez код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:51:52Z минт 2z1s9nrjhTdr код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:52:53Z минт EpoPEGDTJFyS код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:53:28Z минт AZBrTiJatLWB код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T00:55:53Z минт CwSNUU54NLJt код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:00:05Z минт 3Dgwn5E7H5a8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:00:17Z минт BmSgTAafbBed код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:01:40Z минт BmSgTAafbBed код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:03:25Z минт BXoHJddsWJLH код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:08:22Z минт 8jgc9VFikDoU код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:08:55Z минт Fq6gt41D1w4d код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:12:27Z минт CpRkPw9M2iMD код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:16:11Z минт GWTP6M5bxhaJ код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:21:10Z минт BXoHJddsWJLH код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:21:51Z минт Geb69EBttATH код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:29:27Z минт 3Dgwn5E7H5a8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:29:27Z минт 3Dgwn5E7H5a8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:30:48Z минт 22upB1Sfx6gS код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:31:38Z минт 22upB1Sfx6gS код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:34:16Z минт 2eb8TfoAbYyW код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:41:47Z минт 5tCju6YNxHq5 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:49:14Z минт 3Dgwn5E7H5a8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:52:25Z минт 9fJAWKQpkY93 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T01:52:57Z минт 6kpKxNWJLkNM код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:07:06Z минт DioisRY2M15W код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:08:14Z минт Geb69EBttATH код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:08:53Z минт DsCSGkjsoSjQ код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:13:01Z минт BffwFrxLQ82Q код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:22:06Z минт 3XBKc5N6ecPd код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:25:20Z минт 3XBKc5N6ecPd код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:27:19Z минт 5VnbrKp28Qs9 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:31:03Z минт FBGEHacyeX4p код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:31:54Z минт 2pA25N1kJdFM код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:31:54Z минт 2pA25N1kJdFM код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:33:34Z минт 2EUKLvNQ63YC код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T02:47:49Z минт HppB5rMgVsUq код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:03:42Z минт 6Sf8vj1Ah1qA код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:20:45Z минт G9FwsYdvCkCP код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:21:12Z минт 5tCZsxQR2xpZ код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:39:15Z минт AP3NcmQ1yNfB код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:45:37Z минт 5YmMGJ76T7jo код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:51:11Z минт 9dSMwFfPezQ8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:55:34Z минт 74yJPG3gqQBy код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T03:57:41Z минт 5Pun7ZqHxC26 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:04:08Z минт 9dSMwFfPezQ8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:04:37Z минт 6vSxbc1btRLZ код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:05:21Z минт JCsKWhELRJ8M код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:10:19Z минт 9dSMwFfPezQ8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:12:45Z минт EkHsJUXmSTQT код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:14:27Z минт 5Pun7ZqHxC26 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:15:46Z минт 8hSVNdq8As3e код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:16:17Z минт 3J742o8WTojt код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:18:34Z минт 9dSMwFfPezQ8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:19:24Z минт JCsKWhELRJ8M код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:21:58Z минт V9zCeRU67pBU код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:21:58Z минт V9zCeRU67pBU код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:26:40Z минт zL1FM3PtRdgj код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:29:12Z минт 3Dgwn5E7H5a8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:30:57Z минт H7TuvDxEKygh код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:32:13Z минт HDXGnnJEbK9T код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:33:11Z минт CP55en6Um8vG код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:33:25Z минт 4vnJ6J1NwiHR код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:51:39Z минт E84i6c6jFsTg код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:54:16Z минт ADZKfR5FPW4N код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T04:54:16Z минт ADZKfR5FPW4N код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T05:15:44Z минт FsL7ehQrvNEf код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T05:20:27Z минт 4cw7FD7iqtWN код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T05:22:11Z минт 9ZmkKpVR3NdU код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T05:27:56Z минт fCUBpdeRn76x код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T05:46:45Z минт 7Xgc5RacHtGz код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T05:46:45Z минт 7Xgc5RacHtGz код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T05:47:30Z минт 7Xgc5RacHtGz код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:08:14Z минт Dhc2ymaZCJip код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:09:32Z минт BaJqtEAVs3N8 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:14:48Z минт AYLavJzDYKai код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:23:56Z минт 3ZtY5iuH7Bot код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:23:57Z минт 3ZtY5iuH7Bot код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:28:57Z минт 9HanAd4JAvUr код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:31:24Z минт 4mkNDiEALDut код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:35:26Z минт 9bsHPggRK5Dr код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:35:51Z минт 7kd5QBAFWG5p код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:37:33Z минт ECQWrZA656cb код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:38:02Z минт 4mkNDiEALDut код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:40:47Z минт 9bsHPggRK5Dr код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:41:03Z минт V9BhQFQ2GHSf код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:42:18Z минт 9bsHPggRK5Dr код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:42:19Z минт 9bsHPggRK5Dr код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:53:14Z минт GTBxUiw6wJdm код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T06:58:24Z минт BgNZw6VxzYoS код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:02:16Z минт Ed1ZM5GB39Y7 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:04:34Z минт H5mBRtgRA2jk код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:14:03Z минт DU3hNXLSF27d код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:27:02Z минт 2SEJhBjWd7rk код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:28:08Z минт 7fGpP9DpE2g7 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:31:13Z минт AvmvBcApa9dN код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:36:43Z минт 2CZJzBoeS17u код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:42:44Z минт FoS1tjFxvTE1 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T07:54:12Z минт 2CZJzBoeS17u код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T08:22:40Z минт Hg5Ja55T5wES код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T08:25:14Z минт EMZGhHQWyu3G код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T08:35:45Z минт 75gGuxuqKhQQ код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T08:45:13Z минт 8tn3sa36jaDi код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T09:00:42Z минт 8oMvxgcBJtDG код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T09:00:42Z минт 8oMvxgcBJtDG код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T09:13:31Z минт 9aqmJjCnnMQv код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T09:24:04Z минт 7X9YuhfvC9MZ код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T09:56:02Z минт 48Auyz4t4zxa код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T09:56:03Z минт 48Auyz4t4zxa код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T09:57:34Z минт Evqf8gwQ9iW3 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T10:20:31Z минт BgDXbCte2gp1 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T10:20:31Z минт BgDXbCte2gp1 код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T10:21:44Z минт 36mewNdQikpB код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T10:39:55Z минт 4iSjtJhbZx7C код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T10:44:52Z минт dv5jVbBRn88d код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T10:44:52Z минт dv5jVbBRn88d код INSUFFICIENT_BALANCE итог - %
+    2026-10-04T11:14:51Z минт 8RfgokotF4CW код INSUFFICIENT_BALANCE итог - %
 
---- таблица кругов --- сделок 31; пустое поле значит «не мерили», а не ноль
-  - lane-own минт None
+--- таблица кругов --- сделок 88; пустое поле значит «не мерили», а не ноль
+  2026-10-03T22:02:03Z lane-own минт 5e1LBhXxc3
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из -
-      продажа: план -, факт -, слот -, через -
-      итог: по цепи -, продажа подтверждена -, вход - SOL, вернулось чисто - SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:12:38Z lane-own минт GhQYDYJP9F
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453061978'}
+      продажа: план 27.717 с, факт -, слот 453062084, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.498698478 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.444 мс, дорогая по капитализации -
+  2026-10-03T22:08:48Z lane-own минт CscZaq5two
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452418254'}
-      продажа: план 28.443 с, факт -, слот 452418405, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.098183186 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:13:06Z lane-own минт 9quMLTSDn6
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453063487'}
+      продажа: план 28.071 с, факт -, слот 453063595, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.117544293 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.215 мс, дорогая по капитализации -
+  2026-10-03T22:13:59Z lane-own минт BXoHJddsWJ
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452418360'}
-      продажа: план 28.443 с, факт -, слот 452418529, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.075580349 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:21:52Z lane-own минт bnkdo6gJz4
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453064648'}
+      продажа: план 28.441 с, факт -, слот 453064759, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.46148897 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.751 мс, дорогая по капитализации -
+  2026-10-03T22:27:18Z lane-own минт DPhwYPHWws
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452420291'}
-      продажа: план 30.876 с, факт -, слот 452420485, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.10396853 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:22:10Z lane-own минт BpRnvNz2Uc
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453067642'}
+      продажа: план 28.441 с, факт -, слот 453067750, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.093220859 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.767 мс, дорогая по капитализации -
+  2026-10-03T22:35:58Z lane-own минт 5t9rie78rV
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452420358'}
-      продажа: план 30.876 с, факт -, слот -, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто - SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:22:41Z lane-own минт 4R81MHPN5Q
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453069589'}
+      продажа: план 29.21 с, факт -, слот 453069700, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.309559252 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.799 мс, дорогая по капитализации -
+  2026-10-03T22:35:59Z lane-own минт GZnAMJ7DSC
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452420473'}
-      продажа: план 30.876 с, факт -, слот 452420654, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.059434431 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:27:06Z lane-own минт EDpWvkguT5
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453069591'}
+      продажа: план 29.21 с, факт -, слот 453069711, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.087751506 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.738 мс, дорогая по капитализации -
+  2026-10-03T22:39:00Z lane-own минт 6VsnbKz6er
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452421456'}
-      продажа: план 29.21 с, факт -, слот 452421643, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.049195949 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:43:37Z lane-own минт DiPky5GshZ
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453070265'}
+      продажа: план 29.21 с, факт -, слот 453070375, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.120710387 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 4.486 мс, дорогая по капитализации -
+  2026-10-03T22:41:31Z lane-own минт 5KdMFVsopJ
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452425171'}
-      продажа: план 29.613 с, факт -, слот 452425349, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.077638599 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:45:12Z lane-own минт 3VJjpNWzZN
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453070830'}
+      продажа: план 29.208 с, факт -, слот 453070942, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.088979693 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.693 мс, дорогая по капитализации -
+  2026-10-03T22:47:22Z lane-own минт CpRkPw9M2i
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452425526'}
-      продажа: план 29.613 с, факт -, слот 452425679, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.114779317 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:46:41Z lane-own минт Ake2xFaB6A
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453072143'}
+      продажа: план 29.21 с, факт -, слот 453072253, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.103874503 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.927 мс, дорогая по капитализации -
+  2026-10-03T22:49:05Z lane-own минт GZnAMJ7DSC
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452425855'}
-      продажа: план 29.208 с, факт -, слот 452426024, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.071067144 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:47:52Z lane-own минт FtQtgA7gWu
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453072531'}
+      продажа: план 28.072 с, факт -, слот 453072634, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.01 SOL, вернулось чисто 0.010268173 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 4.895 мс, дорогая по капитализации -
+  2026-10-03T22:50:15Z lane-own минт 4FEouBgLRf
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452426117'}
-      продажа: план 29.208 с, факт -, слот 452426277, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.099075351 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:51:04Z lane-own минт Bb7jqcShVK
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453072792'}
+      продажа: план 28.072 с, факт -, слот 453072899, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.071933345 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.281 мс, дорогая по капитализации -
+  2026-10-03T22:57:33Z lane-own минт C3XMbfacf2
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452426835'}
-      продажа: план 28.44 с, факт -, слот -, через -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453074429'}
+      продажа: план 29.219 с, факт -, слот 453074539, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.307309362 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.461 мс, дорогая по капитализации -
+  2026-10-03T23:03:22Z lane-own минт BXoHJddsWJ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453075733'}
+      продажа: план 29.213 с, факт -, слот 453075841, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.456654718 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.342 мс, дорогая по капитализации -
+  2026-10-03T23:18:46Z lane-own минт 3qZj9FZ1Uo
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453079198'}
+      продажа: план 28.819 с, факт -, слот 453079307, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.091015504 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.539 мс, дорогая по капитализации -
+  2026-10-03T23:19:46Z lane-own минт CmSbr2prvn
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453079429'}
+      продажа: план 28.836 с, факт -, слот -, через -
+      итог: по цепи False, продажа подтверждена -, вход 0.01 SOL, вернулось чисто - SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.284 мс, дорогая по капитализации -
+  2026-10-03T23:20:29Z lane-own минт 6StMkk2nyQ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453079588'}
+      продажа: план 28.836 с, факт -, слот 453079699, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.11420151 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.233 мс, дорогая по капитализации -
+  2026-10-03T23:20:35Z lane-own минт ATm1DuMTH9
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453079611'}
+      продажа: план 28.836 с, факт -, слот -, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.01977733 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.361 мс, дорогая по капитализации -
+  2026-10-03T23:20:44Z lane-own минт ExY678iDsP
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453079647'}
+      продажа: план 28.836 с, факт -, слот 453079756, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.156769924 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.912 мс, дорогая по капитализации -
+  2026-10-03T23:39:41Z lane-own минт 4DVesAFuFu
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453083897'}
+      продажа: план 28.071 с, факт -, слот 453084005, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.096443307 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.531 мс, дорогая по капитализации -
+  2026-10-03T23:43:30Z lane-own минт RD6MFzzsFY
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453084756'}
+      продажа: план 28.071 с, факт -, слот 453084863, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.102384085 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.247 мс, дорогая по капитализации -
+  2026-10-03T23:43:43Z lane-own минт 6hTLdzZaaC
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке 818 из 1061 (доля 0.771) · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453084805'}
+      продажа: план 28.071 с, факт -, слот 453084913, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.096308533 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.741 мс, дорогая по капитализации -
+  2026-10-03T23:50:02Z lane-own минт 73XcPAwBvE
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453086225'}
+      продажа: план 29.213 с, факт -, слот 453086333, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.57900286 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.758 мс, дорогая по капитализации -
+  2026-10-03T23:50:51Z lane-own минт 73XcPAwBvE
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453086400'}
+      продажа: план 29.213 с, факт -, слот 453086511, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.086846514 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.109 мс, дорогая по капитализации -
+  2026-10-03T23:55:59Z lane-own минт 9DdHxVe1BS
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453087559'}
+      продажа: план 28.068 с, факт -, слот 453087664, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.094172887 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.023 мс, дорогая по капитализации -
+  2026-10-04T00:05:31Z lane-own минт Geb69EBttA
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453089702'}
+      продажа: план 19.215 с, факт -, слот 453089772, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.10418598 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 3.502 мс, дорогая по капитализации -
+  2026-10-04T00:07:12Z lane-own минт 4smeQ1tioy
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453090079'}
+      продажа: план 28.822 с, факт -, слот 453090186, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.113577869 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.776 мс, дорогая по капитализации -
+  2026-10-04T00:14:18Z lane-own минт 7bC8ugu1ZJ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453091669'}
+      продажа: план 29.208 с, факт -, слот 453091781, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.285099269 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.476 мс, дорогая по капитализации -
+  2026-10-04T00:33:00Z lane-own минт CpRkPw9M2i
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453095861'}
+      продажа: план 29.214 с, факт -, слот 453095971, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.10900132 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.71 мс, дорогая по капитализации -
+  2026-10-04T00:34:00Z lane-own минт EKJQb4Te8j
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453096083'}
+      продажа: план 29.214 с, факт -, слот 453096190, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.106677785 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.914 мс, дорогая по капитализации -
+  2026-10-04T00:35:11Z lane-own минт 4SKVVMaesa
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453096347'}
+      продажа: план 29.217 с, факт -, слот 453096454, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.01 SOL, вернулось чисто 0.008795742 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.502 мс, дорогая по капитализации -
+  2026-10-04T00:40:41Z lane-own минт 9DdHxVe1BS
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453097571'}
+      продажа: план 28.439 с, факт -, слот 453097681, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.091580286 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.491 мс, дорогая по капитализации -
+  2026-10-04T00:46:00Z lane-own минт 8d7Ru5nJQJ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453098773'}
+      продажа: план 29.615 с, факт -, слот 453098886, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.067685598 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.377 мс, дорогая по капитализации -
+  2026-10-04T00:46:01Z lane-own минт Fa1As1BjL8
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453098775'}
+      продажа: план 29.615 с, факт -, слот 453098898, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.09962903 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.791 мс, дорогая по капитализации -
+  2026-10-04T01:00:17Z lane-own минт BmSgTAafbB
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453101967'}
+      продажа: план 28.83 с, факт -, слот 453102076, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.130769953 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.677 мс, дорогая по капитализации -
+  2026-10-04T01:21:11Z lane-own минт BXoHJddsWJ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453106656'}
+      продажа: план 29.62 с, факт -, слот 453106767, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.094664095 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.712 мс, дорогая по капитализации -
+  2026-10-04T01:21:51Z lane-own минт Geb69EBttA
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453106807'}
+      продажа: план 29.62 с, факт -, слот 453106922, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.099979557 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.656 мс, дорогая по капитализации -
+  2026-10-04T01:29:27Z lane-own минт 3Dgwn5E7H5
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453108510'}
+      продажа: план 29.615 с, факт -, слот 453108621, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.440117407 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.342 мс, дорогая по капитализации -
+  2026-10-04T01:31:38Z lane-own минт 22upB1Sfx6
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453109004'}
+      продажа: план 29.615 с, факт -, слот 453109118, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.08485933 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.778 мс, дорогая по капитализации -
+  2026-10-04T01:41:48Z lane-own минт 5tCju6YNxH
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453111296'}
+      продажа: план 28.447 с, факт -, слот 453111405, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.309375609 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.925 мс, дорогая по капитализации -
+  2026-10-04T01:49:14Z lane-own минт 3Dgwn5E7H5
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453112983'}
+      продажа: план 28.441 с, факт -, слот 453113090, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.263403225 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.475 мс, дорогая по капитализации -
+  2026-10-04T02:13:01Z lane-own минт BffwFrxLQ8
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453118337'}
+      продажа: план 28.825 с, факт -, слот 453118452, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.086315284 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.592 мс, дорогая по капитализации -
+  2026-10-04T02:25:20Z lane-own минт 3XBKc5N6ec
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453121108'}
+      продажа: план 28.439 с, факт -, слот 453121216, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.067084888 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.562 мс, дорогая по капитализации -
+  2026-10-04T02:31:03Z lane-own минт FBGEHacyeX
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453122399'}
+      продажа: план 28.819 с, факт -, слот 453122506, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.196523069 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.761 мс, дорогая по капитализации -
+  2026-10-04T02:47:49Z lane-own минт HppB5rMgVs
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453126171'}
+      продажа: план 18.963 с, факт -, слот 453126244, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.097772498 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 3.75 мс, дорогая по капитализации -
+  2026-10-04T03:21:12Z lane-own минт 5tCZsxQR2x
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453133676'}
+      продажа: план 28.818 с, факт -, слот 453133783, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.120629443 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.615 мс, дорогая по капитализации -
+  2026-10-04T03:39:15Z lane-own минт AP3NcmQ1yN
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453137701'}
+      продажа: план 19.472 с, факт -, слот 453137773, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.106902753 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.935 мс, дорогая по капитализации -
+  2026-10-04T03:39:50Z lane-own минт Bf9i7oG8We
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453137831'}
+      продажа: план 29.209 с, факт -, слот 453137942, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.510033481 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 9.258 мс, дорогая по капитализации -
+  2026-10-04T03:51:12Z lane-own минт 9dSMwFfPez
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453140381'}
+      продажа: план 29.608 с, факт -, слот 453140496, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.510923378 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.204 мс, дорогая по капитализации -
+  2026-10-04T03:55:34Z lane-own минт 74yJPG3gqQ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453141352'}
+      продажа: план 29.609 с, факт -, слот 453141467, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.577405097 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.477 мс, дорогая по капитализации -
+  2026-10-04T04:04:08Z lane-own минт 9dSMwFfPez
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453143270'}
+      продажа: план 29.208 с, факт -, слот 453143383, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.337256359 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.657 мс, дорогая по капитализации -
+  2026-10-04T04:05:21Z lane-own минт JCsKWhELRJ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453143547'}
+      продажа: план 29.208 с, факт -, слот 453143654, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.451798407 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.422 мс, дорогая по капитализации -
+  2026-10-04T04:10:19Z lane-own минт 9dSMwFfPez
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453144649'}
+      продажа: план 19.74 с, факт -, слот 453144724, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.102481414 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.787 мс, дорогая по капитализации -
+  2026-10-04T04:15:46Z lane-own минт 8hSVNdq8As
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453145861'}
+      продажа: план 18.96 с, факт -, слот 453145933, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.093360685 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.787 мс, дорогая по капитализации -
+  2026-10-04T04:19:24Z lane-own минт JCsKWhELRJ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453146686'}
+      продажа: план 29.652 с, факт -, слот 453146793, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.54434661 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.625 мс, дорогая по капитализации -
+  2026-10-04T04:21:58Z lane-own минт V9zCeRU67p
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453147261'}
+      продажа: план 29.652 с, факт -, слот 453147375, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.488010701 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.014 мс, дорогая по капитализации -
+  2026-10-04T04:30:57Z lane-own минт H7TuvDxEKy
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453149286'}
+      продажа: план 27.719 с, факт -, слот 453149391, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.508082907 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.93 мс, дорогая по капитализации -
+  2026-10-04T04:54:16Z lane-own минт ADZKfR5FPW
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453154553'}
+      продажа: план 29.21 с, факт -, слот 453154667, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.545941204 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.118 мс, дорогая по капитализации -
+  2026-10-04T05:11:01Z lane-own минт FsL7ehQrvN
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453158303'}
+      продажа: план 28.442 с, факт -, слот -, через -
+      итог: по цепи False, продажа подтверждена -, вход 0.5 SOL, вернулось чисто - SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.035 мс, дорогая по капитализации -
+  2026-10-04T05:19:43Z lane-own минт 6VsnbKz6er
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453160264'}
+      продажа: план 29.208 с, факт -, слот 453160374, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.499403814 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.835 мс, дорогая по капитализации -
+  2026-10-04T05:22:11Z lane-own минт 9ZmkKpVR3N
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453160814'}
+      продажа: план 29.208 с, факт -, слот 453160925, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.35587545 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.901 мс, дорогая по капитализации -
+  2026-10-04T05:27:56Z lane-own минт fCUBpdeRn7
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453162105'}
+      продажа: план 28.819 с, факт -, слот 453162213, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.106465866 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.896 мс, дорогая по капитализации -
+  2026-10-04T05:46:45Z lane-own минт 7Xgc5RacHt
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453166341'}
+      продажа: план 29.209 с, факт -, слот 453166452, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.478597792 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.576 мс, дорогая по капитализации -
+  2026-10-04T06:08:15Z lane-own минт Dhc2ymaZCJ
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453171165'}
+      продажа: план 29.21 с, факт -, слот 453171275, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.472405567 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.947 мс, дорогая по капитализации -
+  2026-10-04T06:09:32Z lane-own минт BaJqtEAVs3
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453171461'}
+      продажа: план 27.361 с, факт -, слот 453171565, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.462103086 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.046 мс, дорогая по капитализации -
+  2026-10-04T06:14:48Z lane-own минт AYLavJzDYK
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453172640'}
+      продажа: план 29.61 с, факт -, слот 453172758, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.456326638 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.83 мс, дорогая по капитализации -
+  2026-10-04T06:23:57Z lane-own минт 3ZtY5iuH7B
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453174709'}
+      продажа: план 28.068 с, факт -, слот 453174818, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.539684553 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 0.686 мс, дорогая по капитализации -
+  2026-10-04T06:31:24Z lane-own минт 4mkNDiEALD
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453176389'}
+      продажа: план 28.452 с, факт -, слот 453176498, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.516229176 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 7.815 мс, дорогая по капитализации -
+  2026-10-04T06:35:26Z lane-own минт 9bsHPggRK5
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453177296'}
+      продажа: план 28.851 с, факт -, слот -, через -
       итог: по цепи False, продажа подтверждена -, вход 0.1 SOL, вернулось чисто - SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T22:55:10Z lane-own минт HXxJdaQbrY
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.972 мс, дорогая по капитализации -
+  2026-10-04T06:35:51Z lane-own минт 7kd5QBAFWG
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452427750'}
-      продажа: план 28.44 с, факт -, слот 452427923, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.573611934 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T23:00:09Z lane-own минт DW4BwZuQ6n
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453177389'}
+      продажа: план 28.851 с, факт -, слот 453177499, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.492547891 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.616 мс, дорогая по капитализации -
+  2026-10-04T06:37:33Z lane-own минт ECQWrZA656
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452428874'}
-      продажа: план 29.62 с, факт -, слот 452429051, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.072949467 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T23:02:23Z lane-own минт 5LnHjZpmYP
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453177769'}
+      продажа: план 28.851 с, факт -, слот 453177879, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.471754563 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.019 мс, дорогая по капитализации -
+  2026-10-04T06:40:47Z lane-own минт 9bsHPggRK5
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452429361'}
-      продажа: план 28.825 с, факт -, слот 452429535, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.085959839 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T23:03:53Z lane-own минт 8KhWvQFdfe
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453178499'}
+      продажа: план 28.822 с, факт -, слот 453178610, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.383334861 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.294 мс, дорогая по капитализации -
+  2026-10-04T06:42:18Z lane-own минт 9bsHPggRK5
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452429700'}
-      продажа: план 28.825 с, факт -, слот 452429870, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.098330762 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T23:27:23Z lane-own минт 86Eev7RJLn
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453178846'}
+      продажа: план 28.822 с, факт -, слот -, через -
+      итог: по цепи False, продажа подтверждена -, вход 0.5 SOL, вернулось чисто - SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.94 мс, дорогая по капитализации -
+  2026-10-04T06:58:24Z lane-own минт BgNZw6VxzY
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452434961'}
-      продажа: план 28.823 с, факт -, слот 452435121, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.079585127 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T23:32:16Z lane-own минт 6anmKB79Wy
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453182480'}
+      продажа: план 28.835 с, факт -, слот 453182592, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.117627449 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.287 мс, дорогая по капитализации -
+  2026-10-04T07:02:16Z lane-own минт Ed1ZM5GB39
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452436048'}
-      продажа: план 28.819 с, факт -, слот 452436277, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.047819854 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T23:33:09Z lane-own минт Cj2CVoXyAN
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453183347'}
+      продажа: план 28.461 с, факт -, слот 453183453, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.099099291 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 9.8 мс, дорогая по капитализации -
+  2026-10-04T07:04:34Z lane-own минт H5mBRtgRA2
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452436241'}
-      продажа: план 28.819 с, факт -, слот 452436447, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.035229284 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-01T23:45:25Z lane-own минт Dh4EMF5SdY
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453183866'}
+      продажа: план 28.461 с, факт -, слот 453183974, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.079976575 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.182 мс, дорогая по капитализации -
+  2026-10-04T07:27:02Z lane-own минт 2SEJhBjWd7
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452438997'}
-      продажа: план 28.441 с, факт -, слот 452439235, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.102193007 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T02:05:32Z lane-own минт 8HJY9GTiEG
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453188917'}
+      продажа: план 29.21 с, факт -, слот 453189027, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.570035978 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.359 мс, дорогая по капитализации -
+  2026-10-04T07:31:13Z lane-own минт AvmvBcApa9
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452470424'}
-      продажа: план 30.442 с, факт -, слот 452470534, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.578589611 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T02:08:37Z lane-own минт 7cYaQc21w9
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453189856'}
+      продажа: план 28.444 с, факт -, слот 453189964, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.107233329 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.372 мс, дорогая по капитализации -
+  2026-10-04T07:34:47Z lane-own минт MukLDtJ8Cx
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452471109'}
-      продажа: план 30.442 с, факт -, слот 452471219, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.345054971 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T03:24:50Z lane-own минт AS5mTg4AaX
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453190652'}
+      продажа: план 28.441 с, факт -, слот 453190760, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.307137314 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.188 мс, дорогая по капитализации -
+  2026-10-04T07:36:43Z lane-own минт 2CZJzBoeS1
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452488166'}
-      продажа: план 28.821 с, факт -, слот 452488275, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.55542078 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T03:46:33Z lane-own минт Aaan4fxwhK
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453191089'}
+      продажа: план 28.441 с, факт -, слот 453191198, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.407287865 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.67 мс, дорогая по капитализации -
+  2026-10-04T07:54:12Z lane-own минт 2CZJzBoeS1
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452493060'}
-      продажа: план 28.083 с, факт -, слот 452493164, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.339777014 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T04:36:18Z lane-own минт GAwhcphCqC
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453195006'}
+      продажа: план 29.213 с, факт -, слот 453195118, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.107799294 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.862 мс, дорогая по капитализации -
+  2026-10-04T08:25:14Z lane-own минт EMZGhHQWyu
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452504177'}
-      продажа: план 27.712 с, факт -, слот 452504282, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.548726767 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T04:37:37Z lane-own минт 2mABZ3Dsgk
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453201977'}
+      продажа: план 29.225 с, факт -, слот 453202086, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.093395963 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 9.085 мс, дорогая по капитализации -
+  2026-10-04T09:00:42Z lane-own минт 8oMvxgcBJt
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452504474'}
-      продажа: план 27.712 с, факт -, слот 452504577, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.529164273 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T04:50:54Z lane-own минт 7VertkgF9K
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453209916'}
+      продажа: план 28.082 с, факт -, слот 453210021, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.617033828 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.344 мс, дорогая по капитализации -
+  2026-10-04T09:13:31Z lane-own минт 9aqmJjCnnM
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452507447'}
-      продажа: план 28.819 с, факт -, слот 452507560, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.419768976 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T05:24:01Z lane-own минт CNohWHNTur
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453212792'}
+      продажа: план 28.071 с, факт -, слот 453212899, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.101242048 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.428 мс, дорогая по капитализации -
+  2026-10-04T09:24:05Z lane-own минт 7X9YuhfvC9
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452514820'}
-      продажа: план 28.444 с, факт -, слот 452514927, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.454491744 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T05:38:53Z lane-own минт 6tpfCENhKo
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453215146'}
+      продажа: план 29.213 с, факт -, слот 453215256, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.147451736 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.13 мс, дорогая по капитализации -
+  2026-10-04T09:56:02Z lane-own минт 48Auyz4t4z
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452518128'}
-      продажа: план 28.827 с, факт -, слот 452518239, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.3 SOL, вернулось чисто 0.26805285 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T05:50:40Z lane-own минт GhAP9Tb8RA
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453222295'}
+      продажа: план 28.084 с, факт -, слот 453222400, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.42705365 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.55 мс, дорогая по капитализации -
+  2026-10-04T10:21:44Z lane-own минт 36mewNdQik
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452520776'}
-      продажа: план 29.209 с, факт -, слот 452520882, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.484848113 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
-  2026-10-02T05:52:34Z lane-own минт 739dnZEG4y
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453228062'}
+      продажа: план 30.043 с, факт -, слот 453228234, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.064410063 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 1.848 мс, дорогая по капитализации -
+  2026-10-04T10:39:56Z lane-own минт 4iSjtJhbZx
       круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
       блок: S+-, место против источника -, впереди -, толпа между -
-      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 452521194'}
-      продажа: план 29.209 с, факт -, слот 452521304, через -
-      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.540722855 SOL
-      тень: наша сборка прошла бы -- - (-), маршрут -, сборка -, дорогая по капитализации -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453232168'}
+      продажа: план 28.077 с, факт -, слот 453232270, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.1 SOL, вернулось чисто 0.088423125 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.42 мс, дорогая по капитализации -
+  2026-10-04T10:44:53Z lane-own минт dv5jVbBRn8
+      круги: bloom -, новых соединений -, наша тх в потоке - от решения и - от ответа Bloom
+      блок: S+-, место против источника -, впереди -, толпа между -
+      маршрут: площадка -, шагов -, напрямую - · место в блоке - из - · getBlock не отдался: RuntimeError: getBlock: {'code': -32004, 'message': 'Block not available for slot 453233260'}
+      продажа: план 30.497 с, факт -, слот 453233376, через -
+      итог: по цепи True, продажа подтверждена -, вход 0.5 SOL, вернулось чисто 0.502967826 SOL
+      тень: наша сборка прошла бы -- нет (other_error), маршрут one_hop, сборка 2.773 мс, дорогая по капитализации -
 
 --- позиции --- live {'count': 0, 'open': 0, 'failed_on_chain': 0, 'intent_sol_failed': 0, 'spent_sol': 0}, live-test {'count': 0, 'open': 0, 'failed_on_chain': 0, 'intent_sol_failed': 0, 'spent_sol': 0}, dry-run {'count': 0, 'open': 0, 'failed_on_chain': 0, 'intent_sol_failed': 0, 'spent_sol': 0} (не учитывается)
-  позиция lane-own live/closed минт AS5mTg4AaXukaPtGUopY9u4mbnLEm8L2azbGafp1pump
+  позиция lane-own live/closed минт BmSgTAafbBedu9ccUahU9Hjd42fyWpLxBNr8qUnRsSjT
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись D7zUnKBFzTUeqVkZVWPKRsPBEf5XXUN7u7qGvCBr4gCT3vskCGBRJT7sqxBBM5mBfuYqyZt8RZfbjDcHkgLBfyf, котировка 545587887 лампортов при поле 381911520 (3000 bps, маршрут metis), доля от входа 109.12 %
+      Jupiter: попыток 1, подпись 5rN3cTb46Di2TEnjQTYzWSyAqxr4ZVvmRKPHcRxzcJ9H8DrZ6Tfj3Q7NenpSNaF5pF538JviSWqe7LX9tLjv13kz, котировка 130879391 лампортов при поле 91615573 (3000 bps, маршрут metis), доля от входа 130.88 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 7VertkgF9KLhxxJXHX6uaWuoYZTP9LdGj2bWmVXVpump
+  позиция lane-own live/closed минт 9DdHxVe1BSPaTy3iGEwvWsooRchNLK61XFAvzot59FwD
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 2souLjAeJJGdrJCa7KPq7RCAJjfDGeUpkRmMpxbsyy9tgUijTwe6HRvCT8rWKwGfTFP7wzsPwZBU1D3xv2MgDJck, котировка 415897132 лампортов при поле 291127992 (3000 bps, маршрут metis), доля от входа 138.63 %
+      Jupiter: попыток 1, подпись 4pqinuLuEgeZNKhMzDE6kFyd7miH3AUsZ4yWvToe7StFksZT2Z5YjnNZyNJjWgnw1DmKTbpP3BABfkJHexu87wQL, котировка 95407393 лампортов при поле 66785175 (3000 bps, маршрут metis), доля от входа 95.41 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт GhAP9Tb8RADFhxpAbyz96VFG8vGUzhMaPLMa38DvQFn2
+  позиция lane-own live/closed минт CscZaq5twomhUkvCY8Jdd1tge32L4Yj9FbkFFEZQpump
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 57q5iHWenskNkpqxxi5nQaaSGdHa8WnGPoaAmHkox8sfbik1YXkL2P3p2qwT7tSpQDoNeDVhbASs273ywRiNQHKk, котировка 495810950 лампортов при поле 347067665 (3000 bps, маршрут metis), доля от входа 99.16 %
+      Jupiter: попыток 1, подпись 3DLDAwXcwKh92keJEw8Dz3seELnG5FrCNNt6ykXtuncSV8Qw4WY7bAaTzrQ8sXxvCmcN4pYbukAHjjJ6APpm4ksD, котировка 117555149 лампортов при поле 82288604 (3000 bps, маршрут metis), доля от входа 117.56 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт Dh4EMF5SdYBXX6NGY6q4ByYBHE5odCZ5YxC6Ej9fpump
+  позиция lane-own live/closed минт 7X9YuhfvC9MZV3RBAuZfPj6Ve2zkuosjWhu5oqAGENT
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5mx3kDM7E75bSqK4TurFmkpKHiKTMGAfhCmxquSDuMCUDzqea4bye11i5hHuUbYF6Z2oMqbSfbFketvrYEXUXDLn, котировка 147457382 лампортов при поле 103220167 (3000 bps, маршрут metis), доля от входа 147.46 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 4SKVVMaesazTkmp3WDsGfGASFTR5HPkTF7i6qQiCpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5j43niijcN86EC5fMHZc62D6AKfcyWs9WQ1KJUUufBv3SD8qP2DX8sVGwr5QyfyNzoQcCS9qnKGXQ4eECuauTcHF, котировка 8805536 лампортов при поле 6163875 (3000 bps, маршрут metis), доля от входа 88.06 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт GZnAMJ7DSCa3k4FoNNMCrA4ZZdDDE9DZAEvcef5Ypump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 51tFHjnXWgyowbtXqZ9eNTdHNGpfEiS8fVAeMHG6dsANHJQsiKxuByxuosdhEzwaxcvkEKYaBhZEoWNhmD5JvKHC, котировка 87758328 лампортов при поле 61430829 (3000 bps, маршрут metis), доля от входа 87.76 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт H5mBRtgRA2jkAx4ALbF3cEbhYJJVHYcdYDSjE4wUpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 37QsApBzUhdE1FePcGHCPvRVXec42fyXMmxVhmsrXVJ5LA1RZx5z3rd4svEy5pRFhRfKdkbkvJiyPkG9vn1pE8s7, котировка 79997529 лампортов при поле 55998270 (3000 bps, маршрут metis), доля от входа 80.0 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a
       покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3UwXJ4dcNWC6RxEWrGtBcMqpXu5YANT77Mekt888Q75BQQ8wxU7KXDBA8BwKi6pmq14SFhPwLwKxLRtQQubYByq3, котировка 100980651 лампортов при поле 70686455 (3000 bps, маршрут metis), доля от входа 100.98 %
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 5e1LBhXxc3Y2joSPSz9og4Q9toFunUUG6SMNKhYKd84g
+      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2H7H6TLd9yNmRzZMn6jSXZteWECFyrY3VvTyCeMPocVU2afuojBwFixFYQRuL5XiSheYNxthbCv4h6vVuaNAJQYh, котировка 495608199 лампортов при поле 346925739 (3000 bps, маршрут metis), доля от входа 99.12 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 86Eev7RJLnxzjGqhzbomTyVdoav8GdocewueNR1bpump
+  позиция lane-own live/closed минт 9aqmJjCnnMQv42TXLk921ceUkN35nea2QP969n1caqjj
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 2cmRZbZ1gL7vWAWqVT7sXpYhFBkQbqtxLCYsqc9jFEHr1dkTFn4QGUPGx9aEV1WCpyp4PmfU66pn2Xceco8x3gsX, котировка 79595010 лампортов при поле 55716507 (3000 bps, маршрут metis), доля от входа 79.6 %
+      Jupiter: попыток 1, подпись 5ui73F9cquj3e2hmWd29GTw3iWzGDrdGtLkStBJzNfDTmUFS9ycDyhDh8U7vUzpL1xFtKfZVXypFRtPmKK3DyReC, котировка 101100551 лампортов при поле 70770385 (3000 bps, маршрут metis), доля от входа 101.1 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт DW4BwZuQ6ndEckpS7WnhB3C18SN34PkPn5isbN51pump
-      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3iX39tVGsnFSDyV61e87fJaAW6yPi79TrThzyKbjWJEK8LZogz4cNSU1cSU7FRSUAUrotX8RNKV34YpxabszMa7V, котировка 82981813 лампортов при поле 58087269 (3000 bps, маршрут metis), доля от входа 82.98 %
-      закрыта: продажа полосы подтверждена по цепи
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт FtQtgA7gWuQe6CecNFo6tM8Um25E9qC4aXBZmRF6JZHa
-      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 2tdqfc4SgnYTc55tNkDHDZTr85QVR5BR2cj2udfeaLWVfrzxRwqdrUKyBAn5594i1jziuh76shSCu27qWk9Jh6HX, котировка 96611936 лампортов при поле 67628355 (3000 bps, маршрут metis), доля от входа 96.61 %
-      закрыта: продажа полосы подтверждена по цепи
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 8HJY9GTiEGgPoUAs3YSRiwLUukZKhKcH1ngqLB8qcBxx
+  позиция lane-own live/closed минт 5t9rie78rVLPPQmFxumMbdEyFqS1LgUo9yM3oNcRprG6
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3joqGEzuJE5Ad5WF54SmvZ2Ym8MdSqyLuEFGmDYK4Nppp5NpV6roEfhJvoBq5iqxJYGVq9dc9iniyZEAcAc7iCEX, котировка 552144718 лампортов при поле 386501302 (3000 bps, маршрут metis), доля от входа 110.43 %
+      Jupiter: попыток 1, подпись 4sTfnmvaVGArN5VFY5S2rUBxX13BD74WbdHN8qV6HzyR9odH1FAK4jLhjSN33yL9UfNfEMjVfh62RWvy82kM6Uop, котировка 296027244 лампортов при поле 207219070 (3000 bps, маршрут metis), доля от входа 98.68 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own None/closed минт None
-      покупка: по None None, программа источника None
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 2219, подпись -, котировка None лампортов при поле None (None bps, маршрут None), доля от входа None %, отказ: заказ не дал ни один путь: swap-v2: в ответе нет transaction/requestId: {"swapType": "aggregator", "inAmount": "497409866807", "outAmount": "13729401", "otherAmountThreshold": "9610580", "swapMode": "ExactIn", "slippageBps": 3000, "priceImpactPct": "-0.008239225822041958", "routePlan": [{"percent": 100, "bps": 10000, "usdValue": 1.6252481207063258, "swapInfo": {"ammKey"; ultra: в ответе нет transaction/requestId: {"swapType": "aggregator", "inAmount": "497409866807", "outAmount": "13729401", "otherAmountThreshold": "9610580", "swapMode": "ExactIn", "slippageBps": 3000, "priceImpactPct": "-0.008239225822041958", "routePlan": [{"percent": 100, "bps": 10000, "usdValue": 1.6252481207063258, "swapInfo": {"ammKey"
-      закрыта: продавать нечего: купленное полосой 497409866807, остаток минта 0, порог крошки 1000
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 7cYaQc21w9dzKkGP6LgkqtmL5yzoK5UJE1GeamTRHwny
+  позиция lane-own live/closed минт 2CZJzBoeS17uAQbAdBcrkpEJjPixEcsFvJAhwRV9pump
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 5yERtUNXDurSJixQVQ4rijhb9WkyFDWsEZ5QpA6z9qQW1cZztoCvaTgjwVcKUJVigjbwtQ4eps4eDsNzJnhQ7g2j, котировка 337391206 лампортов при поле 236173844 (3000 bps, маршрут metis), доля от входа 112.46 %
+      Jupiter: попыток 1, подпись 3LC4iMcbMbfiNiATvtghaQq41gJ8axtkKwWqVSUiVjaTntbEhoWs2gVdqBTaUARrMMJj6W4N4Hsq1as8RuoYU8d1, котировка 107806428 лампортов при поле 75464499 (3000 bps, маршрут metis), доля от входа 107.81 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 739dnZEG4yaBWFsY8L8ZwrfhGG6dhtCSercW8Umspump
+  позиция lane-own live/closed минт JCsKWhELRJ8MhEZjUDdCL49mntw8fx27bKAgCMgSGhcQ
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3Z6Hkg1TMq8uugKL7sC6X9LSowbEzYVgJvXiX45vJregfkSx9we1moSSd4pHHLt6MCf624kmrPWEZYykQ5RZx2pg, котировка 540735142 лампортов при поле 378514599 (3000 bps, маршрут metis), доля от входа 108.15 %
+      Jupiter: попыток 1, подпись 4RKyrP2BRNRUx3A3BcYr59Xzi2PNkGoJ9xQkJALXrHGFm93UneJNGqqv1T3KBCmtxQqtHF7QdYehgCBq25thboni, котировка 544433611 лампортов при поле 381103527 (3000 bps, маршрут metis), доля от входа 108.89 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 2mABZ3Dsgk46ZdsbrGTCmobEpEHBcK3oPVJHY5er2QXv
-      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 4TxnS1fyGJJDQYV9M6KQDBFmfjPHKqNEFAVmm5ejfWm9NAtsuNj5kdedRemJAKbXvo4zZ4deAQoAFocQ18ARBSA5, котировка 527851005 лампортов при поле 369495703 (3000 bps, маршрут metis), доля от входа 105.57 %
-      закрыта: продажа полосы подтверждена по цепи
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 6tpfCENhKozjtambBEecWoV1V6trzqNgi1AQHkTqpump
+  позиция lane-own live/closed минт 9ZmkKpVR3NdUcCmG5NByMHBzvjuqGnYpCPYu4zSSBtJv
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 4GDCFWmjXCxWsZPv35MuaUtNm7v2A9kFNSuXfcXs2NLXnGKN8kyme88wc1F8yZBSPASv6rBPeJ5wzeHqEPCdViWq, котировка 268171696 лампортов при поле 187720187 (3000 bps, маршрут metis), доля от входа 89.39 %
+      Jupiter: попыток 1, подпись 4g3zD85oTQU6XfRGQv2WBQ4sSDMiE76YbzZK43a4zFM5qJA6ezvMCbRxdU8tU8aVbopR1SWZTkTS5qrhSkor6xVa, котировка 349747598 лампортов при поле 244823318 (3000 bps, маршрут metis), доля от входа 69.95 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт Cj2CVoXyAN4m9FfAQfJuGeUN33um3vTxSo8zDmLRpump
+  позиция lane-own live/closed минт 6StMkk2nyQHVQq2679zSJ1kxWeq4YMjkphLiGeoUpaid
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3AjE8QdhAxQF7xUFfrKwXU6RS1cHpnwtQ2NrdU27kTb4VRuJwn663RzwnT3NmT6QcCNA1VjXnDNtLF4QoYJJwL3A, котировка 35541961 лампортов при поле 24879372 (3000 bps, маршрут metis), доля от входа 35.54 %
+      Jupiter: попыток 1, подпись 3VqkJp4ACaoxzWHA6hL9paT6UtDFhT7HUdUwy3pBwtUGFtNBqa4UfPfXmcxetFNPa7JRb11uUYUPiVhy7f31btSW, котировка 122759151 лампортов при поле 85931405 (3000 bps, маршрут metis), доля от входа 122.76 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 3VJjpNWzZN1EB4CdhQzhWHyFPNHL7JRGvcDRMU63pump
-      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 4co1xZfcsedTzkqmKnoz2Y2b9gsZeWqpo2UgfH4AvmKpuS395V1WAb4XpzmgSUtaRbvV5RjfQnsb1wEN2tRChBiZ, котировка 113602542 лампортов при поле 79521779 (3000 bps, маршрут metis), доля от входа 113.6 %
-      закрыта: продажа полосы подтверждена по цепи
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 5LnHjZpmYPMzP7fjDtBiNFmNSsBCV5iDpoWuwXdjCx4N
-      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3e6kgUQK4T29xPfdi7os6FqEzfcgi1SXtGTgLN84aVqp8APuV8zewfw1jYeayTyqea6WSRjNeokf3i1wjLbRLh5C, котировка 83741362 лампортов при поле 58618953 (3000 bps, маршрут metis), доля от входа 83.74 %
-      закрыта: продажа полосы подтверждена по цепи
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт GhQYDYJP9F6GUmdS5Cw8fiornq5oLgNii4kJSczjZ67g
+  позиция lane-own live/closed минт AP3NcmQ1yNfBaDTwKSXu1NhsneFpK4Rpavo7zqr91TEY
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 5BQsLu78nuAcWDB2JFaXpuEGYVNGep3WZJumLvwPbaRV49eNL6qm6HEq9PQ9jKyYbH59UmWFxwCcSoqvxmnRqg55, котировка 98204208 лампортов при поле 68742945 (3000 bps, маршрут metis), доля от входа 98.2 %
+      Jupiter: попыток 1, подпись 5LdERi9Cv4FnFWd2VwS4xM99Lg1fErrKGn8LmYKmzJ3B3SC4v674FV6RUrS14BNf7WsZQywjUA8mGKx99fpTBcvE, котировка 106915734 лампортов при поле 74841013 (3000 bps, маршрут metis), доля от входа 106.92 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт EDpWvkguT5GCjAutPtyFWgQi8NqvhKWrZpLFqK3rpump
-      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3KsZBFm8GFBUFiG19Qt8TpiBtqS1BvspoUzeFLu7kyanvFGUPzHDBejLv281Cv87gQEbf8Nivxoj5xpuQCaN9qJ4, котировка 51884853 лампортов при поле 36319397 (3000 bps, маршрут metis), доля от входа 51.88 %
-      закрыта: продажа полосы подтверждена по цепи
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 9quMLTSDn62tn6ofYHR8NowYvkpNkNZpy9yMZEiEdgkS
+  позиция lane-own live/closed минт 4mkNDiEALDutn8Py1GmJnvVuTdHVuL9y6AmcL9KTZx7F
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 36Uf2rXfvqKrzZDmdppYB3QqQWCJoqAjNEkuD8GSaxqkRA5sdzrbw9MVfuPGJCKWn375TdaB7V6S7A8u4nCRHn5f, котировка 72754135 лампортов при поле 50927894 (3000 bps, маршрут metis), доля от входа 72.75 %
+      Jupiter: попыток 1, подпись hFywoVbApTiAwkRomLdkdjqUh83SyV8Es8cCAFf7Z3iLc3ceacEkMgmyyy1W3DYeogXs9iLNzWXKcLdCkuake2B, котировка 516235465 лампортов при поле 361364825 (3000 bps, маршрут metis), доля от входа 103.25 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт DiPky5GshZvHw4BCdaZo3T8ciFCFdm7i3MW9N1K2pump
+  позиция lane-own live/closed минт DPhwYPHWwsfyEgB63bv6Ab8YFaEMW6ypnyJbpbUjJ63G
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2HHnwc8UByhUsgZjs6c9GuzGiEForVtVkggBHwpwq5WCq4AS6JdxNP3qZgP3VTDocNnoyVRfuS3o88rBVknrTbQD, котировка 92675367 лампортов при поле 64872756 (3000 bps, маршрут metis), доля от входа 92.68 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 5KdMFVsopJfFgHrPFsni5gLpbgZXNAc63nKf5ion6zeH
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись bUGK36dddUHVuGb2YPbw5ajzcASs7YLJvR1TooPUBm87sj8jonRQWmEDZxSNMthykhJBXNnRM1NXPnNPmuNmSDa, котировка 88987026 лампортов при поле 62290918 (3000 bps, маршрут metis), доля от входа 88.99 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт EKJQb4Te8jk7BX4fj7P7nNzAyk3LXAQDUy5m6NkvbsH6
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4rU29TP1NpeaVZcumSm6kBm786DLsJXii68j1FvETFoKuj2T5k2ZXEk4FX6RLq961V4CnGBAtQrXn7tb95NtVZ97, котировка 107389499 лампортов при поле 75172649 (3000 bps, маршрут metis), доля от входа 107.39 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 73XcPAwBvE75hGiBLBx4pkrd3uYUPG99ZVe95dAK58ck
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3XEssg3D1FfXWyxhwBvyzAQTyr5r3WBW59Gu2ypN17iTZyoQ2uEX4uvRqBvejLLi5EGyJaJuYq13Q3FfAAAKYNSP, котировка 86510954 лампортов при поле 60557667 (3000 bps, маршрут metis), доля от входа 86.51 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт C3XMbfacf2LcNF114WqMitAR7nRfAF7yLNC7khGXpump
       покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3pPhVBuPMJYYbdxvqoVMTzpeFKz3zwd1Kw6uHKRDUaBUpFWJXwT3n7sAkow9mtxMZLy3vM1XE2xCfLCXELSYhpUx, котировка 77661716 лампортов при поле 54363201 (3000 bps, маршрут metis), доля от входа 77.66 %
+      Jupiter: попыток 1, подпись 2KDZ5TLPdvMPQoTDobiBHeeGE1kqw7SwC8EakTGSTfovosf76qDf9ubUN3WHJGw8UpoXAhLKN3eySxcs3umifKVk, котировка 307315886 лампортов при поле 215121120 (3000 bps, маршрут dflow), доля от входа 61.46 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт Ake2xFaB6A1vtG5CekMapABwDKdEcHQAbsv5Xgtcpump
+  позиция lane-own live/closed минт RD6MFzzsFYA2ZPrxmmQnCwJWqAZorbroszKWgm8pump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3yVJnTrgMqaZYxYRCu1mU96WwzgVa2JTcdLqNXHVfo9DoSpetf16oR8EQUFbCo5DYxqzTZhgkuW6LSogWjrmcNQ4, котировка 99350919 лампортов при поле 69545643 (3000 bps, маршрут metis), доля от входа 99.35 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт V9zCeRU67pBUXYwKz6A7aL1pXCJBXRVhC3NAWhLpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2qZPALKwoTViTGZrG6zTWzGqp7JRb1wgFnbThKsGugsJt2S6TKKQLZSwxqWdFPrWNWSnWsLwPGPHUGF4tRiHoHeQ, котировка 482662968 лампортов при поле 337864077 (3000 bps, маршрут metis), доля от входа 96.53 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 7kd5QBAFWG5ptic67t6msM2LXVbaxNHr3sjsQNyFNhfH
       покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись Nw8oBBZmxb6oQxWRu96xxAXwa448kfLwA8p7pfbyfQiWKrYs5JnXgejr2amn9T2kvKwe7MpwoKaLLfB2PEHwo9x, котировка 66703069 лампортов при поле 46692148 (3000 bps, маршрут metis), доля от входа 66.7 %
+      Jupiter: попыток 1, подпись 2SoEqPNXEhSWAJfmXwdSzGu3K4MTszcatrN78aQ4ywcCyEd6FBdHCEekQTr4S7Pj1xYVN1RCVNGxs6rj9T4jus9L, котировка 493098202 лампортов при поле 345168741 (3000 bps, маршрут dflow), доля от входа 98.62 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 8KhWvQFdfeGa28V5xHmJwR36rVpfjsYukKhRrYF9pump
+  позиция lane-own live/closed минт 9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт ExY678iDsPquXQ6mugQv7HK4LYLWov47pPN4dY97pump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись hYzXRd9HUfTvKfZw5TE8AYq6ta9TmSVEorgjQGKSjckWoS9LHnNbXXA85ixfUtwjcbZT4UkG1ytMnHRkuuFotDN, котировка 165692259 лампортов при поле 115984581 (3000 bps, маршрут metis), доля от входа 165.69 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 9DdHxVe1BSPaTy3iGEwvWsooRchNLK61XFAvzot59FwD
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5D8UgxDHeB2e58YEScVz9EAffeFxGq1YvQUFkEdo3FVhMoQawJvmkGmrqNPo6jeokyH6AKzVGfAtQ1nLPYw1qEdE, котировка 91586054 лампортов при поле 64110237 (3000 bps, маршрут metis), доля от входа 91.59 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт HppB5rMgVsUqua42N2TEDcjwy7gLuAm6dq5qMSLZpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4t7L4SkHQYcvDtxSA6ipy29oNkqks9y7RQzTAK3uHTWEcDg4xjPkb3HtbGgkhhJZeTpi9jEbNpmyk5cszDkFHSNA, котировка 97782707 лампортов при поле 68447894 (3000 bps, маршрут metis), доля от входа 97.78 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт Dhc2ymaZCJipYLuUHKSAAJsaLJUdxt5Bho5N1rNFpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3jNtHz3eNuti3JjfgPJbV2vigGW1iJA4gzrNFprVsevReRiE6wQ5HD7EK7L5kz6c5b6uGdjcgvRAxhut5tEynScp, котировка 470445728 лампортов при поле 329312009 (3000 bps, маршрут metis), доля от входа 94.09 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт BXoHJddsWJLHtAopeiSbKUSELsu8hSFMs8baGMDkpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2xFGQHBg6jt7Pbaoyw3mAK6Zyr6JfrY7oC4VjvEKCjncvT6bD2MQHbvQMBaTBha2LdbWVpwS3NvmNRAxwrQKhUUR, котировка 464474640 лампортов при поле 325132248 (3000 bps, маршрут metis), доля от входа 92.89 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт ATm1DuMTH9f1yteSzQ6c6t9uz85Gqn4T7nfbKyxYm81A
       покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3w9JLoTowgwzmJyo56DuthrHKwjsrWnMEVrsNMAHVYqBhAF4JUaPo2MnkPQCJoXMUnWQJWSsLpUuUX9RLyAHp8CR, котировка 91814375 лампортов при поле 64270062 (3000 bps, маршрут metis), доля от входа 91.81 %
+      Jupiter: попыток 49, подпись -, котировка None лампортов при поле None (None bps, маршрут None), доля от входа None %, отказ: заказ не дал ни один путь: swap-v2: в ответе нет transaction/requestId: {"swapType": "aggregator", "inAmount": "717052125996", "outAmount": "19764448", "otherAmountThreshold": "13835113", "swapMode": "ExactIn", "slippageBps": 3000, "priceImpactPct": "-0.013900071876663806", "routePlan": [{"percent": 100, "bps": 10000, "usdValue": 2.4031432936471657, "swapInfo": {"ammKey; ultra: в ответе нет transaction/requestId: {"swapType": "aggregator", "inAmount": "717052125996", "outAmount": "19764448", "otherAmountThreshold": "13835113", "swapMode": "ExactIn", "slippageBps": 3000, "priceImpactPct": "-0.013900071876663806", "routePlan": [{"percent": 100, "bps": 10000, "usdValue": 2.4031432936471657, "swapInfo": {"ammKey
+      закрыта: продано вне службы: разовый прогон, подпись Btcw51WCgA88…, остаток минта 0 по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 22upB1Sfx6gScNDTbjhfqZAdaiBsoEh9nxwxCgXtpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5uh5yP1y2THFXdX99LjxrVQpxSaDLvQCd9tNDogE3rHLaTmGuYFWVorMntUMfHMABH7dQgq9duYxBGf31c2Xsvsn, котировка 85855833 лампортов при поле 60099083 (3000 bps, маршрут metis), доля от входа 85.86 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт GAwhcphCqCv5bKHmCiN4VDdNWfbXJL4npmkc8L3Q9S9H
+  позиция lane-own live/closed минт 73XcPAwBvE75hGiBLBx4pkrd3uYUPG99ZVe95dAK58ck
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4BWapkFhA7HBkKYU3NtzjmFbNqA9TFBhvXdRCJrB8S1ShWwcyBgkWQ9XNFXF9xBgc8MydVCFe8wXhVA1Ho6TqkKa, котировка 579503282 лампортов при поле 405652297 (3000 bps, маршрут metis), доля от входа 115.9 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 9dSMwFfPezQ8WPcW1uZV7ns4rcviEj2LssSAg75WBLXd
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись JFsNY4GkeqJ2211igmUoDPHPHbqCniKYqGWL2hwvoi6vDDa8Q6AXnAhYCgwpbT8Gm92i9oodbhsWYxjPNm9dPqt, котировка 336442155 лампортов при поле 235509508 (3000 bps, маршрут metis), доля от входа 112.15 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт GZnAMJ7DSCa3k4FoNNMCrA4ZZdDDE9DZAEvcef5Ypump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3eQzB13KzwAe3NyrqvMmvnGo1yoyfaxhDpTDLGrv6T7Vi49kFWGU5pZpgm7BA9R5KzDGp6cNQt6zeLsYiHi8srfh, котировка 10274280 лампортов при поле 7191996 (3000 bps, маршрут metis), доля от входа 102.74 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт BXoHJddsWJLHtAopeiSbKUSELsu8hSFMs8baGMDkpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись RqzeqnLJ951MgCEc68SwAYdh6Wr9tKjyRSe3KUsHZbhATLEBr2VfUBxx5ygXxf8johCbGkdVRAHnA7Nz3Ucvtx8, котировка 467166493 лампортов при поле 327016545 (3000 bps, маршрут metis), доля от входа 93.43 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 7bC8ugu1ZJn21MhA4ht483nX8brLNesa8R7XLimpFyhq
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 35bxSjFCiWRTa4i8Nk5fRpMHRB4pH2HNeBF8Vdew1LkWD5vYXsDi6Mv6iLXghgrABDv6aLYsSBAVhXXzRHbsR7vD, котировка 286040793 лампортов при поле 200228555 (3000 bps, маршрут metis), доля от входа 95.35 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 3ZtY5iuH7BottzL249JoiQYqdSE9mFLikFYieNAHpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3N5xSftgnwoMuCs3oNTYomfRg1oUuu2J6tMrYSmoMphyteJ96vpL9qcj5hv1hiV4uBxpWxBfi7WdX3Hdc17kogG2, котировка 547065390 лампортов при поле 382945773 (3000 bps, маршрут metis), доля от входа 109.41 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 48Auyz4t4zxaxhW2VdQ2zX2fNrKymDoGXMna1ReSpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4iRfVSZK8Gk5rSExif4VCUodbwH5sFKwn4a3H8M4cChq7WguTT3aYmEXyx9yhHcfv2WgRzWn7hoDj7jFrJAPiU5g, котировка 427064304 лампортов при поле 298945012 (3000 bps, маршрут metis), доля от входа 85.41 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт JCsKWhELRJ8MhEZjUDdCL49mntw8fx27bKAgCMgSGhcQ
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 47gECRMqNsStHvYABGAXT59KXoYrXtBWF5WCBP7gWc3Ej7WpfXZeq8ZCKuJUii9qjis81quof17Hhp3zPLXfSGmq, котировка 451682092 лампортов при поле 316177464 (3000 bps, маршрут metis), доля от входа 90.34 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 4DVesAFuFueAc229o1yK1WnbaBEWgjhQJ1a9DkeB78Kn
+      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 6e4T1isSjyzEeoHGz819nzxhiHtDuKYLfBobwuWJHkQX4WJYga83f99T4FHXos6N5yoDUemc9VkQfg7kRNJDf1d, котировка 95205591 лампортов при поле 66643913 (3000 bps, маршрут metis), доля от входа 95.21 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт Geb69EBttATHG9jHZqsZRPJTfoNZRRYNdVciE9KEDD9A
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5VxGkua9RVWDjPEb4fZTC7NsjBmtTRujAViJMvnN1sNwj79LWjXA4UWPFFC3p6mdNK3WgdeYwPrvX45aHZGkLPqA, котировка 104364325 лампортов при поле 73055027 (3000 bps, маршрут metis), доля от входа 104.36 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 7Xgc5RacHtGzfhw2HukUBk5V986yBbvshr7rrCoopump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4XiMbggth7KdaWUq15iRwJsGnEyRyu5oiadNHGF2HBPU6XSBTpba7TqNTJofpqPNkfARdP9wja1HfnZpz2YVKzQP, котировка 478432200 лампортов при поле 334902540 (3000 bps, маршрут metis), доля от входа 95.69 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт ADZKfR5FPW4NnH3p9ZeoT1i2ZjNGiehUuRxTbb7AXwTc
+      покупка: по None None, программа источника cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3ewHFYVtTEDzJRKG2KdXG3MHR87smvB85tMixDGmNcnVrYfrnFoMMMPa83D4vgT5WYgt2LFjB1Uumi3LWxJXwRBy, котировка 545946336 лампортов при поле 382162435 (3000 bps, маршрут metis), доля от входа 109.19 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 9dSMwFfPezQ8WPcW1uZV7ns4rcviEj2LssSAg75WBLXd
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2YAKYTK9dE2ST9nMsbPZBYiJQ88xaqJHqH8UFbXtLZwmkGMK3PcKZ9u7BrKSyuEoqsx27YtYZ1Aa7mXS5w7XZz51, котировка 102494450 лампортов при поле 71746115 (3000 bps, маршрут metis), доля от входа 102.49 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт CpRkPw9M2iMDUozQFvkEeAjGJWucbLCJw3m3vZqdpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись RMJHADEjrqzqb4Fsb6CheGNpGoR7mz5A3oheH1gVV2vYz8LZmXtz5TrPt6oC5KZ5zTzz8fejgT7rAUaLmHAtkTA, котировка 109008652 лампортов при поле 76306056 (3000 bps, маршрут metis), доля от входа 109.01 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 9bsHPggRK5Drw8sR7QBcx5pXrHH7Mc6haLmiR2d7aY2a
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 55kTbpNDoiPjScoKvgCuhyaYUcMZic2mM9fCTukfNKeASJ8K4fd1ZqUCKPnXF5p6cCdc7Xaac9FhNQGNvLF2juK2, котировка 381146910 лампортов при поле 266802836 (3000 bps, маршрут metis), доля от входа 76.23 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 3Dgwn5E7H5a8k6iGrz3qirkaJqUaJrKHEZ2xPcLRpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3TDQgmUsenZw55FfumxH7ioL56fxGTnX7k1ARpzE9bUcNRV5LPwnErj7cXjSgnRoNh1HhiqVYoszN4g3vVm5anwC, котировка 436746197 лампортов при поле 305722337 (3000 bps, маршрут metis), доля от входа 87.35 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 3XBKc5N6ecPdxSBxPRSobzZ4wWiEqtVxVMjYqPeNTrDb
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2hksFxkxZ6PuEYe5HsHcfMWAX74HCF3QnrnjQQPpJJ6g5VHvGGWoRuToRVZXrx6dmo9cPzFQR6auxCCWyU1ynrXJ, котировка 67043418 лампортов при поле 46930392 (3000 bps, маршрут metis), доля от входа 67.04 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 6hTLdzZaaCjmqtn7RtaEMQsCbXT5Pg8q76tRViEGpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2rfMFG7S353x4CBt5PXPA4DjZJQiP3fdiAuf6BnAZM2ijUg7QmKnLCv4eLUhLUbpYeTjmM49k7JcBVKgt5RYpynr, котировка 96316296 лампортов при поле 67421407 (3000 bps, маршрут metis), доля от входа 96.32 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 2SEJhBjWd7rkLRx6rWujKXNGb6W6Nr1DeWAjGiiFZM5W
+      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5MEHdJMRcQgKsLxfYCJD8yooMXnW6pqj2UFdTUnjnzUu7RcbtG29b3CwHRkMrebGG9hmqtZa9vMGV85amsqNu6BS, котировка 569840203 лампортов при поле 398888142 (3000 bps, маршрут metis), доля от входа 113.97 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт BXoHJddsWJLHtAopeiSbKUSELsu8hSFMs8baGMDkpump
       покупка: по None None, программа источника LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3By9VPCkPwZGhYypwiv7BMqiJReYcFRLp2mVpYzoN6vYEphy3puonvx24zJFnVJWSMaQzYdNRbYF9Nqtve56Czk6, котировка 548736891 лампортов при поле 384115823 (3000 bps, маршрут metis), доля от входа 109.75 %
+      Jupiter: попыток 1, подпись 2KKXQoLYbnbWmrV7cW8paBpS4M1j4cjXx8myMFSSEegjVER98acYeeJt49pgzC31bwrNTecRQzBKRVdxZ2MmQAy3, котировка 94669768 лампортов при поле 66268837 (3000 bps, маршрут metis), доля от входа 94.67 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт Bb7jqcShVKxArq45YyZZJ7GMGhdjoJimaHoDpzq8pump
+  позиция lane-own live/closed минт 2CZJzBoeS17uAQbAdBcrkpEJjPixEcsFvJAhwRV9pump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5pgJwz9GGFxshCNYMnp6AWF12gMh2NngJ8KejQDsWQoaphVajkcnWXNb4MVTYrszmUWWtHM7Tz53ozb5864LK82w, котировка 406794658 лампортов при поле 284756260 (3000 bps, маршрут metis), доля от входа 81.36 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт CmSbr2prvnPwaAAMBF2hcqzfwpNQndrNT42PLLsVQzei
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт BffwFrxLQ82QxuHwjb1hLQ3MdSs6YVfDkRa2cyiadH5y
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4UUafwGbBy63jyyL1B1JBX2iMuvN98yBzekyY46vNy986tn3CYReQQe3JfN3whyiXQ8QGjVKcfxJ1bXnp5H7R1BV, котировка 86320584 лампортов при поле 60424408 (3000 bps, маршрут metis), доля от входа 86.32 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт ECQWrZA656cbVpVtJaF96V7k7qVC4cQv7gEeCgSSFUgM
       покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 6anmKB79WynWd4weo22GGxc4iYGhKNPA57K9MbzKzouT
-      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись yS2Ya9aVxktmELUvdyqLumMR9sdKJLmSSG2JBTdCCNkhdAmAjPZJstBhJbSHTKrtDeNHqHsGpNv9ETswVUPBTjK, котировка 47831679 лампортов при поле 33482175 (3000 bps, маршрут metis), доля от входа 47.83 %
+      Jupiter: попыток 1, подпись 3HQaQZ5UaVQtoLFLbwMy1VZWbVkkQuTTTVDChzv2g6CU738eA7qUNYAP6hgfuTvz3dHT37XYQFCEPz7A46kRUSPr, котировка 470438950 лампортов при поле 329307265 (3000 bps, маршрут metis), доля от входа 94.09 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт CNohWHNTurS7PpB55czspwUJfpk9yy92uf1wXdweEGg9
+  позиция lane-own live/closed минт 5tCZsxQR2xpZozGoPqfBNEb1dgwaRzMgvMVbsneW86FJ
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 2aTjJdxH9cc8B7hFCb5g4UUeZCAAfeJo4tKnXpu9ybs3V92Yiu1vxJKXc9WDimRXjT1cGMR99qCo6hBDKDRW3tMs, котировка 454017109 лампортов при поле 317811976 (3000 bps, маршрут metis), доля от входа 90.8 %
+      Jupiter: попыток 1, подпись 659YUavuXMXTUtrpVy9cEx8xScAtAGnxEJtL5ogtYMZ1HH1ZYWczqr3v8M8JZSPZKpmsGVWrDuNjMVEBn7KKiBkY, котировка 103221149 лампортов при поле 72254804 (3000 bps, маршрут metis), доля от входа 103.22 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт bnkdo6gJz4FTLmvRVgtpHCAqUtc23g2ZucwugDp4YT1
+  позиция lane-own live/closed минт BgNZw6VxzYoS6AHjhpv2S54wGUv5MWeANPkoU2KPTM1G
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 3WVgubkKuQ5FKVKMQvRQSfP2kwwQfu2He6v5PxGXZCzPbRKv37jNmFf6bJWpXfbGKk8GprDRPCEwJhQyqBTLL9cJ, котировка 103268765 лампортов при поле 72288135 (3000 bps, маршрут metis), доля от входа 103.27 %
+      Jupiter: попыток 1, подпись 2ZxntBonGxB6tgk7LbCD4otcfGdzQFK6jAAGEcLV9iZt5hAm1nb3YqMooDBeFcCAccnYUnsz1CCV98LzAaE34Zzn, котировка 117634088 лампортов при поле 82343861 (3000 bps, маршрут metis), доля от входа 117.63 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт Aaan4fxwhKtUUPg2GSKq6natLV9oj9QQNf5xT4UE2gXr
+  позиция lane-own live/closed минт MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump
       покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись mphAcW3gxq1k1KLNs5BVewPtBgngdwpssgCw1472eACdyLEvqhg5QB68syRyiduSQPpRHqf2zjmkGZJVQ4oYxud, котировка 313794821 лампортов при поле 219656374 (3000 bps, маршрут metis), доля от входа 104.6 %
+      Jupiter: попыток 1, подпись 3XfKym46gaQrbSB7D3bMqSgjK2nJDcBD9oBTGq7gis6BsHGn6oc2zCCMGTE9wDrjUUfLeWrmQ4P29D8HafacgLGN, котировка 307143675 лампортов при поле 215000572 (3000 bps, маршрут metis), доля от входа 102.38 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт BpRnvNz2UciES46TkMMcKK2KBbh5d4wP2ryDazmDHQo
+  позиция lane-own live/closed минт Geb69EBttATHG9jHZqsZRPJTfoNZRRYNdVciE9KEDD9A
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4iQVikSwcAG5whg2Y6yhp1s311vHAnmA8Ks2Uv7ZuJzVU3AZVNZJrfiS2ssTHkaGYqT5f8t4z89zXgLDpPjFMmRb, котировка 99985056 лампортов при поле 69989539 (3000 bps, маршрут metis), доля от входа 99.99 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 8d7Ru5nJQJvx3pih2cy3ApiCocQaMpe5jWD4ZcJgpump
       покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 420, подпись -, котировка None лампортов при поле None (None bps, маршрут None), доля от входа None %, отказ: заказ не дал ни один путь: swap-v2: в ответе нет transaction/requestId: {"swapType": "aggregator", "inAmount": "484865346455", "outAmount": "13377054", "otherAmountThreshold": "9363937", "swapMode": "ExactIn", "slippageBps": 3000, "priceImpactPct": "-0.014332999556748187", "routePlan": [{"percent": 100, "bps": 10000, "usdValue": 1.5834816613998826, "swapInfo": {"ammKey"; ultra: в ответе нет transaction/requestId: {"swapType": "aggregator", "inAmount": "484865346455", "outAmount": "13377054", "otherAmountThreshold": "9363937", "swapMode": "ExactIn", "slippageBps": 3000, "priceImpactPct": "-0.014361227435692923", "routePlan": [{"percent": 100, "bps": 10000, "usdValue": 1.583436313093985, "swapInfo": {"ammKey":
-      закрыта: продавать нечего: купленное полосой 484865346455, остаток минта 0, порог крошки 1000
-      продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт HXxJdaQbrYRvwTAM8M8mUPyoRPvmyuUbPFBRkiAAMASS
-      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
-      наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 58WS8dVa3MmME5Myenj3YdhgxA87dN1PjaPX23thd3Wh3vPxnMQkWpDFHjEgMvLsikgsAWSaNw49M1MEWARNBd6y, котировка 573625921 лампортов при поле 401538144 (3000 bps, маршрут metis), доля от входа 191.21 %
+      Jupiter: попыток 1, подпись 57XDpYjEHWXE63JaEHgvmfVJxKx3XVu3vccLTG66F1wY1QHF4wgVJMauhDipe522hS93oDKs3NJULcWRahSBHjT4, котировка 66434381 лампортов при поле 46504066 (3000 bps, маршрут metis), доля от входа 66.43 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
-  позиция lane-own live/closed минт 4R81MHPN5QNuJHfB9C7wuNUXaZkcPfGtUHBEnyCy7bH7
+  позиция lane-own live/closed минт 9dSMwFfPezQ8WPcW1uZV7ns4rcviEj2LssSAg75WBLXd
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись LPQKz1CSNVPHwdcssMX3gU94kiXXy29Zf9t7nqXutWdVJaiyE1jp9kkpy5XdnGZZbxbUHJ4yFPYEz6N2n9Zb6Ko, котировка 510931757 лампортов при поле 357652229 (3000 bps, маршрут metis), доля от входа 102.19 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 8oMvxgcBJtDGNSc8kogCEEFxSvvi7x6jHRfSWaiWpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5hgimVpKRaMXs9bab1hJWob6NSXN7NAgunsTnhYJwDv1G26rUq1W1njYACXx9gTBpekkdbMvDBrrv6xLZHyfWZjT, котировка 617039675 лампортов при поле 431927772 (3000 bps, маршрут metis), доля от входа 123.41 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 4FEouBgLRfLFmp7DBB9DFhRjhTKgaZ25CPpoSHcLLwNA
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4p4hn3iVNzT9BLxbs9oufm596eggXH6fCHttZ9FqPn1aUv6XHCAiXdrbPLcWPTt8TFk6LAEMJwWLEagaajWqNktC, котировка 71939311 лампортов при поле 50357517 (3000 bps, маршрут metis), доля от входа 71.94 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт H7TuvDxEKygh27zGfGcjKG8JGWgrbyKpPtvJEpGosfas
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4CaKdPfmf67Vywn6nzmvbhMyyqyvjRjiZuabWLgZCTF3AzQXAvb2HpkscPhaTcv8VwNGawjYvCvp7asDt4Lv4aGQ, котировка 509964746 лампортов при поле 356975322 (3000 bps, маршрут metis), доля от входа 101.99 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 4smeQ1tioyTwEpGskX9Mtu85yeTmE51mrML8atRd1yDQ
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись gebWAVBkQqCpP62DJnEVr17Gw8vvehsKneNa7U1sdGfJQPXBdfterUJJtTXUMA9em7pBYL16NiefcTsB6u2TaLr, котировка 113595032 лампортов при поле 79516522 (3000 bps, маршрут metis), доля от входа 113.6 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт Ed1ZM5GB39Y7VF2gMX8CNmNNjKg9VtuuHxJ1yPRqeUob
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 472tcnipMi4dVEWJhcJ5d383trY3tVFPHLjnTXZ21V3zFQGXh89EyJDeX2P8AhzhrL5sizoHGbMZgsdpgCU6B1qk, котировка 99105003 лампортов при поле 69373502 (3000 bps, маршрут metis), доля от входа 99.11 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 5tCju6YNxHq5zrA6tGndr6F7TK42mpUFmeE31cSFpump
+      покупка: по None None, программа источника LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3JwvMAgiSZWupTGVNXUoXRv9zrqjC6quwUeVTcZ6rd9dPt4jssCMHnD6Z4ysR6giUhJMWsnxAQpi7U32Dni3VhET, котировка 308700461 лампортов при поле 216090322 (3000 bps, маршрут metis), доля от входа 102.9 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт Bf9i7oG8We16XBtgeAnNB9rDBnmCZPW37P7b6a9Hpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись jJ5jwUnBphvCEBncgvELpeyZ2cHvoeEaLHuz8R5aS6Zam9njMHRECjrPdANXw5M34fWaiAfg5q1HxbdiZQSF9BB, котировка 506397659 лампортов при поле 354478361 (3000 bps, маршрут metis), доля от входа 101.28 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 36mewNdQikpBxuNwRtJ82uy3aeuMtyXJBUGtVE2ypump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2KL7huumpoa5TJZjXUrPyooDceZKniiv469dP217aBZZpADXzMc9SkAVxbiqBYF4CNSDUKuPUmvSX2ccFVjAQLJX, котировка 71390702 лампортов при поле 49973491 (3000 bps, маршрут metis), доля от входа 71.39 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт FBGEHacyeX4pNgwSQuzWHY8jkb789mt21P9isriBLVh4
       покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
       наш маршрут: None, хопов None, пул None (прямой: None), метки -
-      Jupiter: попыток 1, подпись 5LT2MtxCPjHRZfNkNgiVHTRtnDqEpR9GDyWCjrnpKTudgQaLQnUAk2nhBEnwwr9CCjUYiELJeUepNTax7yPT9aWw, котировка 58125579 лампортов при поле 40687905 (3000 bps, маршрут metis), доля от входа 58.13 %
+      Jupiter: попыток 1, подпись 2QGppy674Z3rV1JNKdFNExNQEezvPFapo2PtHo6jY2iSNmgGfJ7zx29hJPej5jC7KtW4zctYNGhpG5R7dUansLnn, котировка 191987278 лампортов при поле 134391094 (3000 bps, маршрут metis), доля от входа 191.99 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 6VsnbKz6erJRTPiiD34Msq7eWmmgZHDnh4Bxan4MpGjm
+      покупка: по None None, программа источника cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись cdY4FLXzfkhhfKn2tUynaEsDw9XDKz1PMx8fL53d2VDBuPx6qK3SXVzRN3cDWQx8Esg2n4NPka1rpzMf6Ry6Cuj, котировка 499408972 лампортов при поле 349586280 (3000 bps, маршрут metis), доля от входа 99.88 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 6VsnbKz6erJRTPiiD34Msq7eWmmgZHDnh4Bxan4MpGjm
+      покупка: по None None, программа источника cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 462qQuvyRKaaJZumiPAELmscXT3UHMebtJdnnByED5NxZg13aVpWDHMZg6a2HhWPTxBMBAgaGh6eqAUEGoCSAPEi, котировка 120715729 лампортов при поле 84501010 (3000 bps, маршрут metis), доля от входа 120.72 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 3Dgwn5E7H5a8k6iGrz3qirkaJqUaJrKHEZ2xPcLRpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись T9ZEGe8jLZNVVysitC5PiALmCosgaZqFgpwnMfoWgVD21coffdHVyCTxRtvvmd57nZyR3SgJEykq7uW4c7gvrZn, котировка 252279869 лампортов при поле 176595908 (3000 bps, маршрут metis), доля от входа 84.09 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 4iSjtJhbZx7CFV8Qngb1zvebsy25SzYxnoQAvc6jpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5iMeHSUu8xGJLaz2CGiZqPeeHgEL1LxALJjQbABiWfkfSv2WKN13J1go9UzRa1g95op5y7iBQJZ2GcSypGk4QTih, котировка 87502062 лампортов при поле 61251443 (3000 bps, маршрут metis), доля от входа 87.5 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт Fa1As1BjL8EzhwxjNSi1ynt2kVGiYfpkXxbPVw42pump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4jzxHZq8RnWr6zUSB6XkQqPyRS4vpYaDJ3dxW5mhnQUrYJPqtMJWYMnBsADrqq9FmPNTs3ykaB7HknGzZK9kTqzZ, котировка 99605577 лампортов при поле 69723903 (3000 bps, маршрут metis), доля от входа 99.61 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт EMZGhHQWyu3GF1NnJSVdKzMVGYmtceiH8QZqFw3Gpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3YH9yT6t2SzHzwesfr8nAQVyuUKAVZHUFW598PLABUq56SgUjGqeuqb56yHaR8uGRXoBT5d59BACTMadkYk7uYvA, котировка 93407003 лампортов при поле 65384902 (3000 bps, маршрут metis), доля от входа 93.41 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 3qZj9FZ1UoyCpxoNSrmceHnsnPdDhbxkEj4o1LCVwxsT
+      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 21n23HJn4KqjZbhR2xxRazXnXtUDu8Z3m2EtQbmafXwuDHJJ9AuwAL2KGLB473cPTYnX1NyPRUNnR5H4es2K3Y3f, котировка 92964953 лампортов при поле 65075467 (3000 bps, маршрут metis), доля от входа 92.96 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт FsL7ehQrvNEfLF7E3ua7UQ1qxuwuo3nXJtqNtNbXAQVa
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт dv5jVbBRn88d2gw7MBiiAyjm8u5PxFAYQAWJ9JtSzeC
+      покупка: по None None, программа источника 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5ZBKMxhj2NKkNKJiAFghqC85ZvHosZhvGdNbjy5tchu5WBd1zd1FToREjeCJ8hWMiAMTBZVsmFBCBMDcQcwtuHVg, котировка 501952794 лампортов при поле 351366955 (3000 bps, маршрут metis), доля от входа 100.39 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт CpRkPw9M2iMDUozQFvkEeAjGJWucbLCJw3m3vZqdpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3saSX53QMMSiqJGS2dMyyEWKpLWjoda5usmMxApLpFbfguhu9CV6xXheYiiiHakDcZPoZFZwXC2Wp35xM72Eowdc, котировка 103880192 лампортов при поле 72716134 (3000 bps, маршрут metis), доля от входа 103.88 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт BaJqtEAVs3N8R8L8GGNxpQtqv8qD7DX9Q28Z7QgdZ8Xv
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 4EmbTVomS8YLZn6fHXPi5G96TQtfdZ87e9WwqpjKXQD5fMJrJoEeeiFVAoK1izC8yweB5hYgPayWfzpv4UrjC14Y, котировка 462114495 лампортов при поле 323480146 (3000 bps, маршрут metis), доля от входа 92.42 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт AYLavJzDYKaif3gKVa56u2V7iQpMg8kkQRagLJ4bAote
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 546ArcroDdN199LJy2ESWhxpebW2u85JpsBMyDT2J42w8NDGquhjMUvXEGH4o4SLp8v6iCz7nMPUNoYhEiRLrLbD, котировка 456333682 лампортов при поле 319433577 (3000 bps, маршрут metis), доля от входа 91.27 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт AvmvBcApa9dNrxXxxVneYzxsFxAqzMiHm6DjQVNnpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 5d4cP2u6ZjNMNzW3UrXVUgMNr5EYQ3SEWFUCg5Wao92vz7KprcSb98edSYbS86vtHcr5HpZPYzuhgRbvrqvskjCo, котировка 109124514 лампортов при поле 76387159 (3000 bps, маршрут metis), доля от входа 109.12 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 8hSVNdq8As3etg9H74ZZmyVq8K94xXhTaQ8hrj2qap8K
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 3rkpphsCtsGpRPU4fy87AbaCqbQGL75XX9PY7tvHWxd5YragfQBmqf3zLhaprZTiqAdheDpzDs1br5DaXxxxa1Fd, котировка 93335524 лампортов при поле 65334866 (3000 bps, маршрут metis), доля от входа 93.34 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт 74yJPG3gqQByxMpKauwadXXzYGX71FX4P5AG894wFHWt
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 52r3BuefknazE4sNcaHrkGLxCxoKg1nKWpxLzMqi2GJosdhW18Am5R3ANF2P3W9gSwdKc3qxkvYLkJZCKAwMo2ie, котировка 577411337 лампортов при поле 404187935 (3000 bps, маршрут metis), доля от входа 115.48 %
+      закрыта: продажа полосы подтверждена по цепи
+      продажа: чем пробовали -, попыток 0
+  позиция lane-own live/closed минт fCUBpdeRn76xfRaa4UPHDauGeRG3EvMB3MjuRgdpump
+      покупка: по None None, программа источника pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA
+      наш маршрут: None, хопов None, пул None (прямой: None), метки -
+      Jupiter: попыток 1, подпись 2Bn1nmb4axT79JgxKLkCkEbaJaoKUNhfPxcax4uCZTvFZT86wXdrCEnhmjbXMGnxyMjUHkucGW3STCkesoNTkx2S, котировка 106478124 лампортов при поле 74534686 (3000 bps, маршрут metis), доля от входа 106.48 %
       закрыта: продажа полосы подтверждена по цепи
       продажа: чем пробовали -, попыток 0
 --- место в блоке относительно источника ---
@@ -674,9 +1460,9 @@ qrmn4JzbjddgWH2JcCrg  BATCH-5  452415588       2026-10-01T22:00:42Z 3.6         
 
 --- гейты live на реальных источниках ---
   [ДА ] executor_on_host: mode=live, sent=0, refused=0
-  [НЕТ] reconciliation: signals=156, need=30, missed_buys=0, agreement=1.0
+  [ДА ] reconciliation: signals=211, need=30, missed_buys=0, agreement=1.0
   [НЕТ] balance: balance_sol=0.0, need=2.0
   [НЕТ] test_call_full_circle: live_test_positions=0, still_open=0
 
 --- расход Helius ---
-{"день": "2026-10-02", "осколков": 3, "службы": [{"служба": "bloom_detector", "кредитов": 232957, "бюджет": 2000000, "доля": 0.1165, "группа": null, "потрачено_по_бюджету": 232957, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 44, "бюджет": 30000, "доля": 0.0015, "группа": null, "потрачено_по_бюджету": 44, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 233001, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}
+{"день": "2026-10-04", "осколков": 3, "службы": [{"служба": "bloom_detector", "кредитов": 184276, "бюджет": 2000000, "доля": 0.0921, "группа": null, "потрачено_по_бюджету": 184276, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}, {"служба": "bloom_seller", "кредитов": 14244, "бюджет": 60000, "доля": 0.2374, "группа": null, "потрачено_по_бюджету": 14244, "выше_70": false, "выше_бюджета": false, "останавливать": false, "останов_запрещён_владельцем": true}], "всего_кредитов": 198520, "без_бюджета": [], "выше_70_процентов": [], "выше_бюджета": [], "к_останову": [], "оговорка": "Службы из списка без_бюджета расход тратят, но порога у них нет: владелец его ещё не называл, а выдумывать свой предел за него нельзя. Для служб исполнителя останов по порогу запрещён владельцем прямо: в live детектор важнее кредитов, превышение -- это доклад."}

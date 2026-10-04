@@ -83,7 +83,49 @@ jobs:
           chmod 600 ~/.ssh/vps_key
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
+      # ПОРЯДОК: ВХОД СНАЧАЛА, САМОПРОВЕРКА ПОТОМ. Этот шаг стоял ПОСЛЕ
+      # самопроверки, а самопроверке нужен ровно тот файл, который он
+      # приносит: без data/konveyer/<дата>.json 10 проверок из 111 молча
+      # пропускаются, а молчаливый пропуск здесь нарочно считается
+      # провалом. 04.10 в 10:10Z применитель на этом и упал -- "проверок
+      # 101, ждали 111" -- при живом, успешно собранном файле Code-2 на
+      # claude/podbivka. То есть первый за сутки прогон применителя НЕ МОГ
+      # пройти свою самопроверку никогда: он проходил только если файл
+      # уже лежал в ветке с прошлого раза.
+      - name: "Файл Code-2 за сутки: взять из claude/podbivka"
+        id: vhod
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          D="${{ inputs.data }}"
+          [ -n "$D" ] || D=$(date -u +%Y-%m-%d)
+          echo "дата: $D"
+          echo "data=$D" >> "$GITHUB_OUTPUT"
+          git fetch -q origin claude/podbivka || true
+          mkdir -p data/konveyer
+          if git show "origin/claude/podbivka:data/konveyer/$D.json" > "data/konveyer/$D.json" 2>/dev/null; then
+            echo "est=yes" >> "$GITHUB_OUTPUT"
+            wc -c "data/konveyer/$D.json"
+          else
+            rm -f "data/konveyer/$D.json"
+            echo "est=no" >> "$GITHUB_OUTPUT"
+            CHAS=$(date -u +%H%M)
+            echo "файла Code-2 за $D нет; сейчас ${CHAS}Z"
+            if [ "${{ inputs.storozh }}" != "no" ] && [ "$CHAS" -ge "0830" ]; then
+              echo "сторож: запускаю прогон Code-2 (ветка claude/podbivka)"
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/workflows/run_podbivka2_konveyer.yml/dispatches" \
+                -f ref=claude/podbivka || echo "СТОРОЖ: запустить прогон Code-2 не удалось"
+              echo "STOROZH_PUSTIL=da" >> "$GITHUB_ENV"
+            fi
+          fi
+
       - name: "Самопроверка применителя НА ХОСТЕ (111/111) до любых действий"
+        # ФАЙЛА CODE-2 НЕТ -- ПРИМЕНЯТЬ НЕЧЕГО, И ЭТО НЕ СБОЙ. Остальные
+        # шаги правки уже стоят под этим же условием (est == yes);
+        # самопроверка без файла не может пройти по построению, поэтому
+        # она под тем же условием.
+        if: steps.vhod.outputs.est == 'yes'
         run: |
           set -e
           set -o pipefail
@@ -109,7 +151,20 @@ jobs:
           # должен лежать и он.
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/deploy/checks/pravka_grupp.py" < deploy/checks/pravka_grupp.py
           ssh $SSH_OPTS root@"$HOST" "install -d -m 777 /tmp/konvprim/data/konveyer"
-          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/konveyer/$(date -u +%Y-%m-%d).json" < "data/konveyer/$(date -u +%Y-%m-%d).json" 2>/dev/null || echo "живого файла Code-2 за сегодня в ветке нет -- самопроверка скажет это сама"
+          # ОБРАЗЕЦ CODE-2 -- ПО ИМЕНИ ИЗ МОДУЛЯ, А НЕ ПО СЕГОДНЯШНЕЙ ДАТЕ.
+          # Здесь копировался файл за ТЕКУЩИЕ сутки, а самопроверке нужен
+          # НАЗВАННЫЙ ОБРАЗЕЦ: в модуле стоит FAJL_ZHIVOJ = "2026-10-03.json",
+          # и к нему привязаны замеренные числа ZHDEM_ZHIVOGO (48 рядов,
+          # добавить 1, 47 не того раздела). 03.10 дата и образец совпадали,
+          # поэтому прогон был зелёным; с 04.10 он не мог пройти НИКОГДА --
+          # 10 проверок из 111 молча пропускались ("проверок 101, ждали 111").
+          # Имя берётся ИЗ МОДУЛЯ, чтобы третья копия даты здесь не завелась
+          # снова: поменяет Code-3 образец -- прогон поедет за ним сам.
+          OBRAZEC=$(python3 -c "import re,pathlib; m=re.search(r'^FAJL_ZHIVOJ\s*=\s*\"([^\"]+)\"', pathlib.Path('analysis/c3_konveyer_primenitel.py').read_text(encoding='utf-8'), re.M); print(m.group(1) if m else '')")
+          [ -n "$OBRAZEC" ] || { echo "ОТКАЗ: имени образца Code-2 (FAJL_ZHIVOJ) из модуля не добыто"; exit 1; }
+          [ -s "data/konveyer/$OBRAZEC" ] || { echo "ОТКАЗ: образца data/konveyer/$OBRAZEC нет в ветке -- самопроверка без него не полная"; exit 1; }
+          echo "образец Code-2 для самопроверки: $OBRAZEC"
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/konveyer/$OBRAZEC" < "data/konveyer/$OBRAZEC"
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_2026-09-25_USTAREL_2809.json" < data/sources_2026-09-25_USTAREL_2809.json
           ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konvprim/data/sources_live.json" < data/sources_live.json
           mkdir -p data/konveyer
@@ -156,34 +211,6 @@ jobs:
             echo "DOGON_UCHJOTA=da" >> "$GITHUB_ENV"
           else
             echo "DOGON_UCHJOTA=net" >> "$GITHUB_ENV"
-          fi
-
-      - name: "Файл Code-2 за сутки: взять из claude/podbivka"
-        id: vhod
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          D="${{ inputs.data }}"
-          [ -n "$D" ] || D=$(date -u +%Y-%m-%d)
-          echo "дата: $D"
-          echo "data=$D" >> "$GITHUB_OUTPUT"
-          git fetch -q origin claude/podbivka || true
-          mkdir -p data/konveyer
-          if git show "origin/claude/podbivka:data/konveyer/$D.json" > "data/konveyer/$D.json" 2>/dev/null; then
-            echo "est=yes" >> "$GITHUB_OUTPUT"
-            wc -c "data/konveyer/$D.json"
-          else
-            rm -f "data/konveyer/$D.json"
-            echo "est=no" >> "$GITHUB_OUTPUT"
-            CHAS=$(date -u +%H%M)
-            echo "файла Code-2 за $D нет; сейчас ${CHAS}Z"
-            if [ "${{ inputs.storozh }}" != "no" ] && [ "$CHAS" -ge "0830" ]; then
-              echo "сторож: запускаю прогон Code-2 (ветка claude/podbivka)"
-              gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/workflows/run_podbivka2_konveyer.yml/dispatches" \
-                -f ref=claude/podbivka || echo "СТОРОЖ: запустить прогон Code-2 не удалось"
-              echo "STOROZH_PUSTIL=da" >> "$GITHUB_ENV"
-            fi
           fi
 
       - name: "Живой файл групп с хоста"

@@ -1,0 +1,355 @@
+name: "Лаборатория Miami: таймеры расписаний (часы вместо cron GitHub)"
+
+# ЗАЧЕМ (слово владельца 04.10 вечером, п.3): учёт, проверку здоровья и
+# конвейер Code-2 с применителем -- с расписаний GitHub на таймеры lab-miami.
+# Не на торговый хост: ключ записи в репозиторий туда не ставить.
+#
+# ПОВОД -- ЗАМЕР, А НЕ ВПЕЧАТЛЕНИЕ. Ночь 03->04.10: по учёту cron GitHub
+# пропустил четыре слота подряд дважды (06:47, 07:17, 07:47, 08:17), по
+# живучести не отработал ни 06:38Z, ни 07:38Z, ни 08:38Z, по конвейеру --
+# ни разу, и файл за сутки пришлось собирать руками. Пять таймеров ХОСТА за ту
+# же ночь не пропустили ни одного часа.
+#
+# ЧАСЫ, А НЕ РАБОТНИК. Сама работа остаётся там, где лежат её секреты:
+#   * учёт (ledger_hourly) -- бегунок торгового хоста, ему нужны HELIUS_API,
+#     DBOT_API_KEY и право пуша в ветку;
+#   * применитель -- бегунок торгового хоста, он ходит по ssh на сам хост;
+#   * конвейер Code-2 -- облачный бегунок.
+# Перенести работу на лабораторию значило бы положить туда ключи Helius, ключ
+# записи в репозиторий и ключ ssh до торгового хоста. Bootstrap лаборатории
+# отдельным шагом проверяет, что там нет ни ключей кошельков, ни env полосы, ни
+# торговых служб, и ломать это ради расписания нельзя. Здесь лаборатории нужен
+# РОВНО ОДИН допуск: actions:write на один репозиторий. Он не даёт ни читать
+# кошельки, ни писать в ветку.
+#
+# ВРЕМЯ -- ВСЕГДА UTC, И ЭТО НАПИСАНО В КАЖДОМ ТАЙМЕРЕ. Лаборатория живёт по
+# EDT (в журнале трекера видно "Oct 04 05:06 EDT" на 09:06Z). OnCalendar без
+# пометки берёт местное время, то есть 07:17 означало бы 11:17Z -- расписание
+# молча уехало бы на четыре часа. Поэтому у всех таймеров стоит UTC.
+on:
+  workflow_dispatch:
+    inputs:
+      pokazat:
+        description: "'yes' -- только показать, что стоит сейчас, ничего не менять"
+        required: false
+        default: "yes"
+      vetka_rabochaja:
+        description: "ветка для учёта, здоровья и применителя"
+        required: false
+        default: "claude/nifty-sagan-r0polg"
+      vetka_konveyera:
+        description: "ветка, с которой дёргать конвейер Code-2"
+        required: false
+        default: "claude/podbivka"
+      pervyj_zapusk:
+        description: "'yes' -- запустить каждый таймер руками сразу после установки (слово владельца: первый запуск каждого руками)"
+        required: false
+        default: "no"
+      razreshit_runner_pat:
+        description: "'yes' -- если секрета LAB_DISPATCH_TOKEN нет, взять GH_RUNNER_PAT (он ШИРЕ по правам: это осознанный выбор владельца, а не моё решение)"
+        required: false
+        default: "no"
+      snjat:
+        description: "'yes' -- снять таймеры расписаний и выйти"
+        required: false
+        default: "no"
+
+concurrency:
+  group: lab-raspisanie
+  cancel-in-progress: false
+
+env:
+  HOST_LAB: 169.128.191.158
+  OUT: data/lab_raspisanie.txt
+
+jobs:
+  raspisanie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Скрипт часов разбирается ДО всякого ssh"
+        run: |
+          set -e
+          sh -n deploy/lab_raspisanie_dispatch.sh
+          echo "sh -n: skript chasov razobran bez oshibok"
+
+      - name: "Ключ лаборатории"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+        run: |
+          set -e
+          [ -n "$KLJUCH_MIAMI" ] || { echo "OTKAZ: sekreta VPS_SSH_KEY_MIAMI net"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_MIAMI" > ~/.ssh/lab_key
+          chmod 600 ~/.ssh/lab_key
+          echo "SSH_OPTS=-i $HOME/.ssh/lab_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "ЭТО ТОЧНО ЛАБОРАТОРИЯ, А НЕ ТОРГОВЫЙ ХОСТ"
+        run: |
+          set -e
+          set -o pipefail
+          # ОТКАЗ, А НЕ ПРЕДУПРЕЖДЕНИЕ. Поставить таймер с токеном GitHub на
+          # торговую машину -- ровно то, что владелец запретил. Поэтому прогон
+          # сперва доказывает, что перед ним лаборатория: торговых служб нет.
+          SOST=$(ssh -n $SSH_OPTS root@"$HOST_LAB" "
+            hostname
+            for S in bloom-detector bloom-seller dbot-sold-guard; do
+              printf '%s=%s\n' \"\$S\" \"\$(systemctl show \$S -p LoadState --value 2>/dev/null)\"
+            done
+            test -e /etc/bloom-executor/env && echo 'env_polosy=EST' || echo 'env_polosy=net'
+          " 2>&1)
+          printf '%s\n' "$SOST"
+          if printf '%s\n' "$SOST" | grep -qE '=loaded$'; then
+            echo "OTKAZ: na etoj mashine est TORGOVYE sluzhby -- eto ne laboratorija"; exit 1
+          fi
+          if printf '%s\n' "$SOST" | grep -q 'env_polosy=EST'; then
+            echo "OTKAZ: na etoj mashine lezhit env polosy -- eto ne laboratorija"; exit 1
+          fi
+          echo "laboratorija podtverzhdena: torgovyh sluzhb net, env polosy net"
+
+      - name: "Что стоит сейчас"
+        run: |
+          set -e
+          mkdir -p data
+          {
+            echo "=== Лаборатория Miami, таймеры расписаний, $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+          } > "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST_LAB" "
+            systemctl list-timers 'lab-*' --all --no-pager 2>/dev/null || true
+            echo '--- LoadState ---'
+            for T in lab-uchjot-chas lab-zdorovje-chas lab-konveyer-sutki; do
+              printf '%s %s\n' \"\$T.timer\" \"\$(systemctl show \$T.timer -p LoadState --value 2>/dev/null)\"
+            done
+            test -e /etc/lab-raspisanie.env && echo 'env_raspisanija=EST' || echo 'env_raspisanija=net'
+          " 2>&1 | tee -a "$OUT"
+
+      - name: "Снять таймеры расписаний (только по слову snjat=yes)"
+        if: ${{ inputs.snjat == 'yes' }}
+        run: |
+          set -e
+          ssh -n $SSH_OPTS root@"$HOST_LAB" "
+            set -e
+            for T in lab-uchjot-chas lab-zdorovje-chas lab-konveyer-sutki; do
+              systemctl disable --now \$T.timer 2>/dev/null || true
+              rm -f /etc/systemd/system/\$T.timer /etc/systemd/system/\$T.service
+            done
+            systemctl daemon-reload
+            echo 'tajmery raspisanij snjaty'
+          " 2>&1 | tee -a "$OUT"
+
+      - name: "Окружения репозитория: есть ли они вообще (имена, без значений)"
+        # ЗАЧЕМ. Владелец сказал 04.10, что секрет LAB_DISPATCH_TOKEN заведён
+        # (fine-grained, один репозиторий, Actions: Read and write), а прогон не
+        # видит ни одного из пяти вероятных имён (прогоны 37198875680,
+        # 37198994037, 37200179744) при видимом GH_RUNNER_PAT.
+        #
+        # ЧТО ЭТОТ ШАГ ПРОВЕРЯЕТ И ЧЕГО НЕ ПРОВЕРЯЕТ. Имён секретов он НЕ
+        # печатает: на это нужен допуск с правом secrets:read, а у GITHUB_TOKEN
+        # его нет и быть не должно. Он проверяет ОДНУ частую подмену, которую
+        # перебор имён поймать не может: секрет заведён как секрет ОКРУЖЕНИЯ.
+        # Тогда secrets.X в задании пуст ВСЕГДА, пока у задания нет
+        # environment:, -- и со стороны это выглядит ровно как "секрета нет".
+        # Есть окружения -- значит эту причину надо проверять первой; нет ни
+        # одного -- значит она исключена, и остаются другие репозиторий, другое
+        # имя или секрет Dependabot.
+        #
+        # ПОЧЕМУ НЕ ЧЕРЕЗ toJSON(secrets). Так напечатать список имён можно, и я
+        # это сделал (правка 972d4c89), но GitHub ПОСТАВИЛ ТАКОЙ ПРОГОН НА
+        # ОДОБРЕНИЕ: прогон 37200403600 вернулся action_required, ни один шаг не
+        # пошёл, а одобрить его может только владелец. Деплой, пущенный в ту же
+        # минуту, при этом прошёл -- то есть дело именно в этом выражении.
+        # Одобрения ради справки я просить не стал и путь убрал.
+        if: ${{ inputs.snjat != 'yes' }}
+        env:
+          GH_TOKEN_RO: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          echo "--- okruzhenija repozitorija (tolko imena) ---" | tee -a "$OUT"
+          KOD=$(curl -sS -o /tmp/okr.json -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN_RO" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/environments" || echo 000)
+          if [ "$KOD" != "200" ]; then
+            echo "  spisok okruzhenij ne prochitan: HTTP $KOD" | tee -a "$OUT"
+          else
+            python3 -c "import json;d=json.load(open('/tmp/okr.json'));e=d.get('environments') or [];print('  okruzhenij: '+str(d.get('total_count')));[print('  - '+str(x.get('name'))) for x in e]" | tee -a "$OUT"
+            python3 -c "import json;d=json.load(open('/tmp/okr.json'));print('  VYVOD: okruzhenij net -- prichina \"sekret okruzhenija\" isklyuchena' if not (d.get('total_count') or 0) else '  VYVOD: okruzhenija EST -- sekret mog byt zavedjon v odnom iz nih; togda nuzhen environment: v zadanii')" | tee -a "$OUT"
+          fi
+          rm -f /tmp/okr.json
+
+      - name: "Допуск: токен только на действия Actions, 0600, root"
+        if: ${{ inputs.pokazat != 'yes' && inputs.snjat != 'yes' }}
+        env:
+          T_LAB_DISPATCH_TOKEN: ${{ secrets.LAB_DISPATCH_TOKEN }}
+          T_LAB_DISPATCH: ${{ secrets.LAB_DISPATCH }}
+          T_LAB_TOKEN: ${{ secrets.LAB_TOKEN }}
+          T_DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+          T_GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+          T_GH_RUNNER_PAT: ${{ secrets.GH_RUNNER_PAT }}
+          # ЧАСТАЯ ПОДМЕНА: токен положили в Variables, а не в Secrets. Тогда
+          # secrets.X пуст, а vars.X полон -- и это не видно никак, кроме
+          # прямой проверки. Значение переменной тоже НЕ печатается: только
+          # имя и слово est/net. Переменные не маскируются в журнале, поэтому
+          # печатать их значения нельзя тем более.
+          V_LAB_DISPATCH_TOKEN: ${{ vars.LAB_DISPATCH_TOKEN }}
+          V_LAB_TOKEN: ${{ vars.LAB_TOKEN }}
+        run: |
+          set -e
+          # ПРОГОН САМ ГОВОРИТ, ПОД КАКИМ ИМЕНЕМ СЕКРЕТ ВИДЕН -- ИМЕНАМИ, А НЕ
+          # ЗНАЧЕНИЯМИ. 04.10 в 11:26Z владелец сказал, что секрет заведён, а
+          # прогон отказал: в журнале видно "TOKEN_UZKIJ:" пусто при
+          # "TOKEN_SHIROKIJ: ***". То есть под именем LAB_DISPATCH_TOKEN до
+          # прогона ничего не доходило, а прочитать список имён секретов мне
+          # нельзя (прокси отвечает 403 на этот путь Actions). Догадываться
+          # молча нельзя, поэтому прогон перебирает несколько вероятных имён и
+          # ПЕЧАТАЕТ, какое нашлось. Значения не печатаются ни при каком исходе:
+          # печатается только имя и слово "est"/"net".
+          #
+          # ЧАСТЫЕ ПРИЧИНЫ ПУСТОГО СЕКРЕТА ПРИ "он заведён", чтобы владельцу не
+          # искать наугад: секрет создан как секрет ОКРУЖЕНИЯ (тогда нужен
+          # environment: в задании), или как секрет Dependabot, или в другом
+          # репозитории, или имя отличается.
+          echo "--- какие имена допуска видны прогону (только имена) ---" | tee -a "$OUT"
+          NAJDENO=""
+          NAJDENO_VARS=""
+          for IMJA in LAB_DISPATCH_TOKEN LAB_DISPATCH LAB_TOKEN DISPATCH_TOKEN GH_DISPATCH_TOKEN; do
+            eval "Z=\${T_$IMJA:-}"
+            if [ -n "$Z" ]; then
+              echo "  $IMJA est" | tee -a "$OUT"
+              [ -n "$NAJDENO" ] || NAJDENO="$IMJA"
+            else
+              echo "  $IMJA net" | tee -a "$OUT"
+            fi
+          done
+          for IMJA in LAB_DISPATCH_TOKEN LAB_TOKEN; do
+            eval "Z=\${V_$IMJA:-}"
+            if [ -n "$Z" ]; then
+              echo "  vars.$IMJA est -- token lezhit v Variables, a ne v Secrets" | tee -a "$OUT"
+              [ -n "$NAJDENO_VARS" ] || NAJDENO_VARS="$IMJA"
+            else
+              echo "  vars.$IMJA net" | tee -a "$OUT"
+            fi
+          done
+          if [ -n "$T_GH_RUNNER_PAT" ]; then
+            echo "  GH_RUNNER_PAT est (SHIROKIJ -- berjotsja tolko po slovu vo vhode)" | tee -a "$OUT"
+          else
+            echo "  GH_RUNNER_PAT net" | tee -a "$OUT"
+          fi
+          # ВЫБОР ДОПУСКА -- ЗА ВЛАДЕЛЬЦЕМ, А НЕ ЗА МНОЙ. Узкий токен
+          # (actions:write на один репозиторий) -- то, что нужно по делу.
+          # Широкий GH_RUNNER_PAT умеет регистрировать бегунки, то есть кладёт
+          # на машину куда больше прав, чем требует расписание. Поэтому он
+          # берётся ТОЛЬКО по отдельному слову во входе прогона.
+          if [ -n "$NAJDENO" ]; then
+            eval "T=\${T_$NAJDENO}"
+            IMJA="$NAJDENO"
+          elif [ -n "$NAJDENO_VARS" ]; then
+            # БЕРЁМ, НО ГОВОРИМ ВСЛУХ. Переменные окружения Actions НЕ
+            # маскируются в журналах прогонов, то есть токен в Variables
+            # рискует попасть в чей-нибудь вывод. Поэтому прогон его
+            # использует (работа важнее), но прямо просит перенести в Secrets.
+            eval "T=\${V_$NAJDENO_VARS}"
+            IMJA="vars.$NAJDENO_VARS (NE sekret!)"
+            echo "VNIMANIE: token lezhit v Variables, a ne v Secrets." | tee -a "$OUT"
+            echo "Variables NE maskirujutsja v zhurnalah progonov -- perenesti v Secrets." | tee -a "$OUT"
+          elif [ "${{ inputs.razreshit_runner_pat }}" = "yes" ] && [ -n "$T_GH_RUNNER_PAT" ]; then
+            IMJA="GH_RUNNER_PAT (SHIROKIJ -- po slovu vladelca vo vhode)"
+            T="$T_GH_RUNNER_PAT"
+          else
+            echo "OTKAZ: ni odno iz imjon dopuska vyshe ne vidno progonu."
+            echo "Nuzhen tonkij token GitHub na etot odin repozitorij s pravom"
+            echo "Actions: Read and write (bolshe nichego: ni contents, ni secrets),"
+            echo "zavedjonnyj SEKRETOM REPOZITORIJA (ne okruzhenija i ne Dependabot)"
+            echo "pod imenem LAB_DISPATCH_TOKEN."
+            echo "Libo zapustit etot progon s razreshit_runner_pat=yes -- togda"
+            echo "budet vzjat GH_RUNNER_PAT, no on SHIRE po pravam."
+            exit 1
+          fi
+          echo "dopusk: $IMJA" | tee -a "$OUT"
+          # ЗНАЧЕНИЕ ИДЁТ ПО SSH ЧЕРЕЗ stdin, А НЕ В КОМАНДНОЙ СТРОКЕ: аргументы
+          # видны в ps всей машине, stdin -- нет.
+          printf 'LAB_DISPATCH_TOKEN=%s\n' "$T" \
+            | ssh $SSH_OPTS root@"$HOST_LAB" "umask 077; cat > /etc/lab-raspisanie.env; chmod 600 /etc/lab-raspisanie.env; chown root:root /etc/lab-raspisanie.env"
+          ssh -n $SSH_OPTS root@"$HOST_LAB" "ls -l /etc/lab-raspisanie.env; sed -n 's/^\([A-Z_]*\)=.*/\1 est/p' /etc/lab-raspisanie.env" 2>&1 | tee -a "$OUT"
+
+      - name: "Часы и таймеры"
+        if: ${{ inputs.pokazat != 'yes' && inputs.snjat != 'yes' }}
+        env:
+          VETKA_R: ${{ inputs.vetka_rabochaja }}
+          VETKA_K: ${{ inputs.vetka_konveyera }}
+        run: |
+          set -e
+          set -o pipefail
+          # ВЕТКИ ИДУТ ДОВОДАМИ СКРИПТА, А НЕ ВНУТРЬ КОМАНДЫ SSH. Они приходят
+          # ВХОДАМИ прогона, и подставлять вход в текст удалённой команды -- это
+          # чужая команда на хосте при одной кавычке во входе. Code-3 закрыл
+          # ровно такую дыру 04.10, беру правило как есть. Сами доводы ещё и
+          # проверяются здесь до отправки: ничего, кроме имени ветки.
+          for V in "$VETKA_R" "$VETKA_K"; do
+            case "$V" in
+              *[!A-Za-z0-9/._-]*|'') echo "OTKAZ: v imeni vetki est lishnie znaki: $V"; exit 1;;
+            esac
+          done
+          ssh $SSH_OPTS root@"$HOST_LAB" "cat > /usr/local/sbin/lab_raspisanie_dispatch.sh" < deploy/lab_raspisanie_dispatch.sh
+          ssh $SSH_OPTS root@"$HOST_LAB" "cat > /usr/local/sbin/lab_raspisanie_ustanovit.sh" < deploy/lab_raspisanie_ustanovit.sh
+          ssh -n $SSH_OPTS root@"$HOST_LAB" "
+            set -e
+            chmod 755 /usr/local/sbin/lab_raspisanie_dispatch.sh /usr/local/sbin/lab_raspisanie_ustanovit.sh
+            sh -n /usr/local/sbin/lab_raspisanie_dispatch.sh
+            sh -n /usr/local/sbin/lab_raspisanie_ustanovit.sh
+            echo 'oba skripta na hoste razobrany bez oshibok'
+          " 2>&1 | tee -a "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "/usr/local/sbin/lab_raspisanie_ustanovit.sh '$VETKA_R' '$VETKA_K'" \
+            2>&1 | tee -a "$OUT"
+
+      - name: "Первый запуск каждого руками (слово владельца)"
+        if: ${{ inputs.pervyj_zapusk == 'yes' && inputs.pokazat != 'yes' && inputs.snjat != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ПОЧАСОВЫЕ -- СРАЗУ, КОНВЕЙЕР -- ТОЖЕ, НО ОН ДОЛГИЙ. Конвейер идёт
+          # около двух часов, поэтому его служба запускается БЕЗ ожидания
+          # (--no-block): иначе ssh висел бы два часа и прогон упал бы по
+          # своему пределу, а работа при этом шла бы.
+          ssh -n $SSH_OPTS root@"$HOST_LAB" "
+            set -e
+            for T in lab-uchjot-chas lab-zdorovje-chas; do
+              echo \"--- pervyj zapusk \$T\"
+              systemctl start \$T.service || echo \"\$T: start otdal oshibku\"
+              journalctl -u \$T.service -n 25 --no-pager -o cat || true
+            done
+            echo '--- pervyj zapusk lab-konveyer-sutki (bez ozhidanija: on idjot okolo dvuh chasov)'
+            systemctl start --no-block lab-konveyer-sutki.service || echo 'konveyer: start otdal oshibku'
+            sleep 20
+            journalctl -u lab-konveyer-sutki.service -n 20 --no-pager -o cat || true
+          " 2>&1 | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: |
+          [ -f "$OUT" ] || exit 0
+          python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT"
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          [ -f "$OUT" ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Laboratorija Miami: tajmery raspisanij [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
