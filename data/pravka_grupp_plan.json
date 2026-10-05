@@ -1,11 +1,67 @@
 {
- "zachem": "Слово владельца 05.10 (дополнение к правилу продажи), п.4: krug_001 выключить (lane_trades=false) -- круг своей продажи больше не нужен. Правило 4 новой редакции снимает дверь «обкатано» с пути ПРОДАЖИ (п.6 того же слова), то есть первая продажа нового типа своим путём больше не требует отдельной группы с билетом 0.01.",
- "chto_ne_menyaetsya": "У krug_001 всё остальное остаётся как стоит: lane_sol и lane_size 0.01, per_day 3, lane_open_max 1, sell_own_first 1, min_target_sol 2.0, 11 типов пулов, адрес 5YRgrP3m. Группа не удаляется и адрес никуда не переносится -- снимается только признак торговли полосой. Другие группы и env не трогаются вовсе.",
+ "zachem": "Слово владельца 05.10, п.1: гибкий билет «2 % резерва пула» для шести групп. Билет = 2 % резерва SOL-стороны пула на момент входа, потолок 2.0 SOL, пол -- нынешний билет группы (lane_size). Резерв берётся из того, что сборщик уже знает (сделка источника / шаблон пула), новых чтений сети на горячем пути нет; резерва нет -- обычный билет группы, покупка не ждёт.",
+ "chto_ne_menyaetsya": "lane_size и lane_sol НЕ правятся ни у одной группы: подъём идёт поверх пола, спора размера (01.10) быть не может. Не трогаются cand1_03 (0.5), konveyer (0.1), leader (0.01), sniper_src и krug_001 (выключены), cand1_05, kandidaty, off, log_only. Порог входа (min_target_sol) и lane_open_max -- без изменений. env этим прогоном не трогается вовсе.",
+ "pole_dolyi": "bilet_dolya -- доля резерва; bilet_potolok_sol -- свой потолок группы, он может потолок только ОПУСТИТЬ ниже кода (ПОТОЛОК_ПОДЪЁМА_SOL = 2.0), поэтому 2.0 здесь совпадает с кодом и записан ради видимости в файле.",
  "pravki": [
   {
-   "gruppa": "krug_001",
-   "pole": "lane_trades",
-   "znachenie": "0"
+   "gruppa": "cand1",
+   "pole": "bilet_dolya",
+   "znachenie": "0.02"
+  },
+  {
+   "gruppa": "cand1",
+   "pole": "bilet_potolok_sol",
+   "znachenie": "2.0"
+  },
+  {
+   "gruppa": "cand2",
+   "pole": "bilet_dolya",
+   "znachenie": "0.02"
+  },
+  {
+   "gruppa": "cand2",
+   "pole": "bilet_potolok_sol",
+   "znachenie": "2.0"
+  },
+  {
+   "gruppa": "cand3",
+   "pole": "bilet_dolya",
+   "znachenie": "0.02"
+  },
+  {
+   "gruppa": "cand3",
+   "pole": "bilet_potolok_sol",
+   "znachenie": "2.0"
+  },
+  {
+   "gruppa": "cand2_03",
+   "pole": "bilet_dolya",
+   "znachenie": "0.02"
+  },
+  {
+   "gruppa": "cand2_03",
+   "pole": "bilet_potolok_sol",
+   "znachenie": "2.0"
+  },
+  {
+   "gruppa": "batch5",
+   "pole": "bilet_dolya",
+   "znachenie": "0.02"
+  },
+  {
+   "gruppa": "batch5",
+   "pole": "bilet_potolok_sol",
+   "znachenie": "2.0"
+  },
+  {
+   "gruppa": "lane_s0",
+   "pole": "bilet_dolya",
+   "znachenie": "0.02"
+  },
+  {
+   "gruppa": "lane_s0",
+   "pole": "bilet_potolok_sol",
+   "znachenie": "2.0"
   }
  ]
 }
