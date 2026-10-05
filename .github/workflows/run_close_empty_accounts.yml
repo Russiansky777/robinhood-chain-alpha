@@ -42,6 +42,14 @@ on:
         description: "'yes' -- разрешить без стоящего рубильника KILL (по умолчанию нельзя)"
         required: false
         default: "no"
+      min_age_s:
+        description: "окно молодости в секундах (0 -- по политикам групп: max(hold_slots)*0.4 + 600)"
+        required: false
+        default: "0"
+      po_mintam:
+        description: "'yes' -- ПОШТУЧНОЕ правило (слово владельца 05.10): без общего окна, но только минты без открытой/зависшей позиции и без нашей сделки за 10 мин"
+        required: false
+        default: "no"
 
 concurrency:
   group: close-empty-accounts
@@ -110,6 +118,10 @@ jobs:
           if [ "${{ inputs.while_trading }}" = "yes" ]; then TRADING="CLOSE_ACCOUNTS_WHILE_TRADING=1"; fi
           FIRST=""
           if [ "${{ inputs.first_one }}" = "yes" ]; then FIRST="--first-one"; fi
+          # ПОШТУЧНОЕ ПРАВИЛО -- ОТДЕЛЬНЫМ ВХОДОМ, А НЕ ВМЕСТО ОКНА. Старый путь
+          # (общее окно) остаётся по умолчанию: его и зовёт прежняя оснастка.
+          POMINTAM=""
+          if [ "${{ inputs.po_mintam }}" = "yes" ]; then POMINTAM="--po-mintam"; fi
           # Кошелёк: полоса берётся из окружения службы (OWN_SEND_WALLET),
           # исполнитель -- по умолчанию в самом модуле.
           WALLET_ARG=""
@@ -127,7 +139,8 @@ jobs:
               $LIVE $TRADING \
               PYTHONPATH=$CODE_DIR \
               /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py \
-                $WALLET_ARG $FIRST \
+                $WALLET_ARG $FIRST $POMINTAM \
+                --min-age-s '${{ inputs.min_age_s }}' \
                 --batch '${{ inputs.batch }}' \
                 --max-batches '${{ inputs.max_batches }}' \
                 --out /tmp/close_accounts_plan.json \
