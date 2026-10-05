@@ -1,0 +1,413 @@
+{
+ "zachem": "Ответ на вопрос владельца «почему полоса ни разу не купила за USDC» ЧИСЛАМИ ИЗ ЖУРНАЛА РЕШЕНИЙ, а не рассуждением. Выборка: все строки полосы с признаком lane_route_offered (второй маршрут предложен, то есть котировка пула НЕ SOL), включая ротированные журналы.",
+ "vyborka": {
+  "progon": "run_vps_journal_grep_nl.yml 37245744047",
+  "obrazec": "lane_route_offered",
+  "rotirovannye": true,
+  "ot": "2026-09-27T14:01:18Z",
+  "do": "2026-10-04T23:37:18Z",
+  "zapisej": 344,
+  "predel": 400,
+  "usecheno": false
+ },
+ "glavnoe": [
+  "За 8 суток журнала -- 344 сигнала полосы с котировкой пула НЕ SOL.",
+  "Ни в одном из них котировкой пула не был USDC: отказ ноги звучит «котировка пула не EPjFWdd5: стороны пула <котировка>/<база>», и этот отказ по коду c3_usdc_noga_signaly:410 выдаётся только когда НИ ОДНА сторона пула не USDC.",
+  "Единственная строка за 8 суток, где USDC вообще упомянут как котировка, -- 01.10 15:30:16Z, и там отказ был другой: «USDC-нога выключена флагом».",
+  "Отказа «неоднозначная котировка» (то, что починил 802ba1715) в журнале нет ни одного: та правка верна, но населения в этом окне у неё нет.",
+  "За последние сутки полосы (с 04.10 22:00Z) все 33 таких сигнала ДОШЛИ до строителя USDC-ноги (stage usdc_signaly_build) -- гейт их больше не режет."
+ ],
+ "prichiny_nogi_za_8_sutok": {
+  "тип пула не в таблице USDC-ноги: <адрес>": 117,
+  "(нога не звалась)": 102,
+  "USDC-нога выключена флагом BLOOM_USDC_NOGA": 74,
+  "котировка пула не <адрес>: стороны пула <адрес>/<адрес>": 46,
+  "тип пула не в таблице USDC-ноги сигнальных типов: <адрес>": 5
+ },
+ "kotirovki_pulov": [
+  {
+   "adres_8": "Xs3oZwbH",
+   "raz": 12,
+   "imja": "SPCXx (SpaceX xStock)"
+  },
+  {
+   "adres_8": "pumpCmXq",
+   "raz": 6,
+   "imja": "PUMP"
+  },
+  {
+   "adres_8": "DEW9dSN6",
+   "raz": 4,
+   "imja": "SI (Super Inu)"
+  },
+  {
+   "adres_8": "A7bdiYdS",
+   "raz": 3,
+   "imja": "ZEC (Zcash)"
+  },
+  {
+   "adres_8": "GoLDppdj",
+   "raz": 2,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "METAewgx",
+   "raz": 2,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "CARDSccU",
+   "raz": 2,
+   "imja": "CARDS (Collector Crypt)"
+  },
+  {
+   "adres_8": "DJTu7vi8",
+   "raz": 2,
+   "imja": "DJT"
+  },
+  {
+   "adres_8": "XsqE9cRR",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "BmBcQotT",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "JUPyiwrY",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "6GmAFSYs",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "PEPEqnuu",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "Pren1FvF",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "4Zp52aF4",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "7ga6rtE9",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "7VertkgF",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "Dz9mQ9Nz",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "GbbesPba",
+   "raz": 1,
+   "imja": "имени в наших данных нет"
+  },
+  {
+   "adres_8": "PFER6ENq",
+   "raz": 1,
+   "imja": "PFE (Pfizer, Backpack Securities)"
+  },
+  {
+   "adres_8": "Xsc9qvGR",
+   "raz": 1,
+   "imja": "NVDAx (NVIDIA xStock)"
+  }
+ ],
+ "za_poslednie_sutki": {
+  "signalov": 33,
+  "po_etapam": {
+   "usdc_signaly_build": 33
+  },
+  "noga_sobralas": {
+   "False": 33
+  },
+  "stroki": [
+   {
+    "ts": "2026-10-03T22:47:50Z",
+    "gruppa": "cand1_03",
+    "mint": "FeUawxmAjK9ER7ZY9mVNe2KDKNV3HUFLhGdKqJCepump",
+    "istochnik": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+    "podpis_istochnika": "34WenEs34kGxVeKJDmt2Pst2kKWmK8xk9YztevHofgkAccfLgTKN8NnSRxYuCLHDzhJHAptpNnz8LCAAnLjdxRQX",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула 7VertkgF/FeUawxmA"
+   },
+   {
+    "ts": "2026-10-04T01:16:11Z",
+    "gruppa": "cand3",
+    "mint": "GWTP6M5bxhaJ1k2Kxvf8hhYaHE6jZMhh4cKzFuCpnc83",
+    "istochnik": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6",
+    "podpis_istochnika": "2BY2ramiicrNCZjqRxQMkoL2FLbE2dQeuFVKehmCQBzqNGXgJXDEVMST8FZ2DdG2deCPjR9oRyb84DBuFKU18RhX",
+    "pochemu": "тип пула не в таблице USDC-ноги сигнальных типов: CAMMCzo5"
+   },
+   {
+    "ts": "2026-10-04T02:31:54Z",
+    "gruppa": "lane_s0",
+    "mint": "2pA25N1kJdFMo5YApiykmsHWydXRnbb62cTXsr1NiZ5f",
+    "istochnik": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+    "podpis_istochnika": "2CAUWJZsNo4qQdSaUd1FekYVhv9q1UM2yxrntBUux5V38LLKjgDPD1s7PcY9zwwBfJKzEmUnPSjDUjmX6gFi7KqU",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/2pA25N1k"
+   },
+   {
+    "ts": "2026-10-04T03:17:38Z",
+    "gruppa": "batch5",
+    "mint": "2pA25N1kJdFMo5YApiykmsHWydXRnbb62cTXsr1NiZ5f",
+    "istochnik": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+    "podpis_istochnika": "4miUMhHagr4tj1Sy6vdRwQ4c8ZLEyEqatSapHPpaUQJjniXko4PxtPRSbrQymGLzX3P3VaUJe4CUXj88qw4nKsP3",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/2pA25N1k"
+   },
+   {
+    "ts": "2026-10-04T03:31:13Z",
+    "gruppa": "batch5",
+    "mint": "8dBnKHwNYH3hz2fFTJczVwzBTpJFAMtc53k3uA4zpump",
+    "istochnik": "EC2f5DnHzuNRit1ExqghSifDbp1wgrzktsRRZCtU92MJ",
+    "podpis_istochnika": "chxx5WUv7GPKDce6YMFpxp4aSFfWvFPXDiuQg5oghDq1gS2iihTc8236kyMa1S5qeps5phVSbngGGihf3AAER55",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула CARDSccU/8dBnKHwN"
+   },
+   {
+    "ts": "2026-10-04T05:55:14Z",
+    "gruppa": "lane_s0",
+    "mint": "8dBnKHwNYH3hz2fFTJczVwzBTpJFAMtc53k3uA4zpump",
+    "istochnik": "4vER1GJQs73HtN9oYRswHZV4PSe2dvWQ8NLFoDhXeZjm",
+    "podpis_istochnika": "2naLPLoQg3GZhoHqTPYS1DqJuPWkVpkbGztiQ6XoCp91tZ4i8Xbu2D1WoZrPmBLjMhPJQxS4yLrbGnKxJSDW3pmP",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула CARDSccU/8dBnKHwN"
+   },
+   {
+    "ts": "2026-10-04T07:42:44Z",
+    "gruppa": "cand1",
+    "mint": "FoS1tjFxvTE1ELRY38V6GTtfbJ4QV9XkCf5oyLWvpump",
+    "istochnik": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
+    "podpis_istochnika": "5VdKDnvahQGXD6RfQkGRshi3PxYXmBrotL9whSwsLh5Lhu7UGYzkMxABNj6ZWyGUgVthtzC5Et3GViVS5tiqiJ9D",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Dz9mQ9Nz/FoS1tjFx"
+   },
+   {
+    "ts": "2026-10-04T08:45:13Z",
+    "gruppa": "cand1",
+    "mint": "8tn3sa36jaDiwuLFro6DPNMySvYQQC4ZGdGirwsko8re",
+    "istochnik": "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2",
+    "podpis_istochnika": "5gsyx7Si7bNTdx5Ryz9jKmsmBLe3D9XXiKC7SZakXkxTrNMYthCpXivyEtha1iA69tPw2xjrdw4j46Zk6GoPKzSk",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/8tn3sa36"
+   },
+   {
+    "ts": "2026-10-04T10:20:31Z",
+    "gruppa": "lane_s0",
+    "mint": "BgDXbCte2gp163wwYSXTnMcb4hzYQmY4AMcG2zkV2YAN",
+    "istochnik": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+    "podpis_istochnika": "5fzyUkbsmsQr62G3A1bXJS2Bm2yQpKMEivZzZiquB7sdkMj6Xe3bmSLcJP9XHqXZyNL3QQQNfUpvWJ7LTmiNjLg4",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/BgDXbCte"
+   },
+   {
+    "ts": "2026-10-04T11:14:51Z",
+    "gruppa": "cand2",
+    "mint": "8RfgokotF4CW3BAAd6Pzy4ap9AHiZq236C63oB8J7nre",
+    "istochnik": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+    "podpis_istochnika": "2LpBBXzoV8h3ggD8fHWzdai4wBEPeNvfVNU9ybtCfcnw7rZ1p72nMNezn8487eeowNWfLx29wShVSsrsHwaAM6RM",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула DEW9dSN6/8Rfgokot"
+   },
+   {
+    "ts": "2026-10-04T12:34:23Z",
+    "gruppa": "cand1",
+    "mint": "68AGsjomsgTtiTaDhF6XGCeVJDnFeh415ngYYgVxGzns",
+    "istochnik": "6S8GezkxYUfZy9JPtYnanbcZTMB87Wjt1qx3c6ELajKC",
+    "podpis_istochnika": "5q9a9LNqSsSep9pxiTXqPRjbjrn5hF8t991pxUnKn2LL4PHu1QW8KnsKjrEyubPghinHpmFsRmkNCbtVcXLeorHV",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/68AGsjom"
+   },
+   {
+    "ts": "2026-10-04T13:31:14Z",
+    "gruppa": "cand2",
+    "mint": "Bqwvj6FxwZWZWi7SwPzmoyuB1NHLp7zAjKWZuHdTNahj",
+    "istochnik": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87",
+    "podpis_istochnika": "4dkUhH9yR5ATHMUv3WgwF9bZT6CQ1UYYj2NhjxZnJ9uXFyVyYzPzVC4h3V5XLwwGps9vP5n3f8Ja9Zc7Bk1MeuXa",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула DJTu7vi8/Bqwvj6Fx"
+   },
+   {
+    "ts": "2026-10-04T14:12:27Z",
+    "gruppa": "lane_s0",
+    "mint": "8RfgokotF4CW3BAAd6Pzy4ap9AHiZq236C63oB8J7nre",
+    "istochnik": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+    "podpis_istochnika": "4bVBndBgNdVjnV3MQ8cft7xvhYHV4SBGMDtYmERvEtN4o7pFZBXymfFNyhn7oGUgs6gaxnCL76joC4rxM7MSU9YT",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула DEW9dSN6/8Rfgokot"
+   },
+   {
+    "ts": "2026-10-04T14:52:40Z",
+    "gruppa": "cand1_03",
+    "mint": "HYARMuucuFHGMTztgWNh6C8X7n4DBxJMe6c5f3gAAAzw",
+    "istochnik": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+    "podpis_istochnika": "2anbSkPgh31AubsMfaYxZuKJg1tGPid1t3QzTRcDHETWwJ6j6cYN27bqFqqpdRLYgzuM54AkN8eD6z9TxvFz2ryv",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/HYARMuuc"
+   },
+   {
+    "ts": "2026-10-04T15:01:14Z",
+    "gruppa": "cand2",
+    "mint": "DQysBW79uHzZAWd2ahVQrf89CuSFqVzuNA3ijHbjVJfG",
+    "istochnik": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
+    "podpis_istochnika": "57krXP5a71AmWox7LxkK3ke1tXJVkRehASmGBbGTpZnquW1b9EVk2qNfBDXncXHbcziwLzFxJUfJUSCCtEd3fo6U",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/DQysBW79"
+   },
+   {
+    "ts": "2026-10-04T15:36:19Z",
+    "gruppa": "lane_s0",
+    "mint": "Etc2Y9Xw3cvXe9Dw3Gd3ddVzL8dsvtJNa63ARJLKwWhC",
+    "istochnik": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb",
+    "podpis_istochnika": "4hcXY4qyr6aSB139eWScDjziByMk6o19MGqiP7nkBw5JjoUkVgasFkU4GGEUjR7jG5q43XBeofqRvf8gGqaweSFJ",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула DEW9dSN6/Etc2Y9Xw"
+   },
+   {
+    "ts": "2026-10-04T15:36:19Z",
+    "gruppa": "lane_s0",
+    "mint": "Etc2Y9Xw3cvXe9Dw3Gd3ddVzL8dsvtJNa63ARJLKwWhC",
+    "istochnik": "B8m6fDRcw9VnkqWBXo5MEh9uY8HSPCkFuH4NNv5pCiPk",
+    "podpis_istochnika": "4Zyha4PcnteodJosgHNp5cwFR91WnNkhrAdPNyXoXnapqgiZU3ZhkcNd5wmEwScR1JdPcGNgkfbx8b1BHgxDbgs2",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула DEW9dSN6/Etc2Y9Xw"
+   },
+   {
+    "ts": "2026-10-04T17:50:43Z",
+    "gruppa": "cand2",
+    "mint": "A2pFvXrYeBiei2X6FbZFYgvLE7KzQzZqSgvGFZpJZ14L",
+    "istochnik": "AuPp4YTMTyqxYXQnHc5KUc6pUuCSsHQpBJhgnD45yqrf",
+    "podpis_istochnika": "48xLpXZU7LjFYkuJrLF5pNbV4aA8eohnbMvrvCEF3i2Z7saHYHtHuwAYhNkHshQVWPJKPnXFU2ASMnSmGDEc8Ct9",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула DJTu7vi8/A2pFvXrY"
+   },
+   {
+    "ts": "2026-10-04T18:12:49Z",
+    "gruppa": "batch5",
+    "mint": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+    "istochnik": "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD",
+    "podpis_istochnika": "2cD67YbVv96JgM8Kee7LnU62TP3wEuyLrhaRpuniP6BiqgGxASvtEtkjnLdUTiDzdDU5cYVyYf7KeUyTUkFMTUDr",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула pumpCmXq/Hg5Ja55T"
+   },
+   {
+    "ts": "2026-10-04T18:17:10Z",
+    "gruppa": "lane_s0",
+    "mint": "H4KUxsEgCp2yDpFvyDuGM5k6XevSKKrrKUxZ3Zr6nyJc",
+    "istochnik": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+    "podpis_istochnika": "4j3Hcdyw62AeLa3gN9baa3CCq2Ld5xEL5p7VXHtd9HgxqZbJAUf6MyhyxL1Kvr2uP1nwxjjuRPqNfxmD6QiGqmaK",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула pumpCmXq/H4KUxsEg"
+   },
+   {
+    "ts": "2026-10-04T18:23:09Z",
+    "gruppa": "cand2",
+    "mint": "F2GxK4tf7zPNxF6FMpYqHGVYVCKvaZqB9QbAMBJ6BFXN",
+    "istochnik": "AuPp4YTMTyqxYXQnHc5KUc6pUuCSsHQpBJhgnD45yqrf",
+    "podpis_istochnika": "5bwYWe5CSr52qvKWWE2kcdo1TGNbXeUbxY1mbSt3xyH7t6PU8mrWYN9ZiRVdTfWW5P3Jq5LDTPuZS4zMPYh5ffQ",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула pumpCmXq/F2GxK4tf"
+   },
+   {
+    "ts": "2026-10-04T18:29:58Z",
+    "gruppa": "lane_s0",
+    "mint": "jq79mLwhJvj7av6cHAMNdhADeEaxzzCrvEb7Lbppump",
+    "istochnik": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+    "podpis_istochnika": "H85oGLxEhsJ1JofVyDHSDkoV9J5exLwXJ5JssrJume9mbqX1ZEB4Uy4Arrnx9ZQiE61o2o1m9MrNtxNxCi9Kfsp",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула pumpCmXq/jq79mLwh"
+   },
+   {
+    "ts": "2026-10-04T19:04:54Z",
+    "gruppa": "cand2",
+    "mint": "GvA7fjPW3oMk8YVA9Eq1xCoaDkxDpZa67XciBoosVawH",
+    "istochnik": "83Y8aqfDxz8XSerVACBubyinHm8rQ6REg9j5YXvT8b57",
+    "podpis_istochnika": "4EVT8yNWYCaWeZBWF4L1vmpDhBoQqza4zkzUkumnoLfdScJvadRx8GGehGoohU8E4kQRsoenmMwXFXFP9qhRSn2N",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула GbbesPba/GvA7fjPW"
+   },
+   {
+    "ts": "2026-10-04T19:36:37Z",
+    "gruppa": "cand2",
+    "mint": "DQysBW79uHzZAWd2ahVQrf89CuSFqVzuNA3ijHbjVJfG",
+    "istochnik": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy",
+    "podpis_istochnika": "4tCqRaL7xzrzn1mFspVfWVBVGvCMk4u3tc9Syv7LfKtTV1h6UDDEi9mMdAHjCidw9dXUJWoLgkK957KD58CPGZUP",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/DQysBW79"
+   },
+   {
+    "ts": "2026-10-04T19:38:05Z",
+    "gruppa": "cand2_03",
+    "mint": "GVWgrYjBs5LXjF4jDHCwX5vS2gmaitSAoXwzf6LNamN9",
+    "istochnik": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE",
+    "podpis_istochnika": "HWcN9rp39iQYMAqyQ7jq8NrScmgYGVuo1ZinYNzingQwAcMczz4wcgdKiWWkPwfRPyhi6bqWybUGBCForAVV81G",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/GVWgrYjB"
+   },
+   {
+    "ts": "2026-10-04T19:38:17Z",
+    "gruppa": "cand3",
+    "mint": "GVWgrYjBs5LXjF4jDHCwX5vS2gmaitSAoXwzf6LNamN9",
+    "istochnik": "FLyBjfWGsxH4zDDfoUJHwA9774TmPVpR8kB5B46PtbaZ",
+    "podpis_istochnika": "3GRAWpnW6jJZZxU2CUQzjCjidVcbWEWrfQHbFm346tJkzSfoNbsrmNqCuWoemZnBHo88yqWznHGNaZqyv3U9hy3M",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/GVWgrYjB"
+   },
+   {
+    "ts": "2026-10-04T19:38:17Z",
+    "gruppa": "konveyer",
+    "mint": "GVWgrYjBs5LXjF4jDHCwX5vS2gmaitSAoXwzf6LNamN9",
+    "istochnik": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+    "podpis_istochnika": "REuLxbY64qnzAnUHtx8mzkh1r9vtWLUgWbbFFQnuF2ftxbyCYykFaLjr9r1fkEgoEh8JDBL3ieZmxbiYbyJhpAR",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xs3oZwbH/GVWgrYjB"
+   },
+   {
+    "ts": "2026-10-04T20:04:01Z",
+    "gruppa": "cand1_03",
+    "mint": "fKZGW5c7kgVN8FbFKZohEnmUdUsrdimZ4BBHQYp2eEj",
+    "istochnik": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+    "podpis_istochnika": "V6b4migNmBG1uTyHohxRYVddDpjNNUgLx4T1MsmJDhGyGZLAPj3C6qKZie1d9hiWiRWAkVhGgQPKRBudwBi9jGc",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула PFER6ENq/fKZGW5c7"
+   },
+   {
+    "ts": "2026-10-04T20:55:37Z",
+    "gruppa": "cand2",
+    "mint": "C2pRFgAhBHFoVyWG3pLW8v7yKFsDr6GR5grLpL9Y6Fxp",
+    "istochnik": "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ",
+    "podpis_istochnika": "xppywLbyAxNTNiqtSsrLLMaGMyadJEd92FXLZxQYHSKeT8jZ64sT8GgTnvPGGMfyK9FFMDR846fPbeStYyLhJc1",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула A7bdiYdS/C2pRFgAh"
+   },
+   {
+    "ts": "2026-10-04T21:44:33Z",
+    "gruppa": "batch5",
+    "mint": "CwSNUU54NLJt4qbGg5S8TUzJYxjYAfL4VrPr7zvJpump",
+    "istochnik": "GAsnqm4XkNkPVgrAofNQ65jWf8f3tKCLHhE9ZqSy2AP1",
+    "podpis_istochnika": "42Qcn62TSWTMTjoy6QZCkbaStBoHZRdihk5KHGogMn5pHAo7HSh1x51uZRUXvYFAVykbVm1yXy7MLtJBeoRByctj",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула Xsc9qvGR/CwSNUU54"
+   },
+   {
+    "ts": "2026-10-04T22:40:08Z",
+    "gruppa": "lane_s0",
+    "mint": "7HE2WmPoYE7uaA7DKh25N5cUwEcUoiyjwZU9ZeaQpump",
+    "istochnik": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy",
+    "podpis_istochnika": "3L28diUhjQYsXLirQ68qQb9P6wZtox78wFLQTSm8fqG64FLY2u7j3DKUmYtavHXKWVSW96LQw76Ptk27UHVrpY2H",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула pumpCmXq/7HE2WmPo"
+   },
+   {
+    "ts": "2026-10-04T23:27:36Z",
+    "gruppa": "cand2",
+    "mint": "AYHHpvAVf27Rv64PBPXHEJKg8MXaJ35vmsn8GV6wFigf",
+    "istochnik": "DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o",
+    "podpis_istochnika": "3LSc1xGh19pMyULa4RDqpvMSZpsfNxevup5185aPquntm289cGKDS3yW7ptijo9qW8y4Bsgwh5xZYgvc49xebCuq",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула A7bdiYdS/AYHHpvAV"
+   },
+   {
+    "ts": "2026-10-04T23:37:18Z",
+    "gruppa": "cand2",
+    "mint": "EvwGJQ3Xp3h8hgHrSwAhBgSy7QAAzh7XSeah5gjBpump",
+    "istochnik": "HTYho9ioTJcS4Dymi57HB65RBFu549gjyQ7kncfkknti",
+    "podpis_istochnika": "5MwnxfZSnTjWfNpnaPfbTEL9x7jKsxF3CxGgHomioCcXA8zqRZvE8BYkcgrmjjbE29J7kfudR63wdvLvLtCAWEP3",
+    "pochemu": "котировка пула не EPjFWdd5: стороны пула pumpCmXq/EvwGJQ3X"
+   }
+  ]
+ },
+ "chto_eto_znachit": [
+  "Приёмка «севшая покупка за USDC» кодом не достигается: нужен сигнал на пуле с котировкой USDC, а таких в окне не было вовсе.",
+  "Деньги лежат не в USDC-ноге, а в ОБОБЩЕНИИ двухшагового пути на СВОЮ котировку пула (SOL -> X -> токен): 46 отказов за 8 суток -- это пулы, где нога дошла и разошлась только валютой, и ещё 117 -- где тип пула не в её таблице. Это решение владельца, а не моя правка."
+ ]
+}
