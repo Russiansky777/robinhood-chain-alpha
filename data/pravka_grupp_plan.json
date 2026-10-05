@@ -1,67 +1,117 @@
 {
- "zachem": "Слово владельца 05.10, п.1: гибкий билет «2 % резерва пула» для шести групп. Билет = 2 % резерва SOL-стороны пула на момент входа, потолок 2.0 SOL, пол -- нынешний билет группы (lane_size). Резерв берётся из того, что сборщик уже знает (сделка источника / шаблон пула), новых чтений сети на горячем пути нет; резерва нет -- обычный билет группы, покупка не ждёт.",
- "chto_ne_menyaetsya": "lane_size и lane_sol НЕ правятся ни у одной группы: подъём идёт поверх пола, спора размера (01.10) быть не может. Не трогаются cand1_03 (0.5), konveyer (0.1), leader (0.01), sniper_src и krug_001 (выключены), cand1_05, kandidaty, off, log_only. Порог входа (min_target_sol) и lane_open_max -- без изменений. env этим прогоном не трогается вовсе.",
- "pole_dolyi": "bilet_dolya -- доля резерва; bilet_potolok_sol -- свой потолок группы, он может потолок только ОПУСТИТЬ ниже кода (ПОТОЛОК_ПОДЪЁМА_SOL = 2.0), поэтому 2.0 здесь совпадает с кодом и записан ради видимости в файле.",
+ "zachem": "ЗАПАСНОЙ ВАРИАНТ владельца 05.10 (п.2). Гибкий билет выключается: при жёстком потолке размера полосы 0.5 SOL в коде оба сработавших подъёма кончились ОТКАЗОМ покупки -- batch5 12:09:37Z на 1.872375817 SOL (резерв 93.618790877) и cand2 12:10:41Z на 1.971248231 (резерв 98.562411554), строка отказа «размер ... выше потолка полосы 0.5 SOL». То есть подъём отнимал сделки, которые без него ушли бы билетом группы. Поднять потолок кода до 2.0 -- слово владельца, пока оно не дано, ставим запасной: cand1, cand2, cand3 0.1 -> 0.3; cand2_03, batch5 0.3 -> 0.5.",
+ "chto_ne_menyaetsya": "lane_s0 остаётся 0.5 (в запасном списке его нет) -- у него снимается только доля. cand1_03 (0.5), konveyer (0.1), leader (0.01), sniper_src и krug_001 (выключены) не тронуты. Порог входа (min_target_sol) и lane_open_max -- без изменений. env не трогается. Все новые размеры НЕ ВЫШЕ нынешнего потолка полосы 0.5 SOL -- ни одна защита не ослабляется.",
+ "pochemu_oba_imeni": "lane_size и lane_sol правятся парой в одном плане: при разных числах загрузчик выключает группу (lane_size_spor, случай 01.10).",
  "pravki": [
   {
    "gruppa": "cand1",
    "pole": "bilet_dolya",
-   "znachenie": "0.02"
+   "znachenie": ""
   },
   {
    "gruppa": "cand1",
    "pole": "bilet_potolok_sol",
-   "znachenie": "2.0"
+   "znachenie": ""
   },
   {
    "gruppa": "cand2",
    "pole": "bilet_dolya",
-   "znachenie": "0.02"
+   "znachenie": ""
   },
   {
    "gruppa": "cand2",
    "pole": "bilet_potolok_sol",
-   "znachenie": "2.0"
+   "znachenie": ""
   },
   {
    "gruppa": "cand3",
    "pole": "bilet_dolya",
-   "znachenie": "0.02"
+   "znachenie": ""
   },
   {
    "gruppa": "cand3",
    "pole": "bilet_potolok_sol",
-   "znachenie": "2.0"
+   "znachenie": ""
   },
   {
    "gruppa": "cand2_03",
    "pole": "bilet_dolya",
-   "znachenie": "0.02"
+   "znachenie": ""
   },
   {
    "gruppa": "cand2_03",
    "pole": "bilet_potolok_sol",
-   "znachenie": "2.0"
+   "znachenie": ""
   },
   {
    "gruppa": "batch5",
    "pole": "bilet_dolya",
-   "znachenie": "0.02"
+   "znachenie": ""
   },
   {
    "gruppa": "batch5",
    "pole": "bilet_potolok_sol",
-   "znachenie": "2.0"
+   "znachenie": ""
   },
   {
    "gruppa": "lane_s0",
    "pole": "bilet_dolya",
-   "znachenie": "0.02"
+   "znachenie": ""
   },
   {
    "gruppa": "lane_s0",
    "pole": "bilet_potolok_sol",
-   "znachenie": "2.0"
+   "znachenie": ""
+  },
+  {
+   "gruppa": "cand1",
+   "pole": "lane_size",
+   "znachenie": "0.3"
+  },
+  {
+   "gruppa": "cand1",
+   "pole": "lane_sol",
+   "znachenie": "0.3"
+  },
+  {
+   "gruppa": "cand2",
+   "pole": "lane_size",
+   "znachenie": "0.3"
+  },
+  {
+   "gruppa": "cand2",
+   "pole": "lane_sol",
+   "znachenie": "0.3"
+  },
+  {
+   "gruppa": "cand3",
+   "pole": "lane_size",
+   "znachenie": "0.3"
+  },
+  {
+   "gruppa": "cand3",
+   "pole": "lane_sol",
+   "znachenie": "0.3"
+  },
+  {
+   "gruppa": "cand2_03",
+   "pole": "lane_size",
+   "znachenie": "0.5"
+  },
+  {
+   "gruppa": "cand2_03",
+   "pole": "lane_sol",
+   "znachenie": "0.5"
+  },
+  {
+   "gruppa": "batch5",
+   "pole": "lane_size",
+   "znachenie": "0.5"
+  },
+  {
+   "gruppa": "batch5",
+   "pole": "lane_sol",
+   "znachenie": "0.5"
   }
  ]
 }
