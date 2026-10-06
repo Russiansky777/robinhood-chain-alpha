@@ -41,6 +41,10 @@ on:
         description: "для mode=clear: ровно SNYAT -- иначе снятие не делается"
         required: false
         default: ""
+      sbros_otschota:
+        description: "'yes' -- ПЕРЕД снятием перенести начало суточного отсчёта рубильника (lane_day.json) на сейчас"
+        required: false
+        default: "no"
 
 concurrency:
   group: lane-kill-nl
@@ -144,6 +148,44 @@ jobs:
             *'"own": true'*'"ok": true'*) echo "адрес и ключ полосы согласованы" ;;
             *) echo "СБОЙ: кошелёк полосы не готов -- рубильник не снимаю"; exit 1 ;;
           esac
+
+      # ПЕРЕНОС НАЧАЛА ОТСЧЁТА -- ДО СНЯТИЯ, И ЭТО НЕ ПОРЯДОК РАДИ ПОРЯДКА.
+      # Суточный рубильник считает просадку от баланса на 00:00 Мадрида и
+      # ставится САМОЙ СЛУЖБОЙ при каждом обновлении баланса. Снять файл, не
+      # перенеся отсчёт, значит получить его обратно через пульс: 06.10 в
+      # 17:01:31Z просадка была 2.276795 SOL при пороге 2.0.
+      - name: "sbros: самопроверка скрипта переноса отсчёта (без хоста)"
+        if: ${{ inputs.sbros_otschota == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/lane_day_sbros.py
+          # 8/8: до переноса порог рубит, после -- просадка ноль, порог ОСТАЛСЯ
+          # порогом (новая просадка 2.1 снова рубит), и возврат из копии, если
+          # перечитанный файл не сошёлся.
+          python3 deploy/checks/lane_day_sbros.py --self-test | tail -2
+
+      - name: "sbros: перенести начало отсчёта на сейчас (баланс берётся ПО ЦЕПИ)"
+        if: ${{ inputs.sbros_otschota == 'yes' }}
+        env:
+          PRICHINA: ${{ inputs.reason }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$PRICHINA" ] || { echo "СБОЙ: для переноса отсчёта нужна причина"; exit 1; }
+          # ТЕКСТ ПРИЧИНЫ УЕЗЖАЕТ ФАЙЛОМ, а не знаками в команде root: так уже
+          # ломалась правка групп 04.10 (апостроф в свободном тексте).
+          printf '%s\n' "$PRICHINA" > /tmp/lane_day_prichina.txt
+          ssh $SSH_OPTS root@127.0.0.1 "cat > /tmp/lane_day_sbros.py" < deploy/checks/lane_day_sbros.py
+          ssh $SSH_OPTS root@127.0.0.1 "cat > /tmp/lane_day_prichina.txt" < /tmp/lane_day_prichina.txt
+          ssh -n $SSH_OPTS root@127.0.0.1 "
+            set -e
+            set -a; . /etc/bloom-executor/env; set +a
+            cd $CODE_DIR
+            $VENV /tmp/lane_day_sbros.py --sbros --prichina-fajl /tmp/lane_day_prichina.txt
+            chown bot:bot $STATE_DIR/lane_day.json 2>/dev/null || true
+            ls -l $STATE_DIR/lane_day.json*
+            rm -f /tmp/lane_day_sbros.py /tmp/lane_day_prichina.txt"
 
       - name: "clear: снять рубильник (прежняя причина сохраняется)"
         if: ${{ inputs.mode == 'clear' }}
