@@ -365,6 +365,11 @@ def загрузить(путь: str | None = None, *, заново: bool = Fals
             # есть в политике") -- до включения, а не на деньгах.
             "bilet_dolya": г.get("bilet_dolya"),
             "bilet_potolok_sol": г.get("bilet_potolok_sol"),
+            # ПРЕДЕЛ РЕЗЕРВА ДЛЯ ПОДЪЁМА (слово владельца 06.10): подъём
+            # только при резерве SOL-стороны пула не выше этого числа. Поле
+            # может предел только ОПУСТИТЬ ниже кода (150.0); читается как
+            # есть, проверяет читатель полосы.
+            "bilet_rezerv_max_sol": г.get("bilet_rezerv_max_sol"),
             # ---- ПОЛЯ ФИНАЛЬНОГО ПЛАНА 27.09 (п.1в) ----
             "max_slots_from_source": г.get("max_slots_from_source"),
             "skip_flippers": bool(г.get("skip_flippers")),
