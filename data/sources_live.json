@@ -112,7 +112,8 @@
       },
       "lane_sol": 0.5,
       "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0
+      "bilet_potolok_sol": 2.0,
+      "bilet_rezerv_max_sol": 150
     },
     "lane_s0": {
       "lane_size": 0.5,
@@ -191,7 +192,8 @@
       },
       "lane_sol": 0.5,
       "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0
+      "bilet_potolok_sol": 2.0,
+      "bilet_rezerv_max_sol": 150
     },
     "off": {
       "lane_size": null,
@@ -2440,7 +2442,8 @@
         "7HmkKn8P6aZSMg7jn9esjdPQ9cBqg9LQgNECzoDeJiGQ": "log_only 02.10",
         "Gf2wYM2k5ojfPzN5Uqi3mbP1nWEdZhhzMyDBsKrHA3kC": "kust s DYAn4XpA, slovo vladelca 02.10",
         "GM7Hrz2bDq33ezMtL6KGidSWZXMWgZ6qBuugkb5H8NvN": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать",
-        "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать"
+        "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать",
+        "HTYho9ioTJcS4Dymi57HB65RBFu549gjyQ7kncfkknti": "слово владельца 06.10: из cand2 в log_only. По цепи за 11.5 ч гибкого билета: 16 сделок, средний билет 1.8153, итог -0.8867 SOL, 37.5 % в плюсе, худшая -0.6216"
       },
       "subscribe": false
     },
@@ -2515,7 +2518,8 @@
       "note": "Кандидаты вне выборки (добавка владельца к ночному пакету 30.09->01.10, п.0). Список -- docs/podbivka_2026-09-30_kandidaty_vne_vyborki.md (Code-2). Размер 0.1, порог 2 SOL, удержание 108, стоп группы 0.3 за сутки, не более 3 открытых, пулы как у lane_s0",
       "per_day": 150,
       "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0
+      "bilet_potolok_sol": 2.0,
+      "bilet_rezerv_max_sol": 150
     },
     "cand1_03": {
       "lane_trades": 1,
@@ -2545,7 +2549,8 @@
         "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy": "куст DYAn4XpA, из cand1 по слову владельца 02.10",
         "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt": "куст DYAn4XpA (корень), из cand1 по слову владельца 02.10"
       },
-      "min_target_sol": 2.0
+      "min_target_sol": 2.0,
+      "slippage": 0.2
     },
     "cand1_05": {
       "lane_trades": 0,
@@ -2617,7 +2622,6 @@
         "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87": "таблица А (правило на билете 0.1): Fomo, n 50, среднее +4.32 п.п., медиана +4.24 п.п., в плюсе 64 %, толпа 0.94",
         "83Y8aqfDxz8XSerVACBubyinHm8rQ6REg9j5YXvT8b57": "таблица А (правило на билете 0.1): Fomo, n 65, среднее +6.04 п.п., медиана +2.29 п.п., в плюсе 57 %, толпа 0.94",
         "2kv8X2a9bxnBM8NKLc6BBTX2z13GFNRL4oRotMUJRva9": "таблица Б (правило по медиане билета 0.3): 543, GMGN, n 80, среднее +2.15 п.п., медиана +3.14 п.п., в плюсе 56 %, толпа 0.97; НА БИЛЕТЕ 0.1 медиана +1.78 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
-        "HTYho9ioTJcS4Dymi57HB65RBFu549gjyQ7kncfkknti": "таблица Б (правило по медиане билета 0.3): Fomo, n 61, среднее +9.30 п.п., медиана +2.79 п.п., в плюсе 59 %, толпа 0.82; НА БИЛЕТЕ 0.1 медиана +1.38 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
         "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG": "таблица Б (правило по медиане билета 0.3): снайперы, n 193, среднее +6.37 п.п., медиана +2.28 п.п., в плюсе 53 %, толпа 0.95; НА БИЛЕТЕ 0.1 медиана +0.90 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
         "AxtZoNYhAxvpv416hW7yzpTdcJeY45t8JyGUYMJXL9G": "таблица Б (правило по медиане билета 0.3): 543, n 54, среднее +8.85 п.п., медиана +2.27 п.п., в плюсе 57 %, толпа 0.94; НА БИЛЕТЕ 0.1 медиана +0.94 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
         "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ": "таблица Б (правило по медиане билета 0.3): Fomo, n 50, среднее +5.19 п.п., медиана +2.24 п.п., в плюсе 54 %, толпа 0.84; НА БИЛЕТЕ 0.1 медиана +0.85 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
@@ -2626,7 +2630,8 @@
         "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy": "slovo vladelca 04.10 vecherom p.4: iz krug_001 obratno v cand2, bilet 0.1; v krug_001 ostajotsja 5YRgrP3m"
       },
       "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0
+      "bilet_potolok_sol": 2.0,
+      "bilet_rezerv_max_sol": 150
     },
     "cand3": {
       "lane_trades": true,
@@ -2660,7 +2665,8 @@
         "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6": "слово владельца 02.10 п.4: из log_only (список 543) в cand3"
       },
       "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0
+      "bilet_potolok_sol": 2.0,
+      "bilet_rezerv_max_sol": 150
     },
     "cand2_03": {
       "lane_trades": 1,
@@ -2679,7 +2685,8 @@
         "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE": "слово владельца 03.10 п.5: из cand2 (билет 0.1) в свою группу cand2_03 билетом 0.3"
       },
       "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0
+      "bilet_potolok_sol": 2.0,
+      "bilet_rezerv_max_sol": 150
     },
     "krug_001": {
       "lane_trades": false,
