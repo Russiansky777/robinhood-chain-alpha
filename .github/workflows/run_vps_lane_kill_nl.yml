@@ -272,26 +272,28 @@ jobs:
           set -e
           set -o pipefail
           [ -n "$PRICHINA" ] || { echo "СБОЙ: для переноса отсчёта нужна причина"; exit 1; }
-          # ТЕКСТ ПРИЧИНЫ УЕЗЖАЕТ ФАЙЛОМ, а не знаками в команде root: так уже
-          # ломалась правка групп 04.10 (апостроф в свободном тексте).
-          printf '%s\n' "$PRICHINA" > /tmp/lane_day_prichina.txt
-          ssh $SSH_OPTS root@127.0.0.1 "cat > /tmp/lane_day_sbros.py" < deploy/checks/lane_day_sbros.py
-          ssh $SSH_OPTS root@127.0.0.1 "cat > /tmp/lane_day_prichina.txt" < /tmp/lane_day_prichina.txt
-          # ЗАПАСНОЙ ПУТЬ -- СОБСТВЕННАЯ ВЕТКА СЛУЖБЫ "НОВЫЕ СУТКИ". Скрипт
-          # берёт баланс по цепи сам, и если это не удалось (06.10 18:48Z он
-          # упал на хосте), отсчёт всё равно надо перенести: файл суток
-          # отводится в копию, и служба на следующем же пульсе запишет начало
-          # отсчёта по ТЕКУЩЕМУ балансу своей же функцией. Прежняя запись не
-          # теряется -- она в копии рядом.
+          # ПЕРЕНОС ДЕЛАЕТ САМА СЛУЖБА СВОЕЙ ЖЕ ВЕТКОЙ "НОВЫЕ СУТКИ", А МЫ
+          # ТОЛЬКО ОТВОДИМ ФАЙЛ. Это самый короткий путь без лишних частей
+          # (слово владельца 06.10: быстро, без лишних проверок).
+          # ПОЧЕМУ НЕ СКРИПТОМ. Свой скрипт переноса брал баланс по цепи сам и
+          # дважды падал на хосте (18:48Z, 18:53Z), держа снятие. А у службы
+          # это штатная ветка: нет файла суток -> на следующем же пульсе она
+          # записывает начало отсчёта по ТЕКУЩЕМУ балансу
+          # (bloom_own_send.порог_kill_по_балансу), и просадка становится нулём.
+          # Прежняя запись не теряется: уезжает в копию рядом, с меткой времени
+          # и причиной в журнале прогона.
+          echo "причина: $PRICHINA"
           ssh -n $SSH_OPTS root@127.0.0.1 "
-            set -a; . /etc/bloom-executor/env; set +a
-            cd $CODE_DIR
-            $VENV /tmp/lane_day_sbros.py --sbros --prichina-fajl /tmp/lane_day_prichina.txt \
-              || { echo 'скрипт не справился -- отводим файл суток, отсчёт запишет сама служба'; \
-                   mv -f $STATE_DIR/lane_day.json $STATE_DIR/lane_day.json.bak-\$(date -u +%Y%m%dT%H%M%SZ); }
-            chown bot:bot $STATE_DIR/lane_day.json 2>/dev/null || true
-            ls -l $STATE_DIR/lane_day.json* 2>/dev/null || echo 'файла суток нет -- служба создаст его сама'
-            rm -f /tmp/lane_day_sbros.py /tmp/lane_day_prichina.txt"
+            f=$STATE_DIR/lane_day.json
+            if [ -f \$f ]; then
+              printf 'было: '; cat \$f; echo
+              cp -a \$f \$f.bak-\$(date -u +%Y%m%dT%H%M%SZ)
+              rm -f \$f
+              echo 'файл суток отведён в копию -- отсчёт запишет служба по текущему балансу'
+            else
+              echo 'файла суток нет -- служба запишет отсчёт сама'
+            fi
+            ls -l $STATE_DIR/lane_day.json* 2>/dev/null || true"
 
       - name: "clear: снять рубильник (прежняя причина сохраняется)"
         if: ${{ inputs.mode == 'clear' }}
