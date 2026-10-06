@@ -38,10 +38,31 @@ from pathlib import Path
 КОРЕНЬ = ЗДЕСЬ.parents[2]
 
 
+def _есть_модуль(п: Path) -> bool:
+    """Лежит ли модуль по этому пути. ОТКАЗ В ДОСТУПЕ -- ЭТО "НЕТ", А НЕ ПАДЕНИЕ.
+
+    ЖИВОЙ СЛУЧАЙ 06.10 17:18Z: самопроверка этого скрипта на своём бегунке
+    (пользователь ghrunner) упала с PermissionError на
+    /home/bot/bloom_executor/bloom_own_send.py -- каталог кода принадлежит bot
+    и бегунку не читается. Path.exists() в этом случае НЕ отдаёт False, а
+    бросает исключение, и прогон встал ещё до хоста.
+    """
+    try:
+        return (п / "bloom_own_send.py").exists()
+    except OSError:
+        return False
+
+
 def _модули():
-    """Модули службы: сперва каталог кода на хосте, потом дерево репозитория."""
-    for п in (Path("/home/bot/bloom_executor"), КОРЕНЬ / "analysis"):
-        if (п / "bloom_own_send.py").exists() and str(п) not in sys.path:
+    """Модули службы: сперва дерево репозитория, потом каталог кода на хосте.
+
+    ПОРЯДОК ВАЖЕН. На бегунке дерево репозитория читается всегда, а каталог
+    кода -- не всегда (см. выше). На самом хосте скрипт зовётся из $CODE_DIR,
+    дерева репозитория там нет, и модули берутся из каталога службы -- то есть
+    ровно те, которыми она и работает.
+    """
+    for п in (КОРЕНЬ / "analysis", Path("/home/bot/bloom_executor")):
+        if _есть_модуль(п) and str(п) not in sys.path:
             sys.path.insert(0, str(п))
     import bloom_exec_state as ST  # noqa: PLC0415
     import bloom_own_send as O  # noqa: PLC0415
