@@ -36,7 +36,7 @@
       "lane_sol": 0.01
     },
     "batch5": {
-      "lane_size": 0.5,
+      "lane_size": 0.3,
       "lane_trades": true,
       "bloom_trades": false,
       "bloom_sol": null,
@@ -110,10 +110,7 @@
         },
         "4KFjw2xfH4cXJJKjG1jDZRNphctZPMoFz3K6r3bAVtmD": "dreamloader"
       },
-      "lane_sol": 0.5,
-      "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0,
-      "bilet_rezerv_max_sol": 150
+      "lane_sol": 0.3
     },
     "lane_s0": {
       "lane_size": 0.5,
@@ -190,10 +187,7 @@
           "flipper": false
         }
       },
-      "lane_sol": 0.5,
-      "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0,
-      "bilet_rezerv_max_sol": 150
+      "lane_sol": 0.5
     },
     "off": {
       "lane_size": null,
@@ -2489,8 +2483,8 @@
     },
     "cand1": {
       "lane_trades": true,
-      "lane_size": 0.3,
-      "lane_sol": 0.3,
+      "lane_size": 0.1,
+      "lane_sol": 0.1,
       "min_target_sol": 2.0,
       "hold_slots": 108,
       "lane_open_max": 3,
@@ -2516,10 +2510,7 @@
         "EjtQrPTbcMevStBkpnjsH23NfUCMhGHusTYsHuGVQZp2"
       ],
       "note": "Кандидаты вне выборки (добавка владельца к ночному пакету 30.09->01.10, п.0). Список -- docs/podbivka_2026-09-30_kandidaty_vne_vyborki.md (Code-2). Размер 0.1, порог 2 SOL, удержание 108, стоп группы 0.3 за сутки, не более 3 открытых, пулы как у lane_s0",
-      "per_day": 150,
-      "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0,
-      "bilet_rezerv_max_sol": 150
+      "per_day": 150
     },
     "cand1_03": {
       "lane_trades": 1,
@@ -2585,8 +2576,8 @@
       "bloom_trades": false,
       "bloom_sol": null,
       "fanout": false,
-      "lane_sol": 0.3,
-      "lane_size": 0.3,
+      "lane_sol": 0.1,
+      "lane_size": 0.1,
       "per_day": 150,
       "hold_slots": 108,
       "lane_open_max": 3,
@@ -2628,10 +2619,7 @@
         "DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o": "таблица Б (правило по медиане билета 0.3): 543, n 59, среднее +6.42 п.п., медиана +2.20 п.п., в плюсе 54 %, толпа 1.00; НА БИЛЕТЕ 0.1 медиана +0.87 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
         "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr": "slovo vladelca 04.10: iz lane_s0 (0.5) v cand2 (0.1), prichina Code-2 -- 34 pct pokupok prodajutsja im za 10 s, itog za nedelju okolo 0, SI -0.198",
         "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy": "slovo vladelca 04.10 vecherom p.4: iz krug_001 obratno v cand2, bilet 0.1; v krug_001 ostajotsja 5YRgrP3m"
-      },
-      "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0,
-      "bilet_rezerv_max_sol": 150
+      }
     },
     "cand3": {
       "lane_trades": true,
@@ -2639,8 +2627,8 @@
       "bloom_trades": false,
       "bloom_sol": null,
       "fanout": false,
-      "lane_sol": 0.3,
-      "lane_size": 0.3,
+      "lane_sol": 0.1,
+      "lane_size": 0.1,
       "per_day": 150,
       "hold_slots": 108,
       "lane_open_max": 3,
@@ -2663,18 +2651,15 @@
         "FLyBjfWGsxH4zDDfoUJHwA9774TmPVpR8kB5B46PtbaZ": "cand3 02.10",
         "C9s6hwgurdYfmnCNgdRou44ihPcssZmu7X45wBQ3y5t3": "cand3 02.10",
         "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6": "слово владельца 02.10 п.4: из log_only (список 543) в cand3"
-      },
-      "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0,
-      "bilet_rezerv_max_sol": 150
+      }
     },
     "cand2_03": {
       "lane_trades": 1,
       "bloom_trades": 0,
       "subscribe": 1,
       "fanout": 0,
-      "lane_sol": 0.5,
-      "lane_size": 0.5,
+      "lane_sol": 0.3,
+      "lane_size": 0.3,
       "per_day": 150,
       "hold_slots": 108,
       "lane_open_max": 3,
@@ -2683,10 +2668,7 @@
       "note": "Слово владельца 03.10, п.5: куст DsqRyTUh отдельной группой. Билет 0.3, порог входа 2.0, до 3 открытых, не более 150 покупок в сутки, держим 108 слотов от s0. Своего списка пулов нет -- как у cand1_03, типы задают флаги окружения полосы. Дневного стопа группы нет (правило 16): останавливает только полосовой -2.0 по цепи.",
       "addresses": {
         "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE": "слово владельца 03.10 п.5: из cand2 (билет 0.1) в свою группу cand2_03 билетом 0.3"
-      },
-      "bilet_dolya": 0.02,
-      "bilet_potolok_sol": 2.0,
-      "bilet_rezerv_max_sol": 150
+      }
     },
     "krug_001": {
       "lane_trades": false,
