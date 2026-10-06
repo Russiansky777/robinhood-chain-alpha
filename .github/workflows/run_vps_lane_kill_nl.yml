@@ -138,15 +138,28 @@ jobs:
           # что именно упало, приходилось искать в журнале прогона, которого
           # нет. Теперь вывод держится в переменной, фильтр печатает СБОЙ-строки
           # и итог, а наружу уходит код самого python.
+          # САМОПРОВЕРКА ИДЁТ ИЗ ВРЕМЕННОГО КАТАЛОГА И БЕЗ ЗАПИСИ БАЙТКОДА.
+          # Страж самопроверок (selftest_guard) падает на ЛЮБОЙ ЗАПИСИ в
+          # /home/bot, /etc/bloom-executor, /var/lib/bloom -- он для этого и
+          # сделан. При cwd = $CODE_DIR любая запись относительным путём (и
+          # __pycache__ заодно) упирается в этот запрет, и самопроверка падает
+          # не из-за кода, а из-за места запуска. Поэтому cwd -- временный
+          # каталог в /tmp, модули ищутся через PYTHONPATH, байткод не пишется.
+          # В журнал печатаются последние строки вывода: по одному слову
+          # "Traceback" причину не узнать.
           ssh -n $SSH_OPTS root@127.0.0.1 "
             set -a; . /etc/bloom-executor/env; set +a
-            cd $CODE_DIR
+            export PYTHONPATH=$CODE_DIR
+            export PYTHONDONTWRITEBYTECODE=1
+            rab=\$(mktemp -d /tmp/st.XXXXXX)
+            cd \$rab
             rc=0
             for m in bloom_own_send.py bloom_seller.py; do
-              out=\$($VENV \$m --self-test 2>&1) || rc=1
-              echo "--- \$m"
-              printf '%s\n' "\$out" | grep -E 'СБОЙ|Error|Traceback|пройдено' | tail -15
+              out=\$($VENV $CODE_DIR/\$m --self-test 2>&1) || rc=1
+              echo \"--- \$m\"
+              printf '%s\n' \"\$out\" | tail -12
             done
+            cd /tmp; rm -rf \$rab
             exit \$rc"
 
       - name: "clear: гейт 3 -- ключ полосы даёт именно её адрес"
