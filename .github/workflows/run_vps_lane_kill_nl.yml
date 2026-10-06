@@ -181,8 +181,7 @@ jobs:
             for m in bloom_own_send.py bloom_seller.py; do
               out=\$($VENV $CODE_DIR/\$m --self-test 2>&1) || rc=1
               echo \"--- \$m\"
-              printf '%s\n' \"\$out\" | grep -E 'СБОЙ|Traceback|Error' | head -20
-              printf '%s\n' \"\$out\" | tail -3
+              printf '%s\n' \"\$out\" | grep -vE '\\[ok  \\]' | tail -25
             done
             cd /tmp; rm -rf \$rab
             exit \$rc"
