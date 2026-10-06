@@ -1,0 +1,160 @@
+name: "Полоса: перенести НАЧАЛО ОТСЧЁТА суточного рубильника на сейчас (pokazat/sbros)"
+
+# ЗАЧЕМ (слово владельца 06.10, после возврата билетов): "обновить начальный
+# баланс отсчёта на нынешнее время, чтобы рубильник ресетнулся и считал заново
+# для новой полосы". Суточный рубильник полосы (LANE_KILL_DROP_SOL) считает
+# просадку от баланса на 00:00 Мадрида, и 06.10 в 17:01:31Z он сработал честно:
+# просадка 2.276795 SOL при пороге 2.0. Но вся она набрана СТАРЫМИ билетами (до
+# 2.0 SOL), а с 17:01Z полоса торгует новыми (0.1-0.5). Начало отсчёта
+# переносится на сейчас, чтобы порог мерил новую полосу.
+#
+# ЧЕГО ЭТОТ ПРОГОН НЕ ДЕЛАЕТ:
+#   * НЕ снимает рубильник (файл KILL_OWN_SEND) -- это отдельный прогон
+#     run_vps_lane_kill_nl.yml со своими тремя гейтами;
+#   * НЕ меняет сам порог (env LANE_KILL_DROP_SOL) и ничего не перезапускает;
+#   * НЕ придумывает число: баланс берётся ПО ЦЕПИ тем же вызовом, которым его
+#     берёт служба.
+#
+# ПРЕЖНЯЯ ЗАПИСЬ НЕ ПРОПАДАЕТ: уезжает в копию lane_day.json.bak-<метка> и
+# называется в новой записи полями prezhnij_open_sol / prezhnij_open_ts.
+# Самопроверка денежного пути: после записи файл перечитывается ТЕМ ЖЕ модулем
+# службы, и если он не говорит "просадка ноль, рубильник не ставим" -- файл
+# возвращается из копии.
+on:
+  workflow_dispatch:
+    inputs:
+      rezhim:
+        description: "'pokazat' -- только показать отсчёт и порог; 'sbros' -- перенести начало отсчёта на сейчас"
+        required: true
+        default: "pokazat"
+      prichina:
+        description: "почему переносим (обязательно для sbros; уезжает файлом, не знаками в команде)"
+        required: false
+        default: ""
+      confirm:
+        description: "для rezhim=sbros: ровно SBROS -- иначе перенос не делается"
+        required: false
+        default: ""
+
+concurrency:
+  group: lane-day-sbros
+  cancel-in-progress: false
+
+env:
+  HOST: 127.0.0.1
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  CODE_DIR: /home/bot/bloom_executor
+  VENV: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: data/lane_day_sbros.txt
+
+jobs:
+  sbros:
+    runs-on: ${{ fromJSON('["self-hosted","nl-host"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Самопроверка скрипта ДО любого касания хоста"
+        run: |
+          set -e
+          set -o pipefail
+          python3 -m py_compile deploy/checks/lane_day_sbros.py
+          # 8/8: до сброса порог рубит, после -- просадка ноль, порог ОСТАЛСЯ
+          # порогом (новая просадка 2.1 снова рубит), а не сошлась самопроверка
+          # -- файл возвращается из копии. Падает -- хост не трогаем вовсе.
+          python3 deploy/checks/lane_day_sbros.py --self-test | tail -2
+
+      - name: "Гейт: подтверждение словом и причина (только для sbros)"
+        if: ${{ inputs.rezhim == 'sbros' }}
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          PRICHINA: ${{ inputs.prichina }}
+        run: |
+          set -e
+          [ "$CONFIRM" = "SBROS" ] || { echo "СБОЙ: нужно confirm=SBROS"; exit 1; }
+          [ -n "$PRICHINA" ] || { echo "СБОЙ: нужна причина"; exit 1; }
+          # Текст уходит в файл, а не в команду: в команде на хосте остаются
+          # только литералы.
+          printf '%s\n' "$PRICHINA" > /tmp/lane_day_prichina.txt
+          echo "подтверждение принято, причина записана файлом"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "СБОЙ: VPS_SSH_KEY не задан"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Показать отсчёт и порог как их видит служба (только чтение)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/lane_day_sbros.py" < deploy/checks/lane_day_sbros.py
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -a; . /etc/bloom-executor/env; set +a
+            cd $CODE_DIR
+            $VENV /tmp/lane_day_sbros.py --pokazat" | tee "$OUT"
+
+      - name: "sbros: перенести начало отсчёта на сейчас"
+        if: ${{ inputs.rezhim == 'sbros' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/lane_day_prichina.txt" < /tmp/lane_day_prichina.txt
+          ssh -n $SSH_OPTS root@"$HOST" "
+            set -e
+            set -a; . /etc/bloom-executor/env; set +a
+            cd $CODE_DIR
+            $VENV /tmp/lane_day_sbros.py --sbros --prichina-fajl /tmp/lane_day_prichina.txt
+            rc=\$?
+            chown bot:bot $STATE_DIR/lane_day.json 2>/dev/null || true
+            ls -l $STATE_DIR/lane_day.json*
+            rm -f /tmp/lane_day_sbros.py /tmp/lane_day_prichina.txt
+            exit \$rc" | tee -a "$OUT"
+
+      - name: "Служба читает новый отсчёт (признак жизни)"
+        if: ${{ always() }}
+        run: |
+          set -e
+          # Ждём до подтверждения службой, а не фиксированные секунды: признак
+          # жизни пишется раз в пульс, и молча закончиться здесь нельзя.
+          PREDEL_S=180; SHAG_S=10; proshlo=0; podtverzhdeno=net
+          while [ "$proshlo" -lt "$PREDEL_S" ]; do
+            out=$(ssh -n $SSH_OPTS root@"$HOST" "grep -A8 '\"balance_day_threshold\"' $STATE_DIR/detector_status.json || true")
+            echo "$out"
+            case "$out" in *'"kill": false'*) podtverzhdeno=da ;; esac
+            [ "$podtverzhdeno" = da ] && break
+            sleep "$SHAG_S"; proshlo=$((proshlo + SHAG_S))
+          done
+          echo "$out" >> "$OUT"
+          [ "$podtverzhdeno" = da ] || { echo "СБОЙ: служба всё ещё видит просадку выше порога"; exit 1; }
+          echo "служба считает просадку от нового начала отсчёта" | tee -a "$OUT"
+
+      - name: "Ключей в отчёте быть не должно"
+        if: always()
+        run: python3 deploy/checks/bez_klyuchey_v_otchete.py "$OUT" || true
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          [ -f "$OUT" ] && git add "$OUT"
+          git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
+          git commit -m "Polosa: nachalo otschota sutochnogo rubilnika [automated]"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && exit 0
+            git pull --rebase -X theirs origin claude/nifty-sagan-r0polg
+            sleep 3
+          done
+          exit 1
