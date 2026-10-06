@@ -45,6 +45,10 @@ on:
         description: "'yes' -- ПЕРЕД снятием перенести начало суточного отсчёта рубильника (lane_day.json) на сейчас"
         required: false
         default: "no"
+      bez_geyta_samoproverok:
+        description: "'DA_SLOVO_VLADELCA' -- самопроверки всё равно гоняются и печатаются, но их падение не держит снятие (только по явному слову владельца)"
+        required: false
+        default: "no"
 
 concurrency:
   group: lane-kill-nl
@@ -121,8 +125,22 @@ jobs:
 
       - name: "clear: гейт 2 -- самопроверки полосы и сторожа НА ХОСТЕ"
         if: ${{ inputs.mode == 'clear' }}
+        env:
+          BEZ_GEYTA: ${{ inputs.bez_geyta_samoproverok }}
         run: |
           set -e
+          # ОБХОД ТОЛЬКО ПО ЯВНОМУ СЛОВУ ВЛАДЕЛЬЦА (06.10, "разрешаю записанный
+          # в журнал обход гейта"). Проверки ниже всё равно выполняются и
+          # печатаются; при BEZ_GEYTA их падение не держит снятие, и об этом в
+          # журнале стоит отдельная строка. Без этого входа гейт работает как
+          # раньше и роняет шаг.
+          proval() {
+            if [ "$BEZ_GEYTA" = "DA_SLOVO_VLADELCA" ]; then
+              echo "ГЕЙТ ОБОЙДЁН ПО СЛОВУ ВЛАДЕЛЬЦА: падение проверки не держит снятие"
+            else
+              echo "СБОЙ: проверка не прошла -- рубильник не снимаю"; exit 1
+            fi
+          }
           # Самопроверки ТОГО кода, что лежит на хосте, а не того, что в
           # репозитории: снимаем рубильник с работающей службы, и проверять
           # надо её. `set -e` внутри удалённой оболочки роняет шаг, если
@@ -202,15 +220,15 @@ jobs:
             hh=$(ssh -n $SSH_OPTS root@127.0.0.1 "sha256sum $CODE_DIR/$m" | cut -d' ' -f1)
             rr=$(sha256sum "analysis/$m" | cut -d' ' -f1)
             echo "$m: хост ${hh:0:12} / ветка ${rr:0:12}"
-            [ -n "$hh" ] && [ "$hh" = "$rr" ] || { echo "СБОЙ: на хосте не тот $m -- рубильник не снимаю"; exit 1; }
+            [ -n "$hh" ] && [ "$hh" = "$rr" ] || { echo "расхождение sha256 у $m"; proval; }
           done
           cd analysis
           for m in bloom_own_send.py bloom_seller.py; do
             out=$(python3 "$m" --self-test 2>&1) || {
               echo "--- $m"
               printf '%s\n' "$out" | grep -vE '\[ok  \]' | tail -25
-              echo "СБОЙ: самопроверка $m не прошла -- рубильник не снимаю"
-              exit 1
+              echo "самопроверка $m не прошла"
+              proval
             }
             printf '%s\n' "$out" | tail -1
           done
