@@ -277,13 +277,20 @@ jobs:
           printf '%s\n' "$PRICHINA" > /tmp/lane_day_prichina.txt
           ssh $SSH_OPTS root@127.0.0.1 "cat > /tmp/lane_day_sbros.py" < deploy/checks/lane_day_sbros.py
           ssh $SSH_OPTS root@127.0.0.1 "cat > /tmp/lane_day_prichina.txt" < /tmp/lane_day_prichina.txt
+          # ЗАПАСНОЙ ПУТЬ -- СОБСТВЕННАЯ ВЕТКА СЛУЖБЫ "НОВЫЕ СУТКИ". Скрипт
+          # берёт баланс по цепи сам, и если это не удалось (06.10 18:48Z он
+          # упал на хосте), отсчёт всё равно надо перенести: файл суток
+          # отводится в копию, и служба на следующем же пульсе запишет начало
+          # отсчёта по ТЕКУЩЕМУ балансу своей же функцией. Прежняя запись не
+          # теряется -- она в копии рядом.
           ssh -n $SSH_OPTS root@127.0.0.1 "
-            set -e
             set -a; . /etc/bloom-executor/env; set +a
             cd $CODE_DIR
-            $VENV /tmp/lane_day_sbros.py --sbros --prichina-fajl /tmp/lane_day_prichina.txt
+            $VENV /tmp/lane_day_sbros.py --sbros --prichina-fajl /tmp/lane_day_prichina.txt \
+              || { echo 'скрипт не справился -- отводим файл суток, отсчёт запишет сама служба'; \
+                   mv -f $STATE_DIR/lane_day.json $STATE_DIR/lane_day.json.bak-\$(date -u +%Y%m%dT%H%M%SZ); }
             chown bot:bot $STATE_DIR/lane_day.json 2>/dev/null || true
-            ls -l $STATE_DIR/lane_day.json*
+            ls -l $STATE_DIR/lane_day.json* 2>/dev/null || echo 'файла суток нет -- служба создаст его сама'
             rm -f /tmp/lane_day_sbros.py /tmp/lane_day_prichina.txt"
 
       - name: "clear: снять рубильник (прежняя причина сохраняется)"
