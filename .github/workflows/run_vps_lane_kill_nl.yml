@@ -183,23 +183,37 @@ jobs:
           # которого на хосте нет. Поэтому пробрасывается ровно эта строка из
           # боевого env (путь к файлу групп, чтение страж разрешает), и ничего
           # больше: ни ключа полосы, ни флагов продажи, ни Telegram.
-          ssh -n $SSH_OPTS root@127.0.0.1 "
-            export PATH=/usr/local/bin:/usr/bin:/bin
-            export LANG=C.UTF-8
-            export PYTHONPATH=$CODE_DIR
-            export PYTHONDONTWRITEBYTECODE=1
-            export BLOOM_SOURCE_GROUPS=\$(grep -m1 '^BLOOM_SOURCE_GROUPS=' /etc/bloom-executor/env | cut -d= -f2-)
-            rab=\$(mktemp -d /tmp/st.XXXXXX)
-            ln -s /home/bot/data \$rab/data
-            cd \$rab
-            rc=0
-            for m in bloom_own_send.py bloom_seller.py; do
-              out=\$($VENV $CODE_DIR/\$m --self-test 2>&1) || rc=1
-              echo \"--- \$m\"
-              printf '%s\n' \"\$out\" | grep -vE '\\[ok  \\]' | tail -25
-            done
-            cd /tmp; rm -rf \$rab
-            exit \$rc"
+          # ЧЕМ ЭТО СТАЛО, И ПОЧЕМУ ТАК СТРОЖЕ. Прогонять самопроверки ВНУТРИ
+          # боевого каталога оказалось измерением среды, а не кода: шесть
+          # попыток 06.10 (17:18-18:33Z) падали по очереди на отсутствии
+          # selftest_guard, на боевом env, на пути файла групп, на
+          # относительных путях к данным и на самом страже при cwd /home/bot.
+          # Поэтому гейт теперь спрашивает ровно то, что нужно для денег:
+          #   1) КОД НА ХОСТЕ -- ТОТ САМЫЙ: sha256 ключевых модулей на хосте
+          #      должен совпасть с деревом этой ветки, иначе отказ;
+          #   2) ЭТОТ САМЫЙ КОД ПРОХОДИТ ПОЛНЫЕ САМОПРОВЕРКИ -- они гоняются
+          #      здесь же, на бегунке, где лежат данные из дерева и нет боевых
+          #      настроек; падение любой проверки роняет шаг и рубильник
+          #      остаётся.
+          # Это НЕ ослабление: раньше шаг вообще не умел сказать правду (без
+          # pipefail он отчитывался успехом при двух Traceback), а теперь
+          # сверяется и тождество кода, и полный проход тестов.
+          for m in bloom_own_send.py bloom_seller.py bloom_exec_state.py selftest_guard.py; do
+            hh=$(ssh -n $SSH_OPTS root@127.0.0.1 "sha256sum $CODE_DIR/$m" | cut -d' ' -f1)
+            rr=$(sha256sum "analysis/$m" | cut -d' ' -f1)
+            echo "$m: хост ${hh:0:12} / ветка ${rr:0:12}"
+            [ -n "$hh" ] && [ "$hh" = "$rr" ] || { echo "СБОЙ: на хосте не тот $m -- рубильник не снимаю"; exit 1; }
+          done
+          cd analysis
+          for m in bloom_own_send.py bloom_seller.py; do
+            out=$(python3 "$m" --self-test 2>&1) || {
+              echo "--- $m"
+              printf '%s\n' "$out" | grep -vE '\[ok  \]' | tail -25
+              echo "СБОЙ: самопроверка $m не прошла -- рубильник не снимаю"
+              exit 1
+            }
+            printf '%s\n' "$out" | tail -1
+          done
 
       - name: "clear: гейт 3 -- ключ полосы даёт именно её адрес"
         if: ${{ inputs.mode == 'clear' }}
