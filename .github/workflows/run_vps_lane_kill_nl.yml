@@ -133,13 +133,21 @@ jobs:
           # доставки деплоя), в журнале стояли два Traceback, а шаг
           # отчитался УСПЕХОМ: без pipefail код берётся от `tail`, а он всегда
           # 0. Гейт, который не умеет не пройти, гейтом не является.
+          # ИМЕНА УПАВШИХ ПРОВЕРОК ВИДНЫ, А КОД ВОЗВРАТА -- ОТ PYTHON, НЕ ОТ
+          # ФИЛЬТРА. `--self-test | tail -1` показывал только итоговую строку:
+          # что именно упало, приходилось искать в журнале прогона, которого
+          # нет. Теперь вывод держится в переменной, фильтр печатает СБОЙ-строки
+          # и итог, а наружу уходит код самого python.
           ssh -n $SSH_OPTS root@127.0.0.1 "
-            set -e
-            set -o pipefail
             set -a; . /etc/bloom-executor/env; set +a
             cd $CODE_DIR
-            $VENV bloom_own_send.py --self-test | tail -1
-            $VENV bloom_seller.py --self-test | tail -1"
+            rc=0
+            for m in bloom_own_send.py bloom_seller.py; do
+              out=\$($VENV \$m --self-test 2>&1) || rc=1
+              echo "--- \$m"
+              printf '%s\n' "\$out" | grep -E 'СБОЙ|Error|Traceback|пройдено' | tail -15
+            done
+            exit \$rc"
 
       - name: "clear: гейт 3 -- ключ полосы даёт именно её адрес"
         if: ${{ inputs.mode == 'clear' }}
@@ -253,9 +261,14 @@ jobs:
           PREDEL_S=180
           SHAG_S=5
           proshlo=0
+          # ПЕЧАТАЕМ ТОЛЬКО ИЗМЕНЕНИЯ. Прежний цикл выводил пять строк признака
+          # жизни каждые пять секунд -- за 180 с это 180 строк, в которых
+          # тонули сообщения предыдущих шагов (06.10 именно так потерялась
+          # причина падения гейта самопроверок).
+          proshloe=""
           while [ "$proshlo" -lt "$PREDEL_S" ]; do
             out=$(ssh -n $SSH_OPTS root@127.0.0.1 "grep -A4 '\"lane_kill\"' $STATE_DIR/detector_status.json || true")
-            echo "$out"
+            if [ "$out" != "$proshloe" ]; then echo "$out"; proshloe="$out"; fi
             case "$mode_now" in
               clear) case "$out" in *false*) echo "служба больше не видит рубильник"; podtverzhdeno=da ;; esac ;;
               status) podtverzhdeno=da ;;
