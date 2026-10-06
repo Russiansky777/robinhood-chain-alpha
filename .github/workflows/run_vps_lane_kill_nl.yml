@@ -144,7 +144,14 @@ jobs:
           # сделан. При cwd = $CODE_DIR любая запись относительным путём (и
           # __pycache__ заодно) упирается в этот запрет, и самопроверка падает
           # не из-за кода, а из-за места запуска. Поэтому cwd -- временный
-          # каталог в /tmp, модули ищутся через PYTHONPATH, байткод не пишется.
+          # каталог службы, модули ищутся через PYTHONPATH, байткод не пишется.
+          #
+          # ОТКУДА ЗАПУСКАТЬ. Из /tmp не годится: три проверки полосы ищут
+          # ДАННЫЕ относительным путём (data/c2_pool_samples, образцы USDC-ноги)
+          # и в /tmp их не находят -- 06.10 18:20Z это дало 704/707 строками
+          # [ПЛОХО], то есть провал по месту запуска, а не по коду. Поэтому cwd
+          # -- /home/bot, где у службы и лежит data/. Запись туда по-прежнему
+          # запрещена стражем, а байткод не пишется вовсе.
           # В журнал печатаются последние строки вывода: по одному слову
           # "Traceback" причину не узнать.
           # ОКРУЖЕНИЕ САМОПРОВЕРКИ -- ЧИСТОЕ, ПОТОМУ ЧТО ОНА ПРОВЕРЯЕТ КОД, А НЕ
@@ -175,15 +182,13 @@ jobs:
             export PYTHONPATH=$CODE_DIR
             export PYTHONDONTWRITEBYTECODE=1
             export BLOOM_SOURCE_GROUPS=\$(grep -m1 '^BLOOM_SOURCE_GROUPS=' /etc/bloom-executor/env | cut -d= -f2-)
-            rab=\$(mktemp -d /tmp/st.XXXXXX)
-            cd \$rab
+            cd /home/bot
             rc=0
             for m in bloom_own_send.py bloom_seller.py; do
               out=\$($VENV $CODE_DIR/\$m --self-test 2>&1) || rc=1
               echo \"--- \$m\"
               printf '%s\n' \"\$out\" | grep -vE '\\[ok  \\]' | tail -25
             done
-            cd /tmp; rm -rf \$rab
             exit \$rc"
 
       - name: "clear: гейт 3 -- ключ полосы даёт именно её адрес"
