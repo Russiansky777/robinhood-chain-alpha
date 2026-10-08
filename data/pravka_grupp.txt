@@ -1,12 +1,9 @@
-leader.lane_trades: было True, стало False
-batch5.lane_trades: было True, стало False
-lane_s0.lane_trades: было True, стало False
-cand1.lane_trades: было True, стало False
-cand1_03.lane_trades: было 1, стало False
-cand2.lane_trades: было True, стало False
-cand3.lane_trades: было True, стало False
-cand2_03.lane_trades: было 1, стало False
-konveyer.lane_trades: было 1, стало False
-адреса сверены: было 632, стало 632, ни один не потерян (перенесено нарочно 0)
-самопроверка денежного пути пройдена; копия /home/bot/data/sources_2026-09-25.json.bak-20261008T161301Z
--rw-r--r-- 1 bot bot 148771 Oct  8 18:13 /home/bot/data/sources_2026-09-25.json
+создана группа vol_4vw: {"lane_size": 0.01, "lane_trades": true, "bloom_trades": false, "bloom_sol": null, "fanout": false, "min_target_sol": 2.0, "max_slots_from_source": 3, "skip_flippers": true, "allow_taxed_route": true, "slippage": 0.4, "min_pool_sol_reserve": null, "lane_open_max": 3, "hold_slots": 36, "note": "Группа объёмного источника 4vw54Bmo (слово владельца 09.10): поля как у lane_s0, своё -- удержание 36 слотов (~10 с при длине слота 0.274 с), допуск по цене 0.40, порог входа 2.0 SOL-экв. По Правилу 8 первая сделка идёт билетом 0.01 полным кругом (покупка, продажа по таймеру, закрытие счёта, итог по цепи), после неё билет 0.3 без нового слова. Адрес перенесён из log_only.", "lane_sol": 0.01}
+создана группа vol_4vw: lane_pools = ["amm_v4", "bonding", "clmm", "cpmm", "damm2", "dbc", "dlmm", "launchlab", "pump_amm", "two_step", "whirlpool"] (11 шт.)
+убран из log_only (1 мест)
+4vw54BmA: ['log_only'] -> vol_4vw
+поле vol_4vw.note политика не читает -- не сверяю
+vol_4vw.lane_pools сверено списком: 11 шт.
+адреса сверены: было 632, стало 632, ни один не потерян (перенесено нарочно 1)
+самопроверка денежного пути пройдена; копия /home/bot/data/sources_2026-09-25.json.bak-20261008T231820Z
+-rw-r--r-- 1 bot bot 150048 Oct  9 01:18 /home/bot/data/sources_2026-09-25.json
