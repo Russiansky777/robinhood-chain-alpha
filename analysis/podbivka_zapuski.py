@@ -30,6 +30,7 @@ import io
 import json
 import os
 import re
+import statistics
 import sys
 import time
 from pathlib import Path
@@ -42,6 +43,8 @@ WSOL = "So11111111111111111111111111111111111111112"
 ВЫХОДЫ = (20, 40, 60, 90, 120, 160, 230)
 ОКНА_С = (5, 15, 30, 60)
 КРИВЫЕ = {"pump", "raydium-launchpad"}
+# пулы, у которых модель берёт наценку входа/выхода из подогнанных f и g, а не из тарифа
+XYK = {"raydium-cpmm", "meteora-damm-v1", "pump-amm"}
 
 р_sig = re.compile(r'"signature":\s*"([1-9A-HJ-NP-Za-km-z]{64,90})"')
 р_pool = re.compile(r'"poolId":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
@@ -55,12 +58,24 @@ WSOL = "So11111111111111111111111111111111111111112"
 р_action = re.compile(r'"action":\s*"([a-zA-Z_]+)"')
 р_qam = re.compile(r'"quoteAmount":\s*"?([0-9.eE+-]+)')
 р_q = re.compile(r'"(quoteInPool|tokensInPool|vQuoteInBondingCurve|vTokensInBondingCurve)":\s*"?([0-9.eE+-]+)')
+р_fee = re.compile(r'"poolFeeRate":\s*"?([0-9.eE+-]+)')
+р_tam = re.compile(r'"tokenAmount":\s*"?([0-9.eE+-]+)')
 
 
 def часы(с: str, сколько: int) -> list:
     т = time.strptime(с, "%Y-%m-%dT%H")
     н = int(time.mktime(т)) - time.timezone
     return [time.strftime("%Y/%m/%d/%H", time.gmtime(н + 3600 * k)) for k in range(сколько)]
+
+
+def число(м) -> float | None:
+    """Первая группа совпадения как float; None, если совпадения нет или это не число."""
+    if not м:
+        return None
+    try:
+        return float(м.group(1))
+    except ValueError:
+        return None
 
 
 def состояние(стр: str) -> tuple | None:
@@ -95,6 +110,28 @@ def запись(з: dict) -> dict:
         волна[f"{т}с"] = {"покупок": len(пок),
                           "кошельков": len({e["кто"] for e in пок if e["кто"]}),
                           "sol": round(sum(e["sol"] or 0 for e in пок), 4)}
+    # Наценка для модели. Пулам из XYK `сделка_по_состояниям` требует подогнанные f и g,
+    # остальным -- тариф пула. Подгонка та же, что в podbivka_arhiv_den.модель(): по парам
+    # соседних событий, у которых известно предыдущее состояние и оба объёма свопа.
+    тариф = next((e["тариф"] for e in ряд if e.get("тариф") is not None), None)
+    f_, g_ = None, None
+    if з["пул"] in XYK:
+        fs, gs = [], []
+        for пред, e in zip(ряд, ряд[1:]):
+            if not пред["сост"] or not e.get("ток") or not e.get("кв"):
+                continue
+            x0, y0 = пред["сост"]
+            dy, dx = e["ток"], e["кв"]
+            if e["действие"] == "buy" and y0 > dy > 0 and dx > 0:
+                v = x0 * dy / ((y0 - dy) * dx)
+                if 0.5 <= v <= 1.0:
+                    fs.append(v)
+            elif e["действие"] == "sell" and dy > 0 and x0 > 0:
+                v = dx * (y0 + dy) / (x0 * dy)
+                if 0.5 <= v <= 1.0:
+                    gs.append(v)
+        f_ = statistics.median(fs) if fs else (1 - тариф if тариф is not None else None)
+        g_ = statistics.median(gs) if gs else (1 - тариф if тариф is not None else None)
     цены = [(e["блок"], e["сост"][0] / e["сост"][1]) for e in ряд if e["сост"]]
     пик = max(цены, key=lambda x: x[1]) if цены else None
     п0 = цены[0][1] if цены else None
@@ -103,7 +140,8 @@ def запись(з: dict) -> dict:
     return {
         "минт": з["минт"], "poolId": з["poolId"], "пул": з["пул"], "блок": б0, "ts": з["ts"],
         "создатель": з["создатель"], "правило": з["правило"], "quoteMint": з["quoteMint"],
-        "событий": len(ряд), "вход": вход, "выход": выход, "волна": волна,
+        "событий": len(ряд), "тариф": тариф, "f": f_, "g": g_,
+        "вход": вход, "выход": выход, "волна": волна,
         "в_блоке_создания": {"покупок": len(в_блоке),
                              "кошельков": len({e["кто"] for e in в_блоке if e["кто"]}),
                              "sol": round(sum(e["sol"] or 0 for e in в_блоке), 4),
@@ -196,7 +234,9 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                         sol = float(qм.group(1))
                     except ValueError:
                         sol = None
-                e = {"блок": блок, "ts": ts, "действие": д, "кто": кто, "sol": sol, "сост": сост}
+                e = {"блок": блок, "ts": ts, "действие": д, "кто": кто, "sol": sol,
+                     "сост": сост, "тариф": число(р_fee.search(стр)),
+                     "ток": число(р_tam.search(стр)), "кв": число(qм)}
                 if pid in молодые:
                     if блок <= молодые[pid]["блок"] + а.slotov:
                         молодые[pid]["ряд"].append(e)
