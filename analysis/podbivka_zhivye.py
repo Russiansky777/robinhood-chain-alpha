@@ -64,7 +64,8 @@ def итог_сделки(р: dict) -> tuple[float | None, str]:
         "билет_sol", "bilet_ot_rezerva", "bilet_rezerv_sol", "pool_reserve_sol",
         "pool_reserve_kind", "nalog_tokena_bps", "nalog_marshruta_bps", "komissiya_pula_pct",
         "chuzhie_prodazhi_sol", "chuzhih_prodazh", "source_sig", "buy_sig", "sell_sig",
-        "сходится", "sverka_ok", "итог_po_polyam_sol")
+        "сходится", "sverka_ok", "итог_po_polyam_sol", "итог_po_cepi_chasti",
+        "итог_po_cepi_pochemu_net")
 
 
 def сделка(р: dict, файл: str, снято: str) -> dict:
