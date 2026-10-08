@@ -40,14 +40,29 @@ from pathlib import Path
 ЗАДЕРЖКА = 1.2            # пауза между запросами, чтобы не долбить чужой сайт
 ПРЕДЕЛ_СТРАНИЦ = 60       # на канал за один прогон
 
+# Поиск по каталогам отдаёт только собственные каналы сайта: страницы выдачи рисуются
+# скриптом, в html имён нет (первый прогон 08.10 23:20Z -- 12 кандидатов, из них открылись
+# TGStat, telepulse, TGStatAPI, то есть сам сервис). Поэтому семена берутся из поиска по
+# вебу с указанием источника, а расширение списка идёт по блоку «похожие каналы» страниц
+# каталога -- это органика каталога, а не мой домысел.
+СЕМЕНА = [
+    ("solana100xcall", "tgstat.com/channel/@solana100xcall; telemetr.io/en/channels/2178813210-solana100xcall"),
+    ("shitcoingemsalert", "tgstat.com/channel/@shitcoingemsalert"),
+    ("SolanaMemeCoinss", "tgstat.com/channel/@SolanaMemeCoinss; t.me/s/solanamemecoinss"),
+    ("memecoin_finder", "tgstat.com/channel/@memecoin_finder"),
+    ("MemeCoin_Whale_Pumps", "tgstat.com/channel/@MemeCoin_Whale_Pumps"),
+    ("SolanaMemeCryptoCoins", "t.me/SolanaMemeCryptoCoins"),
+    ("solalphacalls", "t.me/solalphacalls"),
+    ("AlphaCallsSolana", "t.me/AlphaCallsSolana"),
+    ("Cabal777xbt", "t.me/s/Cabal777xbt"),
+    ("pumpfuncalls_sol", "telegramchannels.me/channels/pumpfuncalls_sol"),
+]
+# страницы каталога на каждое имя: из них берётся блок «похожие каналы»
+ПОХОЖИЕ = ("https://tgstat.com/channel/@{и}", "https://tgstat.ru/channel/@{и}")
 КАТАЛОГИ = [
-    "https://tgstat.ru/en/search?q=solana",
-    "https://tgstat.ru/en/search?q=memecoin",
-    "https://tgstat.ru/en/search?q=solana%20calls",
-    "https://tgstat.com/search?q=solana",
-    "https://telemetr.me/search?q=solana",
-    "https://telemetr.me/search?q=memecoin",
-    "https://www.solanatracker.io/leaderboard",
+    "https://tgstat.com/en/ratings/channels/cryptocurrency",
+    "https://tgstat.ru/cryptocurrency",
+    "https://telemetr.io/en/channels/catalog/cryptocurrency",
 ]
 р_имя = re.compile(r"(?:https?://)?t\.me/(?:s/)?([A-Za-z][A-Za-z0-9_]{4,31})")
 р_пост = re.compile(r'data-post="([^"/]+)/(\d+)"')
@@ -73,11 +88,16 @@ def достать(requests, url: str, попыток: int = 3):
     return 0, ""
 
 
+СОХРАНЁННОЕ: list = []
+
+
 def сохранить(url: str, текст: str) -> str:
     СЫРЬЁ.mkdir(parents=True, exist_ok=True)
     имя = hashlib.sha1(url.encode()).hexdigest()[:16] + ".html.gz"
-    with gzip.open(СЫРЬЁ / имя, "wt", encoding="utf-8") as ф:
+    путь = СЫРЬЁ / имя
+    with gzip.open(путь, "wt", encoding="utf-8") as ф:
         ф.write(f"<!-- {url} -->\n{текст}")
+    СОХРАНЁННОЕ.append(путь)
     return имя
 
 
@@ -90,40 +110,77 @@ def минты(текст: str) -> list:
     return из_
 
 
+def проверить(requests, и: str, откуда: str) -> dict:
+    """Открывается ли https://t.me/s/<имя> без входа и есть ли на странице посты."""
+    url = f"https://t.me/s/{и}"
+    код, текст = достать(requests, url)
+    посты = р_пост.findall(текст or "")
+    загл = ""
+    м = re.search(r'<meta property="og:title" content="([^"]*)"', текст or "")
+    if м:
+        загл = м.group(1)
+    подп = ""
+    м2 = re.search(r'tgme_page_extra"[^>]*>([^<]*)', текст or "")
+    if м2:
+        подп = м2.group(1).strip()
+    return {"имя": и, "откуда": откуда, "код": код, "постов_на_странице": len(посты),
+            "заголовок": загл, "подписчиков_строкой": подп,
+            "последний_id": max((int(x[1]) for x in посты), default=None),
+            "открывается_без_входа": bool(код == 200 and посты),
+            "сырьё": сохранить(url, текст) if текст else None}
+
+
 def режим_каталог(requests) -> dict:
-    кандидаты: collections.Counter = collections.Counter()
-    страницы = []
+    """Семена из веб-поиска (с источником) + расширение по «похожим каналам» каталога."""
+    служебные = {"share", "joinchat", "addstickers", "proxy", "socks", "iv", "telegram",
+                 "durov", "telegramtips", "s", "tgstat", "tgstatapi", "telepulse",
+                 "tgstat_bot", "TGStat", "telemetr", "telemetr_io"}
+    проверка, видели = [], set()
+    # 1. семена
+    for и, откуда in СЕМЕНА:
+        if и.lower() in видели:
+            continue
+        видели.add(и.lower())
+        проверка.append(проверить(requests, и, откуда))
+        time.sleep(ЗАДЕРЖКА)
+    # 2. похожие каналы со страниц каталога на каждое живое семя
+    страницы, новые = [], collections.Counter()
+    for и, _ in СЕМЕНА:
+        for шаб in ПОХОЖИЕ:
+            url = шаб.format(и=и)
+            код, текст = достать(requests, url)
+            файл = сохранить(url, текст) if текст else None
+            найдено = {x for x in р_имя.findall(текст or "")} | {
+                x for x in re.findall(r'/channel/@([A-Za-z][A-Za-z0-9_]{4,31})', текст or "")}
+            страницы.append({"url": url, "код": код, "сырьё": файл, "имён": len(найдено)})
+            for н in найдено:
+                if н.lower() not in видели and н.lower() not in служебные:
+                    новые[н] += 1
+            time.sleep(ЗАДЕРЖКА)
+            if код == 200 and найдено:
+                break
+    # 3. общие страницы каталога -- тоже как источник имён
     for url in КАТАЛОГИ:
         код, текст = достать(requests, url)
         файл = сохранить(url, текст) if текст else None
-        найдено = set(р_имя.findall(текст or ""))
+        найдено = {x for x in р_имя.findall(текст or "")} | {
+            x for x in re.findall(r'/channel/@([A-Za-z][A-Za-z0-9_]{4,31})', текст or "")}
         страницы.append({"url": url, "код": код, "сырьё": файл, "имён": len(найдено)})
-        for и in найдено:
-            кандидаты[и] += 1
+        for н in найдено:
+            if н.lower() not in видели and н.lower() not in служебные:
+                новые[н] += 1
         time.sleep(ЗАДЕРЖКА)
-    служебные = {"share", "joinchat", "addstickers", "proxy", "socks", "iv", "telegram",
-                 "durov", "telegramtips", "s"}
-    проверка = []
-    for и, встреч in кандидаты.most_common():
-        if и.lower() in служебные or len(и) < 5:
-            continue
-        url = f"https://t.me/s/{и}"
-        код, текст = достать(requests, url)
-        посты = р_пост.findall(текст or "")
-        постов = len(посты)
-        загл = ""
-        м = re.search(r'<meta property="og:title" content="([^"]*)"', текст or "")
-        if м:
-            загл = м.group(1)
-        проверка.append({"имя": и, "встреч_в_каталогах": встреч, "код": код,
-                         "постов_на_странице": постов, "заголовок": загл,
-                         "открывается_без_входа": bool(код == 200 and постов > 0),
-                         "сырьё": сохранить(url, текст) if текст else None})
-        time.sleep(ЗАДЕРЖКА)
-        if len([x for x in проверка if x["открывается_без_входа"]]) >= 60:
+    # 4. проверка новых, пока не наберётся 40 открытых
+    for н, встреч in новые.most_common(120):
+        if len([x for x in проверка if x["открывается_без_входа"]]) >= 40:
             break
-    return {"страницы_каталогов": страницы, "кандидатов": len(кандидаты),
-            "проверено": len(проверка), "каналы": проверка}
+        if н.lower() in видели:
+            continue
+        видели.add(н.lower())
+        проверка.append(проверить(requests, н, f"похожие каналы каталога, встреч {встреч}"))
+        time.sleep(ЗАДЕРЖКА)
+    return {"страницы_каталогов": страницы, "семян": len(СЕМЕНА),
+            "кандидатов": len(видели), "проверено": len(проверка), "каналы": проверка}
 
 
 def режим_история(requests, имена: list, с_utc: str) -> dict:
@@ -191,6 +248,8 @@ def main() -> int:
             "%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **из_}, ensure_ascii=False, indent=1),
             encoding="utf-8")
         R.записано(ф)
+        for с_ in СОХРАНЁННОЕ:
+            R.записано(с_)
         откр = [x["имя"] for x in из_["каналы"] if x["открывается_без_входа"]]
         print(f"каталог: кандидатов {из_['кандидатов']}, проверено {из_['проверено']}, "
               f"открываются без входа {len(откр)}: {', '.join(откр[:30])}", flush=True)
@@ -214,6 +273,8 @@ def main() -> int:
     R.записано(ф)
     for с in из_["по_каналам"]:
         R.записано(ПАПКА / с["файл"])
+    for с_ in СОХРАНЁННОЕ:
+        R.записано(с_)
     print(f"история: каналов {из_['каналов']}, постов "
           f"{sum(x['постов'] for x in из_['по_каналам'])}, минтов "
           f"{sum(x['минтов'] for x in из_['по_каналам'])}", flush=True)
