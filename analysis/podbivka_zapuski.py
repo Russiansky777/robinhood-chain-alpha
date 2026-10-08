@@ -43,6 +43,8 @@ WSOL = "So11111111111111111111111111111111111111112"
 ВЫХОДЫ = (20, 40, 60, 90, 120, 160, 230)
 ОКНА_С = (5, 15, 30, 60)
 КРИВЫЕ = {"pump", "raydium-launchpad"}
+# переезд в потоке размечен дважды: настоящий пул около 85 SOL и пылевая засевка на 1e-5 SOL
+РЕЗЕРВ_ПЕРЕЕЗДА = 10.0
 # пулы, у которых модель берёт наценку входа/выхода из подогнанных f и g, а не из тарифа
 XYK = {"raydium-cpmm", "meteora-damm-v1", "pump-amm"}
 
@@ -153,6 +155,7 @@ def запись(з: dict) -> dict:
 
 
 def main() -> int:  # noqa: PLR0912, PLR0915
+    global ВЫХОДЫ  # noqa: PLW0603
     import subprocess  # noqa: PLC0415
     import requests  # noqa: PLC0415
     # в venv облачного прогона стоят только requests и solders; zstandard проход
@@ -172,8 +175,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     р_.add_argument("--metka", default="")
     р_.add_argument("--tolko-slovar", action="store_true",
                     help="только словарь действий потока, без сбора запусков")
+    р_.add_argument("--vyhody", default="",
+                    help="горизонты выхода в слотах через запятую; пусто -- как по умолчанию")
+    р_.add_argument("--tolko-pereezd", action="store_true",
+                    help="держать только пулы переезда кривой (createPool/migrate) -- так "
+                         "можно взять окно в тысячу слотов, не выедая память на всех запусках")
     а = р_.parse_args()
     метка = а.metka or f"zap_{а.s}"
+    if а.vyhody:
+        ВЫХОДЫ = tuple(sorted(int(x) for x in а.vyhody.split(",") if x.strip()))
+        а.slotov = max(а.slotov, max(ВЫХОДЫ))
 
     словарь: collections.Counter = collections.Counter()
     счёт: collections.Counter = collections.Counter()
@@ -257,6 +268,13 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                     правило = "первое_событие_кривой"
                 if правило is None:
                     счёт["пул_не_запуск"] += 1
+                    continue
+                if а.tolko_pereezd and правило not in ("создание:createPool",
+                                                         "создание:migrate"):
+                    счёт["мимо_среза_переезда"] += 1
+                    continue
+                if а.tolko_pereezd and (сост is None or сост[0] < РЕЗЕРВ_ПЕРЕЕЗДА):
+                    счёт["переезд_без_резерва"] += 1
                     continue
                 счёт[правило] += 1
                 мм = р_mint.search(стр)
