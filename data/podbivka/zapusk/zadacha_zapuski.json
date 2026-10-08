@@ -1,9 +1,16 @@
 {
  "skript": "podbivka_zapuski.py",
  "zapuski": [
-  ["--s", "2026-10-07T06", "--chasov", "24", "--metka", "zap_2026-10-07T06"]
+  [
+   "--s",
+   "2026-10-07T06",
+   "--chasov",
+   "24",
+   "--metka",
+   "zap_2026-10-07T06"
+  ]
  ],
  "helius_rps_na_paket": 0,
  "parallelno": 1,
- "zachem": "Zapuski memkoinov (zadacha vladelca 08.10, punkt V): pervye slots zhizni pula. Snachala ODIN den -- nado uznat slovar deystviy potoka PumpApi (est li v nyom sobytie sozdaniya minta ili pul opoznayotsya tolko po pervomu sobytiyu) i skolko zapuskov v sutki vidno po cepi protiv 2366 raznyh mintov, kotorye vidit obychnyy prohod. Lokalno proverit nelzya: proksi kontejnera otdayot 403 na replay.pumpapi.io. Posle etogo dnya -- ostalnye 17 sutok okna. Shyft i Helius ne nuzhny, tolko arhiv."
+ "zachem": "Zapuski memkoinov (zadacha vladelca 08.10, punkt V): pervye slots zhizni pula. Snachala ODIN den -- nado uznat slovar deystviy potoka PumpApi (est li v nyom sobytie sozdaniya minta ili pul opoznayotsya tolko po pervomu sobytiyu) i skolko zapuskov v sutki vidno po cepi protiv 2366 raznyh mintov, kotorye vidit obychnyy prohod. Lokalno proverit nelzya: proksi kontejnera otdayot 403 na replay.pumpapi.io. Posle etogo dnya -- ostalnye 17 sutok okna. Shyft i Helius ne nuzhny, tolko arhiv. Pervyy zapusk 22:42Z upal: skript importiroval zstandard napryamuyu, a v venv progona stoyat tolko requests i solders -- teper dostavlyaetsya tak zhe, kak v podbivka_arhiv_den."
 }
