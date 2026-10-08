@@ -674,10 +674,6 @@
           "from": "прежний файл: log_only",
           "also": "список 543: Исторический ранг есть; прежнее ДА"
         },
-        "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9": {
-          "from": "прежний файл: log_only",
-          "also": "список 543: Исторический ранг есть; прежнее ДА"
-        },
         "4xY9T1Q7foJzJsJ6YZDSsfp9zkzeZsXnxd45SixduMmr": {
           "from": "прежний файл: log_only",
           "also": "список 543: Исторический ранг есть; прежнее ДА"
@@ -2717,6 +2713,39 @@
         "ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy": "слово владельца 03.10 вечером, п.4: адрес из суточного прохода Code-2 (data/konveyer/2026-10-03.json, раздел «добавить»); порядок тот же, что будет у применителя c3_konveyer_primenitel"
       },
       "lane_open_max": 3
+    },
+    "vol_4vw": {
+      "lane_size": 0.01,
+      "lane_trades": true,
+      "bloom_trades": false,
+      "bloom_sol": null,
+      "fanout": false,
+      "min_target_sol": 2.0,
+      "max_slots_from_source": 3,
+      "skip_flippers": true,
+      "allow_taxed_route": true,
+      "slippage": 0.4,
+      "min_pool_sol_reserve": null,
+      "lane_open_max": 3,
+      "hold_slots": 36,
+      "lane_pools": [
+        "amm_v4",
+        "bonding",
+        "clmm",
+        "cpmm",
+        "damm2",
+        "dbc",
+        "dlmm",
+        "launchlab",
+        "pump_amm",
+        "two_step",
+        "whirlpool"
+      ],
+      "note": "Группа объёмного источника 4vw54Bmo (слово владельца 09.10): поля как у lane_s0, своё -- удержание 36 слотов (~10 с при длине слота 0.274 с), допуск по цене 0.40, порог входа 2.0 SOL-экв. По Правилу 8 первая сделка идёт билетом 0.01 полным кругом (покупка, продажа по таймеру, закрытие счёта, итог по цепи), после неё билет 0.3 без нового слова. Адрес перенесён из log_only.",
+      "lane_sol": 0.01,
+      "addresses": {
+        "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9": "перенесён из log_only по слову владельца 09.10: объёмный источник, круг 0.01 по Правилу 8"
+      }
     }
   },
   "prefixes_resolved": {
