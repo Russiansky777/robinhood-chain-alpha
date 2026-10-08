@@ -115,8 +115,15 @@ def запись(з: dict) -> dict:
 
 
 def main() -> int:  # noqa: PLR0912, PLR0915
+    import subprocess  # noqa: PLC0415
     import requests  # noqa: PLC0415
-    import zstandard  # noqa: PLC0415
+    # в venv облачного прогона стоят только requests и solders; zstandard проход
+    # доустанавливает себе сам (podbivka_arhiv_den, строка 435) -- делаем так же
+    try:
+        import zstandard  # noqa: PLC0415
+    except ModuleNotFoundError:
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "zstandard"], check=True)
+        import zstandard  # noqa: PLC0415
     import podbivka_arhiv_den as AD  # noqa: PLC0415
     import podbivka_run as R  # noqa: PLC0415
 
