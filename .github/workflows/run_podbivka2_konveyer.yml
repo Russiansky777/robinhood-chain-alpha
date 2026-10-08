@@ -70,7 +70,7 @@ jobs:
           echo "sutki: ${DEN}T17 -> +25 chasov, metka konv_${DEN}T17"
           $PY analysis/podbivka_arhiv_den.py \
             --s "${DEN}T17" --chasov 25 --porog 2 --okno 160 --ne-sol --okno-vsem \
-            --okno-dokupki 1800 --bilety 0.1,0.3 --pered 10 --bez-sobytij --bez-adresov \
+            --okno-dokupki 1800 --bilety 0.1,0.3 --pered 10 --bez-sobytij \
             --metka "konv_${DEN}T17"
 
       - name: "Nedelnaya chast (ponedelnik)"
