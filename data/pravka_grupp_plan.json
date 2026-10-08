@@ -1,205 +1,50 @@
 {
- "zachem": "Слово владельца 06.10: вернуть билеты как до 05.10, подъём и гибкий билет выключить. 1) bilet_dolya снято у ВСЕХ групп (у шести оно стояло, у остальных поля не было -- прогон скажет это словами). 2) Вместе с долей сняты её спутники bilet_potolok_sol и bilet_rezerv_max_sol у тех же шести: без доли они мертвы, а потолок 2.0 в файле при потолке полосы 0.5 только путал бы глаз. 3) Билеты (lane_size и lane_sol парой, иначе загрузчик гасит группу): lane_s0 0.5, cand1_03 0.5, batch5 0.3, cand2_03 0.3, cand1 0.1, cand2 0.1, cand3 0.1, konveyer 0.1, leader 0.01.",
- "chisla_po_cepi": "основание по цепи, 155 сделок 12:44:12Z 05.10 -> 00:21Z 06.10: вложено 167.3626 SOL, итог +0.0219 SOL, в плюсе 42.6 %; корзина резерва выше 150 SOL -- -1.6160 при 39.3 %, 50-150 -- +2.6249, ниже 50 -- +0.2524. То есть двадцатикратный билет дал ноль.",
- "chto_ne_menyaetsya": "HTYho9ioTJcS... остаётся в log_only, slippage 0.2 у cand1_03 остаётся (оба поставлены правкой 00:39:57Z 06.10) -- в плане их нет нарочно. sniper_src, cand1_05, krug_001, kandidaty, off, log_only по билетам не правятся. Порог входа (min_target_sol), lane_open_max, hold_slots, подписки -- без изменений. env этой правкой не трогается.",
+ "pochemu": "Pauza pokupok polosy do kalibrovannogo progona Code-2 (slovo vladelca 08.10): lane_trades=false u vseh torguyushchih grupp. Signaly pishutsya dalshe, prodazhi/rubilniki/env ne trogaem.",
  "pravki": [
   {
    "gruppa": "leader",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "batch5",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "lane_s0",
-   "udalit_pole": "bilet_dolya"
-  },
-  {
-   "gruppa": "off",
-   "udalit_pole": "bilet_dolya"
-  },
-  {
-   "gruppa": "log_only",
-   "udalit_pole": "bilet_dolya"
-  },
-  {
-   "gruppa": "sniper_src",
-   "udalit_pole": "bilet_dolya"
-  },
-  {
-   "gruppa": "kandidaty",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "cand1",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "cand1_03",
-   "udalit_pole": "bilet_dolya"
-  },
-  {
-   "gruppa": "cand1_05",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "cand2",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "cand3",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "cand2_03",
-   "udalit_pole": "bilet_dolya"
-  },
-  {
-   "gruppa": "krug_001",
-   "udalit_pole": "bilet_dolya"
+   "pole": "lane_trades",
+   "znachenie": "0"
   },
   {
    "gruppa": "konveyer",
-   "udalit_pole": "bilet_dolya"
-  },
-  {
-   "gruppa": "cand1",
-   "udalit_pole": "bilet_potolok_sol"
-  },
-  {
-   "gruppa": "cand1",
-   "udalit_pole": "bilet_rezerv_max_sol"
-  },
-  {
-   "gruppa": "cand2",
-   "udalit_pole": "bilet_potolok_sol"
-  },
-  {
-   "gruppa": "cand2",
-   "udalit_pole": "bilet_rezerv_max_sol"
-  },
-  {
-   "gruppa": "cand3",
-   "udalit_pole": "bilet_potolok_sol"
-  },
-  {
-   "gruppa": "cand3",
-   "udalit_pole": "bilet_rezerv_max_sol"
-  },
-  {
-   "gruppa": "cand2_03",
-   "udalit_pole": "bilet_potolok_sol"
-  },
-  {
-   "gruppa": "cand2_03",
-   "udalit_pole": "bilet_rezerv_max_sol"
-  },
-  {
-   "gruppa": "batch5",
-   "udalit_pole": "bilet_potolok_sol"
-  },
-  {
-   "gruppa": "batch5",
-   "udalit_pole": "bilet_rezerv_max_sol"
-  },
-  {
-   "gruppa": "lane_s0",
-   "udalit_pole": "bilet_potolok_sol"
-  },
-  {
-   "gruppa": "lane_s0",
-   "udalit_pole": "bilet_rezerv_max_sol"
-  },
-  {
-   "gruppa": "lane_s0",
-   "pole": "lane_size",
-   "znachenie": "0.5"
-  },
-  {
-   "gruppa": "lane_s0",
-   "pole": "lane_sol",
-   "znachenie": "0.5"
-  },
-  {
-   "gruppa": "cand1_03",
-   "pole": "lane_size",
-   "znachenie": "0.5"
-  },
-  {
-   "gruppa": "cand1_03",
-   "pole": "lane_sol",
-   "znachenie": "0.5"
-  },
-  {
-   "gruppa": "batch5",
-   "pole": "lane_size",
-   "znachenie": "0.3"
-  },
-  {
-   "gruppa": "batch5",
-   "pole": "lane_sol",
-   "znachenie": "0.3"
-  },
-  {
-   "gruppa": "cand2_03",
-   "pole": "lane_size",
-   "znachenie": "0.3"
-  },
-  {
-   "gruppa": "cand2_03",
-   "pole": "lane_sol",
-   "znachenie": "0.3"
-  },
-  {
-   "gruppa": "cand1",
-   "pole": "lane_size",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "cand1",
-   "pole": "lane_sol",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "cand2",
-   "pole": "lane_size",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "cand2",
-   "pole": "lane_sol",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "cand3",
-   "pole": "lane_size",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "cand3",
-   "pole": "lane_sol",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "konveyer",
-   "pole": "lane_size",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "konveyer",
-   "pole": "lane_sol",
-   "znachenie": "0.1"
-  },
-  {
-   "gruppa": "leader",
-   "pole": "lane_size",
-   "znachenie": "0.01"
-  },
-  {
-   "gruppa": "leader",
-   "pole": "lane_sol",
-   "znachenie": "0.01"
+   "pole": "lane_trades",
+   "znachenie": "0"
   }
  ]
 }
