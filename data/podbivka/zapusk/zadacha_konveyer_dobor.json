@@ -1,0 +1,17 @@
+{
+ "skript": "podbivka_arhiv_den.py",
+ "zapuski": [
+  ["--s", "2026-10-04T17", "--chasov", "25", "--porog", "2", "--okno", "160", "--ne-sol", "--okno-vsem",
+   "--okno-dokupki", "1800", "--bilety", "0.1,0.3", "--pered", "10", "--bez-sobytij",
+   "--metka", "konv_2026-10-04T17"],
+  ["--s", "2026-10-05T17", "--chasov", "25", "--porog", "2", "--okno", "160", "--ne-sol", "--okno-vsem",
+   "--okno-dokupki", "1800", "--bilety", "0.1,0.3", "--pered", "10", "--bez-sobytij",
+   "--metka", "konv_2026-10-05T17"],
+  ["--s", "2026-10-06T17", "--chasov", "25", "--porog", "2", "--okno", "160", "--ne-sol", "--okno-vsem",
+   "--okno-dokupki", "1800", "--bilety", "0.1,0.3", "--pered", "10", "--bez-sobytij",
+   "--metka", "konv_2026-10-06T17"]
+ ],
+ "helius_rps_na_paket": 0,
+ "parallelno": 3,
+ "zachem": "Dobor arhiva za 05.10 i 06.10: cheterye nochnyh prohoda konveyera (konv_2026-10-03T17 .. konv_2026-10-06T17) legli PUSTYMI -- po 330-400 bayt, signalov 0 pri 56-69 mln prochitannyh strok. Prichina: na vetke po umolchaniyu v .github/workflows/run_podbivka2_konveyer.yml ostalsya flag --bez-adresov (on znachit tolko celi, adresa obnulyayutsya), a cron striklyaet imenno s vetki po umolchaniyu; pravka lezhit tolko na claude/podbivka. Iz-za etogo v kesh signalov ne popali sutki 05.10 i 06.10 -- rovno otrezok podyoma bileta (05.10 12:44Z .. 06.10 17:01Z), i razdel rynok ili my po nemu ne schitaetsya. Tri progona zakryvayut 04.10T17 .. 07.10T18. Shyft, Helius ne nuzhen."
+}
