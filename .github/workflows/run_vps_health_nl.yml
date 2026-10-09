@@ -121,6 +121,21 @@ jobs:
                 --value | tr '\n' ' '" || echo "ssh не ответил")
             echo "$SVC: current/peak/max/high = $OUT" | tee -a data/vps_health_nl.txt
           done
+          # ОТКУДА ВЗЯТ ПРЕДЕЛ. 09.10 живой юнит детектора показал
+          # MemoryMax=infinity при MemoryHigh=512M, хотя прогон деплоя пишет
+          # MemoryMax=512M: значит действует не то, что в прогоне, а врезка
+          # (drop-in) или юнит от прежней версии. Без этих двух строк такое
+          # расхождение не видно вовсе, а предел памяти -- это причина OOM.
+          {
+            echo ""
+            echo "--- откуда предел памяти детектора ---"
+          } >> data/vps_health_nl.txt
+          ssh -n $SSH_OPTS root@$HOST "
+            systemctl show bloom-detector -p FragmentPath -p DropInPaths
+            grep -n -E 'Memory(Max|High|Limit)' /etc/systemd/system/bloom-detector.service \
+              /etc/systemd/system/bloom-detector.service.d/*.conf 2>/dev/null \
+              || echo 'строк Memory* в юните и врезках не найдено'" \
+            >> data/vps_health_nl.txt 2>&1 || echo "ssh не ответил" >> data/vps_health_nl.txt
 
       - name: "Признаки жизни и журналы"
         run: |
