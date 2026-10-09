@@ -1,68 +1,35 @@
-=== Полоса: воронка по журналу решений, 2026-10-09T17:05:17Z ===
-окно: с '2026-10-09T16:28:00Z' до 'конца журнала'
+=== Полоса: воронка по журналу решений, 2026-10-09T17:24:55Z ===
+окно: с '2026-10-09T17:20:00Z' до 'конца журнала'
 {
  "строк_всего": 400000,
- "попыток_полосы": 197,
- "в_окне": 17,
- "с": "2026-10-09T16:28:00Z",
+ "попыток_полосы": 99,
+ "в_окне": 3,
+ "с": "2026-10-09T17:20:00Z",
  "до": null,
  "группа": null,
  "по_этапам": {
-  "sent": 5,
-  "gate": 10,
-  "build": 2
+  "sent": 1,
+  "gate": 2
  },
  "по_группам": {
   "cand1": {
    "gate": 1
   },
-  "cand1_03": {
-   "gate": 1
-  },
   "cand2": {
-   "gate": 5
-  },
-  "cand3": {
    "gate": 1
-  },
-  "lane_s0": {
-   "gate": 2
   },
   "vol_4vw": {
-   "sent": 5,
-   "build": 2
+   "sent": 1
   }
  },
  "причины": {
-  "build": [
-   {
-    "почему": "шаблон: у источника инструкция c2ab1c46684d5b2f, не buy_exact_quote_in",
-    "раз": 1
-   },
-   {
-    "почему": "тип пула вне полосы: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA|6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-    "раз": 1
-   }
-  ],
   "gate": [
    {
     "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "раз": 5
-   },
-   {
-    "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-    "раз": 2
+    "раз": 1
    },
    {
     "почему": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
-    "раз": 1
-   },
-   {
-    "почему": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-    "раз": 1
-   },
-   {
-    "почему": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
     "раз": 1
    }
   ]
@@ -76,46 +43,10 @@
     }
    ]
   },
-  "cand1_03": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-     "раз": 1
-    }
-   ]
-  },
   "cand2": {
    "gate": [
     {
      "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-     "раз": 5
-    }
-   ]
-  },
-  "cand3": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
-     "раз": 1
-    }
-   ]
-  },
-  "lane_s0": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-     "раз": 2
-    }
-   ]
-  },
-  "vol_4vw": {
-   "build": [
-    {
-     "почему": "шаблон: у источника инструкция c2ab1c46684d5b2f, не buy_exact_quote_in",
-     "раз": 1
-    },
-    {
-     "почему": "тип пула вне полосы: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA|6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
      "раз": 1
     }
    ]
@@ -124,291 +55,117 @@
  "примеры": {
   "cand1/gate": [
    {
-    "ts_utc": "2026-10-09T16:33:54Z",
+    "ts_utc": "2026-10-09T17:22:25Z",
     "group": "cand1",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
-    "mint": "2x3kudsxqCWdWeZA1vSNr9uKkHUBQG81m5mBGRAPpump",
-    "source_sig": "8D8YFoTtHySYjKVVguiD6WHui7Taa5XnRwZ6XYE4TMF2K4dASSTX5c3dfw2WeF28GaqA5tqM75YYfY9kzazjMWc",
+    "mint": "EaNHa8ptX1676w1H4KymsX7pyiYpQpkbzFWMQaRvpump",
+    "source_sig": "4JzrFH9MszzP96MrYvXFuwWidVUEXwhLqbxfsAjQiQ3EJ57S34zsuhXxnuKwffFKVHJd6ys6Jv388wQRu5ebiGYx",
     "size_sol": 0.1,
-    "source": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw"
-   }
-  ],
-  "cand1_03/gate": [
-   {
-    "ts_utc": "2026-10-09T16:54:52Z",
-    "group": "cand1_03",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-    "mint": "9gQSAG4y44LB7XBRmstFg1ZrW9omqr4nVmrSwTjRV5L2",
-    "source_sig": "4xPVr3TYXr4j9sWpJbhsarggy1RZvWcT73X2scnb49S4Z8uobwRipovuFqVXd8jQHaHiYHToVeiJhfFZtzyMJjsX",
-    "size_sol": 0.5,
-    "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy"
+    "source": "2net6etAtTe3Rbq2gKECmQwnzcKVXRaLcHy2Zy1iCiWz"
    }
   ],
   "cand2/gate": [
    {
-    "ts_utc": "2026-10-09T16:29:57Z",
+    "ts_utc": "2026-10-09T17:21:34Z",
     "group": "cand2",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "mint": "HDiVMtmJpPYuNfs49CGQ5JxKHXcpXd6RQSmsZR6upump",
-    "source_sig": "61UGDgPPefx46VNJvaCbKrauFfMMPqBqEUfqVr8bW92HxUzhK2ZcJ84WBjx5LMX1iem2eQMpPYuCGfG8tUntJ6vM",
+    "mint": "5PCoAydvzWVceVYQsgYTXkSydhZ3FbH1bsuKw8mepump",
+    "source_sig": "5qHfYwDgDFhUSWbKVr7fPwSjuq8uoANmYKfjqGbh4crMW9kdmfAw49X5AtCX3Vt3v1wBfoctmR4P68bXKKsAR5BX",
     "size_sol": 0.1,
-    "source": "DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o"
-   },
-   {
-    "ts_utc": "2026-10-09T16:30:01Z",
-    "group": "cand2",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "mint": "DRwAY9CXyryJM6Bnn4hzKe63d1bi4PW94eAndiwymdfp",
-    "source_sig": "4KJ456BxtmmNZR5FPY42xzi6gX3tg3CisTP62o4ViKgBS4jPLo7QaoFcHr6gK5Rtdym8iEigxgMfqiJsodJin4Qv",
-    "size_sol": 0.1,
-    "source": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87"
-   },
-   {
-    "ts_utc": "2026-10-09T16:38:56Z",
-    "group": "cand2",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "mint": "EcZndAERfzNhLirHwfsy44dAyPSZazjDU83pa6RApump",
-    "source_sig": "4wSCUTVcFJ4DEg8dhwenz3rHniX4vnJrJpG6KbBQSkQZJun2hijBq6vhcPmcvXvXoqDcAfmwFv7z919Dgd2wYbNj",
-    "size_sol": 0.1,
-    "source": "DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o"
-   }
-  ],
-  "cand3/gate": [
-   {
-    "ts_utc": "2026-10-09T16:56:15Z",
-    "group": "cand3",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
-    "mint": "2x3kudsxqCWdWeZA1vSNr9uKkHUBQG81m5mBGRAPpump",
-    "source_sig": "5wR1T4ys3SF2ktZVCFUKoyDTpdAVFqTxH6kgdsoQpNnwqu8Kt9jDuSpPcUnSc3apEFrpAtGQKvUtCja363eZL7vL",
-    "size_sol": 0.1,
-    "source": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6"
-   }
-  ],
-  "lane_s0/gate": [
-   {
-    "ts_utc": "2026-10-09T16:39:55Z",
-    "group": "lane_s0",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-    "mint": "trWf4uM5rNn7kCXcQthZA4NwMZzCxjSBgQE4JFz8RGx",
-    "source_sig": "3pkFYU7wfXu4sa4eLTu917DZPKBM8jSFuDctbpW2a2UwQ1TzZsT197GV8vAewxLbqQASRQt44Y6kJioZu4eNYSxC",
-    "size_sol": 0.5,
-    "source": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb"
-   },
-   {
-    "ts_utc": "2026-10-09T17:02:58Z",
-    "group": "lane_s0",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-    "mint": "H3qohLn7pJPadsd9GvZvKzCDvbd5SLkfhapUyrLJpump",
-    "source_sig": "JfTGbzLPfmgxZKCb1em295XwrFNRnKgtRPdXSAzrYRfRUiA1dSiYJ9gjQpUvSSNjXQui2NmcEBJL6L669dZK8Q1",
-    "size_sol": 0.5,
-    "source": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb"
-   }
-  ],
-  "vol_4vw/build": [
-   {
-    "ts_utc": "2026-10-09T16:31:34Z",
-    "group": "vol_4vw",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "шаблон: у источника инструкция c2ab1c46684d5b2f, не buy_exact_quote_in",
-    "mint": "2x3kudsxqCWdWeZA1vSNr9uKkHUBQG81m5mBGRAPpump",
-    "source_sig": "46VzB1FFLYR6PNAhiuSF6aPdFTXBsPKUw7K18Ts9r1BkRaAfYm8ZdWxLrTKeafK71brFWk41pkmcXNsdx2Kbn8Dr",
-    "size_sol": 0.01,
-    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
-   },
-   {
-    "ts_utc": "2026-10-09T16:37:47Z",
-    "group": "vol_4vw",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "тип пула вне полосы: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA|6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
-    "mint": "8B5v6ve3VTCPVo3pvcdXjXtpRibR81PdTdBPRLv7pump",
-    "source_sig": "4s4ABExwjPDQyTs7ntbBwE6iLFKrU1jRgUfwksCVA3Fnv6HpQofAuuFwd2BYr9dm2UQQ9CcRuAH77w163RKdeVkE",
-    "size_sol": 0.01,
-    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+    "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy"
    }
   ],
   "vol_4vw/sent": [
    {
-    "ts_utc": "2026-10-09T16:29:24Z",
+    "ts_utc": "2026-10-09T17:21:32Z",
     "group": "vol_4vw",
     "stage": "sent",
     "ok": true,
     "sent": true,
-    "mint": "B4JrtKaNNqua7J5DsNwL8b8PT5GSFup3QMo6mUFdWzta",
-    "source_sig": "3VR2H1wXhNM2R3nadmE5do6EQmeG9niXoD8E2J3KNkVPNxXsEfE2f9KpuUm8T5C74miXLi6Q2kySQ8Zzw8YaffaF",
-    "signature": "4yDyYNjDhCQiRjwBLaq42tqUnTbuuVyUUrEj2yQJpjewXaUdxGPbVJC2KmTpcnRU9dgxy56GfJLcVeufpVxx4GAT",
-    "size_sol": 0.01,
-    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
-   },
-   {
-    "ts_utc": "2026-10-09T16:41:27Z",
-    "group": "vol_4vw",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "9Qtv4X85WY1Xzr5BtsameN7onwzDtP3afHriMfrhfYbA",
-    "source_sig": "JbK8acSpuzMzQxtcbjtgHvtwtKYA8ByCfWPyBJaqXGUbn4XnJVgjZTzLxNn1yowkgc11MeAhz6NesmzHq3afVbY",
-    "signature": "2p3RKmcmnRe7rdErfEqHr9wmjykS44y5ZjJUyzcrjuYFTXHKMohozwBeAiS7ah8EQ8TYTDPSaXiw9q2J4i3o3ygV",
-    "size_sol": 0.01,
-    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
-   },
-   {
-    "ts_utc": "2026-10-09T16:44:21Z",
-    "group": "vol_4vw",
-    "stage": "sent",
-    "ok": true,
-    "sent": true,
-    "mint": "HCL6poxvBMJdFWgbYnEoa3rCoyubhAV4573v8bRtpump",
-    "source_sig": "2h3MZpaLGdSFjMZHdSNh4Z4mDQcPFUsuBZY6svVbZjsKNJb21JzNSFWrfvzsaeWTNu1Bu8mByqoZae1s56RmQEaT",
-    "signature": "3gPUYcezz6sqgMg5r5ng58UqBin2vYy487tSL5nGBp5TaemGibqdRFtetRq1uAXb5jg9oVN9DCPoXWQFW3GkkR4y",
-    "size_sol": 0.01,
+    "mint": "88N698f7gRN5yQzNQBzj4voUXkJG5jYmQy9iVYTRpump",
+    "source_sig": "3c6Q9L3cUQ4HXcZHWqdLuasjMvg5T183HGCyhoaiTJcgWLYJKFfE3Vgz1RH8wXdZR8xCZUqpzaDGFErM7LRyjzYg",
+    "signature": "4CQdrh2nkJoxjKS56AK46bMEmmzaAhbN7sZvfHeRQK7t76V4qDN5m313hCLqx4h4PqhnF5Tmrt59Bb53vTRsK6sB",
+    "size_sol": 0.3,
     "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
    }
   ]
  },
- "первая_utc": "2026-10-09T16:29:24Z",
- "последняя_utc": "2026-10-09T17:04:28Z",
- "отправлено": 5,
+ "первая_utc": "2026-10-09T17:21:32Z",
+ "последняя_utc": "2026-10-09T17:22:25Z",
+ "отправлено": 1,
  "подписи": [
   {
-   "ts_utc": "2026-10-09T16:29:24Z",
+   "ts_utc": "2026-10-09T17:21:32Z",
    "group": "vol_4vw",
-   "signature": "4yDyYNjDhCQiRjwBLaq42tqUnTbuuVyUUrEj2yQJpjewXaUdxGPbVJC2KmTpcnRU9dgxy56GfJLcVeufpVxx4GAT"
-  },
-  {
-   "ts_utc": "2026-10-09T16:41:27Z",
-   "group": "vol_4vw",
-   "signature": "2p3RKmcmnRe7rdErfEqHr9wmjykS44y5ZjJUyzcrjuYFTXHKMohozwBeAiS7ah8EQ8TYTDPSaXiw9q2J4i3o3ygV"
-  },
-  {
-   "ts_utc": "2026-10-09T16:44:21Z",
-   "group": "vol_4vw",
-   "signature": "3gPUYcezz6sqgMg5r5ng58UqBin2vYy487tSL5nGBp5TaemGibqdRFtetRq1uAXb5jg9oVN9DCPoXWQFW3GkkR4y"
-  },
-  {
-   "ts_utc": "2026-10-09T16:51:42Z",
-   "group": "vol_4vw",
-   "signature": "PXPr1kxxz82nTPQQxZ3grxu3DGps6FBQpe9ziTbmNQE78E198VzvtczLwRzXB2zAq9JjziNEHm5Y18sRtAhQohE"
-  },
-  {
-   "ts_utc": "2026-10-09T17:04:28Z",
-   "group": "vol_4vw",
-   "signature": "3ewe99CNa9qov79WBHZS8jVG9wJNZHEUQXehj8JkijQVnti4KjhqKjfgLvfCrePA2oCXeHBszxCzb4S4YK5CJWvQ"
+   "signature": "4CQdrh2nkJoxjKS56AK46bMEmmzaAhbN7sZvfHeRQK7t76V4qDN5m313hCLqx4h4PqhnF5Tmrt59Bb53vTRsK6sB"
   }
  ],
  "подписи_отказов": {
   "cand1/gate": [
-   "8D8YFoTtHySYjKVVguiD6WHui7Taa5XnRwZ6XYE4TMF2K4dASSTX5c3dfw2WeF28GaqA5tqM75YYfY9kzazjMWc"
-  ],
-  "cand1_03/gate": [
-   "4xPVr3TYXr4j9sWpJbhsarggy1RZvWcT73X2scnb49S4Z8uobwRipovuFqVXd8jQHaHiYHToVeiJhfFZtzyMJjsX"
+   "4JzrFH9MszzP96MrYvXFuwWidVUEXwhLqbxfsAjQiQ3EJ57S34zsuhXxnuKwffFKVHJd6ys6Jv388wQRu5ebiGYx"
   ],
   "cand2/gate": [
-   "61UGDgPPefx46VNJvaCbKrauFfMMPqBqEUfqVr8bW92HxUzhK2ZcJ84WBjx5LMX1iem2eQMpPYuCGfG8tUntJ6vM",
-   "4KJ456BxtmmNZR5FPY42xzi6gX3tg3CisTP62o4ViKgBS4jPLo7QaoFcHr6gK5Rtdym8iEigxgMfqiJsodJin4Qv",
-   "4wSCUTVcFJ4DEg8dhwenz3rHniX4vnJrJpG6KbBQSkQZJun2hijBq6vhcPmcvXvXoqDcAfmwFv7z919Dgd2wYbNj",
-   "2hJtmDWbt2VNns1nXuYNDRkbDgpH1AXCE9V2Gou7du4cZc5P4FdLT2DF8aGptrHdeLtpepNsAva97kDfVAntukdY",
-   "5KN9h5kURYjYi8QsQ6WC1XALEYu3JUGafhLGxoMm8R7nHp58Grchfqa1HWZNUq8pPgMYQZSo6PRZhkzKo4AHGhSE"
-  ],
-  "cand3/gate": [
-   "5wR1T4ys3SF2ktZVCFUKoyDTpdAVFqTxH6kgdsoQpNnwqu8Kt9jDuSpPcUnSc3apEFrpAtGQKvUtCja363eZL7vL"
-  ],
-  "lane_s0/gate": [
-   "3pkFYU7wfXu4sa4eLTu917DZPKBM8jSFuDctbpW2a2UwQ1TzZsT197GV8vAewxLbqQASRQt44Y6kJioZu4eNYSxC",
-   "JfTGbzLPfmgxZKCb1em295XwrFNRnKgtRPdXSAzrYRfRUiA1dSiYJ9gjQpUvSSNjXQui2NmcEBJL6L669dZK8Q1"
-  ],
-  "vol_4vw/build": [
-   "46VzB1FFLYR6PNAhiuSF6aPdFTXBsPKUw7K18Ts9r1BkRaAfYm8ZdWxLrTKeafK71brFWk41pkmcXNsdx2Kbn8Dr",
-   "4s4ABExwjPDQyTs7ntbBwE6iLFKrU1jRgUfwksCVA3Fnv6HpQofAuuFwd2BYr9dm2UQQ9CcRuAH77w163RKdeVkE"
+   "5qHfYwDgDFhUSWbKVr7fPwSjuq8uoANmYKfjqGbh4crMW9kdmfAw49X5AtCX3Vt3v1wBfoctmR4P68bXKKsAR5BX"
   ]
  }
 }
 --- ves zhurnal bez okna ---
 {
  "строк_всего": 400000,
- "попыток_полосы": 197,
- "в_окне": 197,
+ "попыток_полосы": 99,
+ "в_окне": 99,
  "с": null,
  "до": null,
  "группа": null,
  "по_этапам": {
-  "gate": 151,
-  "build": 38,
-  "usdc_signaly_build": 3,
-  "sent": 5
+  "build": 30,
+  "gate": 55,
+  "usdc_signaly_build": 5,
+  "sent": 9
  },
  "по_группам": {
-  "batch5": {
-   "gate": 2
-  },
   "cand1": {
-   "gate": 28
+   "gate": 7
   },
   "cand1_03": {
-   "gate": 12
+   "gate": 5
   },
   "cand2": {
-   "gate": 54
-  },
-  "cand2_03": {
-   "gate": 1
+   "gate": 22
   },
   "cand3": {
-   "gate": 21
+   "gate": 2
   },
   "kandidaty": {
-   "gate": 4
+   "gate": 3
   },
   "krug_001": {
-   "gate": 4
+   "gate": 1
   },
   "lane_s0": {
-   "gate": 22
+   "gate": 12
   },
   "leader": {
    "gate": 2
   },
-  "sniper_src": {
-   "gate": 1
-  },
   "vol_4vw": {
-   "build": 38,
-   "usdc_signaly_build": 3,
-   "sent": 5
+   "build": 30,
+   "usdc_signaly_build": 5,
+   "sent": 9,
+   "gate": 1
   }
  },
  "причины": {
   "build": [
    {
     "почему": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "раз": 35
+    "раз": 27
    },
    {
     "почему": "шаблон: у источника инструкция c2ab1c46684d5b2f, не buy_exact_quote_in",
@@ -422,23 +179,23 @@
   "gate": [
    {
     "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "раз": 54
-   },
-   {
-    "почему": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
-    "раз": 28
-   },
-   {
-    "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
     "раз": 22
    },
    {
-    "почему": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
-    "раз": 21
+    "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
+    "раз": 12
+   },
+   {
+    "почему": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
+    "раз": 7
    },
    {
     "почему": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-    "раз": 12
+    "раз": 5
+   },
+   {
+    "почему": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+    "раз": 3
    }
   ],
   "usdc_signaly_build": [
@@ -453,23 +210,23 @@
    {
     "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/7abnFE3k",
     "раз": 1
+   },
+   {
+    "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
+    "раз": 1
+   },
+   {
+    "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/2Mruy3nQ",
+    "раз": 1
    }
   ]
  },
  "причины_по_группам": {
-  "batch5": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе batch5 полоса не торгует (lane_trades выключен)",
-     "раз": 2
-    }
-   ]
-  },
   "cand1": {
    "gate": [
     {
      "почему": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
-     "раз": 28
+     "раз": 7
     }
    ]
   },
@@ -477,7 +234,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-     "раз": 12
+     "раз": 5
     }
    ]
   },
@@ -485,15 +242,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-     "раз": 54
-    }
-   ]
-  },
-  "cand2_03": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе cand2_03 полоса не торгует (lane_trades выключен)",
-     "раз": 1
+     "раз": 22
     }
    ]
   },
@@ -501,7 +250,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
-     "раз": 21
+     "раз": 2
     }
    ]
   },
@@ -509,7 +258,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
-     "раз": 4
+     "раз": 3
     }
    ]
   },
@@ -517,7 +266,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
-     "раз": 4
+     "раз": 1
     }
    ]
   },
@@ -525,7 +274,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-     "раз": 22
+     "раз": 12
     }
    ]
   },
@@ -537,19 +286,11 @@
     }
    ]
   },
-  "sniper_src": {
-   "gate": [
-    {
-     "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-     "раз": 1
-    }
-   ]
-  },
   "vol_4vw": {
    "build": [
     {
      "почему": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-     "раз": 35
+     "раз": 27
     },
     {
      "почему": "шаблон: у источника инструкция c2ab1c46684d5b2f, не buy_exact_quote_in",
@@ -557,6 +298,12 @@
     },
     {
      "почему": "тип пула вне полосы: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA|6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+     "раз": 1
+    }
+   ],
+   "gate": [
+    {
+     "почему": "от слота источника прошло 7 слотов при пределе 3 (группа vol_4vw)",
      "раз": 1
     }
    ],
@@ -572,228 +319,160 @@
     {
      "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/7abnFE3k",
      "раз": 1
+    },
+    {
+     "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
+     "раз": 1
+    },
+    {
+     "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/2Mruy3nQ",
+     "раз": 1
     }
    ]
   }
  },
  "примеры": {
-  "batch5/gate": [
-   {
-    "ts_utc": "2026-10-09T11:54:11Z",
-    "group": "batch5",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе batch5 полоса не торгует (lane_trades выключен)",
-    "mint": "ArenDYANqFNkp8ZqAXt69vT5Dz7WD4zDfSpVw6oPpump",
-    "source_sig": "3iRa5rWQToAanQG7ZVangahBP3FjrfNSTmBeP2dW64afYHDr2wAYPW5nxBpysZjw624PQqJJ8XXg9jmACnE6PuKB",
-    "size_sol": 0.3,
-    "source": "HYh78tNpGBUcxoHgPU9v7VeP2wqSbkapuTzrfYHjfyLo"
-   },
-   {
-    "ts_utc": "2026-10-09T12:24:28Z",
-    "group": "batch5",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе batch5 полоса не торгует (lane_trades выключен)",
-    "mint": "7dCkdo2stVFNkXeyvkdQ82UhNJatwyaWFNve56kA28hj",
-    "source_sig": "2Uzpez8sxZUr3YDzjLLgvJcrcJAN51Qv25ZyZWuWov2quxp4oV9CvcVc4AVV7nDHFaso6LXQ4SgXxjMFgaQMmmGs",
-    "size_sol": 0.3,
-    "source": "HYh78tNpGBUcxoHgPU9v7VeP2wqSbkapuTzrfYHjfyLo"
-   }
-  ],
   "cand1/gate": [
    {
-    "ts_utc": "2026-10-09T08:46:05Z",
+    "ts_utc": "2026-10-09T14:47:07Z",
     "group": "cand1",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
-    "mint": "5eVvmFQ8jjW3WvdYANPoau37N8ENQ1kZAbpvBJL2pump",
-    "source_sig": "7MMiK7skFc7TFX8byFAEoKNfvAzzMkdDiRx9tk9c6HJp3CHXEjsPNtDq31EYLfDPGbbNUoyrKbpeA7tzKqa2jgP",
-    "size_sol": 0.1,
-    "source": "2net6etAtTe3Rbq2gKECmQwnzcKVXRaLcHy2Zy1iCiWz"
-   },
-   {
-    "ts_utc": "2026-10-09T08:58:16Z",
-    "group": "cand1",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
-    "mint": "hashB5SmxsD5zu5mKGuLGjsY1mkPEAUeLXk4pMtFEjq",
-    "source_sig": "3XTHqiM83xq7UAvU6w15fyLRVKzPk85JySnxDj8n4XQ9dLAgA6sN1WaR5FodZWLikdhAGNUG3rWRdjr552ESiuQg",
+    "mint": "DiHNMd2GCsjc73jMphP7V5RPUBcW3sYJbCvoGhiD5Pm5",
+    "source_sig": "ePzKezBuJvM4SSzRP297zn27rNr3PmRXwxCEiTYj84p1KqbAEF4XMXA6atm5eFxGZgSXBxKRjog2TaEiWHPfdJG",
     "size_sol": 0.1,
     "source": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw"
    },
    {
-    "ts_utc": "2026-10-09T09:54:01Z",
+    "ts_utc": "2026-10-09T15:10:59Z",
     "group": "cand1",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
-    "mint": "2mU1NrQzQL8HE3EgxydD8CWWp34h15TVUECuqyRRpump",
-    "source_sig": "58jyyxjy76hiHzknrDGCLfQLJea92GGTcjzgpLYdPNp5Dtm5jfq4HbtwyJ4jn3A6YMgu6ZknPogrAEvwuZMpiZpD",
+    "mint": "66VR6bjEV5DPSDhYSQyPAxNsY3dgmH6Lwgi5cyf2pump",
+    "source_sig": "2cZzfbhduwX7edADEcLaoDQcNrtHtNStGgvbbmzjvtx97DyfSeTr8KNDJQehVh46Kb7yTN5hwgpspJ4gwaHQy4KH",
+    "size_sol": 0.1,
+    "source": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw"
+   },
+   {
+    "ts_utc": "2026-10-09T15:24:24Z",
+    "group": "cand1",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
+    "mint": "6GH8KgotzU3Waqkw2FPoDw8R3qt7SVYwB71Wc6DchUXx",
+    "source_sig": "5oPuqPhziazVnZfjYRfiihLaggB2ecGUji6A6UcMVvkk2A4uCYhb8Z2By6NY6YSm26Gh33Xmg3eSnZEVNZwdv2h5",
     "size_sol": 0.1,
     "source": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw"
    }
   ],
   "cand1_03/gate": [
    {
-    "ts_utc": "2026-10-09T13:40:36Z",
+    "ts_utc": "2026-10-09T14:42:45Z",
     "group": "cand1_03",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-    "mint": "SEndN2w8WHq4anwsebcaAEQfpJxHnrWQN92HpBXUWit",
-    "source_sig": "diRfkfLrzHfZM1TpnfYc3GJSuUfBygX6fSGLdgrng3Z78bPVcr6zFGmwWYrhHpSCQtRK7ZVTCXp9ZQXHB2tDBiY",
+    "mint": "DiHNMd2GCsjc73jMphP7V5RPUBcW3sYJbCvoGhiD5Pm5",
+    "source_sig": "56QDhyNJgP8HEMfE4LTyjDboN2uLLwtavuH2Ynqy6SmDevEDoyA3HBpw2PyZcrgkbEoPFHdcLhVKXbtgheiVtREe",
     "size_sol": 0.5,
     "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy"
    },
    {
-    "ts_utc": "2026-10-09T13:42:05Z",
+    "ts_utc": "2026-10-09T15:16:51Z",
     "group": "cand1_03",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-    "mint": "27PpF6Mq7x95uPc87gEpAvATCjkcDNKP6iWH94VNpump",
-    "source_sig": "64tbdkK5gQDyS1uFXKSrGruCoadxM1CfRQGSzxVKEU2qUCVZ9JuVPZCFxnHfMswayh9HHJhQNhynPDEAX9JQsmJS",
+    "mint": "6hkAKx76WsusZvq42vbarjcHhNHUPouehRX8n3PEpump",
+    "source_sig": "4f1ohsom3hbqQ1kVSnDSdBxjBqhY8QVBFHn89hyVMj77iyDZuaAdmgkeQCbCwNac3NR6ZoEwowGkdNCbrzev4D8U",
     "size_sol": 0.5,
     "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy"
    },
    {
-    "ts_utc": "2026-10-09T13:43:47Z",
+    "ts_utc": "2026-10-09T15:23:31Z",
     "group": "cand1_03",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)",
-    "mint": "ELon2AbN3GZkhERj1DiZe74uJnjZ8ncVu45qjb1jmUSk",
-    "source_sig": "45TNJQoeRz7jCLb9iTy6YcLZ9A8Z4N7JifDsVntHfhrGs4XvV6Ns1DNZs19xejVsB9xGTrqTxLZ2SfR7Vk74UpxN",
+    "mint": "5uBbSh5GLwNuSidc3roBVHaeXLTCUGBY97FGuR9CUNW6",
+    "source_sig": "3qixmCN8M47cnirweNq7RB8XsxkKic2h6Xaem3xfJWP4TKN9oMxHapfEURE2xmAmLSnQLD1LzNfpwEE9R54mA5oA",
     "size_sol": 0.5,
     "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy"
    }
   ],
   "cand2/gate": [
    {
-    "ts_utc": "2026-10-09T08:59:04Z",
+    "ts_utc": "2026-10-09T14:44:28Z",
     "group": "cand2",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "mint": "HwJyyniKKDRLXxjRSzyLtpvxzqecqrhrbcSbKRm7STNK",
-    "source_sig": "5CfinffhcsUPU5eXd7DsXCNDjktYKBUgmEgENJepUYaeZqTizTpJDpeReiq3HqdVpArzH3E831GN44F3Uc7ouQbW",
+    "mint": "DiHNMd2GCsjc73jMphP7V5RPUBcW3sYJbCvoGhiD5Pm5",
+    "source_sig": "3BWeAvr4CwgLeMjhpgX5h3ttLNmZMETNzSmVH5i9Exx4BoTYER82V9NYLDpsGsXLvmf6fRoPthfaPUFKoHMjbQdm",
     "size_sol": 0.1,
     "source": "DrJ6SnDXkEsPeGdmSs93v5rwWumv5QMvAGSZjAyWSd5o"
    },
    {
-    "ts_utc": "2026-10-09T09:32:17Z",
+    "ts_utc": "2026-10-09T14:45:11Z",
     "group": "cand2",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "mint": "5oD9H8JBYQJmzTQtgnypejqs4zAWYxw2cKi82gnSpump",
-    "source_sig": "49PL95Tw8pj1u9dxSBMChDHxrXKnJw9drXXL6Zc7a2PkWoUUgib1vBwBy1HGtFKj7AG2HArXizvcniwLNKJ94BTj",
+    "mint": "4mbPZzDCWXvTCJbscMWeDD7TT1pra9mkZHGaBxc2jupx",
+    "source_sig": "5okJFPpfSoSfKR6FXV6EWwR8bnB1ys9j7MsW1DSdAHFw3W7SESUFSrSP3S5qREB4aPAx7VpkLb1BkCH1yXEFP25J",
     "size_sol": 0.1,
-    "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG"
+    "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy"
    },
    {
-    "ts_utc": "2026-10-09T09:51:44Z",
+    "ts_utc": "2026-10-09T15:06:04Z",
     "group": "cand2",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "mint": "BfFyJjCQikVMeG335GEHPrkYXvyv25EQhM7kUVnVWEzb",
-    "source_sig": "4aKfMrrYeixehMaCgFRDBodL4fw1ZuUSNA1tjkK2zyDshwA7tPVD5UfsVUKzrPH8RyPwMkEzNjgm2rstuYWCkTvG",
+    "mint": "E2Tp336kbrNnWbVcTBiDuEX5mbmUTtz4hfzvkWnnjupx",
+    "source_sig": "4sqJqkCnJdSmST2mo2rQZ9KLu7qtodhAVzPPz2o4esL2MdadXt9WKurdoYEqP7WtKfmPhewga1jRzVKP7YEXobi9",
     "size_sol": 0.1,
-    "source": "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG"
-   }
-  ],
-  "cand2_03/gate": [
-   {
-    "ts_utc": "2026-10-09T10:34:37Z",
-    "group": "cand2_03",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе cand2_03 полоса не торгует (lane_trades выключен)",
-    "mint": "C43ZJvyPUeDPNJLJrBVqRZdE9FM2sdi2KeGgpnqupump",
-    "source_sig": "2VMZWe7Wi3V65F4xdyXWse1sBYi1QTBtjexL2smURoThKrdairEWaREfmgfTK6LgpX4zsdGpnRumJwXb4jPyzkDU",
-    "size_sol": 0.3,
-    "source": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE"
+    "source": "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87"
    }
   ],
   "cand3/gate": [
    {
-    "ts_utc": "2026-10-09T09:24:50Z",
+    "ts_utc": "2026-10-09T16:03:35Z",
     "group": "cand3",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
-    "mint": "UQkv5gtnUNptQEUYhf9PkPKGmKyBUJzQnJgHZcdpump",
-    "source_sig": "PmGT2exfJxFTydNoi4dM7z8Qk4jZq1LEuDEALmvrJFMCp5Gyw4m3JpHCfnJDjVu7udx5xxDkryySpQXsEcPiqwY",
+    "mint": "CPN8PxvymFkL9kxVHuCPTzMuFaCmANPD2rPRKE3v482x",
+    "source_sig": "2o4X8JBjf9ZeRJF2v4hATKnJXWM4dnRc82LeFBdHU1rZYYWtzzEVdpvwTv2KDjfoNqjoBJmPmrwd8Eq1h2rU3U74",
     "size_sol": 0.1,
-    "source": "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT"
+    "source": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6"
    },
    {
-    "ts_utc": "2026-10-09T09:58:47Z",
+    "ts_utc": "2026-10-09T16:56:15Z",
     "group": "cand3",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
-    "mint": "9os9vrvzgu3XfK7Pq3Gdr1S2TfyMW9TjaYkKCZeMpump",
-    "source_sig": "3EgGHGn7KkkuLbziAToNmbQM2XBZEL9FHLx571zrHSuZjPJQgiQJQjCTqpd2sY4YxFTURtoufu1Wjr8exoLbHw9S",
+    "mint": "2x3kudsxqCWdWeZA1vSNr9uKkHUBQG81m5mBGRAPpump",
+    "source_sig": "5wR1T4ys3SF2ktZVCFUKoyDTpdAVFqTxH6kgdsoQpNnwqu8Kt9jDuSpPcUnSc3apEFrpAtGQKvUtCja363eZL7vL",
     "size_sol": 0.1,
-    "source": "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT"
-   },
-   {
-    "ts_utc": "2026-10-09T10:07:43Z",
-    "group": "cand3",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
-    "mint": "CVw57tgADzThKWFma4ZEt1vb1CAqt5YU3UQY59NHLtiB",
-    "source_sig": "a8Hqec9WyQN7Xn7671pxL3VKpZJatZD9f7GMFMtWF5GG1HrGqRum45c6MFsJCcvXqbLmaFQjGNAyC7JUzTZBnKG",
-    "size_sol": 0.1,
-    "source": "ENGkTtUanFtqD5avHk5jJARwZNz5DX1AZ8TGQqASw8CT"
+    "source": "Be24Gbf5KisDk1LcWWZsBn8dvB816By7YzYF5zWZnRR6"
    }
   ],
   "kandidaty/gate": [
-   {
-    "ts_utc": "2026-10-09T10:05:21Z",
-    "group": "kandidaty",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
-    "mint": "BfFyJjCQikVMeG335GEHPrkYXvyv25EQhM7kUVnVWEzb",
-    "source_sig": "45Qtu6ozZPjGBj7Jrw8jVQmfqTHUHNTBJU6S68MGc3w3RqzzW5KouKJpyzXJtaPYSGRwAe5fekyE1qhdboEhF2oh",
-    "size_sol": 0.05,
-    "source": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7"
-   },
-   {
-    "ts_utc": "2026-10-09T12:11:41Z",
-    "group": "kandidaty",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
-    "mint": "46doJPsSjEVMsNZm4b32UbbvbUXjFTM3TDPBWMM3pump",
-    "source_sig": "5jTTJoy2eGLGgFt4UEShVYKDzmsMS3ea578gBwDLK2jQHr95dxVfbdsFySXUPpqybHLwwpeaxU6XtqG1TReENF99",
-    "size_sol": 0.05,
-    "source": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7"
-   },
    {
     "ts_utc": "2026-10-09T14:36:23Z",
     "group": "kandidaty",
@@ -805,82 +484,82 @@
     "source_sig": "4yadt9ZVaJ3Tp4QGxBwVj3j2bRbUjnZ1hj934VaiN8zG7XHj83XNgcRwi8cTwSqn3YuzNukMAAccLR419bdjPoeT",
     "size_sol": 0.05,
     "source": "2L17Sw85Lh2Ca7ejEzWqyJsZ3yS4DxQhYr52X5H5xRns"
+   },
+   {
+    "ts_utc": "2026-10-09T15:51:51Z",
+    "group": "kandidaty",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+    "mint": "9wk8xngMCkvraqg3nrPWrxxGKF33XMRz89MAV75epump",
+    "source_sig": "tviqh4V55bzx2LcPtJ4BjRowBYoNKtf2Ly87pA3wk3EwcyaLsMzRU7hNzwZt2YreQ3Bn5H1MYpmfX97eGd6oyqF",
+    "size_sol": 0.05,
+    "source": "CzU8MaRcwvwUoNkwJFLbvtFWJugcEXAhDDQqNFE4ybb7"
+   },
+   {
+    "ts_utc": "2026-10-09T17:17:30Z",
+    "group": "kandidaty",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)",
+    "mint": "2iPzs2s7GVbK48ttJCNpaCgKdyz3Su7S5DWTW8QKXxYN",
+    "source_sig": "3cEXLPpfV67XqzAwPSiaX8fjgsAaiMKr78eowvq8182FcTN17tdrtfKgkvr8UkuDTrT6WvHfgprGUNZAH9rxvrfi",
+    "size_sol": 0.05,
+    "source": "BMgsHTvcasRVtuevHJh8t6Vf5dmcWkDLAx6gSAQ3dsYm"
    }
   ],
   "krug_001/gate": [
    {
-    "ts_utc": "2026-10-09T10:53:16Z",
+    "ts_utc": "2026-10-09T15:02:46Z",
     "group": "krug_001",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
-    "mint": "HoLyRoDEQvK5zPsGpcz3BbCWhceTGhWAGnVifSoUShit",
-    "source_sig": "5hzfof7pGRYV9PQyvzHeBFHHPcjXH1pVUwYdu9iCvkeABQyVjELDS4mhARJzMbrSQKH3bYEirqTCgCFjHyM78AyM",
-    "size_sol": 0.01,
-    "source": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij"
-   },
-   {
-    "ts_utc": "2026-10-09T13:32:59Z",
-    "group": "krug_001",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
-    "mint": "DsJY6FRWMG75ZfuWMLPwi27976wCTUG6ZJtB2Utbpump",
-    "source_sig": "GknYwYT1jBFXJvNdLnMN2AcCD9kWJoA9LyHvEXmYMAwGhsjnTdGpN55STweqDN7EfAbKMdimw7dgVKov5jEdQCd",
-    "size_sol": 0.01,
-    "source": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij"
-   },
-   {
-    "ts_utc": "2026-10-09T14:13:47Z",
-    "group": "krug_001",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
-    "mint": "7jnN59bQFK7Q5zwWKrHHgzfG7V8j8TTF44HULhgeQ9JJ",
-    "source_sig": "3EMcWHBcYY9G8fiC8XcWiexZcKKbVCiQr8pHovqXQjCTZ4F1VWd5EJUJioYykGn7ZWnHqjCZ2mMeqS51Q6JiMo7i",
+    "mint": "BfYYDM5qyN7BaWdaQ9zy9odR71QFvZHr2tfbcXcxpump",
+    "source_sig": "37PtiJBmu5LhvMRva7joyQib7byjZASvSAAXc57WFG3EQY95b8DmAhw3CorVvfufhzTt2F5x4tvwGpesbU5bGPKh",
     "size_sol": 0.01,
     "source": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij"
    }
   ],
   "lane_s0/gate": [
    {
-    "ts_utc": "2026-10-09T08:37:33Z",
+    "ts_utc": "2026-10-09T15:13:59Z",
     "group": "lane_s0",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-    "mint": "5eVvmFQ8jjW3WvdYANPoau37N8ENQ1kZAbpvBJL2pump",
-    "source_sig": "225cgSsd5P1cNxhfbNEEsnoxddW62pT6rwKUWYZhAZKZoxJBSQczPUnN56Lam5gSu17HPgXaMQAyTCMaHGCVaewE",
-    "size_sol": 0.5,
-    "source": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb"
-   },
-   {
-    "ts_utc": "2026-10-09T08:55:42Z",
-    "group": "lane_s0",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-    "mint": "4gcot9xnK9sghf6YyQv4DiWUEVW3qzjvfLE9G1ozdAXh",
-    "source_sig": "5Yg7HDB3Z31xvJNYUbvnHggT1b8UFVY9NxxKmXUCHuxnDosoppevQQ2VmxFyafQ6zgNUEPHFU8kRuTNUphjFApVG",
-    "size_sol": 0.5,
-    "source": "Xk9onqHkpULDEYYN9ZPyM7Q9AfTNYUrsCkzywyqdMeb"
-   },
-   {
-    "ts_utc": "2026-10-09T09:56:08Z",
-    "group": "lane_s0",
-    "stage": "gate",
-    "ok": false,
-    "sent": false,
-    "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-    "mint": "ArenDYANqFNkp8ZqAXt69vT5Dz7WD4zDfSpVw6oPpump",
-    "source_sig": "cRyequam1FPA2s3JGx2pu1CeysXFZbzqKknkPDrDB8VjUtBAG5WuFVeoY6wbqsiYJanX7whHQNLYNCkU5MU5zy3",
+    "mint": "H72pex1VtfY2M7v2Tfk9D9PgvCocRuFN3owCveERSa4s",
+    "source_sig": "27yqizRcZFPQNwtCBX7MAFdf9LjCnfhMRETy1VQH9nrs7GFBarRdSAiYncwzREW9oa5RdxRoc3vt8EhLietKwLUJ",
     "size_sol": 0.5,
     "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy"
+   },
+   {
+    "ts_utc": "2026-10-09T15:14:54Z",
+    "group": "lane_s0",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
+    "mint": "H72pex1VtfY2M7v2Tfk9D9PgvCocRuFN3owCveERSa4s",
+    "source_sig": "3rvsmjmUT3Y6nTewqtXju7jdViGeBokwQvxGR7JsusouFWn9dy4TGkG3HEz5RWZFj4cgvZBDYkXYuJc4wu1htU4H",
+    "size_sol": 0.5,
+    "source": "5pHeNsWMVEi1cbMzLhgqABnhEUwRTSzy5vBfeGWyJfxS"
+   },
+   {
+    "ts_utc": "2026-10-09T15:22:14Z",
+    "group": "lane_s0",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
+    "mint": "3jQGHGNyZk5V13AsfDm4dEgmY8x3NADGfc59zWnwpump",
+    "source_sig": "4Tvdo985QHDDHV7jDDY7zeMTeRAkDuj3cZZGXgujWRzL5k4x3cSVgFUmDjS8JvNvvTGy3DSnRqWZj4oxBLzeQtVw",
+    "size_sol": 0.5,
+    "source": "4hwPamSooBr5JhxHdcEC21HoxN5HUwYR2hGucLPyZAi8"
    }
   ],
   "leader/gate": [
@@ -909,55 +588,54 @@
     "source": "Beqv6dzTcjV2eodo8RRXCiCcnSYrS1vkQKhfqwHXqeit"
    }
   ],
-  "sniper_src/gate": [
+  "vol_4vw/build": [
    {
-    "ts_utc": "2026-10-09T14:18:12Z",
-    "group": "sniper_src",
+    "ts_utc": "2026-10-09T14:31:32Z",
+    "group": "vol_4vw",
+    "stage": "build",
+    "ok": false,
+    "sent": false,
+    "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
+    "mint": "8Nq9SzfcYeTXR5Fe2Sru24jEwazaQbkgbuNa4B1pump",
+    "source_sig": "Yd3W2etUUSMNCDaAqgLZz6RweVZ5JEx4Ue5WhWCK34k3DRCMSyjtLbuRiYTgZmEcusMEssteqcUwadejjRti1bx",
+    "size_sol": 0.01,
+    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+   },
+   {
+    "ts_utc": "2026-10-09T14:36:31Z",
+    "group": "vol_4vw",
+    "stage": "build",
+    "ok": false,
+    "sent": false,
+    "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
+    "mint": "9bwxW9nYC5LbHb19WRxudRfvV9F7GnGGyk35UdsNpump",
+    "source_sig": "3JbhagTWoszVdrj6pPh6nuKFFyws8fFenp7bv9E5R7gJhzinXHsWHAFVjhdyv7n65rFh6y91i3oBtKhUtK564WCk",
+    "size_sol": 0.01,
+    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+   },
+   {
+    "ts_utc": "2026-10-09T14:39:30Z",
+    "group": "vol_4vw",
+    "stage": "build",
+    "ok": false,
+    "sent": false,
+    "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
+    "mint": "8RcnYcsijSWSzAo9nREC1NddsTPzBCvZtzghy38jUnk5",
+    "source_sig": "gLe2tMyv9E4Y9QDK2nzr1xtV7Db6CCK6Refu1KCguoif5PGGkfpCnzf5ktZKU14VCPa3Ur7KRBjJVj8dCGCHfLL",
+    "size_sol": 0.01,
+    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+   }
+  ],
+  "vol_4vw/gate": [
+   {
+    "ts_utc": "2026-10-09T17:09:10Z",
+    "group": "vol_4vw",
     "stage": "gate",
     "ok": false,
     "sent": false,
-    "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "mint": "2G6ZBcMWFdEh6YSXX3NipKGn5PuZ3kgA98SeH8s2fyea",
-    "source_sig": "5cWu1ngkun2hDRhhdGr8wvAwazhDb6eLfJkzJuZNtsMNT7zvcQyRFGTdwmkCPjuPqkaExfH7wRmSkxsME3UHfyQh",
-    "size_sol": 0.3,
-    "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC"
-   }
-  ],
-  "vol_4vw/build": [
-   {
-    "ts_utc": "2026-10-09T13:47:47Z",
-    "group": "vol_4vw",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "mint": "2rR7yDed6BM7L2tga5Uf9DoJvmpvw6iGK1x2PhacscLy",
-    "source_sig": "vnbHYUYs25XLHP1uSp9JYLq8Cpt5k5SuzwgbQWAM6Q2S5HJyUawvUyp2SWDJyED8eWtzdwvxiZpSUGuyMAMRa4U",
-    "size_sol": 0.01,
-    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
-   },
-   {
-    "ts_utc": "2026-10-09T14:00:23Z",
-    "group": "vol_4vw",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "mint": "6TUJabF7YqXsiUwYMdaEz4QsC8QwQn6hWYtpGxMi4twG",
-    "source_sig": "2GLc7s6UJ2k44pg4LB73R6LW3P8VAxdUy5gJDqgVnTisgvhGhajfS3y66vQYtxtBkHuwzEeQHeetPqSpZEmUfJwA",
-    "size_sol": 0.01,
-    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
-   },
-   {
-    "ts_utc": "2026-10-09T14:01:05Z",
-    "group": "vol_4vw",
-    "stage": "build",
-    "ok": false,
-    "sent": false,
-    "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "mint": "GGse14qXdue7K2JhypoNzGxvmnPRUwXzthURFMHaoijv",
-    "source_sig": "4UkU4SfgAKZAn1BC4Lc1gMyph13qKkHFhCFCg3NXonKXtkurWc3XtizBwtdgKNioy2xCbqSzRvaCSCsupRyvPjNY",
-    "size_sol": 0.01,
+    "why_not": "от слота источника прошло 7 слотов при пределе 3 (группа vol_4vw)",
+    "mint": "GsuDhesx1TorDEahDSBdTefQfwGCvtLPzijDAeHL3bft",
+    "source_sig": "esao3bhSASMpKGQgWe7JNrSG2jXn3FzgawPiMbYVZXpk5Dfy14iMKMpTnQ4LmFdjy18MZ1PdNrcLhfX3xGvzhza",
     "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
    }
   ],
@@ -1116,9 +794,9 @@
    }
   ]
  },
- "первая_utc": "2026-10-09T08:37:33Z",
- "последняя_utc": "2026-10-09T17:04:28Z",
- "отправлено": 5,
+ "первая_utc": "2026-10-09T14:31:32Z",
+ "последняя_utc": "2026-10-09T17:22:25Z",
+ "отправлено": 9,
  "подписи": [
   {
    "ts_utc": "2026-10-09T16:29:24Z",
@@ -1144,51 +822,39 @@
    "ts_utc": "2026-10-09T17:04:28Z",
    "group": "vol_4vw",
    "signature": "3ewe99CNa9qov79WBHZS8jVG9wJNZHEUQXehj8JkijQVnti4KjhqKjfgLvfCrePA2oCXeHBszxCzb4S4YK5CJWvQ"
+  },
+  {
+   "ts_utc": "2026-10-09T17:12:04Z",
+   "group": "vol_4vw",
+   "signature": "8EHXwwXj8pktuKg6aSZGDS5z1pNnpFLHNakrdm8xNVrDnFPadNB1jEGWZKP2EeKgnK3cFkigqBtMXrxtJNDQpKe"
+  },
+  {
+   "ts_utc": "2026-10-09T17:16:20Z",
+   "group": "vol_4vw",
+   "signature": "3QnvFU3JrKxmxcqAP8GU5Hrwyjx95UhEpA7dQWdrMrmrDA2nnpjUZDTuejXgMpYZVq7EcNFxyvCxhVSxUZzQw1gu"
+  },
+  {
+   "ts_utc": "2026-10-09T17:17:48Z",
+   "group": "vol_4vw",
+   "signature": "d5TqiCrBCgbMUcBV9tgLS8tsiRwWMyp3Vwm4Zu9SHTtTwzysUhkWadAPmSDz3An8zncfqnTB4H2dQUottSuDtfy"
+  },
+  {
+   "ts_utc": "2026-10-09T17:21:32Z",
+   "group": "vol_4vw",
+   "signature": "4CQdrh2nkJoxjKS56AK46bMEmmzaAhbN7sZvfHeRQK7t76V4qDN5m313hCLqx4h4PqhnF5Tmrt59Bb53vTRsK6sB"
   }
  ],
  "подписи_отказов": {
-  "batch5/gate": [
-   "3iRa5rWQToAanQG7ZVangahBP3FjrfNSTmBeP2dW64afYHDr2wAYPW5nxBpysZjw624PQqJJ8XXg9jmACnE6PuKB",
-   "2Uzpez8sxZUr3YDzjLLgvJcrcJAN51Qv25ZyZWuWov2quxp4oV9CvcVc4AVV7nDHFaso6LXQ4SgXxjMFgaQMmmGs"
-  ],
   "cand1/gate": [
-   "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",
-   "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"
+   "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"
   ],
   "cand1_03/gate": [
-   "diRfkfLrzHfZM1TpnfYc3GJSuUfBygX6fSGLdgrng3Z78bPVcr6zFGmwWYrhHpSCQtRK7ZVTCXp9ZQXHB2tDBiY",
-   "64tbdkK5gQDyS1uFXKSrGruCoadxM1CfRQGSzxVKEU2qUCVZ9JuVPZCFxnHfMswayh9HHJhQNhynPDEAX9JQsmJS",
-   "45TNJQoeRz7jCLb9iTy6YcLZ9A8Z4N7JifDsVntHfhrGs4XvV6Ns1DNZs19xejVsB9xGTrqTxLZ2SfR7Vk74UpxN",
-   "4M6fBs3E2Q1xBd5WsLBMMjkXcdKzdrpE62Cvn2LMKYdw5iJrmxVmYjZaT7q58JH3xWjsxXPkPFeuV5BTz3xJvvq2",
-   "3bUm4vaGUwiTkkM1FtmVUhpWbsB6zaJqFLQDQevktbF89wqthbqx4Uvoe7TMyB4qFVVP4dzZW2tsYCWWifrBZfVM",
-   "4TEAAkWJmiAv7Lait1UrabBQ4gZ9pqZYR19siUGgnV63rxUtvxJoSCqS1HKwd8UHAULvFHYCPD9Bua2wu76nRww8",
-   "4SR7Y2e4JsBN5xSKN3fgxQw1Hqe3GeXJPub4YfvPZDFLCB8jdsEi3nfL4ijoNj9FQ8yiVG9ybQR9dCingHoKo6ST",
    "56QDhyNJgP8HEMfE4LTyjDboN2uLLwtavuH2Ynqy6SmDevEDoyA3HBpw2PyZcrgkbEoPFHdcLhVKXbtgheiVtREe",
    "4f1ohsom3hbqQ1kVSnDSdBxjBqhY8QVBFHn89hyVMj77iyDZuaAdmgkeQCbCwNac3NR6ZoEwowGkdNCbrzev4D8U",
    "3qixmCN8M47cnirweNq7RB8XsxkKic2h6Xaem3xfJWP4TKN9oMxHapfEURE2xmAmLSnQLD1LzNfpwEE9R54mA5oA",
@@ -1196,39 +862,6 @@
    "4xPVr3TYXr4j9sWpJbhsarggy1RZvWcT73X2scnb49S4Z8uobwRipovuFqVXd8jQHaHiYHToVeiJhfFZtzyMJjsX"
   ],
   "cand2/gate": [
-   "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",
@@ -1249,57 +882,22 @@
    "4KJ456BxtmmNZR5FPY42xzi6gX3tg3CisTP62o4ViKgBS4jPLo7QaoFcHr6gK5Rtdym8iEigxgMfqiJsodJin4Qv",
    "4wSCUTVcFJ4DEg8dhwenz3rHniX4vnJrJpG6KbBQSkQZJun2hijBq6vhcPmcvXvXoqDcAfmwFv7z919Dgd2wYbNj",
    "2hJtmDWbt2VNns1nXuYNDRkbDgpH1AXCE9V2Gou7du4cZc5P4FdLT2DF8aGptrHdeLtpepNsAva97kDfVAntukdY",
-   "5KN9h5kURYjYi8QsQ6WC1XALEYu3JUGafhLGxoMm8R7nHp58Grchfqa1HWZNUq8pPgMYQZSo6PRZhkzKo4AHGhSE"
-  ],
-  "cand2_03/gate": [
-   "2VMZWe7Wi3V65F4xdyXWse1sBYi1QTBtjexL2smURoThKrdairEWaREfmgfTK6LgpX4zsdGpnRumJwXb4jPyzkDU"
+   "5KN9h5kURYjYi8QsQ6WC1XALEYu3JUGafhLGxoMm8R7nHp58Grchfqa1HWZNUq8pPgMYQZSo6PRZhkzKo4AHGhSE",
+   "5qHfYwDgDFhUSWbKVr7fPwSjuq8uoANmYKfjqGbh4crMW9kdmfAw49X5AtCX3Vt3v1wBfoctmR4P68bXKKsAR5BX"
   ],
   "cand3/gate": [
-   "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"
   ],
   "kandidaty/gate": [
-   "45Qtu6ozZPjGBj7Jrw8jVQmfqTHUHNTBJU6S68MGc3w3RqzzW5KouKJpyzXJtaPYSGRwAe5fekyE1qhdboEhF2oh",
-   "5jTTJoy2eGLGgFt4UEShVYKDzmsMS3ea578gBwDLK2jQHr95dxVfbdsFySXUPpqybHLwwpeaxU6XtqG1TReENF99",
    "4yadt9ZVaJ3Tp4QGxBwVj3j2bRbUjnZ1hj934VaiN8zG7XHj83XNgcRwi8cTwSqn3YuzNukMAAccLR419bdjPoeT",
-   "tviqh4V55bzx2LcPtJ4BjRowBYoNKtf2Ly87pA3wk3EwcyaLsMzRU7hNzwZt2YreQ3Bn5H1MYpmfX97eGd6oyqF"
+   "tviqh4V55bzx2LcPtJ4BjRowBYoNKtf2Ly87pA3wk3EwcyaLsMzRU7hNzwZt2YreQ3Bn5H1MYpmfX97eGd6oyqF",
+   "3cEXLPpfV67XqzAwPSiaX8fjgsAaiMKr78eowvq8182FcTN17tdrtfKgkvr8UkuDTrT6WvHfgprGUNZAH9rxvrfi"
   ],
   "krug_001/gate": [
-   "5hzfof7pGRYV9PQyvzHeBFHHPcjXH1pVUwYdu9iCvkeABQyVjELDS4mhARJzMbrSQKH3bYEirqTCgCFjHyM78AyM",
-   "GknYwYT1jBFXJvNdLnMN2AcCD9kWJoA9LyHvEXmYMAwGhsjnTdGpN55STweqDN7EfAbKMdimw7dgVKov5jEdQCd",
-   "3EMcWHBcYY9G8fiC8XcWiexZcKKbVCiQr8pHovqXQjCTZ4F1VWd5EJUJioYykGn7ZWnHqjCZ2mMeqS51Q6JiMo7i",
    "37PtiJBmu5LhvMRva7joyQib7byjZASvSAAXc57WFG3EQY95b8DmAhw3CorVvfufhzTt2F5x4tvwGpesbU5bGPKh"
   ],
   "lane_s0/gate": [
-   "225cgSsd5P1cNxhfbNEEsnoxddW62pT6rwKUWYZhAZKZoxJBSQczPUnN56Lam5gSu17HPgXaMQAyTCMaHGCVaewE",
-   "5Yg7HDB3Z31xvJNYUbvnHggT1b8UFVY9NxxKmXUCHuxnDosoppevQQ2VmxFyafQ6zgNUEPHFU8kRuTNUphjFApVG",
-   "cRyequam1FPA2s3JGx2pu1CeysXFZbzqKknkPDrDB8VjUtBAG5WuFVeoY6wbqsiYJanX7whHQNLYNCkU5MU5zy3",
-   "3JUvuFbbVjyQr11ZV73TvvUQRkvC9PB9wLxSGwMfDqXQGEtmzKmKGKt2bVZ5KG2Rgxk2AA98w22FcZxK1uUxs8TC",
-   "3fTXHYvYxqSNSxyBtmqU9M2UMwTtztRAGVBZKLi3Gn4X4SV1KHgK8BRFbr8qP9rGKRE5xPv3n3ydHCWPA8F2z2Nm",
-   "3ejugic1rFN4dxBvPnRseAmyFSvpev4S3wqZRusmpfwnKW3JWDYMrddkC2fwZ16LetSQKoXqRCmCwM45Wr9jxxBM",
-   "5y7wfzwvPsjh3usV1vhqYdk7NmTaYiW4HZuveXapzC97QtrMU2F78wWt7TfobbQqRqe4d5eAG5918u8BSPdvcoFS",
-   "5m88tVARNvCPxDj1xjZuuLtpgvwGnq4AaYsnfFhHsiuN8s4SSWbPWJMaZmqXDvvBbexJeBSWtdvatoGkFRBBNoeD",
-   "5eiAAGGNT2hVDPiai6Qi6xSCRiZLppxQvsWBLuEv4Sg4Zc1rznrJBoCD4k5v1c72fYVhmfTVqzTre6RWookGczZ2",
-   "4pA84SEnTWRzbnshTyCvYaeEfi54nsLm5cbXtBSUTXKhyxcuPJMcwBdbk9q7taJWW4NVtXQHn6Amh6BrhbwNdD6B",
    "27yqizRcZFPQNwtCBX7MAFdf9LjCnfhMRETy1VQH9nrs7GFBarRdSAiYncwzREW9oa5RdxRoc3vt8EhLietKwLUJ",
    "3rvsmjmUT3Y6nTewqtXju7jdViGeBokwQvxGR7JsusouFWn9dy4TGkG3HEz5RWZFj4cgvZBDYkXYuJc4wu1htU4H",
    "4Tvdo985QHDDHV7jDDY7zeMTeRAkDuj3cZZGXgujWRzL5k4x3cSVgFUmDjS8JvNvvTGy3DSnRqWZj4oxBLzeQtVw",
@@ -1317,18 +915,7 @@
    "2mfjh3FURk6QeejTT3cJJvxude8pqKxqFV7sb2JX25KrduBPFGDvLTFQybSp19FHT7GgejcsoJKKVYuUeP4sdP2T",
    "5G1A3FMNrVhAARgZLT7tGmBPGpkicCSm9f5s1ocEuZGvDqGRVNnpGwCiBJGrYjgV4NGsF4JiFewbm1psFvKxJXdH"
   ],
-  "sniper_src/gate": [
-   "5cWu1ngkun2hDRhhdGr8wvAwazhDb6eLfJkzJuZNtsMNT7zvcQyRFGTdwmkCPjuPqkaExfH7wRmSkxsME3UHfyQh"
-  ],
   "vol_4vw/build": [
-   "vnbHYUYs25XLHP1uSp9JYLq8Cpt5k5SuzwgbQWAM6Q2S5HJyUawvUyp2SWDJyED8eWtzdwvxiZpSUGuyMAMRa4U",
-   "2GLc7s6UJ2k44pg4LB73R6LW3P8VAxdUy5gJDqgVnTisgvhGhajfS3y66vQYtxtBkHuwzEeQHeetPqSpZEmUfJwA",
-   "4UkU4SfgAKZAn1BC4Lc1gMyph13qKkHFhCFCg3NXonKXtkurWc3XtizBwtdgKNioy2xCbqSzRvaCSCsupRyvPjNY",
-   "67SZD48kk1VS2BE6n8728RguYEecEE3qLB9fxttPXM8hNskvYbqSN1TqZv3JNj6x73yLJaJrz5pWUhaUZKPugHYe",
-   "Ah7qX9nGYWQC5sbq4FvmkJC2ZpmpSGnZYziM2kvRzCvprccvWrdaVAcWyjnEgCQCn8zSPaUh2avBWYHsmKCTS7i",
-   "3JkRRFo72djJXq8H5xhiHWTDaR4VnBfoFmMS7RvGdK3i8KBewrhkBAsjoDehVU4rqSgNTWF4XoYK1ZdiokzWbTbn",
-   "4ydXP3EKaFp5iboXXVvuCZGZoszXZD49NdbtYc6GvXFJRuWtqRe5a73a1xiAYYFrjTSbyDCrzZDtxSDgGjLag8zK",
-   "5sErUGfSFDhCmKwKm2jzPZjBxwJHst3yw7WuEsJDx3i3mYgVRJzjdm1armaZthLDwwWg7X4UzDQJ6h38C4yWAesD",
    "Yd3W2etUUSMNCDaAqgLZz6RweVZ5JEx4Ue5WhWCK34k3DRCMSyjtLbuRiYTgZmEcusMEssteqcUwadejjRti1bx",
    "3JbhagTWoszVdrj6pPh6nuKFFyws8fFenp7bv9E5R7gJhzinXHsWHAFVjhdyv7n65rFh6y91i3oBtKhUtK564WCk",
    "gLe2tMyv9E4Y9QDK2nzr1xtV7Db6CCK6Refu1KCguoif5PGGkfpCnzf5ktZKU14VCPa3Ur7KRBjJVj8dCGCHfLL",
@@ -1360,38 +947,45 @@
    "46VzB1FFLYR6PNAhiuSF6aPdFTXBsPKUw7K18Ts9r1BkRaAfYm8ZdWxLrTKeafK71brFWk41pkmcXNsdx2Kbn8Dr",
    "4s4ABExwjPDQyTs7ntbBwE6iLFKrU1jRgUfwksCVA3Fnv6HpQofAuuFwd2BYr9dm2UQQ9CcRuAH77w163RKdeVkE"
   ],
+  "vol_4vw/gate": [
+   "esao3bhSASMpKGQgWe7JNrSG2jXn3FzgawPiMbYVZXpk5Dfy14iMKMpTnQ4LmFdjy18MZ1PdNrcLhfX3xGvzhza"
+  ],
   "vol_4vw/usdc_signaly_build": [
    "6XQecd248MuAPVaETVkHweByuX8wghCvDLPPU4iUYVbLYjih7wgywK2mQd4J8YzCyoWAkpQPxuGUAiEBzFirDEr",
    "ZCfRLJJAGJK9cVX37nEcNtuizWKtD87QLUX2a5xuBQy2sH6AxdYh4kYTSk8EQX8cHfFAVdyLK6QdHUqabi3MgH7",
-   "5KV7o2mhFPQUPhp16ahxqdSQTr9WoL4av8gANmnhs1FibkS8KnEU7uerd2FmvkowMx9WRLFZNFGwCNUWRK9LJrSh"
+   "5KV7o2mhFPQUPhp16ahxqdSQTr9WoL4av8gANmnhs1FibkS8KnEU7uerd2FmvkowMx9WRLFZNFGwCNUWRK9LJrSh",
+   "2n1nsXmG1RUJBY6PegEkJD8Fp75Zy62t7tcoEn4so93Eg3ZhDjmhW6cTJn5yvQUHtfnncMWZzocHcoEHsRA522yt",
+   "5FmbL3RGFtdYnccZutLHzSHGC2wr11KS3yZpqYF4HdZvGXkzbki7bXRNBmhNAMsRmUMMhAZfDn8kq1dFZ99JFsb9"
   ]
  }
 }
 --- gruppa vol_4vw po vsemu zhurnalu ---
 {
  "строк_всего": 400000,
- "попыток_полосы": 197,
- "в_окне": 46,
+ "попыток_полосы": 99,
+ "в_окне": 45,
  "с": null,
  "до": null,
  "группа": "vol_4vw",
  "по_этапам": {
-  "build": 38,
-  "usdc_signaly_build": 3,
-  "sent": 5
+  "build": 30,
+  "usdc_signaly_build": 5,
+  "sent": 9,
+  "gate": 1
  },
  "по_группам": {
   "vol_4vw": {
-   "build": 38,
-   "usdc_signaly_build": 3,
-   "sent": 5
+   "build": 30,
+   "usdc_signaly_build": 5,
+   "sent": 9,
+   "gate": 1
   }
  },
  "причины": {
   "build": [
    {
     "почему": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "раз": 35
+    "раз": 27
    },
    {
     "почему": "шаблон: у источника инструкция c2ab1c46684d5b2f, не buy_exact_quote_in",
@@ -1399,6 +993,12 @@
    },
    {
     "почему": "тип пула вне полосы: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA|6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "раз": 1
+   }
+  ],
+  "gate": [
+   {
+    "почему": "от слота источника прошло 7 слотов при пределе 3 (группа vol_4vw)",
     "раз": 1
    }
   ],
@@ -1414,6 +1014,14 @@
    {
     "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/7abnFE3k",
     "раз": 1
+   },
+   {
+    "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
+    "раз": 1
+   },
+   {
+    "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/2Mruy3nQ",
+    "раз": 1
    }
   ]
  },
@@ -1422,7 +1030,7 @@
    "build": [
     {
      "почему": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-     "раз": 35
+     "раз": 27
     },
     {
      "почему": "шаблон: у источника инструкция c2ab1c46684d5b2f, не buy_exact_quote_in",
@@ -1430,6 +1038,12 @@
     },
     {
      "почему": "тип пула вне полосы: pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA|6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+     "раз": 1
+    }
+   ],
+   "gate": [
+    {
+     "почему": "от слота источника прошло 7 слотов при пределе 3 (группа vol_4vw)",
      "раз": 1
     }
    ],
@@ -1445,6 +1059,14 @@
     {
      "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/7abnFE3k",
      "раз": 1
+    },
+    {
+     "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
+     "раз": 1
+    },
+    {
+     "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула HsRpHQn6/2Mruy3nQ",
+     "раз": 1
     }
    ]
   }
@@ -1452,39 +1074,52 @@
  "примеры": {
   "vol_4vw/build": [
    {
-    "ts_utc": "2026-10-09T13:47:47Z",
+    "ts_utc": "2026-10-09T14:31:32Z",
     "group": "vol_4vw",
     "stage": "build",
     "ok": false,
     "sent": false,
     "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "mint": "2rR7yDed6BM7L2tga5Uf9DoJvmpvw6iGK1x2PhacscLy",
-    "source_sig": "vnbHYUYs25XLHP1uSp9JYLq8Cpt5k5SuzwgbQWAM6Q2S5HJyUawvUyp2SWDJyED8eWtzdwvxiZpSUGuyMAMRa4U",
+    "mint": "8Nq9SzfcYeTXR5Fe2Sru24jEwazaQbkgbuNa4B1pump",
+    "source_sig": "Yd3W2etUUSMNCDaAqgLZz6RweVZ5JEx4Ue5WhWCK34k3DRCMSyjtLbuRiYTgZmEcusMEssteqcUwadejjRti1bx",
     "size_sol": 0.01,
     "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
    },
    {
-    "ts_utc": "2026-10-09T14:00:23Z",
+    "ts_utc": "2026-10-09T14:36:31Z",
     "group": "vol_4vw",
     "stage": "build",
     "ok": false,
     "sent": false,
     "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "mint": "6TUJabF7YqXsiUwYMdaEz4QsC8QwQn6hWYtpGxMi4twG",
-    "source_sig": "2GLc7s6UJ2k44pg4LB73R6LW3P8VAxdUy5gJDqgVnTisgvhGhajfS3y66vQYtxtBkHuwzEeQHeetPqSpZEmUfJwA",
+    "mint": "9bwxW9nYC5LbHb19WRxudRfvV9F7GnGGyk35UdsNpump",
+    "source_sig": "3JbhagTWoszVdrj6pPh6nuKFFyws8fFenp7bv9E5R7gJhzinXHsWHAFVjhdyv7n65rFh6y91i3oBtKhUtK564WCk",
     "size_sol": 0.01,
     "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
    },
    {
-    "ts_utc": "2026-10-09T14:01:05Z",
+    "ts_utc": "2026-10-09T14:39:30Z",
     "group": "vol_4vw",
     "stage": "build",
     "ok": false,
     "sent": false,
     "why_not": "шаблон: разновидность инструкции кривой не известна: e1f7501ed5b38488",
-    "mint": "GGse14qXdue7K2JhypoNzGxvmnPRUwXzthURFMHaoijv",
-    "source_sig": "4UkU4SfgAKZAn1BC4Lc1gMyph13qKkHFhCFCg3NXonKXtkurWc3XtizBwtdgKNioy2xCbqSzRvaCSCsupRyvPjNY",
+    "mint": "8RcnYcsijSWSzAo9nREC1NddsTPzBCvZtzghy38jUnk5",
+    "source_sig": "gLe2tMyv9E4Y9QDK2nzr1xtV7Db6CCK6Refu1KCguoif5PGGkfpCnzf5ktZKU14VCPa3Ur7KRBjJVj8dCGCHfLL",
     "size_sol": 0.01,
+    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+   }
+  ],
+  "vol_4vw/gate": [
+   {
+    "ts_utc": "2026-10-09T17:09:10Z",
+    "group": "vol_4vw",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "от слота источника прошло 7 слотов при пределе 3 (группа vol_4vw)",
+    "mint": "GsuDhesx1TorDEahDSBdTefQfwGCvtLPzijDAeHL3bft",
+    "source_sig": "esao3bhSASMpKGQgWe7JNrSG2jXn3FzgawPiMbYVZXpk5Dfy14iMKMpTnQ4LmFdjy18MZ1PdNrcLhfX3xGvzhza",
     "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
    }
   ],
@@ -1643,9 +1278,9 @@
    }
   ]
  },
- "первая_utc": "2026-10-09T13:47:47Z",
- "последняя_utc": "2026-10-09T17:04:28Z",
- "отправлено": 5,
+ "первая_utc": "2026-10-09T14:31:32Z",
+ "последняя_utc": "2026-10-09T17:21:32Z",
+ "отправлено": 9,
  "подписи": [
   {
    "ts_utc": "2026-10-09T16:29:24Z",
@@ -1671,18 +1306,30 @@
    "ts_utc": "2026-10-09T17:04:28Z",
    "group": "vol_4vw",
    "signature": "3ewe99CNa9qov79WBHZS8jVG9wJNZHEUQXehj8JkijQVnti4KjhqKjfgLvfCrePA2oCXeHBszxCzb4S4YK5CJWvQ"
+  },
+  {
+   "ts_utc": "2026-10-09T17:12:04Z",
+   "group": "vol_4vw",
+   "signature": "8EHXwwXj8pktuKg6aSZGDS5z1pNnpFLHNakrdm8xNVrDnFPadNB1jEGWZKP2EeKgnK3cFkigqBtMXrxtJNDQpKe"
+  },
+  {
+   "ts_utc": "2026-10-09T17:16:20Z",
+   "group": "vol_4vw",
+   "signature": "3QnvFU3JrKxmxcqAP8GU5Hrwyjx95UhEpA7dQWdrMrmrDA2nnpjUZDTuejXgMpYZVq7EcNFxyvCxhVSxUZzQw1gu"
+  },
+  {
+   "ts_utc": "2026-10-09T17:17:48Z",
+   "group": "vol_4vw",
+   "signature": "d5TqiCrBCgbMUcBV9tgLS8tsiRwWMyp3Vwm4Zu9SHTtTwzysUhkWadAPmSDz3An8zncfqnTB4H2dQUottSuDtfy"
+  },
+  {
+   "ts_utc": "2026-10-09T17:21:32Z",
+   "group": "vol_4vw",
+   "signature": "4CQdrh2nkJoxjKS56AK46bMEmmzaAhbN7sZvfHeRQK7t76V4qDN5m313hCLqx4h4PqhnF5Tmrt59Bb53vTRsK6sB"
   }
  ],
  "подписи_отказов": {
   "vol_4vw/build": [
-   "vnbHYUYs25XLHP1uSp9JYLq8Cpt5k5SuzwgbQWAM6Q2S5HJyUawvUyp2SWDJyED8eWtzdwvxiZpSUGuyMAMRa4U",
-   "2GLc7s6UJ2k44pg4LB73R6LW3P8VAxdUy5gJDqgVnTisgvhGhajfS3y66vQYtxtBkHuwzEeQHeetPqSpZEmUfJwA",
-   "4UkU4SfgAKZAn1BC4Lc1gMyph13qKkHFhCFCg3NXonKXtkurWc3XtizBwtdgKNioy2xCbqSzRvaCSCsupRyvPjNY",
-   "67SZD48kk1VS2BE6n8728RguYEecEE3qLB9fxttPXM8hNskvYbqSN1TqZv3JNj6x73yLJaJrz5pWUhaUZKPugHYe",
-   "Ah7qX9nGYWQC5sbq4FvmkJC2ZpmpSGnZYziM2kvRzCvprccvWrdaVAcWyjnEgCQCn8zSPaUh2avBWYHsmKCTS7i",
-   "3JkRRFo72djJXq8H5xhiHWTDaR4VnBfoFmMS7RvGdK3i8KBewrhkBAsjoDehVU4rqSgNTWF4XoYK1ZdiokzWbTbn",
-   "4ydXP3EKaFp5iboXXVvuCZGZoszXZD49NdbtYc6GvXFJRuWtqRe5a73a1xiAYYFrjTSbyDCrzZDtxSDgGjLag8zK",
-   "5sErUGfSFDhCmKwKm2jzPZjBxwJHst3yw7WuEsJDx3i3mYgVRJzjdm1armaZthLDwwWg7X4UzDQJ6h38C4yWAesD",
    "Yd3W2etUUSMNCDaAqgLZz6RweVZ5JEx4Ue5WhWCK34k3DRCMSyjtLbuRiYTgZmEcusMEssteqcUwadejjRti1bx",
    "3JbhagTWoszVdrj6pPh6nuKFFyws8fFenp7bv9E5R7gJhzinXHsWHAFVjhdyv7n65rFh6y91i3oBtKhUtK564WCk",
    "gLe2tMyv9E4Y9QDK2nzr1xtV7Db6CCK6Refu1KCguoif5PGGkfpCnzf5ktZKU14VCPa3Ur7KRBjJVj8dCGCHfLL",
@@ -1714,15 +1361,20 @@
    "46VzB1FFLYR6PNAhiuSF6aPdFTXBsPKUw7K18Ts9r1BkRaAfYm8ZdWxLrTKeafK71brFWk41pkmcXNsdx2Kbn8Dr",
    "4s4ABExwjPDQyTs7ntbBwE6iLFKrU1jRgUfwksCVA3Fnv6HpQofAuuFwd2BYr9dm2UQQ9CcRuAH77w163RKdeVkE"
   ],
+  "vol_4vw/gate": [
+   "esao3bhSASMpKGQgWe7JNrSG2jXn3FzgawPiMbYVZXpk5Dfy14iMKMpTnQ4LmFdjy18MZ1PdNrcLhfX3xGvzhza"
+  ],
   "vol_4vw/usdc_signaly_build": [
    "6XQecd248MuAPVaETVkHweByuX8wghCvDLPPU4iUYVbLYjih7wgywK2mQd4J8YzCyoWAkpQPxuGUAiEBzFirDEr",
    "ZCfRLJJAGJK9cVX37nEcNtuizWKtD87QLUX2a5xuBQy2sH6AxdYh4kYTSk8EQX8cHfFAVdyLK6QdHUqabi3MgH7",
-   "5KV7o2mhFPQUPhp16ahxqdSQTr9WoL4av8gANmnhs1FibkS8KnEU7uerd2FmvkowMx9WRLFZNFGwCNUWRK9LJrSh"
+   "5KV7o2mhFPQUPhp16ahxqdSQTr9WoL4av8gANmnhs1FibkS8KnEU7uerd2FmvkowMx9WRLFZNFGwCNUWRK9LJrSh",
+   "2n1nsXmG1RUJBY6PegEkJD8Fp75Zy62t7tcoEn4so93Eg3ZhDjmhW6cTJn5yvQUHtfnncMWZzocHcoEHsRA522yt",
+   "5FmbL3RGFtdYnccZutLHzSHGC2wr11KS3yZpqYF4HdZvGXkzbki7bXRNBmhNAMsRmUMMhAZfDn8kq1dFZ99JFsb9"
   ]
  }
 }
 --- tipy pulov i rezhim USDC-nogi po gruppam (zhivoe) ---
-detektor MainPID: 2088854
+detektor MainPID: 2165269
 interpretator: /home/bot/robinhood-chain-alpha/venv/bin/python
 {
  "группы": {
