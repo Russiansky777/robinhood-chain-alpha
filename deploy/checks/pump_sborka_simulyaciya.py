@@ -569,8 +569,13 @@ def svoja_pokupka_dlja_otkazannyh(zov, *, obrazcy: dict,
         # associated_base_* и AnchorError 3012 AccountNotInitialized. Теперь
         # значения по умолчанию нет вовсе, и программа читается.
         def _владелец(м, _zov=zov):
+            # ЗОВ ОТДАЁТ ВЕСЬ КОНВЕРТ JSON-RPC (ТР.rpc_iz_url), поэтому
+            # владелец лежит в result.value.owner. 09.10 я сперва читал
+            # о["value"] -- выходило None, и три минта краснели не по делу:
+            # "программа токена не задана" там, где она прекрасно читается.
             о = _zov("getAccountInfo", [м, {"encoding": "base64"}])
-            зн = ((о or {}).get("value") or {}) if isinstance(о, dict) else {}
+            рез = (о or {}).get("result") if isinstance(о, dict) else None
+            зн = ((рез or {}).get("value") or {}) if isinstance(рез, dict) else {}
             return зн.get("owner")
 
         try:
