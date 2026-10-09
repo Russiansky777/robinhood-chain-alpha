@@ -38,6 +38,10 @@ on:
         description: "pump_sborka: сколько образцов на вариант считать целью"
         required: false
         default: "20"
+      cel_t2022:
+        description: "pump_sborka: сколько образцов Token-2022 ждать у buy_exact_quote_in_v3 и sell_v3"
+        required: false
+        default: "10"
       predel_tx:
         description: "pump_sborka: предел прочитанных транзакций"
         required: false
@@ -105,14 +109,20 @@ jobs:
           set -e
           set -o pipefail
           git fetch --depth=1 origin claude/stroiteli
-          echo "коммит оснастки: $(git rev-parse --short FETCH_HEAD) $(git log -1 --format=%s FETCH_HEAD)"
+          echo "ветка оснастки Code-3: $(git rev-parse --short FETCH_HEAD)"
+          # СБОРЩИК, ОСНАСТКА И IDL -- УЖЕ МОИ, И ИХ НЕЛЬЗЯ ЗАТИРАТЬ ВЕТКОЙ
+          # CODE-3 (правка 09.10, п.1 владельца: "Token-2022 правь сам при
+          # врезке"). В моих копиях снято значение по умолчанию у
+          # base_token_program и добавлен счёт образцов Token-2022; выкачка из
+          # claude/stroiteli вернула бы молчаливый классический Token.
+          # Оттуда берутся ТОЛЬКО образцы и трекер, которых у меня нет.
           git checkout FETCH_HEAD -- \
-            analysis/c3_pump_sborka.py analysis/c3_kapital_trekker.py \
-            deploy/checks/pump_sborka_simulyaciya.py \
-            data/idl data/c2_pool_samples data/c3_usdc_noga data/samples \
+            analysis/c3_kapital_trekker.py \
+            data/c2_pool_samples data/c3_usdc_noga data/samples \
             data/bloom_regression_txs.json data/bloom_tx_raw.json \
             data/c2_curve_variant_samples.json data/nogi_shablony.json \
             data/obrazcy_vidov_instrukciy.json data/solana_raw_tx_dump_vyvod.json
+          echo "сборщик и оснастка -- из моей ветки, с правкой Token-2022"
           ls -1 data/idl | sed 's/^/  idl: /'
           # САМОПРОВЕРКИ ОБЕИХ ЧАСТЕЙ -- ДО ЛЮБОГО ВЫЗОВА УЗЛА. Объявлено
           # Code-3: сборщик 24 из 24, оснастка 23 из 23.
@@ -138,7 +148,8 @@ jobs:
           set +e
           PYTHONPATH=analysis $PY deploy/checks/pump_sborka_simulyaciya.py --live \
             --cel "${{ inputs.cel }}" --predel-tx "${{ inputs.predel_tx }}" \
-            --pauza "${{ inputs.pauza }}" > /tmp/pump_sborka.txt 2>&1
+            --pauza "${{ inputs.pauza }}" --cel-t2022 "${{ inputs.cel_t2022 }}" \
+            > /tmp/pump_sborka.txt 2>&1
           RC=$?
           set -e
           tail -80 /tmp/pump_sborka.txt

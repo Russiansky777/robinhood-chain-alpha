@@ -423,12 +423,24 @@ def simulirovat(zov, tx64: str) -> dict:
 
 
 def proverit_variant(zov, *, imja_programmy: str, variant: str,
-                     obrazcy: list, cel: int, pauza: float) -> dict:
+                     obrazcy: list, cel: int, pauza: float,
+                     cel_t2022: int = 0) -> dict:
     """ОДИН ВАРИАНТ: близнецы на каждом образце, итог числами."""
+    # TOKEN-2022 СЧИТАЕТСЯ ОТДЕЛЬНО (слово владельца 09.10, п.2: "из них >= 10
+    # на минтах Token-2022"). Программа токена входит семенем в оба
+    # associated_base_*, поэтому вариант, проверенный только на классическом
+    # Token, про Token-2022 не говорит НИЧЕГО -- а именно на нём 09.10 и вышли
+    # три красных 3012.
+    t2022 = sum(1 for р in obrazcy
+                if (р.get("scheta") or {}).get("base_token_program")
+                == СБ.ПРОГ_ТОКЕНА_2022)
     из_ = {"variant": f"{imja_programmy}.{variant}", "obrazcov": len(obrazcy),
-           "cel": cel, "proverok": 0, "proshlo": 0, "krasnyh": 0,
+           "cel": cel, "obrazcov_token2022": t2022, "cel_token2022": cel_t2022,
+           "proverok": 0, "proshlo": 0, "krasnyh": 0,
            "raskladka_soshlas": 0, "bajt_v_bajt": 0, "stroki": [],
-           "nedobor": len(obrazcy) < cel, "why_not": None}
+           "nedobor": len(obrazcy) < cel,
+           "nedobor_token2022": (cel_t2022 > 0 and t2022 < cel_t2022),
+           "why_not": None}
     if not obrazcy:
         из_["why_not"] = WHY_НЕТ_ОБРАЗЦОВ
         return из_
@@ -503,6 +515,10 @@ def proverit_variant(zov, *, imja_programmy: str, variant: str,
         из_["stroki"].append(строка)
     if из_["nedobor"]:
         из_["why_not"] = f"{WHY_МАЛО}: {len(obrazcy)} из {cel}"
+    elif из_["nedobor_token2022"]:
+        из_["why_not"] = (f"{WHY_МАЛО}: образцов Token-2022 {t2022} из "
+                          f"{cel_t2022} -- вариант проверен почти только на "
+                          "классическом Token")
     return из_
 
 
@@ -547,10 +563,33 @@ def svoja_pokupka_dlja_otkazannyh(zov, *, obrazcy: dict,
     из_["buyback_iz_obrazca"] = получатель
     for минт in СБ.ОТКАЗ_08_10["minty"]:
         строка = {"mint": минт, "ok": False, "why_not": None}
+        # ПРОГРАММА ТОКЕНА -- С ЦЕПИ, ВЛАДЕЛЬЦЕМ СЧЁТА МИНТА (правка 09.10).
+        # Было: обёртка звалась без неё и подставляла классический Token
+        # значением по умолчанию -- на трёх минтах Token-2022 это дало чужие
+        # associated_base_* и AnchorError 3012 AccountNotInitialized. Теперь
+        # значения по умолчанию нет вовсе, и программа читается.
+        def _владелец(м, _zov=zov):
+            о = _zov("getAccountInfo", [м, {"encoding": "base64"}])
+            зн = ((о or {}).get("value") or {}) if isinstance(о, dict) else {}
+            return зн.get("owner")
+
+        try:
+            тп = СБ.programma_tokena_minta(минт, chitatel=_владелец)
+        except СБ.ОшибкаСборки as сбой:
+            строка["why_not"] = str(сбой)
+            из_["minty"].append(строка)
+            из_["proverok"] += 1
+            из_["krasnyh"] += 1
+            continue
+        строка["base_token_program"] = тп
+        строка["token2022"] = (тп == СБ.ПРОГ_ТОКЕНА_2022)
+        if pauza:
+            time.sleep(pauza)
         try:
             собрано = СБ.pokupka_krivoj_v3(
                 base_mint=минт, user=koshelek,
                 buyback_fee_recipient=получатель,
+                base_token_program=тп,
                 spendable_quote_in=10_000_000, min_tokens_out=1)
         except СБ.ОшибкаСборки as сбой:
             строка["why_not"] = str(сбой)
@@ -607,8 +646,14 @@ def suhoj_progon() -> dict:
     return из_
 
 
+# ПОРОГ TOKEN-2022 ТОЛЬКО ТАМ, ГДЕ ОН ОСМЫСЛЕН: у двух разновидностей v3,
+# которыми полоса и торгует (слово владельца 09.10, п.2). У прочих вариантов
+# порога нет -- не потому что не важно, а потому что их владелец ждать не велел.
+S_POROGOM_T2022 = ("pump.buy_exact_quote_in_v3", "pump.sell_v3")
+
+
 def zhivoj_progon(*, stranic: int, na_stranicu: int, predel_tx: int,
-                  pauza: float, cel: int, koshelek: str,
+                  pauza: float, cel: int, koshelek: str, cel_t2022: int = 0,
                   zov=None, pechat=print) -> dict:
     """ЖИВОЙ: подписи, транзакции, близнецы, отказанные минты."""
     url = uzel_iz_okruzheniya()
@@ -631,27 +676,43 @@ def zhivoj_progon(*, stranic: int, na_stranicu: int, predel_tx: int,
     for имя_п, вариант in ВАРИАНТЫ:
         ключ = f"{имя_п}.{вариант}"
         pechat(f"  {ключ}: образцов {len(сбор['obrazcy'][ключ])}")
-        итоги.append(proverit_variant(_зов, imja_programmy=имя_п,
-                                      variant=вариант,
-                                      obrazcy=сбор["obrazcy"][ключ],
-                                      cel=cel, pauza=pauza))
+        итоги.append(proverit_variant(
+            _зов, imja_programmy=имя_п, variant=вариант,
+            obrazcy=сбор["obrazcy"][ключ], cel=cel, pauza=pauza,
+            cel_t2022=(cel_t2022 if ключ in S_POROGOM_T2022 else 0)))
     отказ = svoja_pokupka_dlja_otkazannyh(_зов, obrazcy=сбор["obrazcy"],
                                           koshelek=koshelek, pauza=pauza)
     проверок = sum(и["proverok"] for и in итоги) + отказ["proverok"]
     прошло = sum(и["proshlo"] for и in итоги) + отказ["proshlo"]
     недобор = [и["variant"] for и in итоги if и["nedobor"]]
+    недобор_t2022 = [и["variant"] for и in итоги if и["nedobor_token2022"]]
     из_ = {"rezhim": "zhivoj", "uzel": zateret(url),
            "setevyh_vyzovov": вызовов["n"],
            "prochitano_tx": сбор["prochitano_tx"],
            "propushcheno": сбор["propushcheno"],
            "propushcheno_po_variantu": сбор["propushcheno_po_variantu"],
-           "cel_na_variant": cel, "varianty": итоги, "otkazannye": отказ,
+           "cel_na_variant": cel, "cel_token2022": cel_t2022,
+           "nedobor_token2022": недобор_t2022,
+           "varianty": итоги, "otkazannye": отказ,
            "proverok": проверок, "proshlo": прошло,
            "krasnyh": проверок - прошло, "nedobor": недобор,
            "why_not": None}
-    if недобор:
-        из_["why_not"] = (f"{WHY_МАЛО}: {len(недобор)} вариантов не набрали "
-                          f"{cel} -- {', '.join(недобор)}")
+    # ЧТО СЧИТАЕТСЯ ЗЕЛЁНЫМ (слово владельца 09.10, п.2). Ждём добора только у
+    # двух разновидностей v3, которыми полоса торгует, и Token-2022 у них же.
+    # AMM-варианты и старые v2 не ждём: НЕИЗВЕСТНЫЙ ВАРИАНТ -- ОТКАЗ СБОРКИ, то
+    # есть полоса по нему просто не покупает. Недобор по ним печатается числом,
+    # но зелёное им не мешает -- иначе гейт стоял бы вечно на том, чего владелец
+    # ждать не велел. Красные при этом перекрывают всё: они везде красные.
+    ждём = [и for и in итоги if и["variant"] in S_POROGOM_T2022]
+    недобор_ждём = [и["variant"] for и in ждём if и["nedobor"]]
+    недобор_t2022_ждём = [и["variant"] for и in ждём if и["nedobor_token2022"]]
+    из_["nedobor_ne_zhdjom"] = [и for и in недобор if и not in недобор_ждём]
+    if недобор_ждём:
+        из_["why_not"] = (f"{WHY_МАЛО}: не набрали {cel} -- "
+                          f"{', '.join(недобор_ждём)}")
+    elif недобор_t2022_ждём:
+        из_["why_not"] = (f"{WHY_МАЛО}: образцов Token-2022 меньше "
+                          f"{cel_t2022} -- {', '.join(недобор_t2022_ждём)}")
     elif проверок != прошло:
         из_["why_not"] = f"{проверок - прошло} проверок из {проверок} красные"
     return из_
@@ -659,10 +720,11 @@ def zhivoj_progon(*, stranic: int, na_stranicu: int, predel_tx: int,
 
 def tablica(итог: dict) -> str:
     """Таблица «вариант -> проверок / прошло симуляцию»."""
-    строки = [f"{'вариант':<40} {'образцов':>8} {'проверок':>8} {'прошло':>7} "
-              f"{'раскладка':>9} {'байты':>6}"]
+    строки = [f"{'вариант':<40} {'образцов':>8} {'t2022':>6} {'проверок':>8} "
+              f"{'прошло':>7} {'раскладка':>9} {'байты':>6}"]
     for и in итог.get("varianty") or []:
-        строки.append(f"{и['variant']:<40} {и['obrazcov']:>8} {и['proverok']:>8} "
+        строки.append(f"{и['variant']:<40} {и['obrazcov']:>8} "
+                      f"{и.get('obrazcov_token2022', 0):>6} {и['proverok']:>8} "
                       f"{и['proshlo']:>7} {и['raskladka_soshlas']:>9} "
                       f"{и['bajt_v_bajt']:>6}")
     о = итог.get("otkazannye") or {}
@@ -811,10 +873,11 @@ def self_test() -> int:  # noqa: C901, PLR0915
         len(СБ.ОТКАЗ_08_10["minty"]) == 3)
 
     # СБОРКА СООБЩЕНИЯ v0 -- НА НАСТОЯЩИХ АДРЕСАХ, ЧЕРЕЗ solders.
+    # Token-2022: минты отказа 08.10 именно такие (журнал детектора).
     собрано = СБ.pokupka_krivoj_v3(
         base_mint=СБ.ОТКАЗ_08_10["minty"][0], user=КОШЕЛЁК_ПОЛОСЫ,
         buyback_fee_recipient=КОШЕЛЁК_ПОЛОСЫ, spendable_quote_in=10_000_000,
-        min_tokens_out=1)
+        min_tokens_out=1, base_token_program=СБ.ПРОГ_ТОКЕНА_2022)
     постр = tx_base64(programma=СБ.ПРОГ_КРИВОЙ, scheta=собрано["accounts"],
                       dannye=bytes.fromhex(собрано["data_hex"]),
                       platelshchik=КОШЕЛЁК_ПОЛОСЫ)
@@ -955,6 +1018,9 @@ def _parser() -> argparse.ArgumentParser:
                    help="предел чтений getTransaction за прогон")
     п.add_argument("--pauza", type=float, default=0.05,
                    help="пауза между вызовами узла, секунды")
+    п.add_argument("--cel-t2022", type=int, default=0,
+                   help="сколько образцов Token-2022 ждать у двух "
+                        "разновидностей v3 (0 -- не ждать)")
     п.add_argument("--koshelek", default=КОШЕЛЁК_ПОЛОСЫ,
                    help="кошелёк для своей покупки по минтам отказа")
     п.add_argument("--json", action="store_true", help="только JSON")
@@ -969,6 +1035,7 @@ def main() -> int:
         итог = zhivoj_progon(stranic=дов.stranic, na_stranicu=дов.na_stranicu,
                              predel_tx=дов.predel_tx, pauza=дов.pauza,
                              cel=дов.cel, koshelek=дов.koshelek,
+                             cel_t2022=дов.cel_t2022,
                              pechat=(lambda *_: None) if дов.json else print)
         if not дов.json:
             print()

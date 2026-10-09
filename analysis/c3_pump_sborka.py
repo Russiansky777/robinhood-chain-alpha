@@ -485,13 +485,69 @@ def kontekst_iz_pereezda(tx: dict, *, nash_koshelek: str) -> dict:
                     "buyback_fee_recipient")
 
 
+WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА = (
+    "программа токена базового минта не задана: её нельзя подставить "
+    "классическим Token -- она входит СЕМЕНЕМ в associated_base_bonding_curve "
+    "и associated_base_user, и у минта Token-2022 адреса выйдут чужие")
+ПРОГРАММЫ_ТОКЕНА = (ПРОГ_ТОКЕНА, ПРОГ_ТОКЕНА_2022)
+
+
+def programma_tokena_minta(mint: str, *, iz_signala: str | None = None,
+                           chitatel=None) -> str:
+    """Программа-владелец счёта минта: из сигнала или с цепи. Иначе ОТКАЗ.
+
+    ЗАЧЕМ (слово владельца 09.10, п.1). 09.10 симуляция дала три красных на
+    отказанных сигналах vol_4vw: AnchorError 3012 AccountNotInitialized по
+    associated_base_bonding_curve и associated_base_user. Причина не в
+    раскладке -- в семенах: программа токена входит в них третьим семенем
+    (КАК_ATA и pda-семена IDL), а у этих минтов токен Token-2022
+    (TokenzQdB…), тогда как обёртки сборки подставляли классический Token
+    молча, значением по умолчанию. Адрес выходил чужой, счёт по нему не
+    существует -- программа и отвечала "не инициализирован".
+    ПОЭТОМУ ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ ЗДЕСЬ БОЛЬШЕ НЕТ: не знаем программу --
+    отказываемся по имени, а не угадываем.
+
+    iz_signala -- поле token_program решения детектора (он читает его из
+    транзакции источника). chitatel -- вызываемое, получающее владельца счёта
+    минта с цепи (getAccountInfo.owner).
+    """
+    if iz_signala and str(iz_signala) in ПРОГРАММЫ_ТОКЕНА:
+        return str(iz_signala)
+    if iz_signala:
+        raise ОшибкаСборки(
+            f"{WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА}: в сигнале стоит {iz_signala!r}, "
+            "а это не Token и не Token-2022")
+    if chitatel is not None:
+        владелец = chitatel(mint)
+        if владелец and str(владелец) in ПРОГРАММЫ_ТОКЕНА:
+            return str(владелец)
+        raise ОшибкаСборки(
+            f"{WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА}: владелец счёта минта {mint} "
+            f"прочитан как {владелец!r}")
+    raise ОшибкаСборки(WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА)
+
+
+def _проверить_программу_токена(base_token_program: str | None) -> str:
+    if not base_token_program:
+        raise ОшибкаСборки(WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА)
+    if str(base_token_program) not in ПРОГРАММЫ_ТОКЕНА:
+        raise ОшибкаСборки(
+            f"{WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА}: передано {base_token_program!r}")
+    return str(base_token_program)
+
+
 def pokupka_krivoj_v3(*, base_mint: str, user: str, buyback_fee_recipient: str,
                       spendable_quote_in: int, min_tokens_out: int,
                       quote_mint: str = WSOL,
-                      base_token_program: str = ПРОГ_ТОКЕНА,
+                      base_token_program: str | None = None,
                       quote_token_program: str = ПРОГ_ТОКЕНА,
                       partial_fill: bool = False) -> dict:
-    """НАША ПОКУПКА кривой разновидностью, которую программа принимает сейчас."""
+    """НАША ПОКУПКА кривой разновидностью, которую программа принимает сейчас.
+
+    base_token_program ОБЯЗАТЕЛЕН: см. programma_tokena_minta. quote_token_program
+    остаётся классическим Token -- котировка у нас WSOL, а он классический.
+    """
+    base_token_program = _проверить_программу_токена(base_token_program)
     к = {"base_mint": base_mint, "quote_mint": quote_mint,
          "base_token_program": base_token_program,
          "quote_token_program": quote_token_program, "user": user,
@@ -505,9 +561,15 @@ def pokupka_krivoj_v3(*, base_mint: str, user: str, buyback_fee_recipient: str,
 def prodazha_krivoj_v3(*, base_mint: str, user: str,
                        buyback_fee_recipient: str, amount: int,
                        min_sol_output: int, quote_mint: str = WSOL,
-                       base_token_program: str = ПРОГ_ТОКЕНА,
+                       base_token_program: str | None = None,
                        quote_token_program: str = ПРОГ_ТОКЕНА) -> dict:
-    """НАША ПРОДАЖА кривой: sell_v3, те же 17 счетов."""
+    """НАША ПРОДАЖА кривой: sell_v3, те же 17 счетов.
+
+    base_token_program ОБЯЗАТЕЛЕН по той же причине, что и в покупке: он семя
+    у associated_base_*. Продажа Token-2022 классической программой собрала бы
+    чужой счёт и не продала бы ничего.
+    """
+    base_token_program = _проверить_программу_токена(base_token_program)
     к = {"base_mint": base_mint, "quote_mint": quote_mint,
          "base_token_program": base_token_program,
          "quote_token_program": quote_token_program, "user": user,
@@ -519,9 +581,13 @@ def prodazha_krivoj_v3(*, base_mint: str, user: str,
 def prodazha_krivoj_v2(*, base_mint: str, user: str, fee_recipient: str,
                        buyback_fee_recipient: str, creator: str, amount: int,
                        min_sol_output: int, quote_mint: str = WSOL,
-                       base_token_program: str = ПРОГ_ТОКЕНА,
+                       base_token_program: str | None = None,
                        quote_token_program: str = ПРОГ_ТОКЕНА) -> dict:
-    """ПРОДАЖА sell_v2 -- 26 счетов; `creator` берётся из события сделки."""
+    """ПРОДАЖА sell_v2 -- 26 счетов; `creator` берётся из события сделки.
+
+    base_token_program ОБЯЗАТЕЛЕН -- то же семя, та же цена ошибки.
+    """
+    base_token_program = _проверить_программу_токена(base_token_program)
     к = {"base_mint": base_mint, "quote_mint": quote_mint,
          "base_token_program": base_token_program,
          "quote_token_program": quote_token_program, "user": user,
@@ -733,7 +799,9 @@ def krivaja_iz_minta_v_zhivyh(*, tranzakcii: list | None = None) -> dict:
 
 # ------------------------------------------------------------- самопроверка
 
-ZHDEM_PROVEROK = 24
+# 24 у Code-3 + 7 про программу токена базового минта (правка 09.10, Code-1):
+# два адреса одного минта, четыре доказанных красных и два пути получения.
+ZHDEM_PROVEROK = 31
 # ЧИСЛА ЗАМЕРА ПО ЖИВЫМ ОБРАЗЦАМ РЕПОЗИТОРИЯ (09.10). Меньше -- значит образцы
 # подменили или разбор сломался; больше -- значит образцов прибавилось, и это
 # тоже надо увидеть, а не проглотить.
@@ -851,8 +919,12 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     # ---------------------------------------------- 6. НАШИ СБОРКИ
     МИНТ = ОТКАЗ_08_10["minty"][1]
     НАШ = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+    # МИНТЫ ОТКАЗА 08.10 -- Token-2022: так их назвал журнал детектора
+    # ("token_program": TokenzQdB…). Поэтому и здесь стоит Token-2022, иначе
+    # самопроверка шла бы по случаю, которого в жизни не было.
     пок = pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
-                            spendable_quote_in=10 ** 8, min_tokens_out=1)
+                            spendable_quote_in=10 ** 8, min_tokens_out=1,
+                            base_token_program=ПРОГ_ТОКЕНА_2022)
     chk("НАША ПОКУПКА v3 собирается БЕЗ ТРАНЗАКЦИИ ИСТОЧНИКА -- из шести "
         "значений, и в ней ровно 17 счетов с названным провенансом",
         пок["schetov"] == 17
@@ -866,7 +938,8 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         (пок["bajt_dannyh"], пок["data_hex"][:20]))
     прод = prodazha_krivoj_v3(base_mint=МИНТ, user=НАШ,
                               buyback_fee_recipient=НАШ, amount=1000,
-                              min_sol_output=1)
+                              min_sol_output=1,
+                              base_token_program=ПРОГ_ТОКЕНА_2022)
     chk("наша продажа sell_v3 -- те же 17 счетов и 24 байта данных",
         прод["schetov"] == 17 and прод["bajt_dannyh"] == 24, прод["bajt_dannyh"])
     плохие_в = []
@@ -881,6 +954,61 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     chk("аргументы нашей сборки читаются обратно теми же числами",
         круг["spendable_quote_in"] == 10 ** 8 and круг["min_tokens_out"] == 1
         and круг["_hvost"] == 0, круг)
+    # ---------- ПРОГРАММА ТОКЕНА: ДВА АДРЕСА ОДНОГО МИНТА (правка 09.10)
+    т2 = pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                           spendable_quote_in=10 ** 8, min_tokens_out=1,
+                           base_token_program=ПРОГ_ТОКЕНА_2022)
+    кл = pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                           spendable_quote_in=10 ** 8, min_tokens_out=1,
+                           base_token_program=ПРОГ_ТОКЕНА)
+    по_имени_т2 = {а["imja"]: а["pubkey"] for а in т2["accounts"]}
+    по_имени_кл = {а["imja"]: а["pubkey"] for а in кл["accounts"]}
+    разные = [и for и in ("associated_base_bonding_curve", "associated_base_user")
+              if по_имени_т2[и] != по_имени_кл[и]]
+    chk("программа токена МЕНЯЕТ адреса: у Token-2022 и классического Token "
+        "associated_base_bonding_curve и associated_base_user РАЗНЫЕ -- именно "
+        "на этом 09.10 вышли три красных 3012 AccountNotInitialized",
+        разные == ["associated_base_bonding_curve", "associated_base_user"],
+        разные)
+    упало_тп = None
+    try:
+        pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                          spendable_quote_in=10 ** 8, min_tokens_out=1)
+    except ОшибкаСборки as сбой:
+        упало_тп = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: без программы токена покупка НЕ собирается -- "
+        "значения по умолчанию больше нет",
+        упало_тп and WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА in упало_тп, упало_тп)
+    упало_тп2 = None
+    try:
+        prodazha_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                           amount=1, min_sol_output=1)
+    except ОшибкаСборки as сбой:
+        упало_тп2 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: то же у продажи sell_v3",
+        упало_тп2 and WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА in упало_тп2, упало_тп2)
+    упало_тп3 = None
+    try:
+        programma_tokena_minta(МИНТ, iz_signala="ЧужаяПрограмма")
+    except ОшибкаСборки as сбой:
+        упало_тп3 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: чужая программа из сигнала не принимается",
+        упало_тп3 and "не Token и не Token-2022" in упало_тп3, упало_тп3)
+    chk("программа токена из сигнала берётся, когда она настоящая",
+        programma_tokena_minta(МИНТ, iz_signala=ПРОГ_ТОКЕНА_2022)
+        == ПРОГ_ТОКЕНА_2022)
+    chk("программа токена читается с цепи владельцем счёта минта",
+        programma_tokena_minta(МИНТ, chitatel=lambda _м: ПРОГ_ТОКЕНА_2022)
+        == ПРОГ_ТОКЕНА_2022)
+    упало_тп4 = None
+    try:
+        programma_tokena_minta(МИНТ, chitatel=lambda _м: None)
+    except ОшибкаСборки as сбой:
+        упало_тп4 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: владелец счёта минта не прочитался -- отказ, "
+        "а не классический Token наугад",
+        упало_тп4 and WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА in упало_тп4, упало_тп4)
+
     # ---------------------------------------------- 7. ДОКАЗАННЫЕ КРАСНЫЕ
     упало = None
     try:
@@ -898,7 +1026,8 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     try:
         prodazha_krivoj_v2(base_mint=МИНТ, user=НАШ, fee_recipient=НАШ,
                            buyback_fee_recipient=НАШ, creator="", amount=1,
-                           min_sol_output=1)
+                           min_sol_output=1,
+                           base_token_program=ПРОГ_ТОКЕНА_2022)
     except ОшибкаСборки as сбой:
         упало2 = str(сбой)
     chk("ДОКАЗАННЫЙ КРАСНЫЙ: sell_v2 без создателя кривой НЕ собирается -- "
