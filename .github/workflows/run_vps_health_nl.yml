@@ -334,8 +334,13 @@ jobs:
             KUDA=$(echo "$PARA" | cut -d' ' -f2)
             if ssh -n $SSH_OPTS root@$HOST "test -s $OTKUDA"; then
               ssh -n $SSH_OPTS root@$HOST "cat $OTKUDA" > "$KUDA"
-              python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$KUDA" || {
-                echo "SBOY: $OTKUDA ne razbiraetsja kak json -- fajl ne kommitim"
+              # .jsonl -- ЭТО НЕ JSON ЦЕЛИКОМ, А ПО СТРОКЕ НА ОБЪЕКТ. Здесь
+              # стоял один json.load на всё, и журнал тревог валил прогон
+              # живучести каждый раз: "Extra data: line 2 column 1". Проверка
+              # осталась настоящей -- просто разбирает тем же разбором, каким
+              # файл написан, и падает на ПЕРВОЙ непригодной строке.
+              python3 deploy/checks/json_ili_jsonl.py "$KUDA" || {
+                echo "SBOY: $OTKUDA ne razbiraetsja -- fajl ne kommitim"
                 rm -f "$KUDA"; exit 1; }
               echo "забран $OTKUDA -> $KUDA ($(wc -c < "$KUDA") байт)" | tee -a data/vps_health_nl.txt
             else
