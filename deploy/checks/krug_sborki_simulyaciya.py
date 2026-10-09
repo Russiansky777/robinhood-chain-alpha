@@ -326,6 +326,76 @@ def _bez_budzheta(instrukcii: list) -> list:
     return [и for и in instrukcii if и["programma"] != прог]
 
 
+# ОТКАЗЫ ПРОГРАММЫ, КОТОРЫЕ ГОВОРЯТ "КРИВАЯ ЗАКОНЧИЛАСЬ", А НЕ "СЧЕТА НЕ ТЕ".
+# Оба номера -- из программы кривой, и оба приходят ПОСЛЕ того, как она приняла
+# наш список счетов: 6005 BondingCurveComplete -- кривая добрана и уехала в
+# пул, 6004 MintDoesNotMatchBondingCurve -- счёта кривой для этого минта на
+# цепи уже нет (после переезда он закрыт, и по адресу лежит не тот минт).
+# Отличать это от отказа по раскладке обязательно: отказанные сигналы полосы
+# прогоняются СУТКИ СПУСТЯ, и часть кривых к тому моменту закрыта. Считать это
+# красным врезки значило бы врать в обе стороны.
+ЗАВЕРШЁННАЯ_КРИВАЯ = {
+    "6005": "BondingCurveComplete -- кривая добрана и переехала в пул",
+    "6004": "MintDoesNotMatchBondingCurve -- счёта кривой этого минта уже нет",
+}
+# complete -- bool после дискриминатора (8) и пяти u64: смещение 48. Раскладка
+# из IDL (тип BondingCurve), а не на глаз.
+СМЕЩЕНИЕ_COMPLETE = 48
+
+
+def klass_otkaza(logi: list) -> dict:
+    """Отказ по раскладке счетов или "кривая закончилась"? По номеру программы."""
+    из_ = {"klass": "raskladka", "kod": None, "slovami": None}
+    for л in reversed(list(logi or [])):
+        if "Error Number:" not in л:
+            continue
+        хвост = л.split("Error Number:", 1)[1].strip()
+        код = хвост.split(".", 1)[0].strip()
+        из_["kod"] = код
+        if код in ЗАВЕРШЁННАЯ_КРИВАЯ:
+            из_.update(klass="krivaya_zakonchilas",
+                       slovami=ЗАВЕРШЁННАЯ_КРИВАЯ[код])
+        return из_
+    return из_
+
+
+def sostoyanie_krivoj(bazovyj_vault: str, mint: str) -> dict:
+    """Счёт кривой этого минта на цепи: есть ли и добрана ли (complete).
+
+    Читается PDA ["bonding-curve", mint] -- тот же, что выводит сборщик.
+    Нужно, чтобы "кривая закончилась" было ИЗМЕРЕНО, а не выведено из номера
+    ошибки: номер говорит, что ответила программа, а счёт -- что на цепи.
+    """
+    из_ = {"schyot": None, "est": None, "complete": None, "why_not": None}
+    try:
+        from solders.pubkey import Pubkey  # noqa: PLC0415
+
+        пда, _ = Pubkey.find_program_address(
+            [b"bonding-curve", bytes(Pubkey.from_string(mint))],
+            Pubkey.from_string(СБ.ПРОГ_КРИВОЙ))
+        из_["schyot"] = str(пда)
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = f"PDA кривой не вывелся: {type(сбой).__name__}"
+        return из_
+    о = зов("getAccountInfo", [из_["schyot"], {"encoding": "base64"}])
+    if not о["ok"]:
+        из_["why_not"] = f"счёт кривой не прочитан: {о['why_not']}"
+        return из_
+    зн = (о.get("result") or {}).get("value")
+    из_["est"] = bool(зн)
+    if not зн:
+        return из_
+    try:
+        сырые = base64.b64decode((зн.get("data") or [""])[0])
+    except Exception:  # noqa: BLE001
+        из_["why_not"] = "данные счёта не раскодировались"
+        return из_
+    из_["dlina"] = len(сырые)
+    if len(сырые) > СМЕЩЕНИЕ_COMPLETE:
+        из_["complete"] = bool(сырые[СМЕЩЕНИЕ_COMPLETE])
+    return из_
+
+
 def krug_denezhnogo_puti(*, tx_istochnika: dict, mint: str, token_program: str,
                          bazovyj_vault: str, koshelek: str,
                          bilet_lamportov: int, cu: int, pauza: float) -> dict:
@@ -375,8 +445,21 @@ def krug_denezhnogo_puti(*, tx_istochnika: dict, mint: str, token_program: str,
     из_.update(pokupka_err=о_пок["err"], pokupka_units=о_пок["units"],
                ostatok_posle_pokupki=ostatok_tokena(о_пок["accounts"]))
     if о_пок["err"] is not None:
-        из_["why_not"] = "покупка денежного пути не прошла симуляцию"
         из_["logi"] = о_пок["logi"][-8:]
+        к = klass_otkaza(о_пок["logi"])
+        из_.update(klass_otkaza=к["klass"], kod_otkaza=к["kod"],
+                   otkaz_slovami=к["slovami"])
+        из_["krivaya"] = sostoyanie_krivoj(bazovyj_vault, mint)
+        если_закончилась = (к["klass"] == "krivaya_zakonchilas")
+        из_["why_not"] = (
+            f"кривая закончилась, повторить сигнал суткам позже нечем: "
+            f"{к['slovami']}" if если_закончилась
+            else "покупка денежного пути не прошла симуляцию")
+        # ЗАКОНЧИВШАЯСЯ КРИВАЯ -- НЕ КРАСНОЕ ВРЕЗКИ, И ПОЛЕ ЭТО ГОВОРИТ.
+        # Решает вызывающий: ok остаётся False (покупки не было), но
+        # отдельным признаком видно, что программа ПРИНЯЛА раскладку и
+        # отказала по состоянию кривой, а не по счетам.
+        из_["raskladka_prinyata"] = если_закончилась
         return из_
     if not из_["ostatok_posle_pokupki"]:
         из_["why_not"] = ("покупка прошла, а токена на счёте "
@@ -467,7 +550,8 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
     здесь нечем. На каждой: шаблон -> build_buy -> подготовить -> узел.
     """
     из_ = {"podpisej": len(podpisi), "proshlo": 0, "krasnyh": 0,
-           "ne_razobrano": 0, "sdelki": [], "why_not": None}
+           "krivaya_zakonchilas": 0, "ne_razobrano": 0, "sdelki": [],
+           "why_not": None}
     for п in podpisi:
         п = str(п).strip()
         if not п:
@@ -495,12 +579,20 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
         р["podpis"] = п
         из_["sdelki"].append(р)
         из_["proshlo"] += 1 if р["ok"] else 0
-        из_["krasnyh"] += 0 if р["ok"] else 1
+        if not р["ok"]:
+            if р.get("raskladka_prinyata"):
+                из_["krivaya_zakonchilas"] += 1
+            else:
+                из_["krasnyh"] += 1
         if pauza:
             time.sleep(pauza)
     if из_["krasnyh"]:
         из_["why_not"] = (f"{из_['krasnyh']} отказанных сигналов из "
                           f"{из_['podpisej']} красные на денежном пути")
+    elif not из_["proshlo"]:
+        из_["why_not"] = ("ни один сигнал не прошёл денежным путём: "
+                          f"закончившихся кривых {из_['krivaya_zakonchilas']}, "
+                          f"не разобрано {из_['ne_razobrano']}")
     return из_
 
 
@@ -642,6 +734,29 @@ def самопроверка() -> int:
     chk("потолок версии транзакции -- как у службы (BLOOM_MAX_TX_VERSION=1), "
         "а не ноль: на нуле узел отказал 468 раз подряд",
         ПОТОЛОК_ВЕРСИИ_TX == 1 and s_tx_version_vezde(), ПОТОЛОК_ВЕРСИИ_TX)
+    _лог = ["Program log: Instruction: BuyExactQuoteInV3",
+            "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:148. "
+            "Error Code: BondingCurveComplete. Error Number: 6005. Error Message: "
+            "The bonding curve has completed and liquidity migrated to raydium.",
+            "Program 6EF8 failed: custom program error: 0x1775"]
+    chk("6005 -- это «кривая закончилась», а не отказ по раскладке",
+        klass_otkaza(_лог)["klass"] == "krivaya_zakonchilas"
+        and klass_otkaza(_лог)["kod"] == "6005", klass_otkaza(_лог))
+    chk("6004 -- тоже «кривая закончилась»: счёта кривой этого минта нет",
+        klass_otkaza(["Error Code: MintDoesNotMatchBondingCurve. "
+                      "Error Number: 6004. Error Message: x"])["klass"]
+        == "krivaya_zakonchilas")
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: 3012 AccountNotInitialized остаётся отказом ПО "
+        "РАСКЛАДКЕ -- иначе разбор прятал бы ровно ту поломку, из-за которой "
+        "полоса встала",
+        klass_otkaza(["Error Code: AccountNotInitialized. Error Number: 3012. "
+                      "Error Message: x"])["klass"] == "raskladka")
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: без номера ошибки класс остаётся «раскладка», а "
+        "не «закончилась» -- молчание не оправдание",
+        klass_otkaza(["Program failed"])["klass"] == "raskladka"
+        and klass_otkaza([])["kod"] is None)
+    chk("смещение complete взято из раскладки IDL: дискриминатор и пять u64",
+        СМЕЩЕНИЕ_COMPLETE == 8 + 5 * 8)
     chk("ключ узла в выводе затирается",
         "СЕК" not in затереть("https://x/?api-key=СЕК"))
     # ОСТАТОК ТОКЕНА: amount -- u64 с 64-го байта счёта SPL.
