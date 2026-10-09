@@ -1,0 +1,22 @@
+{
+ "skript": "podbivka_pereezd_cep.py",
+ "zapuski": [
+  [
+   "--rezhim",
+   "sverka",
+   "--skolko",
+   "40",
+   "--slotov",
+   "5"
+  ],
+  [
+   "--rezhim",
+   "tempy",
+   "--blokov",
+   "120"
+  ]
+ ],
+ "helius_rps_na_paket": 3,
+ "parallelno": 2,
+ "zachem": "Punkty 1b i 1v: sverka arhiva s cepyu na 40 sluchajnyh pereezdah (po ravnoj dole iz kazhdyh sutok) i temp pereezdov po cepi. Podpisi pula berutsya pryamym pereborom getSignaturesForAddress do samoj staroj -- nezavisimo ot arhiva, inache proverka byla by krugovoj. Helius 3 rps na paket, dva paketa = 6 rps summarno -- potolok vladelca. Rezhim tempy chitaet programmy pulov iz rezultata sverki, poetomu stavitsya vtorym."
+}
