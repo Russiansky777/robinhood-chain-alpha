@@ -511,6 +511,14 @@ def krug_denezhnogo_puti(*, tx_istochnika: dict, mint: str, token_program: str,
                            cu_units=int(cu), wrap_sol=True, close_wsol=False)
     except Exception as сбой:  # noqa: BLE001
         из_["why_not"] = f"build_buy: {type(сбой).__name__}: {str(сбой)[:160]}"
+        # НАШ СОБСТВЕННЫЙ НАЗВАННЫЙ ОТКАЗ -- НЕ КРАСНОЕ ВРЕЗКИ. Котировка
+        # кривой не WSOL значит, что полоса этой кривой купить не может по
+        # сути: она платит солами. Сборка отказывает ДО подписи, и это
+        # правильное поведение, а не поломка раскладки.
+        if "не WSOL" in str(сбой):
+            из_.update(klass_otkaza="kotirovka_ne_wsol",
+                       otkaz_slovami=str(сбой)[:200], raskladka_prinyata=True)
+            из_["krivaya"] = sostoyanie_krivoj(bazovyj_vault, mint)
         return из_
     из_.update(razmer_pokupki=пок.get("size"),
                instrukcij_pokupki=пок.get("n_instructions"),
@@ -632,8 +640,8 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
     здесь нечем. На каждой: шаблон -> build_buy -> подготовить -> узел.
     """
     из_ = {"podpisej": len(podpisi), "proshlo": 0, "krasnyh": 0,
-           "krivaya_zakonchilas": 0, "ne_razobrano": 0, "sdelki": [],
-           "why_not": None}
+           "krivaya_zakonchilas": 0, "kotirovka_ne_wsol": 0,
+           "ne_razobrano": 0, "sdelki": [], "why_not": None}
     for п in podpisi:
         п = str(п).strip()
         if not п:
@@ -662,7 +670,10 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
         из_["sdelki"].append(р)
         из_["proshlo"] += 1 if р["ok"] else 0
         if not р["ok"]:
-            if р.get("raskladka_prinyata"):
+            кл = р.get("klass_otkaza")
+            if кл == "kotirovka_ne_wsol":
+                из_["kotirovka_ne_wsol"] += 1
+            elif р.get("raskladka_prinyata"):
                 из_["krivaya_zakonchilas"] += 1
             else:
                 из_["krasnyh"] += 1
@@ -674,6 +685,7 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
     elif not из_["proshlo"]:
         из_["why_not"] = ("ни один сигнал не прошёл денежным путём: "
                           f"закончившихся кривых {из_['krivaya_zakonchilas']}, "
+                          f"котировка не WSOL {из_['kotirovka_ne_wsol']}, "
                           f"не разобрано {из_['ne_razobrano']}")
     return из_
 
@@ -833,6 +845,11 @@ def самопроверка() -> int:
         "полоса встала",
         klass_otkaza(["Error Code: AccountNotInitialized. Error Number: 3012. "
                       "Error Message: x"])["klass"] == "raskladka")
+    chk("наш названный отказ по котировке отделён от красного раскладки: "
+        "«не WSOL» в тексте сборки -- это свой отказ до подписи",
+        "не WSOL" in "котировка кривой CARDS не WSOL"
+        and 'klass_otkaza="kotirovka_ne_wsol"' in
+        Path(__file__).read_text(encoding="utf-8"))
     chk("ДОКАЗАННЫЙ КРАСНЫЙ: без номера ошибки класс остаётся «раскладка», а "
         "не «закончилась» -- молчание не оправдание",
         klass_otkaza(["Program failed"])["klass"] == "raskladka"
