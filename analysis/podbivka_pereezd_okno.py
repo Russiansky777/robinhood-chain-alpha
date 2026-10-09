@@ -213,8 +213,11 @@ def main() -> int:
     р.add_argument("--celi", default=str(П / "pereezd_celi.json"))
     р.add_argument("--slotov", type=int, default=1121)
     р.add_argument("--chasov-predel", type=int, default=12)
-    р.add_argument("--razdely", default="пункт_2,пункт_к",
-                   help="разделы файла целей через запятую; пусто -- все")
+    р.add_argument("--razdely", default="",
+                   help="разделы файла целей через запятую; пусто (по умолчанию) -- все. "
+                        "Имена разделов у файлов разные (пункт_2/пункт_к у переезда, срезы "
+                        "у TG), и неподходящий фильтр молча отбрасывал ВСЕ цели -- так один "
+                        "проход на 87 часов прошёл впустую. Поэтому по умолчанию -- все.")
     р.add_argument("--metka", default="okno")
     а = р.parse_args()
     цел = цели(Path(а.celi),
@@ -227,6 +230,14 @@ def main() -> int:
         оставить = set(часы[:а.chasov_predel])
         цел = {pid: з for pid, з in цел.items() if з.get("час") in оставить}
         часы = часы_целей(цел, а.slotov)
+    if not цел or not часы:
+        # Пустой проход -- это ошибка, а не результат: лучше упасть сразу, чем положить
+        # пустой файл и выдать его за ответ.
+        print(f"ОШИБКА: целей {len(цел)}, часов {len(часы)} -- нечего читать. "
+              f"Проверь --celi и --razdely (разделы файла: "
+              f"{sorted(json.loads(Path(а.celi).read_text(encoding='utf-8')))}).",
+              flush=True)
+        return 2
     print(f"целей {len(цел)}, часов {len(часы)}: {часы}", flush=True)
     счёт: collections.Counter = collections.Counter()
     соб = проход(цел, часы, а.slotov, счёт)
