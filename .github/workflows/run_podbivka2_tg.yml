@@ -49,10 +49,11 @@ jobs:
           M=data/podbivka/zapusk/tg_sbor.json
           REZH=$($PY -c "import json;print(' '.join(json.load(open('$M')).get('rezhimy') or ['katalog']))")
           S=$($PY -c "import json;print(json.load(open('$M')).get('s') or '2026-09-21T00:00:00Z')")
+          K=$($PY -c "import json;print(json.load(open('$M')).get('kanaly') or '')")
           for r in $REZH; do
             echo "--- rezhim $r"
             if [ "$r" = "istoriya" ]; then
-              $PY analysis/podbivka_tg_sbor.py --rezhim istoriya --s "$S"
+              $PY analysis/podbivka_tg_sbor.py --rezhim istoriya --s "$S" --kanaly "$K"
             else
               $PY analysis/podbivka_tg_sbor.py --rezhim "$r"
             fi

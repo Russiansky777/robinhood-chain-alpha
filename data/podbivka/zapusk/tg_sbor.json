@@ -1,9 +1,9 @@
 {
  "rezhimy": [
-  "katalog",
   "istoriya"
  ],
  "s": "2026-09-21T00:00:00Z",
- "zachem": "Punkt 2 zadachi vladelca 09.10: 20-30 publichnyh kanalov kollov memkoinov Solana i istoriya ih postov s 21.09. Katalog: semena iz veb-poiska (s ukazaniem istochnika v kazhdoy stroke) + rasshirenie po bloku 'pohozhie kanaly' stranic TGStat; proverka kazhdogo imeni na t.me/s/<imya> -- otkryvaetsya li bez vhoda i est li posty. Istoriya: hod nazad po ?before=<id> do 21.09, na kazhdyy post vremya UTC po sekundam, tekst i base58-minty. Pervyy progon 08.10 23:20Z pokazal, chto poisk po katalogam otdayot tolko kanaly samogo servisa (stranicy vydachi risuyutsya skriptom), poetomu semena teper iz veb-poiska. Vtoraya popytka: pervyy progon upal na ModuleNotFoundError solders -- podbivka_run (obschiy modul zapisi faylov) tyanet solders, a v venv progona stoyal tolko requests; dobavlen solders.",
- "popytka": 2
+ "zachem": "Punkt 2b: dobor istorii. Katalog proshyol -- iz 57 kandidatov t.me/s/<imya> otkryvayutsya bez vhoda 23 kanala, spisok v data/podbivka/tg/kanaly.json s istochnikom u kazhdogo. Istoriya sobrana: 7846 postov, 5187 mintov. No u chetyryoh samyh aktivnyh kanalov (pumpfun_kol_calls, pumpfuncalls_sol, shitcoingemsalert, solana100xcall) 1200 postov upyorlis v predel 60 stranic, ne doydya do 21.09 -- oni dotyanulis tolko do 01.10-06.10. Predel podnyat do 400 stranic, perebirayutsya tolko eti chetyre: ostalnye 19 do 21.09 doshli.",
+ "popytka": 3,
+ "kanaly": "pumpfun_kol_calls,pumpfuncalls_sol,shitcoingemsalert,solana100xcall"
 }
