@@ -1,4 +1,4 @@
-=== NL-хост, живучесть служб, 2026-10-09T01:39:13Z ===
+=== NL-хост, живучесть служб, 2026-10-09T01:39:51Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Thu 2026-10-01 21:01:53 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Thu 2026-10-01 21:01:53 CEST
 bloom-seller: active=active enabled=enabled restarts=0 since=Tue 2026-10-06 19:26:17 CEST
@@ -7,15 +7,15 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
 
 --- память хоста (MiB) ---
                total        used        free      shared  buff/cache   available
-Mem:            3915        1293         148          49        2809        2621
+Mem:            3915        1267         182          49        2801        2648
 Swap:              0           0           0
 
 --- память по службам (байты; MemoryPeak -- с последнего старта) ---
-bloom-detector: MemoryCurrent=504442880 MemoryPeak=504991744 MemoryHigh=infinity MemoryMax=536870912 
+bloom-detector: MemoryCurrent=504709120 MemoryPeak=505229312 MemoryHigh=infinity MemoryMax=536870912 
 bloom-seller: MemoryCurrent=76447744 MemoryPeak=85438464 MemoryHigh=infinity MemoryMax=536870912 
 dbot-sold-guard: MemoryCurrent=21209088 MemoryPeak=22372352 MemoryHigh=infinity MemoryMax=infinity 
 dbot-detect-probe: MemoryCurrent=302305280 MemoryPeak=353329152 MemoryHigh=infinity MemoryMax=infinity 
-grpc-feed-probe: MemoryCurrent=59588608 MemoryPeak=62570496 MemoryHigh=infinity MemoryMax=infinity 
+grpc-feed-probe: MemoryCurrent=59584512 MemoryPeak=62570496 MemoryHigh=infinity MemoryMax=infinity 
 
 --- откуда предел памяти детектора ---
 FragmentPath=/etc/systemd/system/bloom-detector.service
@@ -1447,11 +1447,11 @@ DropInPaths=
   ]
 }
 показан ЦЕЛИКОМ: 43670 знаков
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-10-09T01:39:14Z):
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-10-09T01:39:53Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-10-09T01:39:14Z",
-  "updated_ts": 1791509954.332063,
+  "updated_utc": "2026-10-09T01:39:53Z",
+  "updated_ts": 1791509993.3368585,
   "mode": "live",
   "positions_in_cycle": 0,
   "last_cycle": [],
@@ -1582,7 +1582,7 @@ DropInPaths=
     "note": "путь рубильника доступен на чтение"
   }
 }
-показан ЦЕЛИКОМ: 3660 знаков
+показан ЦЕЛИКОМ: 3661 знаков
 /home/bot/bloom_executor_live_data/samoproverka_hosta.json (изменён 2026-10-09T01:10:01Z):
 {"время": "01:10Z", "строка": "самопроверка 01:10Z: журнал службы за час пуст -- у живой службы так не бывает, значит он не прочитан\nпроверено на хосте: службы, признаки жизни, сбои за час, UNSOLD за час, кредиты Helius, рубильники. Не с хоста (смотрит сессия): свежесть учёта и прогоны Actions.", "плохо": ["журнал службы за час пуст -- у живой службы так не бывает, значит он не прочитан"], "обновлено_utc": "01:10Z"}
 
@@ -1596,10 +1596,10 @@ DropInPaths=
  }
 }
 показан ЦЕЛИКОМ: 250 знаков
-/home/bot/dbot_detect_probe/status.json (изменён 2026-10-09T01:38:25Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-10-09T01:39:25Z):
 {
-  "updated_utc": "2026-10-09T01:38:25Z",
-  "uptime_s": 628592.0,
+  "updated_utc": "2026-10-09T01:39:25Z",
+  "uptime_s": 628652.0,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
@@ -1675,8 +1675,8 @@ DropInPaths=
   "слепое_время_с": 48.7,
   "слепое_время_доля": 8e-05,
   "переподключений_slot": 41,
-  "slot_уведомлений": 2343628,
-  "текущий_слот": 454720744,
+  "slot_уведомлений": 2343856,
+  "текущий_слот": 454720972,
   "последнее_событие_utc": "2026-10-09T01:33:27Z",
   "часы": {
     "checked_at_utc": "2026-10-09T01:02:00Z",
@@ -1687,11 +1687,11 @@ DropInPaths=
   }
 }
 показан ЦЕЛИКОМ: 2358 знаков
-/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-10-09T01:39:10Z):
+/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-10-09T01:39:50Z):
 {
-  "utc": "2026-10-09T01:39:10Z",
+  "utc": "2026-10-09T01:39:50Z",
   "started_utc": "2026-10-02T00:08:32Z",
-  "uptime_s": 610238.3,
+  "uptime_s": 610278.3,
   "channels": 4,
   "channel_names": [
     "grpc",
@@ -1910,28 +1910,28 @@ DropInPaths=
 }
 показан ЦЕЛИКОМ: 5448 знаков
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 375704 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 375927 строк
 /home/bot/bloom_executor_live_data/positions.jsonl: нет или пуст
 /home/bot/dbot_detect_probe/events.jsonl: 25466 строк
 
 --- решения детектора по кодам ---
-всего решений: 375706
+всего решений: 375930
 первое: "ts_utc": "2026-10-08T22:00:30Z"
-последнее: "ts_utc": "2026-10-09T01:39:17Z"
+последнее: "ts_utc": "2026-10-09T01:39:55Z"
 по кодам:
- 363186 NOT_A_BUY
+ 363422 NOT_A_BUY
   10546 STALE
-    489 TARGET_AMOUNT_OUT_OF_RANGE
-    450 TOKEN_RECEIVED_NOT_BOUGHT
+    491 TARGET_AMOUNT_OUT_OF_RANGE
+    451 TOKEN_RECEIVED_NOT_BOUGHT
      98 INSUFFICIENT_BALANCE
      62 SKIP_TARGET_INCREASE_POSITION
       8 THRESHOLD_EDGE
       1 WS_BREAK
       1 AMBIGUOUS_TX
 по задачам источника:
- 372361 cand1_03
-    714 vol_4vw
-    537 cand2
+ 372575 cand1_03
+    715 vol_4vw
+    539 cand2
     428 krug_001
     209 batch5
     135 sniper_src
@@ -1945,23 +1945,23 @@ DropInPaths=
      16 leader
      11 cand2_03
       3 TEST
-забран bloom_detector.json (50203 байт)
+забран bloom_detector.json (50204 байт)
 забран bloom_seller.json (35863 байт)
 забран c2_own_send_dry.json (793 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 178039 кредитов, бюджет 2000000, доля 0.089
+  bloom_detector: 178346 кредитов, бюджет 2000000, доля 0.0892
   ledger: 904 кредитов, бюджет 50000, доля 0.0181
-  ВСЕГО за 2026-10-09: 178943 кредитов
+  ВСЕГО за 2026-10-09: 179250 кредитов
 
 --- работа хостовых таймеров ---
 имена таймеров из установщика: 'bloom-uchet-chas.timer' 'bloom-zhivuchest-chas.timer' 'bloom-vygruzka-sutki.timer' 'bloom-uborshchik-itog-sutki.timer' 'bloom-uborshchik-chas.timer'
 NEXT                             LEFT LAST                               PASSED UNIT                              ACTIVATES
-Fri 2026-10-09 03:53:00 CEST    13min Fri 2026-10-09 02:53:01 CEST    46min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
-Fri 2026-10-09 04:23:00 CEST    43min Fri 2026-10-09 03:23:01 CEST    16min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
-Fri 2026-10-09 04:38:00 CEST    58min Fri 2026-10-09 03:38:01 CEST 1min 33s ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
-Fri 2026-10-09 08:00:00 CEST 4h 20min Thu 2026-10-08 08:00:01 CEST      19h ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
-Fri 2026-10-09 23:55:00 CEST      20h Thu 2026-10-08 23:55:01 CEST 3h 44min ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
+Fri 2026-10-09 03:53:00 CEST    12min Fri 2026-10-09 02:53:01 CEST    47min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
+Fri 2026-10-09 04:23:00 CEST    42min Fri 2026-10-09 03:23:01 CEST    17min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
+Fri 2026-10-09 04:38:00 CEST    57min Fri 2026-10-09 03:38:01 CEST 2min 10s ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
+Fri 2026-10-09 08:00:00 CEST 4h 19min Thu 2026-10-08 08:00:01 CEST      19h ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
+Fri 2026-10-09 23:55:00 CEST      20h Thu 2026-10-08 23:55:01 CEST 3h 45min ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
 
 5 timers listed.
 bloom-uchet-chas.timer loaded active
@@ -1989,10 +1989,10 @@ data/sdelki_polosy_2026-10-08.json уже в ветке (его написал �
 забрана выгрузка sdelki_polosy_2026-10-08.json -> data/sdelki_polosy_2026-10-08_s_hosta.json, сделок 181
 
 --- возраст признаков жизни (порог 600 с) ---
-/home/bot/bloom_executor_live_data/detector_status.json: 26 с (свежий)
-/home/bot/bloom_executor_live_data/seller_heartbeat.json: 2 с (свежий)
-/home/bot/dbot_detect_probe/status.json: 15 с (свежий)
-/home/bot/grpc_feed_probe_data/heartbeat.json: 10 с (свежий)
+/home/bot/bloom_executor_live_data/detector_status.json: 0 с (свежий)
+/home/bot/bloom_executor_live_data/seller_heartbeat.json: 0 с (свежий)
+/home/bot/dbot_detect_probe/status.json: 52 с (свежий)
+/home/bot/grpc_feed_probe_data/heartbeat.json: 7 с (свежий)
 
 --- старт служб против mtime модулей ---
 самый свежий модуль служб: /home/bot/bloom_executor/selftest_guard.py (2026-10-06T17:25:42Z)
