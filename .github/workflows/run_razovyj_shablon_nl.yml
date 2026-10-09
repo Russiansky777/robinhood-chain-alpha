@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "prodat_ostatok | prodat_pravilo4 | zakryt_pustye_scheta"
+        description: "prodat_ostatok | prodat_pravilo4 | zakryt_pustye_scheta | pump_sborka_simulyaciya"
         required: true
         default: "prodat_ostatok"
       dovody:
@@ -62,6 +62,7 @@ jobs:
           set -e
           case "$ZADACHA" in
             prodat_ostatok|prodat_pravilo4|zakryt_pustye_scheta) : ;;
+            pump_sborka_simulyaciya) : ;;
             *) echo "OTKAZ: zadacha ne iz spiska"; exit 1 ;;
           esac
           case "$LIVE" in yes|no) : ;; *) echo "OTKAZ: live -- yes ili no"; exit 1 ;; esac
@@ -90,6 +91,7 @@ jobs:
             prodat_ostatok) SKRIPT=deploy/checks/prodat_ostatok_raz.py ;;
             prodat_pravilo4) SKRIPT=deploy/checks/prodat_pravilo4_raz.py ;;
             zakryt_pustye_scheta) SKRIPT=deploy/checks/zakryt_pustye_scheta_raz.py ;;
+            pump_sborka_simulyaciya) SKRIPT=deploy/checks/pump_sborka_simulyaciya.py ;;
           esac
           if [ ! -f "$SKRIPT" ]; then
             echo "OTKAZ: skripta zadachi net: $SKRIPT"
@@ -108,6 +110,26 @@ jobs:
           tar -C analysis -cf - \
               bloom_seller.py bloom_own_send.py bloom_exec_state.py c2_common.py \
             | tar -C "$RABOTA/kod" -xf -
+          # SIMULJACIJA SBORKI JEZDIT SO SVOIM GRUZOM, i tolko ona: denezhnyje
+          # zadachi dolzhny jehat tochno tem zhe naborom, chto i do etogo.
+          # IDL I OBRAZCY LOZHATSJA RJADOM S kod/, A NE VNUTRI: sborshchik
+          # ishchet ih po KORNJU, to jest na odin katalog vyshe sebja
+          # (data/idl/*.json). Polozhish vnutri kod/ -- sborshchik otkazhet po
+          # imeni fajla, i eto pravilno: raskladki bez IDL ne vydumyvajutsja.
+          # Nedovoz obrazcov tozhe ne projdjot molcha: suhoj progon sverjajet
+          # ih CHISLO (150) i krasneet do zhivogo progona.
+          if [ "$ZADACHA" = pump_sborka_simulyaciya ]; then
+            tar -C analysis -cf - c3_pump_sborka.py c3_kapital_trekker.py \
+              | tar -C "$RABOTA/kod" -xf -
+            install -d -m 755 "$RABOTA/data"
+            tar -C data -cf - \
+                idl c2_pool_samples c3_usdc_noga samples \
+                bloom_regression_txs.json bloom_tx_raw.json \
+                c2_curve_variant_samples.json nogi_shablony.json \
+                obrazcy_vidov_instrukciy.json solana_raw_tx_dump_vyvod.json \
+              | tar -C "$RABOTA/data" -xf -
+            echo "gruz simuljacii: idl i zhivyje obrazcy dovezeny"
+          fi
           cp "$SKRIPT" "$RABOTA/zadacha.py"
           cp deploy/checks/razovyj_predpuskovoj.py "$RABOTA/predpuskovoj.py"
           # MANIFEST SUMM -- PO KAZHDOMU FAJLU. Odno chislo na katalog ne govorit,
@@ -127,11 +149,15 @@ jobs:
       - name: "PREDPUSKOVAJA: summy, puti modulej, piton, mesto"
         run: |
           set -e
+          MODULI=bloom_seller,bloom_own_send,bloom_exec_state
+          if [ "$ZADACHA" = pump_sborka_simulyaciya ]; then
+            MODULI=c3_pump_sborka,c3_kapital_trekker
+          fi
           sudo -u bot -E env PYTHONDONTWRITEBYTECODE=1 \
             PYTHONPATH="$RABOTA/kod:$CODE_DIR" \
             "$PY_HOSTA" "$RABOTA/predpuskovoj.py" \
               --kat "$RABOTA/kod" \
-              --moduli bloom_seller,bloom_own_send,bloom_exec_state \
+              --moduli "$MODULI" \
               --summy "$RABOTA/summy.json" | tee "$RABOTA/predpuskovoj.json"
           echo "predpuskovaja proshla"
 
