@@ -417,7 +417,8 @@ jobs:
             ls -l /home/bot/data/solana_buyer_200/prior/current/buyer_100/dex_labels.json
             ls -l /home/bot/data/senders.json
             ls -l /home/bot/data/clmm_konfigi.json 2>/dev/null || echo 'clmm_konfigi.json ne dostavlen'
-            ls -l /home/bot/data/dlmm_shag_korziny.json 2>/dev/null || echo 'dlmm_shag_korziny.json ne dostavlen' 
+            ls -l /home/bot/data/dlmm_shag_korziny.json 2>/dev/null || echo 'dlmm_shag_korziny.json ne dostavlen'
+            ls -l /home/bot/data/idl/pump.json /home/bot/data/idl/pump_amm.json 2>/dev/null || echo 'SBOJ: IDL pump.fun ne dostavlen -- vrezka krivoj v2/v3 otkazhet na kazhdom signale' 
             echo 'fayl grupp deploy ne trogal, pokazyvaem ego vremya kak est:'
             ls -l /home/bot/data/sources_2026-09-25.json
           "
