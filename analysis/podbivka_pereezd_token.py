@@ -84,6 +84,35 @@ def цели(путь: Path, разделы: tuple) -> list:
     return из_
 
 
+def ставка_налога(расш: list) -> dict:
+    """Ставка налога на перевод из расширения transferFeeConfig, в базисных пунктах.
+
+    У Token-2022 налог задаётся ДВУМЯ ставками: `olderTransferFee` (действует до эпохи
+    переключения) и `newerTransferFee` (после). Какая из них в силе -- зависит от текущей
+    эпохи, поэтому берутся обе, а в счёт идёт НАИБОЛЬШАЯ: модель круга не должна
+    недооценивать расход. Поле `maximumFee` -- потолок налога в единицах токена; при нём
+    налог перестаёт быть пропорциональным, и это помечается отдельно.
+    """
+    for x in расш:
+        if not isinstance(x, dict) or x.get("extension") != "transferFeeConfig":
+            continue
+        s = x.get("state") or {}
+        из_: dict = {"есть": True}
+        бп = []
+        for имя in ("newerTransferFee", "olderTransferFee"):
+            v = s.get(имя) or {}
+            б = v.get("transferFeeBasisPoints")
+            if б is not None:
+                из_[имя] = {"бп": б, "потолок": v.get("maximumFee"),
+                            "эпоха": v.get("epoch")}
+                бп.append(int(б))
+        из_["бп_в_счёт"] = max(бп) if бп else None
+        из_["управляющий"] = s.get("transferFeeConfigAuthority")
+        из_["получатель"] = s.get("withdrawWithheldAuthority")
+        return из_
+    return {"есть": False, "бп_в_счёт": 0}
+
+
 def счёт_минта(rpc, темп: Темп, минт: str) -> dict:
     темп.ждать()
     о = rpc.call("getAccountInfo", [минт, {"encoding": "jsonParsed"}])
@@ -91,7 +120,8 @@ def счёт_минта(rpc, темп: Темп, минт: str) -> dict:
     п = ((v.get("data") or {}).get("parsed") or {}).get("info") or {}
     расш = п.get("extensions") or []
     имена = [(x.get("extension") if isinstance(x, dict) else str(x)) for x in расш]
-    return {"владелец": v.get("owner"),
+    налог = ставка_налога(расш)
+    return {"владелец": v.get("owner"), "налог": налог,
             "программа": ("Token-2022" if v.get("owner") == TOKEN22
                           else "Token" if v.get("owner") == TOKEN else v.get("owner")),
             "десятичных": п.get("decimals"), "выпуск": п.get("supply"),
@@ -200,6 +230,12 @@ def main() -> int:
         свод["опасные_расширения"] += 1 if м["опасные"] else 0
         for и in м["опасные"]:
             свод[f"расширение:{и}"] += 1
+        нал = м.get("налог") or {}
+        if нал.get("есть"):
+            свод["налог_на_перевод_есть"] += 1
+            свод[f"налог_бп:{нал.get('бп_в_счёт')}"] += 1
+            if (нал.get("newerTransferFee") or {}).get("потолок") not in (None, "0", 0):
+                свод["налог_с_потолком"] += 1
         for пл in (ист.get("создание_площадки") or []):
             свод[f"исток:{пл}"] += 1
         if ист and not ист.get("создание_площадки") and not ист.get("обрезано"):
