@@ -117,7 +117,10 @@ def наценки(п: dict) -> None:
     if п.get("свежо"):
         return
     т_ = п.get("тариф")
-    п["f"] = statistics.median(п["fs"]) if п["fs"] else (1 - т_ if т_ is not None else None)
+    # у pump-amm тариф берётся с выхода: f = 1, g = 1 - тариф (замерено на цепи, медиана f
+    # ровно 1.00000 по 3884 пулам суток 24.09). Запас 1 - тариф для f занижал покупку.
+    запас_f = 1.0 if п.get("тип") == "pump-amm" else (1 - т_ if т_ is not None else None)
+    п["f"] = statistics.median(п["fs"]) if п["fs"] else запас_f
     п["g"] = statistics.median(п["gs"]) if п["gs"] else (1 - т_ if т_ is not None else None)
     п["свежо"] = True
 

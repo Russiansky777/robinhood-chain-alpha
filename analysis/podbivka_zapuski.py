@@ -132,8 +132,13 @@ def запись(з: dict) -> dict:
                 v = dx * (y0 + dy) / (x0 * dy)
                 if 0.5 <= v <= 1.0:
                     gs.append(v)
-        f_ = statistics.median(fs) if fs else (1 - тариф if тариф is not None else None)
-        g_ = statistics.median(gs) if gs else (1 - тариф if тариф is not None else None)
+        # у pump-amm тариф берётся с выхода: f = 1, g = 1 - тариф (замерено на цепи,
+        # медиана f ровно 1.00000 по 3884 пулам). Запас 1 - тариф для f занижал покупку.
+        запас_f = 1.0 if з["пул"] == "pump-amm" else (
+            1 - тариф if тариф is not None else None)
+        запас_g = 1 - тариф if тариф is not None else None
+        f_ = statistics.median(fs) if fs else запас_f
+        g_ = statistics.median(gs) if gs else запас_g
     цены = [(e["блок"], e["сост"][0] / e["сост"][1]) for e in ряд if e["сост"]]
     пик = max(цены, key=lambda x: x[1]) if цены else None
     п0 = цены[0][1] if цены else None

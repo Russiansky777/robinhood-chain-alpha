@@ -139,7 +139,10 @@ def часы_под_коллы(кс: list) -> list:
 
 def наценки(п: dict) -> None:
     т_ = п.get("тариф")
-    п["f"] = statistics.median(п["fs"]) if п["fs"] else (1 - т_ if т_ is not None else None)
+    # у pump-amm тариф берётся с выхода: f = 1, g = 1 - тариф (замерено на цепи, медиана f
+    # ровно 1.00000 по 3884 пулам суток 24.09). Запас 1 - тариф для f занижал покупку.
+    запас_f = 1.0 if п.get("тип") == "pump-amm" else (1 - т_ if т_ is not None else None)
+    п["f"] = statistics.median(п["fs"]) if п["fs"] else запас_f
     п["g"] = statistics.median(п["gs"]) if п["gs"] else (1 - т_ if т_ is not None else None)
 
 
@@ -296,7 +299,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                 if з["пик"] is None or ц > з["пик"][0]:
                     з["пик"] = [ц, round(если, 3), блок]
 
-    for ч in часы(а.s, а.chasov):
+    for ч in часы:
         url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
         for попытка in range(3):
             try:
