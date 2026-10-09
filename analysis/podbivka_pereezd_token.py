@@ -68,19 +68,36 @@ class Темп:
 
 
 def цели(путь: Path, разделы: tuple) -> list:
+    """Цели из файла -- раздел может быть и списком, и словарём списков.
+
+    У файла целей переезда разделы устроены как «имя -> список», а у файла целей кривой --
+    сразу список. Прежде принимался только первый вид, и проход падал на `.items()` у
+    списка; из-за этого два облачных задания легли впустую.
+    """
     д = json.loads(путь.read_text(encoding="utf-8"))
     из_, видел = [], set()
-    for раздел in разделы:
-        тело = д.get(раздел) or {}
-        for имя, сп in тело.items():
-            if not isinstance(сп, list):
+
+    def добавить(сп, метка: str) -> None:
+        for e in сп:
+            if not isinstance(e, dict):
                 continue
-            for e in сп:
-                pid, м = e.get("poolId"), e.get("минт")
-                if not pid or not м or (pid, м) in видел:
-                    continue
-                видел.add((pid, м))
-                из_.append({**e, "зачем": f"{раздел}/{имя}"})
+            pid, м = e.get("poolId"), e.get("минт")
+            if not м or (pid, м) in видел:
+                continue
+            видел.add((pid, м))
+            из_.append({**e, "зачем": метка})
+
+    for раздел in разделы:
+        тело = д.get(раздел)
+        if isinstance(тело, list):
+            добавить(тело, раздел)
+        elif isinstance(тело, dict):
+            for имя, сп in тело.items():
+                if isinstance(сп, list):
+                    добавить(сп, f"{раздел}/{имя}")
+    if not из_:
+        print(f"ОШИБКА: по разделам {list(разделы)} целей нет. Разделы файла: "
+              f"{sorted(д)}", flush=True)
     return из_
 
 
