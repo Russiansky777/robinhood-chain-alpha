@@ -458,6 +458,33 @@ jobs:
             *) echo "все службы стартовали позже своих модулей" ;;
           esac
 
+      - name: "Врезка кривой v2/v3 жива на хосте (только чтение)"
+        if: always()
+        run: |
+          set -e
+          # ЗАЧЕМ. Деплой доставляет МОДУЛЬ и отдельно ДАННЫЕ, которые модуль
+          # читает файлом. Сборщик по IDL берёт раскладки из /home/bot/data/idl;
+          # без них врезка отказывает на каждом сигнале кривой, а снаружи это
+          # молчание полосы -- ровно так она стояла 08.10. Проверка идёт ОТ
+          # ПОЛЬЗОВАТЕЛЯ СЛУЖБЫ и его питоном: файл, доставленный root'ом с
+          # чужими правами, служба не прочтёт, и узнать это надо здесь.
+          #
+          # Скрипт уходит на хост через stdin, поэтому кавычек в ssh нет вовсе.
+          {
+            echo ""
+            echo "--- врезка кривой v2/v3 на хосте ---"
+          } >> data/vps_health_nl.txt
+          set +e
+          OUT=$(ssh $SSH_OPTS root@$HOST "sudo -u bot env PYTHONPATH=/home/bot/bloom_executor /home/bot/robinhood-chain-alpha/venv/bin/python -" < deploy/checks/vrezka_krivoj_na_hoste.py 2>&1)
+          RC=$?
+          set -e
+          echo "$OUT" | tee -a data/vps_health_nl.txt
+          if [ "$RC" = "0" ]; then
+            echo "врезка кривой на хосте: жива" | tee -a data/vps_health_nl.txt
+          else
+            echo "ТРЕВОГА: врезка кривой на хосте НЕ жива (код $RC)" | tee -a data/vps_health_nl.txt
+          fi
+
       - name: "Разбор сбоев за окно (только чтение)"
         if: ${{ always() && inputs.diag_min != '0' && inputs.diag_min != '' }}
         run: |
