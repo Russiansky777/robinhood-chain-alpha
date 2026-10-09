@@ -238,6 +238,50 @@ def tx_base64(*, programma: str, scheta: list, dannye: bytes,
             "podpisej": n}
 
 
+def ata_idempotent_scheta(*, payer: str, owner: str, mint: str,
+                          token_program: str) -> dict:
+    """CreateIdempotent ATA -- ТЕМИ ЖЕ БАЙТАМИ И СЧЕТАМИ, что в денежном пути.
+
+    ЗАЧЕМ (правка 09.10). Наша покупка в бою уходит НЕ ОДНОЙ инструкцией:
+    c2_swap_build.py:803 всегда ставит перед свопом ata_idempotent на базовый
+    минт. Симуляция же посылала одну инструкцию, и на кошельке, который этого
+    минта никогда не держал, программа честно отвечала 3012
+    AccountNotInitialized по associated_base_user -- то есть красный был у
+    ОСНАСТКИ, а не у сборки. Теперь проверяется то, что мы и отправляем.
+    Байты (один байт 1) и порядок счетов взяты из денежного пути, а не придуманы
+    здесь: c2_swap_build.ata_idempotent.
+    """
+    адрес = СБ.ata(owner, token_program, mint)
+    return {"programma": СБ.ПРОГ_ATA, "dannye": bytes([1]), "scheta": [
+        {"pubkey": payer, "isSigner": True, "isWritable": True},
+        {"pubkey": адрес, "isSigner": False, "isWritable": True},
+        {"pubkey": owner, "isSigner": False, "isWritable": False},
+        {"pubkey": mint, "isSigner": False, "isWritable": False},
+        {"pubkey": СБ.СИСТЕМНАЯ, "isSigner": False, "isWritable": False},
+        {"pubkey": token_program, "isSigner": False, "isWritable": False}]}
+
+
+def tx_base64_mnogo(*, instrukcii: list, platelshchik: str) -> dict:
+    """Несколько инструкций в одном неподписанном v0 -- как в бою."""
+    (Hash, AccountMeta, Instruction, MessageV0, Pubkey, Signature,
+     VersionedTransaction) = _solders()
+    спис = []
+    for и in instrukcii:
+        metas = [AccountMeta(Pubkey.from_string(а["pubkey"]),
+                             is_signer=bool(а["isSigner"]),
+                             is_writable=bool(а["isWritable"]))
+                 for а in и["scheta"]]
+        спис.append(Instruction(Pubkey.from_string(и["programma"]),
+                                bytes(и["dannye"]), metas))
+    msg = MessageV0.try_compile(Pubkey.from_string(platelshchik), спис, [],
+                                Hash.default())
+    n = msg.header.num_required_signatures
+    vtx = VersionedTransaction.populate(msg, [Signature.default()] * n)
+    сырое = bytes(vtx)
+    return {"tx_base64": base64.b64encode(сырое).decode(), "bajt": len(сырое),
+            "podpisej": n, "instrukciy": len(спис)}
+
+
 # ------------------------------------------------- наша копия образца
 
 def nasha_kopija(razbor: dict) -> dict:
@@ -602,9 +646,14 @@ def svoja_pokupka_dlja_otkazannyh(zov, *, obrazcy: dict,
             из_["proverok"] += 1
             из_["krasnyh"] += 1
             continue
-        tx = tx_base64(programma=СБ.ПРОГ_КРИВОЙ, scheta=собрано["accounts"],
-                       dannye=bytes.fromhex(собрано["data_hex"]),
-                       platelshchik=koshelek)
+        # ДВЕ ИНСТРУКЦИИ, КАК В БОЮ: создание ATA базового минта и сам своп.
+        tx = tx_base64_mnogo(instrukcii=[
+            ata_idempotent_scheta(payer=koshelek, owner=koshelek, mint=минт,
+                                  token_program=тп),
+            {"programma": СБ.ПРОГ_КРИВОЙ, "scheta": собрано["accounts"],
+             "dannye": bytes.fromhex(собрано["data_hex"])}],
+            platelshchik=koshelek)
+        строка["instrukciy"] = tx["instrukciy"]
         if pauza:
             time.sleep(pauza)
         отв = simulirovat(zov, tx["tx_base64"])
