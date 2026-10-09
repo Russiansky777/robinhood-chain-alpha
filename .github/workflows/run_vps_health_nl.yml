@@ -97,6 +97,51 @@ jobs:
           done
           echo "FAIL=$FAIL" >> $GITHUB_ENV
 
+      # ПАМЯТЬ ХОСТА И СЛУЖБ -- ПОСЛЕ OOM 08.10 23:18:34Z. Детектор был убит
+      # OOM-killer'ом при MemoryMax=512M и пике 515.1M, и ни один отчёт этого
+      # заранее не показывал: в живучести памяти не было вовсе. Теперь она
+      # здесь, и по этому же блоку сверяется пик после подъёма предела
+      # (слово владельца 09.10, п.1). Только чтение: free и systemctl show.
+      - name: "Память хоста и служб"
+        run: |
+          set -e
+          {
+            echo ""
+            echo "--- память хоста (MiB) ---"
+          } >> data/vps_health_nl.txt
+          ssh -n $SSH_OPTS root@$HOST "free -m" >> data/vps_health_nl.txt 2>&1 || \
+            echo "ssh не ответил" >> data/vps_health_nl.txt
+          {
+            echo ""
+            echo "--- память по службам (байты; MemoryPeak -- с последнего старта) ---"
+          } >> data/vps_health_nl.txt
+          for SVC in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
+            # БЕЗ --value, И ЭТО НЕ МЕЛОЧЬ. С четырьмя -p и --value systemd
+            # печатает ЧЕТЫРЕ ЧИСЛА БЕЗ ИМЁН, и порядок не тот, в котором
+            # заданы флаги. 09.10 я на этом прочитал "MemoryMax=infinity,
+            # MemoryHigh=512M" там, где в юните стоит MemoryMax=512M и
+            # MemoryHigh не задан вовсе. Имя рядом со значением -- обязательно.
+            OUT=$(ssh -n $SSH_OPTS root@$HOST "
+              systemctl show $SVC -p MemoryCurrent -p MemoryPeak -p MemoryMax -p MemoryHigh \
+                | tr '\n' ' '" || echo "ssh не ответил")
+            echo "$SVC: $OUT" | tee -a data/vps_health_nl.txt
+          done
+          # ОТКУДА ВЗЯТ ПРЕДЕЛ. 09.10 живой юнит детектора показал
+          # MemoryMax=infinity при MemoryHigh=512M, хотя прогон деплоя пишет
+          # MemoryMax=512M: значит действует не то, что в прогоне, а врезка
+          # (drop-in) или юнит от прежней версии. Без этих двух строк такое
+          # расхождение не видно вовсе, а предел памяти -- это причина OOM.
+          {
+            echo ""
+            echo "--- откуда предел памяти детектора ---"
+          } >> data/vps_health_nl.txt
+          ssh -n $SSH_OPTS root@$HOST "
+            systemctl show bloom-detector -p FragmentPath -p DropInPaths
+            grep -n -E 'Memory(Max|High|Limit)' /etc/systemd/system/bloom-detector.service \
+              /etc/systemd/system/bloom-detector.service.d/*.conf 2>/dev/null \
+              || echo 'строк Memory* в юните и врезках не найдено'" \
+            >> data/vps_health_nl.txt 2>&1 || echo "ssh не ответил" >> data/vps_health_nl.txt
+
       - name: "Признаки жизни и журналы"
         run: |
           set -e
