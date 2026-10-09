@@ -31,13 +31,17 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' -- как было; 'pump_sborka' -- оснастка Code-3 на девяти разновидностях IDL; 'pereezdy' -- кто подписывает переезд кривая -> PumpSwap"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' -- наш круг [ATA, покупка, продажа] одной транзакцией от нашего адреса"
         required: false
         default: "bonding"
       cel:
         description: "pump_sborka: сколько образцов на вариант считать целью"
         required: false
         default: "20"
+      cel_t2022:
+        description: "pump_sborka: сколько образцов Token-2022 ждать у buy_exact_quote_in_v3 и sell_v3"
+        required: false
+        default: "10"
       predel_tx:
         description: "pump_sborka: предел прочитанных транзакций"
         required: false
@@ -90,7 +94,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy)
+            pump_sborka|pereezdy|krug_sborki)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -105,14 +109,20 @@ jobs:
           set -e
           set -o pipefail
           git fetch --depth=1 origin claude/stroiteli
-          echo "коммит оснастки: $(git rev-parse --short FETCH_HEAD) $(git log -1 --format=%s FETCH_HEAD)"
+          echo "ветка оснастки Code-3: $(git rev-parse --short FETCH_HEAD)"
+          # СБОРЩИК, ОСНАСТКА И IDL -- УЖЕ МОИ, И ИХ НЕЛЬЗЯ ЗАТИРАТЬ ВЕТКОЙ
+          # CODE-3 (правка 09.10, п.1 владельца: "Token-2022 правь сам при
+          # врезке"). В моих копиях снято значение по умолчанию у
+          # base_token_program и добавлен счёт образцов Token-2022; выкачка из
+          # claude/stroiteli вернула бы молчаливый классический Token.
+          # Оттуда берутся ТОЛЬКО образцы и трекер, которых у меня нет.
           git checkout FETCH_HEAD -- \
-            analysis/c3_pump_sborka.py analysis/c3_kapital_trekker.py \
-            deploy/checks/pump_sborka_simulyaciya.py \
-            data/idl data/c2_pool_samples data/c3_usdc_noga data/samples \
+            analysis/c3_kapital_trekker.py \
+            data/c2_pool_samples data/c3_usdc_noga data/samples \
             data/bloom_regression_txs.json data/bloom_tx_raw.json \
             data/c2_curve_variant_samples.json data/nogi_shablony.json \
             data/obrazcy_vidov_instrukciy.json data/solana_raw_tx_dump_vyvod.json
+          echo "сборщик и оснастка -- из моей ветки, с правкой Token-2022"
           ls -1 data/idl | sed 's/^/  idl: /'
           # САМОПРОВЕРКИ ОБЕИХ ЧАСТЕЙ -- ДО ЛЮБОГО ВЫЗОВА УЗЛА. Объявлено
           # Code-3: сборщик 24 из 24, оснастка 23 из 23.
@@ -138,7 +148,8 @@ jobs:
           set +e
           PYTHONPATH=analysis $PY deploy/checks/pump_sborka_simulyaciya.py --live \
             --cel "${{ inputs.cel }}" --predel-tx "${{ inputs.predel_tx }}" \
-            --pauza "${{ inputs.pauza }}" > /tmp/pump_sborka.txt 2>&1
+            --pauza "${{ inputs.pauza }}" --cel-t2022 "${{ inputs.cel_t2022 }}" \
+            > /tmp/pump_sborka.txt 2>&1
           RC=$?
           set -e
           tail -80 /tmp/pump_sborka.txt
@@ -150,6 +161,31 @@ jobs:
       # настоящих транзакций переезда. Кандидаты -- минты, у которых в сутках
       # архива Code-2 есть и кривая, и Pump AMM: другого пути между программами
       # у токена нет. Только чтение.
+      # КРУГ НАШЕЙ СБОРКИ (слово штаба 09.10, п.2). Близнецы говорят "наша
+      # сборка неотличима от чужой", и этого мало: часть "прошедших" v3 -- это
+      # ОБА близнеца, упавшие Custom 1 у программы токена. Здесь проверка
+      # прямая: от НАШЕГО адреса, нашими деньгами в симуляции, три инструкции
+      # одной транзакцией, и успех -- это err=null И баланс токена после
+      # покупки строго больше нуля.
+      - name: "krug_sborki: круг нашей сборки узлом"
+        if: ${{ inputs.zadacha == 'krug_sborki' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          PYTHONPATH=analysis $PY analysis/c3_pump_sborka.py --self-test | tail -2
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --self-test | tail -2
+          export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
+          set +e
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --live \
+            --skolko 5 --out /tmp/krug.json > /tmp/krug.txt 2>&1
+          RC=$?
+          set -e
+          tail -60 /tmp/krug.txt
+          echo "код выхода: $RC (0 -- круг прошёл хотя бы на части минтов и без красных)"
+
       - name: "pereezdy: архив Code-2 и сборщик Code-3"
         if: ${{ inputs.zadacha == 'pereezdy' }}
         run: |
@@ -188,7 +224,7 @@ jobs:
           echo "код выхода: $RC"
 
       - name: "SSH key"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' }}
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -200,7 +236,7 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Свежие сигналы кривой из живого журнала (потоком)"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' }}
         run: |
           set -e
           set -o pipefail
@@ -219,7 +255,7 @@ jobs:
           wc -l < /tmp/bsim/curve.jsonl
 
       - name: "Симуляция нашей покупки на кривой"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
@@ -255,6 +291,13 @@ jobs:
             mkdir -p data
             cp /tmp/pereezdy.json data/pereezdy_po_cepi.json 2>/dev/null || true
             git add data/pereezdy_po_cepi.json || true
+          fi
+          if [ "${{ inputs.zadacha }}" = "krug_sborki" ]; then
+            git checkout -- analysis data 2>/dev/null || true
+            git clean -fd analysis data 2>/dev/null || true
+            mkdir -p data
+            cp /tmp/krug.json data/krug_sborki_simulyaciya.json 2>/dev/null || true
+            git add data/krug_sborki_simulyaciya.json || true
           fi
           for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json; do
             [ -f "$F" ] && git add "$F"
