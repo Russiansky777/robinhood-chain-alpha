@@ -161,9 +161,6 @@ def minty_token2022_s_cepi(*, skolko: int, pauza: float) -> dict:
     у закрытой кривой покупка не пройдёт и проверка соврёт.
     """
     из_ = {"minty": [], "buyback": None, "prosmotreno": 0, "why_not": None}
-    идл = СБ.zagruzit_idl()["pump"]["ix"][ПОКУПКА]
-    диск = идл["disc"]
-    имена = [а["name"] for а in идл["accounts"]]
     о = зов("getSignaturesForAddress", [СБ.ПРОГ_КРИВОЙ, {"limit": 1000}])
     if not о["ok"]:
         из_["why_not"] = f"подписи программы не прочитаны: {о['why_not']}"
@@ -185,35 +182,21 @@ def minty_token2022_s_cepi(*, skolko: int, pauza: float) -> dict:
                                               "commitment": "confirmed"}])
         if not т["ok"] or not т.get("result"):
             continue
-        соо = ((т["result"].get("transaction") or {}).get("message") or {})
-        ключи = [k.get("pubkey") if isinstance(k, dict) else k
-                 for k in (соо.get("accountKeys") or [])]
-        инстр = list(соо.get("instructions") or [])
-        for вн in (т["result"].get("meta") or {}).get("innerInstructions") or []:
-            инстр.extend(вн.get("instructions") or [])
-        for и in инстр:
-            прог = и.get("programId")
-            данные = и.get("data")
-            if прог != СБ.ПРОГ_КРИВОЙ or not isinstance(данные, str):
-                continue
-            try:
-                сырые = СБ.b58d(данные)
-            except Exception:  # noqa: BLE001
-                continue
-            if сырые[:8] != диск:
-                continue
-            счета = [ключи[с] if isinstance(с, int) and с < len(ключи) else с
-                     for с in (и.get("accounts") or [])]
-            по_именам = dict(zip(имена, счета, strict=False))
-            минт = по_именам.get("base_mint")
-            тп = по_именам.get("base_token_program")
-            if из_["buyback"] is None and по_именам.get("buyback_fee_recipient"):
-                из_["buyback"] = по_именам["buyback_fee_recipient"]
-            if (минт and тп == СБ.ПРОГ_ТОКЕНА_2022 and минт not in видели):
-                видели.add(минт)
-                из_["minty"].append({"mint": минт, "base_token_program": тп,
-                                      "iz_podpisi": подпись})
-            break
+        # РАЗБОР -- ОДНОЙ ФУНКЦИЕЙ, той же, что разбирает отказанные сигналы.
+        к = _kriwaja_iz_tx(т["result"])
+        if not к["ok"]:
+            continue
+        if из_["buyback"] is None and к.get("buyback"):
+            из_["buyback"] = к["buyback"]
+        if (к["base_token_program"] == СБ.ПРОГ_ТОКЕНА_2022
+                and к["mint"] not in видели):
+            видели.add(к["mint"])
+            # ТРАНЗАКЦИЯ ИСТОЧНИКА ОСТАЁТСЯ ЦЕЛИКОМ: денежный путь
+            # (extract_template) работает с ответом узла, а не с минтом.
+            из_["minty"].append({
+                "mint": к["mint"], "base_token_program": к["base_token_program"],
+                "iz_podpisi": подпись, "tx": т["result"],
+                "bazovyj_vault": к["bazovyj_vault"]})
     if not из_["minty"]:
         из_["why_not"] = "живых минтов кривой на Token-2022 не нашлось"
     elif not из_["buyback"]:
@@ -288,11 +271,238 @@ def krug_na_minte(*, mint: str, token_program: str, buyback: str,
     return из_
 
 
+# ----------------------------------------------- круг ЧЕРЕЗ ДЕНЕЖНЫЙ ПУТЬ
+
+# ЗАЧЕМ ВТОРОЙ КРУГ (п.5 слова штаба 09.10). Круг выше зовёт СБОРЩИК напрямую:
+# он доказывает, что байты сборщика узел принимает. Но полоса ходит не в
+# сборщик -- она ходит в c2_swap_build.build_buy и c3_prodavec_sborka.подготовить,
+# и ровно между ними и сборщиком стоит врезка, которую надо доказать. Поэтому
+# здесь те же два шага, но ЧЕРЕЗ ФУНКЦИИ ДЕНЕЖНОГО ПУТИ: шаблон из живой сделки
+# источника, покупка -- build_buy, продажа -- подготовить.
+#
+# ПОЧЕМУ ШАБЛОН ПРОДАЖИ БЕРЁТСЯ ИЗ СДЕЛКИ ИСТОЧНИКА, А НЕ ИЗ НАШЕЙ ПОКУПКИ.
+# В работе подготовить получает НАШУ покупку, прочитанную с цепи. В симуляции
+# нашей покупки на цепи нет: она не отправлена. Из сделки берутся ровно четыре
+# значения -- base_mint, base_token_program, buyback_fee_recipient, quote_mint --
+# и у нашей покупки они те же самые, потому что наша покупка собрана по тем же
+# именам IDL того же минта. Подменять ответ узла своей выдумкой нельзя, поэтому
+# подаётся настоящая транзакция источника, а не слепленная.
+
+
+def _instrukcii_iz_tx64(tx64: str) -> list:
+    """Инструкции обратно из собранной транзакции: программа, счета, байты.
+
+    Нужно, чтобы СКЛЕИТЬ покупку и продажу в одну транзакцию: денежный путь
+    отдаёт готовые транзакции по отдельности (в работе их две и подписей две),
+    а узел покажет круг только если купля и продажа стоят в одной.
+    """
+    from solders.transaction import VersionedTransaction  # noqa: PLC0415
+
+    vtx = VersionedTransaction.from_bytes(base64.b64decode(tx64))
+    соо = vtx.message
+    ключи = [str(k) for k in соо.account_keys]
+    из_ = []
+    for ци in соо.instructions:
+        из_.append({
+            "programma": ключи[ци.program_id_index],
+            "dannye": bytes(ци.data),
+            "scheta": [{"pubkey": ключи[и],
+                        "isSigner": bool(соо.is_signer(и)),
+                        "isWritable": bool(соо.is_maybe_writable(и))}
+                       for и in list(ци.accounts)]})
+    return из_
+
+
+def _bez_budzheta(instrukcii: list) -> list:
+    """Без ComputeBudget: два предела CU в одной транзакции -- отказ узла."""
+    прог = "ComputeBudget111111111111111111111111111111"
+    return [и for и in instrukcii if и["programma"] != прог]
+
+
+def krug_denezhnogo_puti(*, tx_istochnika: dict, mint: str, token_program: str,
+                         bazovyj_vault: str, koshelek: str,
+                         bilet_lamportov: int, cu: int, pauza: float) -> dict:
+    """Круг ФУНКЦИЯМИ ПОЛОСЫ: extract_template -> build_buy -> подготовить."""
+    import c2_swap_build as SB  # noqa: PLC0415
+    import c3_prodavec_sborka as SP  # noqa: PLC0415
+
+    из_ = {"mint": mint, "ok": False, "why_not": None, "put": "denezhnyj",
+           "ostatok_posle_pokupki": None}
+    if not bazovyj_vault:
+        из_["why_not"] = "в сделке источника нет associated_base_bonding_curve"
+        return из_
+    ш = SB.extract_template(tx_istochnika, SB.BONDING, bazovyj_vault)
+    if not ш.get("ok"):
+        из_["why_not"] = f"шаблон не снялся: {ш.get('why_not')}"
+        return из_
+    из_.update(po_idl=ш.get("po_idl"), exact_out=ш.get("exact_out"),
+               buyback=ш.get("buyback_fee_recipient"))
+    if not ш.get("po_idl"):
+        из_["why_not"] = ("шаблон снялся СТАРЫМ путём (po_idl пуст) -- "
+                          "врезка не задействована")
+        return из_
+    ата = SB.ata(koshelek, mint, token_program)
+    из_["ata"] = ата
+    try:
+        # close_wsol=False: продажа в том же круге пишет на счёт WSOL, а
+        # закрытие покупки его бы уже снесло. В работе круг -- две транзакции,
+        # и там закрытие покупки на своём месте.
+        пок = SB.build_buy(ш, tx_istochnika, user=koshelek, payer=koshelek,
+                           amount_in=int(bilet_lamportov), min_out=1,
+                           cu_units=int(cu), wrap_sol=True, close_wsol=False)
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = f"build_buy: {type(сбой).__name__}: {str(сбой)[:160]}"
+        return из_
+    из_.update(razmer_pokupki=пок.get("size"),
+               instrukcij_pokupki=пок.get("n_instructions"),
+               base_mint_puti=пок.get("base_mint"),
+               quote_mint_puti=пок.get("quote_mint"))
+    if пок.get("base_mint") != mint:
+        из_["why_not"] = (f"денежный путь взял минт {str(пок.get('base_mint'))[:8]}, "
+                          f"а минт сделки {mint[:8]}")
+        return из_
+    о_пок = simulirovat(пок["tx_base64"], scheta=[ата])
+    if not о_пок["ok"]:
+        из_["why_not"] = f"узел не ответил на покупку: {о_пок['why_not']}"
+        return из_
+    из_.update(pokupka_err=о_пок["err"], pokupka_units=о_пок["units"],
+               ostatok_posle_pokupki=ostatok_tokena(о_пок["accounts"]))
+    if о_пок["err"] is not None:
+        из_["why_not"] = "покупка денежного пути не прошла симуляцию"
+        из_["logi"] = о_пок["logi"][-8:]
+        return из_
+    if not из_["ostatok_posle_pokupki"]:
+        из_["why_not"] = ("покупка прошла, а токена на счёте "
+                          f"{из_['ostatok_posle_pokupki']!r} -- это не успех")
+        из_["logi"] = о_пок["logi"][-8:]
+        return из_
+    if pauza:
+        time.sleep(pauza)
+    прод = SP.подготовить(
+        tx_istochnika, программа=SB.BONDING, наш_кошелёк=koshelek,
+        база_в=int(из_["ostatok_posle_pokupki"]), минт_базы=mint,
+        котировка_типа=1, пол_лампорты=1, продаём_всё=True, cu_units=int(cu))
+    из_.update(sposob_prodazhi=прод.get("способ"),
+               imya_prodazhi=прод.get("имя_инструкции"),
+               programma_bazy=прод.get("программа_базы"),
+               zakryt_schyot_tokena=прод.get("закрыт_счёт_токена"),
+               zakryt_schyot_wsol=прод.get("закрыт_счёт_wsol"))
+    if not прод.get("ok"):
+        из_["why_not"] = f"подготовить: {прод.get('why_not')}"
+        return из_
+    if прод.get("программа_базы") != token_program:
+        из_["why_not"] = (f"продажа закрывает счёт программой "
+                          f"{str(прод.get('программа_базы'))[:8]}, а минт на "
+                          f"{token_program[:8]}")
+        return из_
+    круг_ix = _instrukcii_iz_tx64(пок["tx_base64"]) + \
+        _bez_budzheta(_instrukcii_iz_tx64(прод["tx_base64"]))
+    о_круг = simulirovat(tx_base64(instrukcii=круг_ix, platelshchik=koshelek))
+    if not о_круг["ok"]:
+        из_["why_not"] = f"узел не ответил на круг: {о_круг['why_not']}"
+        return из_
+    из_.update(krug_err=о_круг["err"], krug_units=о_круг["units"],
+               instrukcij_kruga=len(круг_ix))
+    if о_круг["err"] is not None:
+        из_["why_not"] = "круг денежного пути не прошёл симуляцию"
+        из_["logi"] = о_круг["logi"][-10:]
+        return из_
+    из_["ok"] = True
+    return из_
+
+
+def _kriwaja_iz_tx(t: dict) -> dict:
+    """Наша разновидность покупки кривой в ответе узла -- по именам IDL.
+
+    Один разбор на оба применения: поиск живых минтов по программе и разбор
+    ИМЕННО ТЕХ сделок, на которых полоса отказала (их подписи приходят из
+    журнала решений). Второй раз писать то же значило бы разойтись.
+    """
+    из_ = {"ok": False, "why_not": None}
+    идл = СБ.zagruzit_idl()["pump"]["ix"][ПОКУПКА]
+    диск = идл["disc"]
+    имена = [а["name"] for а in идл["accounts"]]
+    соо = ((t or {}).get("transaction") or {}).get("message") or {}
+    ключи = [k.get("pubkey") if isinstance(k, dict) else k
+             for k in (соо.get("accountKeys") or [])]
+    инстр = list(соо.get("instructions") or [])
+    for вн in ((t or {}).get("meta") or {}).get("innerInstructions") or []:
+        инстр.extend(вн.get("instructions") or [])
+    for и in инстр:
+        данные = и.get("data")
+        if и.get("programId") != СБ.ПРОГ_КРИВОЙ or not isinstance(данные, str):
+            continue
+        try:
+            сырые = СБ.b58d(данные)
+        except Exception:  # noqa: BLE001
+            continue
+        if сырые[:8] != диск:
+            continue
+        счета = [ключи[с] if isinstance(с, int) and с < len(ключи) else с
+                 for с in (и.get("accounts") or [])]
+        по_именам = dict(zip(имена, счета, strict=False))
+        if not по_именам.get("base_mint"):
+            continue
+        return {"ok": True, "why_not": None, "mint": по_именам["base_mint"],
+                "base_token_program": по_именам.get("base_token_program"),
+                "buyback": по_именам.get("buyback_fee_recipient"),
+                "bazovyj_vault": по_именам.get("associated_base_bonding_curve")}
+    из_["why_not"] = f"{ПОКУПКА} в транзакции не найдена"
+    return из_
+
+
+def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
+                                bilet_lamportov: int, cu: int,
+                                pauza: float) -> dict:
+    """ОТКАЗАННЫЕ СИГНАЛЫ -- тем же денежным путём до симуляции.
+
+    Подписи приходят снаружи (журнал решений полосы за сутки), выдумывать их
+    здесь нечем. На каждой: шаблон -> build_buy -> подготовить -> узел.
+    """
+    из_ = {"podpisej": len(podpisi), "proshlo": 0, "krasnyh": 0,
+           "ne_razobrano": 0, "sdelki": [], "why_not": None}
+    for п in podpisi:
+        п = str(п).strip()
+        if not п:
+            continue
+        т = зов("getTransaction", [п, {"encoding": "jsonParsed",
+                                        "maxSupportedTransactionVersion": 0,
+                                        "commitment": "confirmed"}])
+        if not т["ok"] or not т.get("result"):
+            из_["ne_razobrano"] += 1
+            из_["sdelki"].append({"podpis": п, "ok": False,
+                                   "why_not": f"транзакция не прочитана: "
+                                              f"{т.get('why_not')}"})
+            continue
+        к = _kriwaja_iz_tx(т["result"])
+        if not к["ok"]:
+            из_["ne_razobrano"] += 1
+            из_["sdelki"].append({"podpis": п, "ok": False,
+                                   "why_not": к["why_not"]})
+            continue
+        р = krug_denezhnogo_puti(
+            tx_istochnika=т["result"], mint=к["mint"],
+            token_program=к["base_token_program"],
+            bazovyj_vault=к["bazovyj_vault"], koshelek=koshelek,
+            bilet_lamportov=bilet_lamportov, cu=cu, pauza=pauza)
+        р["podpis"] = п
+        из_["sdelki"].append(р)
+        из_["proshlo"] += 1 if р["ok"] else 0
+        из_["krasnyh"] += 0 if р["ok"] else 1
+        if pauza:
+            time.sleep(pauza)
+    if из_["krasnyh"]:
+        из_["why_not"] = (f"{из_['krasnyh']} отказанных сигналов из "
+                          f"{из_['podpisej']} красные на денежном пути")
+    return из_
+
+
 def живой(*, skolko: int, koshelek: str, bilet_lamportov: int, cu: int,
           pauza: float) -> dict:
     из_ = {"rezhim": "zhivoj", "uzel": затереть(узел()), "koshelek": koshelek,
             "bilet_lamportov": bilet_lamportov, "minty": [], "proshlo": 0,
-            "krasnyh": 0, "why_not": None}
+            "krasnyh": 0, "denezhnyj_put": [], "proshlo_puti": 0,
+            "krasnyh_puti": 0, "why_not": None}
     сбор = minty_token2022_s_cepi(skolko=skolko, pauza=pauza)
     из_["prosmotreno_tx"] = сбор["prosmotreno"]
     из_["buyback_iz_obrazca"] = сбор["buyback"]
@@ -309,11 +519,28 @@ def живой(*, skolko: int, koshelek: str, bilet_lamportov: int, cu: int,
         из_["krasnyh"] += 0 if р["ok"] else 1
         if pauza:
             time.sleep(pauza)
+        # ТОТ ЖЕ МИНТ -- ЧЕРЕЗ ФУНКЦИИ ПОЛОСЫ. Два круга на минт, а не два
+        # прогона: иначе сравнивать было бы нечего, минты у них разошлись бы.
+        д = krug_denezhnogo_puti(
+            tx_istochnika=м.get("tx") or {}, mint=м["mint"],
+            token_program=м["base_token_program"],
+            bazovyj_vault=м.get("bazovyj_vault"), koshelek=koshelek,
+            bilet_lamportov=bilet_lamportov, cu=cu, pauza=pauza)
+        д["iz_podpisi"] = м["iz_podpisi"]
+        из_["denezhnyj_put"].append(д)
+        из_["proshlo_puti"] += 1 if д["ok"] else 0
+        из_["krasnyh_puti"] += 0 if д["ok"] else 1
+        if pauza:
+            time.sleep(pauza)
     if len(из_["minty"]) < 3:
         из_["why_not"] = (f"минтов всего {len(из_['minty'])}, а нужно 3-5 -- "
                           "проверка не состоялась")
     elif из_["krasnyh"]:
         из_["why_not"] = f"{из_['krasnyh']} минтов из {len(из_['minty'])} красные"
+    elif из_["krasnyh_puti"]:
+        из_["why_not"] = (f"{из_['krasnyh_puti']} минтов из "
+                          f"{len(из_['denezhnyj_put'])} красные на ДЕНЕЖНОМ ПУТИ "
+                          "(сборщик при этом зелёный -- значит дело во врезке)")
     return из_
 
 
@@ -353,6 +580,41 @@ def самопроверка() -> int:
     chk("предел CU -- инструкция ComputeBudget с кодом 2 и числом",
         predel_cu(400_000)["dannye"][:1] == bytes([2])
         and struct.unpack("<I", predel_cu(400_000)["dannye"][1:5])[0] == 400_000)
+    chk("два предела CU в одной транзакции отбрасываются -- иначе узел "
+        "откажет DuplicateInstruction",
+        len(_bez_budzheta([predel_cu(1), ата, predel_cu(2)])) == 1)
+    try:
+        # АДРЕСА ЗДЕСЬ -- НАСТОЯЩИЕ: solders не примет выдуманную строку, а
+        # «A»*32 это не base58-ключ. Минт берётся WSOL -- он есть всегда.
+        _кош = КОШЕЛЁК_ПОЛОСЫ
+        ата = ata_instrukciya(payer=_кош, owner=_кош,
+                               mint="So11111111111111111111111111111111111111112",
+                               token_program=СБ.ПРОГ_ТОКЕНА_2022)
+        _т64 = tx_base64(instrukcii=[predel_cu(321_000), ата],
+                          platelshchik=_кош)
+        _назад = _instrukcii_iz_tx64(_т64)
+        chk("инструкции разбираются обратно из собранной транзакции: "
+            "программы, байты и счета те же",
+            [и["programma"] for и in _назад]
+            == ["ComputeBudget111111111111111111111111111111", СБ.ПРОГ_ATA]
+            and _назад[0]["dannye"] == predel_cu(321_000)["dannye"]
+            and [а["pubkey"] for а in _назад[1]["scheta"]]
+            == [а["pubkey"] for а in ата["scheta"]], _назад)
+        chk("признаки подписи и записи переносятся: плательщик подписывает, "
+            "программа токена -- нет",
+            _назад[1]["scheta"][0]["isSigner"] is True
+            and _назад[1]["scheta"][5]["isSigner"] is False, _назад[1]["scheta"])
+        chk("ДОКАЗАННЫЙ КРАСНЫЙ: в транзакции без покупки кривой разбор "
+            "отказывает по имени, а не возвращает пустой минт",
+            _kriwaja_iz_tx({"transaction": {"message": {
+                "accountKeys": [], "instructions": []}}}).get("why_not")
+            == f"{ПОКУПКА} в транзакции не найдена")
+        chk("склейка покупки и продажи даёт транзакцию без второго предела CU",
+            sum(1 for и in (_назад + _bez_budzheta(_назад))
+                if и["programma"].startswith("ComputeBudget")) == 1)
+    except ImportError:
+        chk("solders на машине нет -- склейка не проверялась (это пропуск, "
+            "а не зелёный)", False)
     print(f"самопроверка круга сборки: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
@@ -367,6 +629,9 @@ def main() -> int:
                     help="трата покупки в лампортах (0.01 SOL по умолчанию)")
     п.add_argument("--cu", type=int, default=600_000)
     п.add_argument("--pauza", type=float, default=0.12)
+    п.add_argument("--podpisi", default="",
+                    help="подписи отказанных сигналов через запятую: каждая "
+                         "прогоняется денежным путём до симуляции")
     п.add_argument("--out", default="")
     а = п.parse_args()
     if а.self_test:
@@ -374,13 +639,25 @@ def main() -> int:
     if not а.live:
         print("СТОП: нужен --live или --self-test", file=sys.stderr)
         return 2
+    if а.podpisi.strip():
+        из_ = otkazy_cherez_denezhnyj_put(
+            podpisi=[x for x in а.podpisi.replace(";", ",").split(",") if x.strip()],
+            koshelek=а.koshelek, bilet_lamportov=а.bilet_lamportov,
+            cu=а.cu, pauza=а.pauza)
+        из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        return 0 if (из_["proshlo"] and not из_["why_not"]) else 1
     из_ = живой(skolko=а.skolko, koshelek=а.koshelek,
                  bilet_lamportov=а.bilet_lamportov, cu=а.cu, pauza=а.pauza)
     текст = json.dumps(из_, ensure_ascii=False, indent=1)
     print(текст)
     if а.out:
         Path(а.out).write_text(текст + "\n", encoding="utf-8")
-    return 0 if (из_["proshlo"] and not из_["why_not"]) else 1
+    return 0 if (из_["proshlo"] and из_["proshlo_puti"]
+                 and not из_["why_not"]) else 1
 
 
 if __name__ == "__main__":

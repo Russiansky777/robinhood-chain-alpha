@@ -286,6 +286,101 @@ SPECS_ПРОДАЖИ = {
 }
 
 
+# ---------------------------------------------------------------- КРИВАЯ ПО IDL
+#
+# ЗАЧЕМ (слово штаба 09.10). 08.10 полоса встала: источники ушли на
+# buy_exact_quote_in_v3 (дискриминатор e1f7501ed5b38488, СЕМНАДЦАТЬ счетов), а
+# BONDING_DISCS такого ключа не знает -- отказ "разновидность инструкции кривой
+# не известна". Старый путь переносит наши счета ПО НОМЕРАМ МЕСТ сделки
+# источника, и для новой раскладки это не работает в принципе: мест другое число
+# и стоят они иначе.
+#
+# ЗДЕСЬ ДОБАВЛЕН ВТОРОЙ ПУТЬ: раскладка берётся ПО ИМЕНАМ из закреплённого IDL
+# (c3_pump_sborka), а не по номерам. Старый путь не тронут -- он по-прежнему
+# первый, и отказ на неизвестном ключе остался: он теперь ловит то, чего нет НИ
+# в таблице, НИ в IDL.
+#
+# ЧТО ПРИХОДИТ ИЗ СДЕЛКИ ИСТОЧНИКА И НЕ ВЫВОДИТСЯ НИКАК: buyback_fee_recipient.
+# В IDL его нет ни константой, ни PDA, а адрес наугад послал бы комиссию
+# чужому -- поэтому он берётся из счетов источника по ИМЕНИ из IDL.
+КРИВАЯ_ПО_IDL_ПОКУПКА = ("buy_exact_quote_in_v3", "buy_v3",
+                         "buy_exact_quote_in_v2", "buy_v2")
+КРИВАЯ_ПО_IDL_ПРОДАЖА = ("sell_v3", "sell_v2")
+# «Точный выход» -- это buy_v*: первым аргументом идёт КОЛИЧЕСТВО ТОКЕНА, а
+# вторым предел траты. У buy_exact_quote_in_* наоборот: первым трата.
+КРИВАЯ_IDL_ТОЧНЫЙ_ВЫХОД = {"buy_v3": True, "buy_v2": True,
+                           "buy_exact_quote_in_v3": False,
+                           "buy_exact_quote_in_v2": False,
+                           "sell_v3": False, "sell_v2": False}
+
+
+def _сборщик_idl():
+    """c3_pump_sborka или None. Нет его -- старый путь работает как работал."""
+    try:
+        import c3_pump_sborka as PS  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return None
+    return PS
+
+
+def вариант_кривой_по_idl(disc_hex: str, *, продажа: bool = False):
+    """Имя разновидности кривой по дискриминатору -- из IDL, не из памяти."""
+    PS = _сборщик_idl()
+    if PS is None:
+        return None
+    try:
+        имя = PS.variant_po_disku("pump", bytes.fromhex(disc_hex))
+    except Exception:  # noqa: BLE001
+        return None
+    годные = КРИВАЯ_ПО_IDL_ПРОДАЖА if продажа else КРИВАЯ_ПО_IDL_ПОКУПКА
+    return имя if имя in годные else None
+
+
+def спец_из_idl(вариант: str) -> dict:
+    """Позиционная раскладка ИЗ ИМЁН IDL -- только для mints_and_vaults.
+
+    Сама инструкция собирается по именам (см. swap_instruction), а эта раскладка
+    нужна лишь затем, чтобы build_buy узнал минты, программы токенов и
+    хранилища кривой и создал ATA -- тем же кодом, что и для прочих типов пулов.
+    """
+    PS = _сборщик_idl()
+    если_нет = {}
+    if PS is None:
+        return если_нет
+    try:
+        имена = [а["name"] for а in PS.zagruzit_idl()["pump"]["ix"][вариант]["accounts"]]
+    except Exception:  # noqa: BLE001
+        return если_нет
+    и = {имя: н for н, имя in enumerate(имена)}
+    нужно = ("base_mint", "quote_mint", "base_token_program",
+             "quote_token_program", "user", "associated_base_user",
+             "associated_quote_user", "associated_base_bonding_curve",
+             "associated_quote_bonding_curve")
+    if any(к not in и for к in нужно):
+        return если_нет
+    return {"n_accounts": len(имена), "user": [и["user"]],
+            "user_ata": [(и["associated_base_user"], и["base_mint"],
+                          и["base_token_program"]),
+                         (и["associated_quote_user"], и["quote_mint"],
+                          и["quote_token_program"])],
+            "base_mint": и["base_mint"], "quote_mint": и["quote_mint"],
+            "base_vault": и["associated_base_bonding_curve"],
+            "quote_vault": и["associated_quote_bonding_curve"],
+            "native_quote": False, "pda": [], "assoc_uva": None}
+
+
+def _по_именам_idl(вариант: str, accounts: list) -> dict:
+    """{имя IDL: адрес} для счетов сделки источника."""
+    PS = _сборщик_idl()
+    if PS is None:
+        return {}
+    try:
+        имена = [а["name"] for а in PS.zagruzit_idl()["pump"]["ix"][вариант]["accounts"]]
+    except Exception:  # noqa: BLE001
+        return {}
+    return dict(zip(имена, accounts, strict=False))
+
+
 def spec_of(tpl: dict) -> dict:
     """Раскладка счетов для ЭТОГО шаблона: у кривой она зависит от разновидности.
 
@@ -297,6 +392,12 @@ def spec_of(tpl: dict) -> dict:
         return dict(SPECS_ПРОДАЖИ[tpl["program"]])
     s = dict(SPECS[tpl["program"]])
     if tpl.get("program") == BONDING:
+        # ШАБЛОН ПО IDL -- СВОЯ РАСКЛАДКА ПО ИМЕНАМ. Её ждёт только
+        # mints_and_vaults: сама инструкция собирается в swap_instruction
+        # сборщиком по именам, а не подстановкой мест.
+        if tpl.get("spec_idl"):
+            s.update(tpl["spec_idl"])
+            return s
         вар = BONDING_DISCS.get(tpl.get("ix")) or {}
         if вар.get("spec"):
             s.update(вар["spec"])
@@ -352,6 +453,35 @@ def extract_template(tx: dict, program: str, pool_vault: str, *,
             ключ = data[:8].hex()
             вид = BONDING_DISCS.get(ключ)
             if вид is None:
+                # ВТОРОЙ ПУТЬ: РАСКЛАДКА ПО ИМЕНАМ IDL. Старый отказ остаётся
+                # ниже и ловит то, чего нет НИ в таблице, НИ в IDL.
+                вар_idl = вариант_кривой_по_idl(ключ, продажа=bool(продажа))
+                сп_idl = спец_из_idl(вар_idl) if вар_idl else {}
+                if вар_idl and сп_idl:
+                    ждём_idl = сп_idl["n_accounts"]
+                    if len(ix["accounts"]) != ждём_idl:
+                        return {"ok": False,
+                                "why_not": (f"{вар_idl}: счетов "
+                                            f"{len(ix['accounts'])}, по IDL "
+                                            f"{ждём_idl}")}
+                    по_именам = _по_именам_idl(вар_idl, list(ix["accounts"]))
+                    выкуп = по_именам.get("buyback_fee_recipient")
+                    if not выкуп:
+                        # НЕ ВЫВОДИТСЯ НИКАК: ни константой, ни PDA. Адрес
+                        # наугад послал бы комиссию чужому.
+                        return {"ok": False,
+                                "why_not": (f"{вар_idl}: в сделке источника нет "
+                                            "buyback_fee_recipient")}
+                    a0_i, a1_i = struct.unpack("<QQ", data[8:24])
+                    return {"ok": True, "program": program, "ix": ключ,
+                            "po_idl": вар_idl, "spec_idl": сп_idl,
+                            "buyback_fee_recipient": выкуп,
+                            "accounts": list(ix["accounts"]), "data": data,
+                            "arg0": a0_i, "arg1": a1_i,
+                            "writable": writable_map(tx),
+                            "signers": sorted(C.signers(tx)),
+                            "продажа": bool(продажа),
+                            "exact_out": КРИВАЯ_IDL_ТОЧНЫЙ_ВЫХОД[вар_idl]}
                 return {"ok": False, "why_not": f"разновидность инструкции кривой не известна: {ключ}"}
             # СКОЛЬКО СЧЕТОВ -- ПО РАЗНОВИДНОСТИ: у 18-счётной и 27-счётной они
             # разные, и общее число из SPECS годится только для первой.
@@ -654,8 +784,74 @@ def mints_and_vaults(tpl: dict, tx: dict) -> dict:
             "quote_vault": acc[spec["quote_vault"]], "base_vault": acc[spec["base_vault"]]}
 
 
+def инструкция_кривой_по_idl(tpl: dict, tx: dict, user: str,
+                             arg0: int, arg1: int) -> Instruction:
+    """НАША инструкция кривой, собранная ПО ИМЕНАМ IDL, а не подстановкой мест.
+
+    Все счета выводит сборщик (константы IDL, PDA по семенам IDL, ATA), наше --
+    кошелёк. Из сделки источника берётся ровно одно значение, которое не
+    выводится никак: buyback_fee_recipient. Программа токена БАЗОВОГО минта
+    берётся из той же сделки (у пампового минта это обычно Token-2022) и
+    входит СЕМЕНЕМ в associated_base_*: подставить её классическим Token значит
+    собрать чужие адреса, и программа отвечает 3012 AccountNotInitialized.
+    """
+    PS = _сборщик_idl()
+    if PS is None:
+        raise ValueError("сборщик по IDL не доступен: c3_pump_sborka не найден")
+    вар = tpl["po_idl"]
+    по_именам = _по_именам_idl(вар, tpl["accounts"])
+    выкуп = tpl.get("buyback_fee_recipient") or по_именам.get("buyback_fee_recipient")
+    if not выкуп:
+        raise ValueError("нет buyback_fee_recipient: он не выводится ни "
+                         "константой, ни PDA")
+    тп_базы = PS.programma_tokena_minta(
+        по_именам.get("base_mint") or "",
+        iz_signala=по_именам.get("base_token_program"))
+    общее = {"base_mint": по_именам.get("base_mint"), "user": user,
+             "buyback_fee_recipient": выкуп, "base_token_program": тп_базы}
+    if вар == "buy_exact_quote_in_v3":
+        собрано = PS.pokupka_krivoj_v3(spendable_quote_in=int(arg0),
+                                       min_tokens_out=int(arg1), **общее)
+    elif вар == "sell_v3":
+        собрано = PS.prodazha_krivoj_v3(amount=int(arg0),
+                                        min_sol_output=int(arg1), **общее)
+    elif вар in ("buy_v3", "buy_exact_quote_in_v2", "buy_v2", "sell_v2"):
+        # ОСТАЛЬНЫЕ -- ТЕМ ЖЕ sobrat, ПО ИМЕНАМ АРГУМЕНТОВ ИЗ IDL. Своей
+        # обёртки у них нет, и выдумывать имена аргументов нельзя: они берутся
+        # из того же IDL, по порядку, и это ровно два u64 у всех шести.
+        арг_имена = [а["name"] for а in
+                     PS.zagruzit_idl()["pump"]["ix"][вар]["args"]]
+        арг = {арг_имена[0]: int(arg0), арг_имена[1]: int(arg1)}
+        if len(арг_имена) > 2:
+            арг[арг_имена[2]] = False   # partial_fill: как у нашей v3-обёртки
+        кон = dict(общее)
+        кон["quote_mint"] = по_именам.get("quote_mint") or C.WSOL
+        кон["quote_token_program"] = по_именам.get("quote_token_program") or TOKEN_PROGRAM
+        # У v2 нужны ещё fee_recipient и создатель кривой: оба есть в сделке
+        # источника (создатель -- семенем creator_vault), и оба берутся оттуда.
+        for имя in ("fee_recipient", "sharing_config"):
+            if по_именам.get(имя):
+                кон[имя] = по_именам[имя]
+        созд = PS.creator_iz_sobytija(tx) if hasattr(PS, "creator_iz_sobytija") else None
+        if созд:
+            кон["bonding_curve.creator"] = созд
+        собрано = PS.sobrat("pump", вар, кон, арг)
+    else:
+        raise ValueError(f"разновидность {вар} по IDL не собираем")
+    return Instruction(
+        Pubkey.from_string(собрано["programma"]),
+        bytes.fromhex(собрано["data_hex"]),
+        [AccountMeta(Pubkey.from_string(а["pubkey"]),
+                     bool(а["isSigner"]), bool(а["isWritable"]))
+         for а in собрано["accounts"]])
+
+
 def swap_instruction(tpl: dict, tx: dict, user: str, arg0: int, arg1: int,
                      keep_source_ix: bool = False) -> Instruction:
+    # ШАБЛОН ПО IDL -- СБОРКА ПО ИМЕНАМ. Подстановка мест для него не годится:
+    # у v3 семнадцать счетов и другие места, и именно на этом встала полоса.
+    if tpl.get("po_idl") and not keep_source_ix:
+        return инструкция_кривой_по_idl(tpl, tx, user, arg0, arg1)
     subs = user_accounts(tpl, tx, user)
     if not subs:
         # ПРИЧИНУ НАДО НАЗВАТЬ. Этот отказ выходит наружу строкой записи решения,
@@ -756,8 +952,16 @@ def sync_native(account: str) -> Instruction:
                        [AccountMeta(Pubkey.from_string(account), False, True)])
 
 
-def close_account(account: str, destination: str, authority: str) -> Instruction:
-    """SPL Token CloseAccount (9): остаток и рента счёта уходят в destination.
+def close_account(account: str, destination: str, authority: str,
+                  token_program: str = TOKEN_PROGRAM) -> Instruction:
+    """CloseAccount (9) ПРОГРАММОЙ ТОКЕНА СЧЁТА: остаток и рента -- в destination.
+
+    ПРОГРАММА -- АРГУМЕНТОМ, А НЕ КОНСТАНТОЙ. Счёт токена принадлежит той
+    программе, которой принадлежит минт; у пампового минта это обычно
+    Token-2022. Закрыть счёт Token-2022 классической программой нельзя: она не
+    владелец счёта и ответит ошибкой. Умолчание -- классический Token, потому
+    что единственный счёт, который закрывает покупка, это WSOL, а WSOL
+    классический; у минта сделки программа приходит из раскладки.
 
     ЗАЧЕМ В ПОКУПКЕ. Обёртка SOL создаёт счёт WSOL и кладёт на него ровно
     amount_in. Если своп эти лампорты НЕ забрал (а у пула с нативной котировкой
@@ -771,7 +975,7 @@ def close_account(account: str, destination: str, authority: str) -> Instruction
     Поэтому закрытие стоит в той же транзакции, что обёртка: не забрал своп --
     деньги вернулись тем же действием, которым ушли.
     """
-    return Instruction(Pubkey.from_string(TOKEN_PROGRAM), bytes([9]), [
+    return Instruction(Pubkey.from_string(token_program), bytes([9]), [
         AccountMeta(Pubkey.from_string(account), False, True),
         AccountMeta(Pubkey.from_string(destination), False, True),
         AccountMeta(Pubkey.from_string(authority), True, False)])
@@ -846,7 +1050,9 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
     # всё, что осталось, вместе с рентой счёта возвращается в кошелёк тем же
     # действием. Не обёртывали -- закрывать нечего, и инструкции нет вовсе.
     if обёрнут_wsol and close_wsol:
-        ixs.append(close_account(обёрнут_wsol, user, user))
+        # ПРОГРАММА -- ИЗ РАСКЛАДКИ (место quote_token_program), а не константой.
+        ixs.append(close_account(обёрнут_wsol, user, user,
+                                 mv["quote_program"] or TOKEN_PROGRAM))
     msg = MessageV0.try_compile(Pubkey.from_string(payer), ixs, [], Hash.default())
     n_sig = msg.header.num_required_signatures
     vtx = VersionedTransaction.populate(msg, [Signature.default()] * n_sig)

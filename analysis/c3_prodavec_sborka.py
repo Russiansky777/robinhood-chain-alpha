@@ -61,6 +61,14 @@ SPOSOB_FLIP = "flip"
 SPOSOB_KRIVAYA = "krivaya"
 SPOSOB_TA_ZHE_RASKLADKA = "ta_zhe_raskladka"
 SPOSOB_DAMM1 = "damm1"
+# ПРОДАЖА КРИВОЙ ПО ИМЕНАМ IDL (врезка 09.10, слово штаба). Позиционные карты
+# (КРИВАЯ_МЕСТА_ПРОДАЖИ и родня) выводят места продажи из НАШЕЙ покупки, и это
+# работает, пока покупка и продажа отличаются ровно хвостом. У v3 это уже не
+# так: sell_v3 -- отдельная раскладка из СЕМНАДЦАТИ счетов, и брать её надо из
+# IDL. Способ добавлен отдельным, прежние пути не тронуты.
+SPOSOB_PO_IDL = "po_idl"
+IDL_ПРОДАЖА_ПО_ПОКУПКЕ = {"buy_exact_quote_in_v3": "sell_v3",
+                          "buy_v3": "sell_v3"}
 
 # ПРОГРАММЫ -- строками, чтобы таблица читалась без загрузки чужих модулей.
 PROG_KRIVAYA = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
@@ -317,6 +325,55 @@ def инструкция_покупки(tx_покупки: dict, *, програ
                                  хранилище=хранилище)
 
 
+def _kriwaja_v3_iz_pokupki(tx_покупки: dict) -> dict:
+    """Наша покупка была v3? Тогда минт, программа токена и получатель buyback.
+
+    Ищется инструкция программы кривой, дискриминатор которой IDL знает как
+    buy_exact_quote_in_v3 или buy_v3. Всё, что нужно продаже, берётся по ИМЕНАМ
+    IDL из той же инструкции: выдумывать тут нечего.
+    """
+    из_ = {"ok": False, "why_not": None}
+    try:
+        import c2_swap_build as B_  # noqa: PLC0415
+        import c3_pump_sborka as PS  # noqa: PLC0415
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = f"сборщик по IDL не доступен: {type(сбой).__name__}"
+        return из_
+    try:
+        инстр = list(B_.all_instructions(tx_покупки))
+    except Exception:  # noqa: BLE001
+        инстр = []
+    for и in инстр:
+        if и.get("programId") != КРИВАЯ_ПРОГРАММА:
+            continue
+        try:
+            данные = B_.b58decode(и["data"])
+        except Exception:  # noqa: BLE001
+            continue
+        имя = PS.variant_po_disku("pump", данные[:8])
+        прод = IDL_ПРОДАЖА_ПО_ПОКУПКЕ.get(имя or "")
+        if not прод:
+            continue
+        имена = [а["name"] for а in PS.zagruzit_idl()["pump"]["ix"][имя]["accounts"]]
+        по_именам = dict(zip(имена, list(и.get("accounts") or []), strict=False))
+        минт = по_именам.get("base_mint")
+        выкуп = по_именам.get("buyback_fee_recipient")
+        if not (минт and выкуп):
+            из_["why_not"] = (f"{имя}: в покупке нет base_mint или "
+                              "buyback_fee_recipient")
+            return из_
+        try:
+            тп = PS.programma_tokena_minta(
+                минт, iz_signala=по_именам.get("base_token_program"))
+        except PS.ОшибкаСборки as сбой:
+            из_["why_not"] = str(сбой)
+            return из_
+        return {"ok": True, "pokupka": имя, "prodazha": прод, "base_mint": минт,
+                "base_token_program": тп, "buyback_fee_recipient": выкуп,
+                "quote_mint": по_именам.get("quote_mint")}
+    return из_
+
+
 def шаблон_продажи(tx_покупки: dict, *, программа: str,
                     минт_базы: str | None = None,
                     минт_котировки: str | None = None,
@@ -334,6 +391,22 @@ def шаблон_продажи(tx_покупки: dict, *, программа: 
             "accounts": None, "writable": None, "tpl": None,
             "имя_инструкции": None, "хвост": None,
             "минт_базы": минт_базы, "минт_котировки": минт_котировки or C.WSOL}
+    # ПОКУПКА БЫЛА v3 -- ПРОДАЁМ sell_v3 ПО ИМЕНАМ IDL, без карты мест.
+    # ТОЛЬКО КОГДА ПОЗИЦИЯ ЧИСЛИТСЯ НА КРИВОЙ. Покупка на Pump AMM тоже могла бы
+    # нести инструкцию кривой во внутренних (переезд в той же транзакции), и
+    # продать купленное в пуле AMM на кривой значит отдать программе чужой счёт.
+    v3 = ({"ok": False, "why_not": "программа позиции не кривая"}
+          if программа != КРИВАЯ_ПРОГРАММА
+          else _kriwaja_v3_iz_pokupki(tx_покупки))
+    if v3.get("ok"):
+        из_.update(ok=True, способ=SPOSOB_PO_IDL, program=КРИВАЯ_ПРОГРАММА,
+                   po_idl=v3["prodazha"], имя_инструкции=v3["prodazha"],
+                   минт_базы=v3["base_mint"],
+                   программа_базы=v3["base_token_program"],
+                   buyback_fee_recipient=v3["buyback_fee_recipient"],
+                   tpl=None, accounts=None, writable=None,
+                   минт_котировки=v3.get("quote_mint") or из_["минт_котировки"])
+        return из_
     т = тип(программа)
     if not т:
         из_["why_not"] = f"тип пула не известен: {str(программа)[:8]}"
@@ -839,6 +912,20 @@ def инструкция_продажи(ш: dict, *, наш_кошелёк: str,
         raise ОшибкаПродавца(ш.get("why_not") or "шаблона продажи нет")
     _C, B = _кирпичи()
     сп, tpl = ш["способ"], ш["tpl"]
+    if сп == SPOSOB_PO_IDL:
+        import c3_pump_sborka as PS  # noqa: PLC0415
+
+        собрано = PS.prodazha_krivoj_v3(
+            base_mint=ш["минт_базы"], user=наш_кошелёк,
+            buyback_fee_recipient=ш["buyback_fee_recipient"],
+            base_token_program=ш["программа_базы"],
+            amount=int(база_в), min_sol_output=int(минимум_выхода))
+        return Instruction(
+            Pubkey.from_string(собрано["programma"]),
+            bytes.fromhex(собрано["data_hex"]),
+            [AccountMeta(Pubkey.from_string(а["pubkey"]),
+                         bool(а["isSigner"]), bool(а["isWritable"]))
+             for а in собрано["accounts"]])
     if сп == SPOSOB_IZ_POKUPKI:
         import bloom_lane_sell as LS  # noqa: PLC0415
 
