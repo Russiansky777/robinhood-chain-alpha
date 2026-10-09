@@ -45,6 +45,13 @@ import c3_pump_sborka as СБ  # noqa: E402
 ПОКУПКА = "buy_exact_quote_in_v3"
 ПРОДАЖА = "sell_v3"
 WHY_НЕТ_УЗЛА = "узел задаётся только окружением BLOOM_TREKKER_RPC"
+# ПОТОЛОК ВЕРСИИ ТРАНЗАКЦИИ -- КАК У СЛУЖБЫ, А НЕ НОЛЬ. Здесь стоял 0, и
+# прогон 37958277476 это показал числом: все 468 подписей источника
+# 4vw54BmA узел отдал ошибкой -32015 "Transaction version (1) is not
+# supported", отчёт сказал "покупок v3 у источника нет", и 468 вызовов ушли
+# в пустоту. В службе BLOOM_MAX_TX_VERSION по умолчанию 1
+# (bloom_detector:318), и читать надо тем же потолком.
+ПОТОЛОК_ВЕРСИИ_TX = 1
 WHY_НЕТ_BUYBACK = ("получателя buyback нет ни в одном живом образце -- "
                    "адрес наугад послал бы комиссию чужому")
 
@@ -178,7 +185,7 @@ def minty_token2022_s_cepi(*, skolko: int, pauza: float) -> dict:
         if pauza:
             time.sleep(pauza)
         т = зов("getTransaction", [подпись, {"encoding": "jsonParsed",
-                                              "maxSupportedTransactionVersion": 0,
+                                              "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX,
                                               "commitment": "confirmed"}])
         if not т["ok"] or not т.get("result"):
             continue
@@ -466,7 +473,7 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
         if not п:
             continue
         т = зов("getTransaction", [п, {"encoding": "jsonParsed",
-                                        "maxSupportedTransactionVersion": 0,
+                                        "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX,
                                         "commitment": "confirmed"}])
         if not т["ok"] or not т.get("result"):
             из_["ne_razobrano"] += 1
@@ -508,7 +515,8 @@ def podpisi_istochnika(*, istochnik: str, chasov: float, predel: int,
     этом никуда не деваются: их можно подать режимом --podpisi.
     """
     из_ = {"istochnik": istochnik, "podpisi": [], "prosmotreno": 0,
-           "v_okne": 0, "why_not": None}
+           "v_okne": 0, "ne_prochitano": 0, "pusto": 0, "bez_v3": 0,
+           "pervyj_otkaz_chteniya": None, "why_not": None}
     о = зов("getSignaturesForAddress", [istochnik, {"limit": int(predel)}])
     if not о["ok"]:
         из_["why_not"] = f"подписи источника не прочитаны: {о['why_not']}"
@@ -532,15 +540,30 @@ def podpisi_istochnika(*, istochnik: str, chasov: float, predel: int,
         if pauza:
             time.sleep(pauza)
         т = зов("getTransaction", [п, {"encoding": "jsonParsed",
-                                        "maxSupportedTransactionVersion": 0,
+                                        "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX,
                                         "commitment": "confirmed"}])
-        if not т["ok"] or not т.get("result"):
+        if not т["ok"]:
+            # ОТКАЗ УЗЛА НЕ ГЛОТАЕТСЯ. Пропуск молча превращал 468 отказов
+            # -32015 в вывод "покупок v3 у источника нет": отличить "не
+            # читается" от "её там нет" было НЕЧЕМ.
+            из_["ne_prochitano"] += 1
+            if из_["pervyj_otkaz_chteniya"] is None:
+                из_["pervyj_otkaz_chteniya"] = str(т.get("why_not"))[:200]
+            continue
+        if not т.get("result"):
+            из_["pusto"] += 1
             continue
         if _kriwaja_iz_tx(т["result"])["ok"]:
             из_["podpisi"].append(п)
-    if not из_["podpisi"]:
+        else:
+            из_["bez_v3"] += 1
+    if из_["ne_prochitano"]:
+        из_["why_not"] = (f"узел не отдал {из_['ne_prochitano']} транзакций из "
+                          f"{из_['prosmotreno']}: {из_['pervyj_otkaz_chteniya']}")
+    elif not из_["podpisi"]:
         из_["why_not"] = (f"покупок {ПОКУПКА} у источника за окно нет "
-                          f"(просмотрено {из_['prosmotreno']})")
+                          f"(прочитано {из_['prosmotreno']}, без v3 "
+                          f"{из_['bez_v3']})")
     return из_
 
 
@@ -591,6 +614,19 @@ def живой(*, skolko: int, koshelek: str, bilet_lamportov: int, cu: int,
     return из_
 
 
+def s_tx_version_vezde() -> bool:
+    """Ни одного getTransaction с потолком версии мимо константы.
+
+    Проверка ЧИТАЕТ СВОЙ ЖЕ ФАЙЛ: три вызова узла легко разъехаться, а
+    разъехавшийся тихо даст "транзакций нет" вместо отказа.
+    """
+    текст = Path(__file__).read_text(encoding="utf-8")
+    всего = текст.count("maxSupportedTransactionVersion")
+    по_константе = текст.count(
+        '"maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX')
+    return всего >= 3 and всего == по_константе + 1   # +1 -- строка в этой проверке
+
+
 def самопроверка() -> int:
     сбоев = всего = 0
 
@@ -603,6 +639,9 @@ def самопроверка() -> int:
             if что is not None:
                 print(f"         {что!r}")
 
+    chk("потолок версии транзакции -- как у службы (BLOOM_MAX_TX_VERSION=1), "
+        "а не ноль: на нуле узел отказал 468 раз подряд",
+        ПОТОЛОК_ВЕРСИИ_TX == 1 and s_tx_version_vezde(), ПОТОЛОК_ВЕРСИИ_TX)
     chk("ключ узла в выводе затирается",
         "СЕК" not in затереть("https://x/?api-key=СЕК"))
     # ОСТАТОК ТОКЕНА: amount -- u64 с 64-го байта счёта SPL.
@@ -701,6 +740,13 @@ def main() -> int:
         for п_ in сбор_ист["podpisi"]:
             if п_ not in спис:
                 спис.append(п_)
+    if сбор_ист is not None and сбор_ист.get("why_not") and not спис:
+        текст = json.dumps({"sbor_istochnika": сбор_ист}, ensure_ascii=False,
+                           indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        return 1
     if спис:
         из_ = otkazy_cherez_denezhnyj_put(
             podpisi=спис,
