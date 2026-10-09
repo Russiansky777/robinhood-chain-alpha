@@ -183,122 +183,145 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     пулы: dict = {}            # poolId -> тариф и подгонка
     счёт: collections.Counter = collections.Counter()
 
-    for ч in часы:
-        url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
-        try:
-            о = AD.открыть_час(requests, url, ч)
-        except Exception as exc:  # noqa: BLE001
-            счёт[f"ошибка_{type(exc).__name__}"] += 1
-            continue
-        with о as поток:
-            if getattr(поток, "status_code", 200) != 200:
-                счёт[f"http_{getattr(поток, 'status_code', '?')}"] += 1
+    def читать_час(поток) -> None:
+        """Тело часа отдельной функцией -- чтобы обрыв потока ловился и час повторялся.
+
+        Поток часа рвётся (urllib3 IncompleteRead): без повтора из-за одного часа
+        теряются целые сутки. Что не дочиталось после трёх попыток, честно считается
+        в «обрыв_часов».
+        """
+
+        for стр in io.TextIOWrapper(
+                zstandard.ZstdDecompressor().stream_reader(поток.raw),
+                encoding="utf-8", errors="ignore"):
+            счёт["строк"] += 1
+            мм = р_mint.search(стр)
+            if not мм or мм.group(1) not in по_минту:
                 continue
-            счёт["часов"] += 1
-            for стр in io.TextIOWrapper(
-                    zstandard.ZstdDecompressor().stream_reader(поток.raw),
-                    encoding="utf-8", errors="ignore"):
-                счёт["строк"] += 1
-                мм = р_mint.search(стр)
-                if not мм or мм.group(1) not in по_минту:
+            минт = мм.group(1)
+            qm = р_qmint.search(стр)
+            if not qm or qm.group(1) != WSOL:
+                счёт["событие_не_sol"] += 1
+                continue
+            тс = р_ts.search(стр)
+            бм = р_block.search(стр)
+            сост = состояние(стр)
+            if not (тс and бм and сост):
+                continue
+            ts = int(тс.group(1)) / 1000.0
+            блок = int(бм.group(1))
+            счёт["событий_минтов"] += 1
+            pid_м = р_pool.search(стр)
+            pid = pid_м.group(1) if pid_м else None
+            д_ = р_action.search(стр)
+            действие = д_.group(1) if д_ else None
+            тм = р_tip.search(стр)
+            тип = тм.group(1) if тм else None
+            # тариф и подгонка f/g по паре «предыдущее состояние -> этот своп»
+            if pid:
+                п = пулы.get(pid)
+                if п is None:
+                    п = {"тип": тип, "тариф": число(р_fee.search(стр)),
+                         "fs": [], "gs": [], "сост": сост}
+                    пулы[pid] = п
+                else:
+                    if п["тариф"] is None:
+                        п["тариф"] = число(р_fee.search(стр))
+                    if тип in XYK and (len(п["fs"]) < 40 or len(п["gs"]) < 40):
+                        dy, dx = число(р_tam.search(стр)), число(р_qam.search(стр))
+                        x0, y0 = п["сост"]
+                        if dy and dx:
+                            if действие == "buy" and y0 > dy > 0 and dx > 0:
+                                v = x0 * dy / ((y0 - dy) * dx)
+                                if 0.5 <= v <= 1.0:
+                                    п["fs"].append(v)
+                            elif действие == "sell" and dy > 0 and x0 > 0:
+                                v = dx * (y0 + dy) / (x0 * dy)
+                                if 0.5 <= v <= 1.0:
+                                    п["gs"].append(v)
+                    п["сост"] = сост
+            кто = None
+            т2 = р_trader.search(стр)
+            с2 = р_signer.search(стр)
+            кто = (т2.group(1) if т2 else None) or (с2.group(1) if с2 else None)
+            sol = число(р_qam.search(стр))
+            for к in по_минту[минт]:
+                если = ts - к["ts"]
+                # до поста берём минуту: «цена на момент поста» -- это последнее
+                # состояние ДО него, а не только событие в ту же секунду
+                if если < -ДО_ПОСТА_С or если > ХВОСТ_С:
                     continue
-                минт = мм.group(1)
-                qm = р_qmint.search(стр)
-                if not qm or qm.group(1) != WSOL:
-                    счёт["событие_не_sol"] += 1
+                ключ = (к["канал"], минт)
+                з = ряды.get(ключ)
+                if з is None:
+                    з = {"канал": к["канал"], "минт": минт, "utc": к["utc"],
+                         "id": к["id"], "ts_поста": к["ts"], "пул": тип, "poolId": pid,
+                         "до_поста": None, "вход": {}, "выход": {},
+                         "вперёд": {f"{t}с": {
+                             "покупок": 0, "кошельков": set(), "sol": 0.0}
+                             for t in ВПЕРЁД_С},
+                         "событий": 0, "пик": None, "первая_продажа_с": None,
+                         "продаж": 0}
+                    ряды[ключ] = з
+                # у минта может быть несколько пулов -- держимся того, в котором
+                # увидели его первым, иначе состояния смешаются
+                if pid and з["poolId"] and pid != з["poolId"]:
+                    счёт["другой_пул_минта"] += 1
                     continue
-                тс = р_ts.search(стр)
-                бм = р_block.search(стр)
-                сост = состояние(стр)
-                if not (тс and бм and сост):
+                з["событий"] += 1
+                if если < 0:
+                    # пик считается только ПОСЛЕ поста, поэтому здесь только состояние
+                    з["до_поста"] = [сост[0], сост[1], блок, round(если, 3)]
                     continue
-                ts = int(тс.group(1)) / 1000.0
-                блок = int(бм.group(1))
-                счёт["событий_минтов"] += 1
-                pid_м = р_pool.search(стр)
-                pid = pid_м.group(1) if pid_м else None
-                д_ = р_action.search(стр)
-                действие = д_.group(1) if д_ else None
-                тм = р_tip.search(стр)
-                тип = тм.group(1) if тм else None
-                # тариф и подгонка f/g по паре «предыдущее состояние -> этот своп»
-                if pid:
-                    п = пулы.get(pid)
-                    if п is None:
-                        п = {"тип": тип, "тариф": число(р_fee.search(стр)),
-                             "fs": [], "gs": [], "сост": сост}
-                        пулы[pid] = п
-                    else:
-                        if п["тариф"] is None:
-                            п["тариф"] = число(р_fee.search(стр))
-                        if тип in XYK and (len(п["fs"]) < 40 or len(п["gs"]) < 40):
-                            dy, dx = число(р_tam.search(стр)), число(р_qam.search(стр))
-                            x0, y0 = п["сост"]
-                            if dy and dx:
-                                if действие == "buy" and y0 > dy > 0 and dx > 0:
-                                    v = x0 * dy / ((y0 - dy) * dx)
-                                    if 0.5 <= v <= 1.0:
-                                        п["fs"].append(v)
-                                elif действие == "sell" and dy > 0 and x0 > 0:
-                                    v = dx * (y0 + dy) / (x0 * dy)
-                                    if 0.5 <= v <= 1.0:
-                                        п["gs"].append(v)
-                        п["сост"] = сост
-                кто = None
-                т2 = р_trader.search(стр)
-                с2 = р_signer.search(стр)
-                кто = (т2.group(1) if т2 else None) or (с2.group(1) if с2 else None)
-                sol = число(р_qam.search(стр))
-                for к in по_минту[минт]:
-                    если = ts - к["ts"]
-                    # до поста берём минуту: «цена на момент поста» -- это последнее
-                    # состояние ДО него, а не только событие в ту же секунду
-                    if если < -ДО_ПОСТА_С or если > ХВОСТ_С:
-                        continue
-                    ключ = (к["канал"], минт)
-                    з = ряды.get(ключ)
-                    if з is None:
-                        з = {"канал": к["канал"], "минт": минт, "utc": к["utc"],
-                             "id": к["id"], "ts_поста": к["ts"], "пул": тип, "poolId": pid,
-                             "до_поста": None, "вход": {}, "выход": {},
-                             "вперёд": {f"{t}с": {
-                                 "покупок": 0, "кошельков": set(), "sol": 0.0}
-                                 for t in ВПЕРЁД_С},
-                             "событий": 0, "пик": None, "первая_продажа_с": None,
-                             "продаж": 0}
-                        ряды[ключ] = з
-                    # у минта может быть несколько пулов -- держимся того, в котором
-                    # увидели его первым, иначе состояния смешаются
-                    if pid and з["poolId"] and pid != з["poolId"]:
-                        счёт["другой_пул_минта"] += 1
-                        continue
-                    з["событий"] += 1
-                    if если < 0:
-                        # пик считается только ПОСЛЕ поста, поэтому здесь только состояние
-                        з["до_поста"] = [сост[0], сост[1], блок, round(если, 3)]
-                        continue
-                    # состояния: берётся ПОСЛЕДНЕЕ событие не позже порога
-                    for t in ВХОДЫ_С:
+                # состояния: берётся ПОСЛЕДНЕЕ событие не позже порога
+                for t in ВХОДЫ_С:
+                    if если <= t:
+                        з["вход"][f"{t}с"] = [сост[0], сост[1], блок, round(если, 3)]
+                for t in ВЫХОДЫ_С:
+                    if если <= t:
+                        з["выход"][f"{t}с"] = [сост[0], сост[1], блок, round(если, 3)]
+                if действие == "buy":
+                    for t in ВПЕРЁД_С:
                         if если <= t:
-                            з["вход"][f"{t}с"] = [сост[0], сост[1], блок, round(если, 3)]
-                    for t in ВЫХОДЫ_С:
-                        if если <= t:
-                            з["выход"][f"{t}с"] = [сост[0], сост[1], блок, round(если, 3)]
-                    if действие == "buy":
-                        for t in ВПЕРЁД_С:
-                            if если <= t:
-                                в = з["вперёд"][f"{t}с"]
-                                в["покупок"] += 1
-                                в["sol"] += sol or 0
-                                if кто:
-                                    в["кошельков"].add(кто)
-                    if действие == "sell":
-                        з["продаж"] += 1
-                        if з["первая_продажа_с"] is None:
-                            з["первая_продажа_с"] = round(если, 3)
-                    ц = сост[0] / сост[1]
-                    if з["пик"] is None or ц > з["пик"][0]:
-                        з["пик"] = [ц, round(если, 3), блок]
+                            в = з["вперёд"][f"{t}с"]
+                            в["покупок"] += 1
+                            в["sol"] += sol or 0
+                            if кто:
+                                в["кошельков"].add(кто)
+                if действие == "sell":
+                    з["продаж"] += 1
+                    if з["первая_продажа_с"] is None:
+                        з["первая_продажа_с"] = round(если, 3)
+                ц = сост[0] / сост[1]
+                if з["пик"] is None or ц > з["пик"][0]:
+                    з["пик"] = [ц, round(если, 3), блок]
+
+    for ч in часы(а.s, а.chasov):
+        url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
+        for попытка in range(3):
+            try:
+                о = AD.открыть_час(requests, url, ч)
+            except Exception as exc:  # noqa: BLE001
+                счёт[f"ошибка_{type(exc).__name__}"] += 1
+                break
+            with о as поток:
+                код = getattr(поток, "status_code", 200)
+                if код != 200:
+                    счёт[f"http_{код}"] += 1
+                    break
+                try:
+                    читать_час(поток)
+                except Exception as exc:  # noqa: BLE001
+                    счёт[f"обрыв_{type(exc).__name__}"] += 1
+                    if попытка < 2:
+                        time.sleep(5 * (попытка + 1))
+                        continue
+                    счёт["обрыв_часов"] += 1
+                    print(f"  час {ч}: поток рвался трижды, идём дальше", flush=True)
+                    break
+                счёт["часов"] += 1
+                break
+
 
     # досчёт и сериализация
     готовые = []

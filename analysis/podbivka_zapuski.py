@@ -197,95 +197,119 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     первый_блок = None
     последний_блок = None
 
+    def читать_час(поток) -> None:
+        """Тело часа отдельной функцией -- чтобы обрыв потока ловился и час повторялся.
+
+        08.10 сутки 30.09 упали на urllib3 IncompleteRead (прочитано 4.4 МБ из 439): поток
+        часа рвётся, и без повтора из-за одного часа теряются целые сутки. Что не
+        дочиталось после трёх попыток, честно считается в «обрыв_часов».
+        """
+        nonlocal первый_блок, последний_блок
+
+        for стр in io.TextIOWrapper(
+                zstandard.ZstdDecompressor().stream_reader(поток.raw),
+                encoding="utf-8", errors="ignore"):
+            счёт["строк"] += 1
+            ам = р_action.search(стр)
+            д = ам.group(1) if ам else "<нет>"
+            словарь[д] += 1
+            бм = р_block.search(стр)
+            if not бм:
+                continue
+            блок = int(бм.group(1))
+            if первый_блок is None:
+                первый_блок = блок
+            последний_блок = блок
+            if а.tolko_slovar:
+                continue
+            пм = р_pool.search(стр)
+            if not пм:
+                continue
+            pid = пм.group(1)
+            # закрываем молодые пулы, чьё окно кончилось
+            if счёт["строк"] % 50000 == 0:
+                for k in [k for k, v in молодые.items() if блок > v["блок"] + а.slotov]:
+                    готовые.append(запись(молодые.pop(k)))
+            сост = состояние(стр)
+            tsм = р_ts.search(стр)
+            ts = int(tsм.group(1)) if tsм else 0
+            кто = None
+            тм = р_trader.search(стр)
+            sм = р_signer.search(стр)
+            кто = (тм.group(1) if тм else None) or (sм.group(1) if sм else None)
+            sol = None
+            qм = р_qam.search(стр)
+            qmм = р_qmint.search(стр)
+            if qм and qmм and qmм.group(1) == WSOL:
+                try:
+                    sol = float(qм.group(1))
+                except ValueError:
+                    sol = None
+            e = {"блок": блок, "ts": ts, "действие": д, "кто": кто, "sol": sol,
+                 "сост": сост, "тариф": число(р_fee.search(стр)),
+                 "ток": число(р_tam.search(стр)), "кв": число(qм)}
+            if pid in молодые:
+                if блок <= молодые[pid]["блок"] + а.slotov:
+                    молодые[pid]["ряд"].append(e)
+                else:
+                    готовые.append(запись(молодые.pop(pid)))
+                continue
+            if pid in видел_пул:
+                continue
+            видел_пул.add(pid)
+            # первый раз видим пул. Запуск -- если это событие создания, иначе (если в потоке
+            # создания нет) -- первое событие пула-кривой в окне, но не в первый час окна:
+            # иначе под «запуск» попадут пулы, жившие до начала окна.
+            правило = None
+            if д not in ("buy", "sell"):
+                правило = f"создание:{д}"
+            elif (первый_блок is not None and блок > первый_блок + 3 * а.slotov
+                  and (р_tip.search(стр).group(1) if р_tip.search(стр) else "") in КРИВЫЕ):
+                правило = "первое_событие_кривой"
+            if правило is None:
+                счёт["пул_не_запуск"] += 1
+                continue
+            if а.tolko_pereezd and правило not in ("создание:createPool",
+                                                     "создание:migrate"):
+                счёт["мимо_среза_переезда"] += 1
+                continue
+            if а.tolko_pereezd and (сост is None or сост[0] < РЕЗЕРВ_ПЕРЕЕЗДА):
+                счёт["переезд_без_резерва"] += 1
+                continue
+            счёт[правило] += 1
+            мм = р_mint.search(стр)
+            тип = р_tip.search(стр)
+            молодые[pid] = {"poolId": pid, "минт": мм.group(1) if мм else None,
+                            "пул": тип.group(1) if тип else None, "блок": блок, "ts": ts,
+                            "создатель": кто, "правило": правило,
+                            "quoteMint": qmм.group(1) if qmм else None, "ряд": [e]}
+
     for ч in часы(а.s, а.chasov):
         url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
-        try:
-            о = AD.открыть_час(requests, url, ч)
-        except Exception as exc:  # noqa: BLE001
-            счёт[f"ошибка_{type(exc).__name__}"] += 1
-            continue
-        with о as поток:
-            if getattr(поток, "status_code", 200) != 200:
-                счёт[f"http_{getattr(поток, 'status_code', '?')}"] += 1
-                continue
-            счёт["часов"] += 1
-            for стр in io.TextIOWrapper(
-                    zstandard.ZstdDecompressor().stream_reader(поток.raw),
-                    encoding="utf-8", errors="ignore"):
-                счёт["строк"] += 1
-                ам = р_action.search(стр)
-                д = ам.group(1) if ам else "<нет>"
-                словарь[д] += 1
-                бм = р_block.search(стр)
-                if not бм:
-                    continue
-                блок = int(бм.group(1))
-                if первый_блок is None:
-                    первый_блок = блок
-                последний_блок = блок
-                if а.tolko_slovar:
-                    continue
-                пм = р_pool.search(стр)
-                if not пм:
-                    continue
-                pid = пм.group(1)
-                # закрываем молодые пулы, чьё окно кончилось
-                if счёт["строк"] % 50000 == 0:
-                    for k in [k for k, v in молодые.items() if блок > v["блок"] + а.slotov]:
-                        готовые.append(запись(молодые.pop(k)))
-                сост = состояние(стр)
-                tsм = р_ts.search(стр)
-                ts = int(tsм.group(1)) if tsм else 0
-                кто = None
-                тм = р_trader.search(стр)
-                sм = р_signer.search(стр)
-                кто = (тм.group(1) if тм else None) or (sм.group(1) if sм else None)
-                sol = None
-                qм = р_qam.search(стр)
-                qmм = р_qmint.search(стр)
-                if qм and qmм and qmм.group(1) == WSOL:
-                    try:
-                        sol = float(qм.group(1))
-                    except ValueError:
-                        sol = None
-                e = {"блок": блок, "ts": ts, "действие": д, "кто": кто, "sol": sol,
-                     "сост": сост, "тариф": число(р_fee.search(стр)),
-                     "ток": число(р_tam.search(стр)), "кв": число(qм)}
-                if pid in молодые:
-                    if блок <= молодые[pid]["блок"] + а.slotov:
-                        молодые[pid]["ряд"].append(e)
-                    else:
-                        готовые.append(запись(молодые.pop(pid)))
-                    continue
-                if pid in видел_пул:
-                    continue
-                видел_пул.add(pid)
-                # первый раз видим пул. Запуск -- если это событие создания, иначе (если в потоке
-                # создания нет) -- первое событие пула-кривой в окне, но не в первый час окна:
-                # иначе под «запуск» попадут пулы, жившие до начала окна.
-                правило = None
-                if д not in ("buy", "sell"):
-                    правило = f"создание:{д}"
-                elif (первый_блок is not None and блок > первый_блок + 3 * а.slotov
-                      and (р_tip.search(стр).group(1) if р_tip.search(стр) else "") in КРИВЫЕ):
-                    правило = "первое_событие_кривой"
-                if правило is None:
-                    счёт["пул_не_запуск"] += 1
-                    continue
-                if а.tolko_pereezd and правило not in ("создание:createPool",
-                                                         "создание:migrate"):
-                    счёт["мимо_среза_переезда"] += 1
-                    continue
-                if а.tolko_pereezd and (сост is None or сост[0] < РЕЗЕРВ_ПЕРЕЕЗДА):
-                    счёт["переезд_без_резерва"] += 1
-                    continue
-                счёт[правило] += 1
-                мм = р_mint.search(стр)
-                тип = р_tip.search(стр)
-                молодые[pid] = {"poolId": pid, "минт": мм.group(1) if мм else None,
-                                "пул": тип.group(1) if тип else None, "блок": блок, "ts": ts,
-                                "создатель": кто, "правило": правило,
-                                "quoteMint": qmм.group(1) if qmм else None, "ряд": [e]}
+        for попытка in range(3):
+            try:
+                о = AD.открыть_час(requests, url, ч)
+            except Exception as exc:  # noqa: BLE001
+                счёт[f"ошибка_{type(exc).__name__}"] += 1
+                break
+            with о as поток:
+                код = getattr(поток, "status_code", 200)
+                if код != 200:
+                    счёт[f"http_{код}"] += 1
+                    break
+                try:
+                    читать_час(поток)
+                except Exception as exc:  # noqa: BLE001
+                    счёт[f"обрыв_{type(exc).__name__}"] += 1
+                    if попытка < 2:
+                        time.sleep(5 * (попытка + 1))
+                        continue
+                    счёт["обрыв_часов"] += 1
+                    print(f"  час {ч}: поток рвался трижды, идём дальше", flush=True)
+                    break
+                счёт["часов"] += 1
+                break
+
     for k in list(молодые):
         готовые.append(запись(молодые.pop(k)))
 
