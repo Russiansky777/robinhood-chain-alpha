@@ -38,6 +38,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import podbivka_tg_sbor as S      # noqa: E402
+
 КОРЕНЬ = Path(__file__).resolve().parent.parent
 П = КОРЕНЬ / "data" / "podbivka"
 ПАПКА = П / "tg"
@@ -87,6 +89,7 @@ def состояние(стр: str) -> tuple | None:
 def коллы(папка: Path) -> list:
     """Первый колл каждого минта в каждом канале, по времени поста."""
     первые: dict = {}
+    счёт_мимо: dict = {}
     всего = 0
     for п in sorted(glob.glob(str(папка / "posty_*.jsonl.gz"))):
         with gzip.open(п, "rt", encoding="utf-8") as ф:
@@ -103,7 +106,11 @@ def коллы(папка: Path) -> list:
                 except ValueError:
                     continue
                 for м in з["минты"]:
-                    if м == WSOL:
+                    # уже собранные файлы могли попасть под старую регулярку без границ:
+                    # из адреса EVM выкусывался кусок из 32 символов алфавита base58.
+                    # Проверяем здесь, чтобы не перекачивать историю заново.
+                    if м == WSOL or not S.адрес_solana(м):
+                        счёт_мимо[м[:8]] = счёт_мимо.get(м[:8], 0) + 1
                         continue
                     всего += 1
                     к = (з["канал"], м)
@@ -111,7 +118,9 @@ def коллы(папка: Path) -> list:
                         первые[к] = {"канал": з["канал"], "минт": м, "ts": ts,
                                      "utc": з["utc"], "id": з.get("id")}
     из_ = sorted(первые.values(), key=lambda x: x["ts"])
-    print(f"коллов в постах {всего}, первых по паре канал+минт {len(из_)}", flush=True)
+    print(f"коллов в постах {всего}, первых по паре канал+минт {len(из_)}; "
+          f"не адресов Solana отброшено {sum(счёт_мимо.values())} "
+          f"({len(счёт_мимо)} разных)", flush=True)
     return из_
 
 

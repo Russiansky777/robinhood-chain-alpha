@@ -70,8 +70,28 @@ from pathlib import Path
 р_время = re.compile(r'datetime="([0-9T:\+\-\.Z]+)"')
 р_текст = re.compile(r'class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', re.S)
 р_тег = re.compile(r"<[^>]+>")
-р_b58 = re.compile(r"[1-9A-HJ-NP-Za-km-z]{32,44}")
+# Границы обязательны: без них регулярка выкусывает кусок из середины чужого адреса. У
+# robinhood_autocalls посты с адресами EVM (0x...), и из «0xd1706e80bd1dc29ab899...» без
+# границ получался ложный «минт» bd1dc29ab8994e9318386c4687872739 -- 32 символа, все из
+# алфавита base58. Поэтому ещё и проверка: адрес Solana -- это ровно 32 байта после
+# раскодировки base58.
+р_b58 = re.compile(r"(?<![0-9A-Za-z])[1-9A-HJ-NP-Za-km-z]{32,44}(?![0-9A-Za-z])")
 НЕ_МИНТЫ = {"So11111111111111111111111111111111111111112"}
+АЛФАВИТ58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+ИНДЕКС58 = {с: i for i, с in enumerate(АЛФАВИТ58)}
+
+
+def адрес_solana(s: str) -> bool:
+    """Ровно 32 байта после раскодировки base58 -- иначе это не ключ Solana."""
+    н = 0
+    for с in s:
+        i = ИНДЕКС58.get(с)
+        if i is None:
+            return False
+        н = н * 58 + i
+    байт = (н.bit_length() + 7) // 8
+    ведущих = len(s) - len(s.lstrip("1"))
+    return байт + ведущих == 32
 
 
 def достать(requests, url: str, попыток: int = 3):
@@ -105,7 +125,7 @@ def сохранить(url: str, текст: str) -> str:
 def минты(текст: str) -> list:
     из_ = []
     for м in р_b58.findall(текст):
-        if м in НЕ_МИНТЫ or м in из_:
+        if м in НЕ_МИНТЫ or м in из_ or not адрес_solana(м):
             continue
         из_.append(м)
     return из_
