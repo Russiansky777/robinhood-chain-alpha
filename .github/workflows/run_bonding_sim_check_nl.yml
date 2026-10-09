@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' -- как было (сборщик кривой на свежих сигналах); 'pump_sborka' -- оснастка Code-3 на девяти разновидностях IDL"
+        description: "'bonding' -- как было; 'pump_sborka' -- оснастка Code-3 на девяти разновидностях IDL; 'pereezdy' -- кто подписывает переезд кривая -> PumpSwap"
         required: false
         default: "bonding"
       cel:
@@ -89,10 +89,11 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/bs_venv"
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
-          if [ "${{ inputs.zadacha }}" = "pump_sborka" ]; then
-            echo "задача pump_sborka: самопроверки оснастки Code-3 ниже, после доставки"
-            exit 0
-          fi
+          case "${{ inputs.zadacha }}" in
+            pump_sborka|pereezdy)
+              echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
+              exit 0 ;;
+          esac
           "$RUNNER_TEMP/bs_venv/bin/python" analysis/c2_swap_build.py --self-test | tail -6
 
       # ОСНАСТКА CODE-3 -- ИЗ ЕГО ВЕТКИ, А НЕ КОПИЕЙ В МОЮ. Копия разошлась бы
@@ -143,8 +144,51 @@ jobs:
           tail -80 /tmp/pump_sborka.txt
           echo "код выхода оснастки: $RC (0 -- все девять вариантов набрали цель и сошлись)"
 
+      # ПЕРЕЕЗДЫ: КТО ИХ ПОДПИСЫВАЕТ (слово владельца 09.10, п.1, "да на твоё
+      # измерение"). Подписка детектора должна идти на ОДИН счёт -- авторитет, --
+      # а его адрес в репозитории нигде не записан. Здесь он берётся по цепи, из
+      # настоящих транзакций переезда. Кандидаты -- минты, у которых в сутках
+      # архива Code-2 есть и кривая, и Pump AMM: другого пути между программами
+      # у токена нет. Только чтение.
+      - name: "pereezdy: архив Code-2 и сборщик Code-3"
+        if: ${{ inputs.zadacha == 'pereezdy' }}
+        run: |
+          set -e
+          set -o pipefail
+          git fetch --depth=1 origin claude/stroiteli
+          echo "оснастка сборки: $(git rev-parse --short FETCH_HEAD)"
+          git checkout FETCH_HEAD -- analysis/c3_pump_sborka.py data/idl
+          git fetch --depth=1 origin claude/podbivka
+          echo "архив Code-2: $(git rev-parse --short FETCH_HEAD)"
+          # СУТОЧНЫЙ ФАЙЛ -- САМЫЙ СВЕЖИЙ ИЗ ЕСТЬ, и его имя печатается: по
+          # другому файлу числа были бы другими, и молчать об этом нельзя.
+          FAJL=$(git ls-tree --name-only FETCH_HEAD data/podbivka/arhiv_den/ \
+                 | grep -E 'konv_.*json\.gz$' | sort | tail -1)
+          [ -n "$FAJL" ] || { echo "СБОЙ: в архиве нет konv_*.json.gz"; exit 1; }
+          echo "беру сутки: $FAJL"
+          git checkout FETCH_HEAD -- "$FAJL"
+          echo "ARHIV=$FAJL" >> "$GITHUB_ENV"
+          PYTHONPATH=analysis $PY deploy/checks/pereezdy_po_cepi.py --self-test | tail -2
+
+      - name: "pereezdy: по цепи -- подписант, байты, create_pool"
+        if: ${{ inputs.zadacha == 'pereezdy' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
+          set +e
+          PYTHONPATH=analysis $PY deploy/checks/pereezdy_po_cepi.py --live \
+            --arhiv "$ARHIV" --skolko 30 --podpisey 15 --pauza 0.12 \
+            --out /tmp/pereezdy.json > /tmp/pereezdy.txt 2>&1
+          RC=$?
+          set -e
+          tail -40 /tmp/pereezdy.txt
+          echo "код выхода: $RC"
+
       - name: "SSH key"
-        if: ${{ inputs.zadacha != 'pump_sborka' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' }}
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -156,7 +200,7 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Свежие сигналы кривой из живого журнала (потоком)"
-        if: ${{ inputs.zadacha != 'pump_sborka' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' }}
         run: |
           set -e
           set -o pipefail
@@ -175,7 +219,7 @@ jobs:
           wc -l < /tmp/bsim/curve.jsonl
 
       - name: "Симуляция нашей покупки на кривой"
-        if: ${{ inputs.zadacha != 'pump_sborka' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
@@ -204,6 +248,13 @@ jobs:
             git clean -fd analysis data 2>/dev/null || true
             cp /tmp/pump_sborka.txt data/pump_sborka_simulyaciya.txt || true
             git add data/pump_sborka_simulyaciya.txt || true
+          fi
+          if [ "${{ inputs.zadacha }}" = "pereezdy" ]; then
+            git checkout -- analysis data 2>/dev/null || true
+            git clean -fd analysis data 2>/dev/null || true
+            mkdir -p data
+            cp /tmp/pereezdy.json data/pereezdy_po_cepi.json 2>/dev/null || true
+            git add data/pereezdy_po_cepi.json || true
           fi
           for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json; do
             [ -f "$F" ] && git add "$F"
