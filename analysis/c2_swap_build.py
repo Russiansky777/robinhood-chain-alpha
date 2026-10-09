@@ -804,6 +804,19 @@ def инструкция_кривой_по_idl(tpl: dict, tx: dict, user: str,
     if not выкуп:
         raise ValueError("нет buyback_fee_recipient: он не выводится ни "
                          "константой, ни PDA")
+    # КОТИРОВКА КРИВОЙ ОБЯЗАНА БЫТЬ WSOL, И ОТКАЗ ЗДЕСЬ ДЕШЕВЛЕ ОТКАЗА
+    # ПРОГРАММЫ. Измерено 09.10 на отказанных сигналах vol_4vw: у трёх кривых
+    # котировка не SOL (CARDSccUMFKo..., SPCXxcqXj6e5...), и программа отвечала
+    # 6004 MintDoesNotMatchBondingCurve -- тем же номером, что при отсутствии
+    # счёта кривой. Собрать такую покупку мы не можем по сути, а не по
+    # раскладке: полоса платит СОЛАМИ, а этой кривой нужен её токен. Прежде
+    # такая сборка уходила в сеть и стоила чаевых и приоритета на каждом
+    # сигнале; теперь отказ идёт ДО подписи и называет минт котировки.
+    кот_источника = по_именам.get("quote_mint")
+    if кот_источника and кот_источника != C.WSOL:
+        raise ValueError(
+            f"котировка кривой {кот_источника[:12]} не WSOL -- полоса платит "
+            f"солами, купить на этой кривой нечем (программа ответила бы 6004)")
     тп_базы = PS.programma_tokena_minta(
         по_именам.get("base_mint") or "",
         iz_signala=по_именам.get("base_token_program"))
@@ -2941,6 +2954,38 @@ def self_test() -> int:
         "min_out_from_reserves отдаёт [x1, y1] -- вход-котировка, выход-база",
         '"reserves_after": [x1, y1]' in _ист
         and "expected = D(y1) * a_eff / (D(x1) + a_eff)" in _ист))
+    # КОТИРОВКА НЕ WSOL -- ОТКАЗ ДО ПОДПИСИ. Собрать такое нельзя по сути:
+    # полоса платит солами. Проверяется настоящей сборкой по IDL на шаблоне,
+    # где котировка подменена, -- а не текстом.
+    _сб_idl = _сборщик_idl()
+    if _сб_idl is not None:
+        try:
+            _имена_v3 = [а["name"] for а in _сб_idl.zagruzit_idl()["pump"]["ix"]
+                         ["buy_exact_quote_in_v3"]["accounts"]]
+            _сч = ["11111111111111111111111111111111"] * len(_имена_v3)
+            _сч[_имена_v3.index("base_mint")] = \
+                "So11111111111111111111111111111111111111112"
+            _сч[_имена_v3.index("quote_mint")] = \
+                "CARDSccUMFKohQ5h1Kw6bjnMuaDfKtyzNHBP9R9N1C2x"
+            _сч[_имена_v3.index("base_token_program")] = TOKEN_PROGRAM
+            _сч[_имена_v3.index("buyback_fee_recipient")] = \
+                "11111111111111111111111111111112"
+            _шб = {"po_idl": "buy_exact_quote_in_v3", "accounts": _сч,
+                   "buyback_fee_recipient": "11111111111111111111111111111112"}
+            _пойм = None
+            try:
+                инструкция_кривой_по_idl(_шб, {}, "11111111111111111111111111111113",
+                                          1, 1)
+            except ValueError as _e:
+                _пойм = str(_e)
+            checks.append((
+                "ДОКАЗАННЫЙ КРАСНЫЙ: котировка кривой не WSOL -- отказ ДО "
+                "подписи, с минтом котировки в причине (прежде такая сборка "
+                "уходила в сеть и стоила чаевых)",
+                bool(_пойм) and "не WSOL" in _пойм and "CARDS" in _пойм))
+        except Exception as _e_кот:  # noqa: BLE001
+            checks.append((f"проверка котировки не состоялась: "
+                           f"{type(_e_кот).__name__}", False))
 
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
