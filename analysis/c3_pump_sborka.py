@@ -289,42 +289,66 @@ def sobrat_scheta(imja_programmy: str, variant: str, kontekst: dict) -> dict:
     константы = {а["name"]: а["address"] for а in их["accounts"]
                  if а.get("address")}
     готово: dict = {}
-    строки = []
-    for а in их["accounts"]:
+    откуда: dict = {}
+
+    def _odin(а) -> bool:
+        """Вывести ОДИН счёт, если уже можно. Нельзя -- False, без ошибки."""
         имя = а["name"]
-        адрес = провенанс = None
+        if имя in готово:
+            return False
         if а.get("address"):
-            адрес, провенанс = а["address"], ПРОВ_КОНСТАНТА
-        elif имя in kontekst and kontekst[имя]:
-            адрес, провенанс = str(kontekst[имя]), ПРОВ_ПЕРЕДАН
-        elif а.get("pda"):
+            готово[имя], откуда[имя] = а["address"], ПРОВ_КОНСТАНТА
+            return True
+        if имя in kontekst and kontekst[имя]:
+            готово[имя], откуда[имя] = str(kontekst[имя]), ПРОВ_ПЕРЕДАН
+            return True
+        if а.get("pda"):
             п = а["pda"]
-            семена = [_semja(с, готово, kontekst, константы)
-                      for с in п.get("seeds") or []]
+            try:
+                семена = [_semja(с, готово, kontekst, константы)
+                          for с in п.get("seeds") or []]
+            except ОшибкаСборки:
+                return False
             прог = сама
             пр = п.get("program") or {}
             if пр.get("value"):
                 прог = b58e(bytes(пр["value"]))
             elif пр.get("path"):
-                прог = (готово.get(пр["path"]) or kontekst.get(пр["path"])
-                        or константы.get(пр["path"]) or сама)
-            адрес, _ = pda(семена, прог)
-            провенанс = ПРОВ_PDA
-        elif имя in КАК_ATA:
+                найдена = (готово.get(пр["path"]) or kontekst.get(пр["path"])
+                           or константы.get(пр["path"]))
+                if not найдена:
+                    return False
+                прог = найдена
+            готово[имя], откуда[имя] = pda(семена, прог)[0], ПРОВ_PDA
+            return True
+        if имя in КАК_ATA:
             вл, тп, мн = КАК_ATA[имя]
-            нужно = [и for и in (вл, тп, мн) if не_задан(и, готово, kontekst)]
-            if нужно:
-                raise ОшибкаСборки(f"{WHY_НЕТ_В_КОНТЕКСТЕ}: для {имя} нет {нужно}")
-            адрес = ata(_znach(вл, готово, kontekst), _znach(тп, готово, kontekst),
-                        _znach(мн, готово, kontekst))
-            провенанс = ПРОВ_ATA
-        else:
-            raise ОшибкаСборки(f"{WHY_НЕТ_В_КОНТЕКСТЕ}: {имя}")
-        готово[имя] = адрес
-        строки.append({"imja": имя, "pubkey": адрес,
-                        "isSigner": bool(а.get("signer")),
-                        "isWritable": bool(а.get("writable")),
-                        "otkuda": провенанс})
+            if any(не_задан(и, готово, kontekst) for и in (вл, тп, мн)):
+                return False
+            готово[имя] = ata(_znach(вл, готово, kontekst),
+                              _znach(тп, готово, kontekst),
+                              _znach(мн, готово, kontekst))
+            откуда[имя] = ПРОВ_ATA
+            return True
+        return False
+
+    # ВЫВОД ИДЁТ ДО УПОРА, А НЕ ОДНИМ ПРОХОДОМ СВЕРХУ ВНИЗ. Порядок счетов в
+    # IDL не обязан совпадать с порядком вывода: у migrate_v2 счёт `pool`
+    # (место 10) выводится ИЗ `pool_authority` (место 11), то есть из того,
+    # что стоит ПОЗЖЕ. Одним проходом `pool` не выводился вовсе, и сборка
+    # падала «семя 'pool_authority'» на всех 24 настоящих переездах с цепи.
+    # Поэтому проходы повторяются, пока хоть один счёт выводится; что не
+    # вывелось после этого -- то не выводится в принципе, и о нём отказ по
+    # имени, а не дырка.
+    while any([_odin(а) for а in их["accounts"]]):
+        pass
+    нет = [а["name"] for а in их["accounts"] if а["name"] not in готово]
+    if нет:
+        raise ОшибкаСборки(f"{WHY_НЕТ_В_КОНТЕКСТЕ}: {нет if len(нет) > 1 else нет[0]}")
+    строки = [{"imja": а["name"], "pubkey": готово[а["name"]],
+               "isSigner": bool(а.get("signer")),
+               "isWritable": bool(а.get("writable")),
+               "otkuda": откуда[а["name"]]} for а in их["accounts"]]
     return {"programma": сама, "variant": variant, "accounts": строки,
             "schetov": len(строки)}
 
@@ -395,11 +419,26 @@ def razbor_istochnika(tx: dict, *, imja_programmy: str | None = None) -> dict:
             except ОшибкаСборки as сбой:
                 из_["why_not"] = str(сбой)
                 continue
+            # ХВОСТ ЦЕПИ. У развёрнутой программы счетов бывает БОЛЬШЕ, чем
+            # в закреплённом IDL: у migrate_v2 на цепи 29 против 27, у
+            # pump_amm.buy_exact_quote_in -- 25--26 против 23. Лишние стоят
+            # В КОНЦЕ, и это ИЗМЕРЕНО, а не предположено: на 24 настоящих
+            # переездах выведенные счета мест 0..26 сошлись 456 из 456.
+            # Поэтому «длиннее IDL» -- это хвост с названными адресами, а
+            # «короче IDL» -- раскладка СТАРШЕ нашего IDL, и там имена мест
+            # уже не те. Склеивать эти два случая нельзя.
+            хвост = len(счета) - len(идл["accounts"])
             из_.update(ok=True, variant=вариант, argumenty=арг,
                        scheta=по_именам, schetov=len(счета),
                        schetov_idl=len(идл["accounts"]),
-                       schetov_sovpalo=len(счета) == len(идл["accounts"]))
+                       schetov_sovpalo=len(счета) == len(идл["accounts"]),
+                       schetov_hvost=хвост,
+                       hvost=(счета[len(идл["accounts"]):] if хвост > 0 else []),
+                       prefiks_polon=хвост >= 0)
             return из_
+    из_["why_not"] = из_["why_not"] or "инструкции pump в транзакции нет"
+    return из_
+
     из_["why_not"] = из_["why_not"] or "инструкции pump в транзакции нет"
     return из_
 
@@ -407,6 +446,26 @@ def razbor_istochnika(tx: dict, *, imja_programmy: str | None = None) -> dict:
 # ------------------------------- п.3: покупка в свежий пул по переезду
 
 ВАРИАНТЫ_ПЕРЕЕЗДА = ("migrate", "migrate_v2")
+
+
+def programma_tokena_iz_tranzakcii(tx: dict, mint: str) -> str | None:
+    """ПРОГРАММА ТОКЕНА ЭТОГО МИНТА -- ИЗ САМОЙ ТРАНЗАКЦИИ.
+
+    ТРЕТИЙ источник рядом с двумя у `programma_tokena_minta` (сигнал
+    детектора и владелец счёта минта с цепи): когда транзакция уже на
+    руках, сети не нужно вовсе. Годится как `iz_signala` для него.
+
+    jsonParsed кладёт `programId` рядом с каждым остатком токена
+    (meta.preTokenBalances / postTokenBalances) -- это и есть владелец минта.
+    Нет остатка по этому минту -- None, и тогда звать сборщик нельзя: он
+    откажет по имени счёта, и это правильнее, чем взять SPL наугад.
+    """
+    мета = (tx or {}).get("meta") or {}
+    for ключ in ("preTokenBalances", "postTokenBalances"):
+        for б in мета.get(ключ) or []:
+            if б.get("mint") == mint and б.get("programId"):
+                return str(б["programId"])
+    return None
 
 
 def kontekst_iz_pereezda(tx: dict, *, nash_koshelek: str) -> dict:
@@ -485,13 +544,69 @@ def kontekst_iz_pereezda(tx: dict, *, nash_koshelek: str) -> dict:
                     "buyback_fee_recipient")
 
 
+WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА = (
+    "программа токена базового минта не задана: её нельзя подставить "
+    "классическим Token -- она входит СЕМЕНЕМ в associated_base_bonding_curve "
+    "и associated_base_user, и у минта Token-2022 адреса выйдут чужие")
+ПРОГРАММЫ_ТОКЕНА = (ПРОГ_ТОКЕНА, ПРОГ_ТОКЕНА_2022)
+
+
+def programma_tokena_minta(mint: str, *, iz_signala: str | None = None,
+                           chitatel=None) -> str:
+    """Программа-владелец счёта минта: из сигнала или с цепи. Иначе ОТКАЗ.
+
+    ЗАЧЕМ (слово владельца 09.10, п.1). 09.10 симуляция дала три красных на
+    отказанных сигналах vol_4vw: AnchorError 3012 AccountNotInitialized по
+    associated_base_bonding_curve и associated_base_user. Причина не в
+    раскладке -- в семенах: программа токена входит в них третьим семенем
+    (КАК_ATA и pda-семена IDL), а у этих минтов токен Token-2022
+    (TokenzQdB…), тогда как обёртки сборки подставляли классический Token
+    молча, значением по умолчанию. Адрес выходил чужой, счёт по нему не
+    существует -- программа и отвечала "не инициализирован".
+    ПОЭТОМУ ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ ЗДЕСЬ БОЛЬШЕ НЕТ: не знаем программу --
+    отказываемся по имени, а не угадываем.
+
+    iz_signala -- поле token_program решения детектора (он читает его из
+    транзакции источника). chitatel -- вызываемое, получающее владельца счёта
+    минта с цепи (getAccountInfo.owner).
+    """
+    if iz_signala and str(iz_signala) in ПРОГРАММЫ_ТОКЕНА:
+        return str(iz_signala)
+    if iz_signala:
+        raise ОшибкаСборки(
+            f"{WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА}: в сигнале стоит {iz_signala!r}, "
+            "а это не Token и не Token-2022")
+    if chitatel is not None:
+        владелец = chitatel(mint)
+        if владелец and str(владелец) in ПРОГРАММЫ_ТОКЕНА:
+            return str(владелец)
+        raise ОшибкаСборки(
+            f"{WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА}: владелец счёта минта {mint} "
+            f"прочитан как {владелец!r}")
+    raise ОшибкаСборки(WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА)
+
+
+def _проверить_программу_токена(base_token_program: str | None) -> str:
+    if not base_token_program:
+        raise ОшибкаСборки(WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА)
+    if str(base_token_program) not in ПРОГРАММЫ_ТОКЕНА:
+        raise ОшибкаСборки(
+            f"{WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА}: передано {base_token_program!r}")
+    return str(base_token_program)
+
+
 def pokupka_krivoj_v3(*, base_mint: str, user: str, buyback_fee_recipient: str,
                       spendable_quote_in: int, min_tokens_out: int,
                       quote_mint: str = WSOL,
-                      base_token_program: str = ПРОГ_ТОКЕНА,
+                      base_token_program: str | None = None,
                       quote_token_program: str = ПРОГ_ТОКЕНА,
                       partial_fill: bool = False) -> dict:
-    """НАША ПОКУПКА кривой разновидностью, которую программа принимает сейчас."""
+    """НАША ПОКУПКА кривой разновидностью, которую программа принимает сейчас.
+
+    base_token_program ОБЯЗАТЕЛЕН: см. programma_tokena_minta. quote_token_program
+    остаётся классическим Token -- котировка у нас WSOL, а он классический.
+    """
+    base_token_program = _проверить_программу_токена(base_token_program)
     к = {"base_mint": base_mint, "quote_mint": quote_mint,
          "base_token_program": base_token_program,
          "quote_token_program": quote_token_program, "user": user,
@@ -505,9 +620,15 @@ def pokupka_krivoj_v3(*, base_mint: str, user: str, buyback_fee_recipient: str,
 def prodazha_krivoj_v3(*, base_mint: str, user: str,
                        buyback_fee_recipient: str, amount: int,
                        min_sol_output: int, quote_mint: str = WSOL,
-                       base_token_program: str = ПРОГ_ТОКЕНА,
+                       base_token_program: str | None = None,
                        quote_token_program: str = ПРОГ_ТОКЕНА) -> dict:
-    """НАША ПРОДАЖА кривой: sell_v3, те же 17 счетов."""
+    """НАША ПРОДАЖА кривой: sell_v3, те же 17 счетов.
+
+    base_token_program ОБЯЗАТЕЛЕН по той же причине, что и в покупке: он семя
+    у associated_base_*. Продажа Token-2022 классической программой собрала бы
+    чужой счёт и не продала бы ничего.
+    """
+    base_token_program = _проверить_программу_токена(base_token_program)
     к = {"base_mint": base_mint, "quote_mint": quote_mint,
          "base_token_program": base_token_program,
          "quote_token_program": quote_token_program, "user": user,
@@ -519,9 +640,13 @@ def prodazha_krivoj_v3(*, base_mint: str, user: str,
 def prodazha_krivoj_v2(*, base_mint: str, user: str, fee_recipient: str,
                        buyback_fee_recipient: str, creator: str, amount: int,
                        min_sol_output: int, quote_mint: str = WSOL,
-                       base_token_program: str = ПРОГ_ТОКЕНА,
+                       base_token_program: str | None = None,
                        quote_token_program: str = ПРОГ_ТОКЕНА) -> dict:
-    """ПРОДАЖА sell_v2 -- 26 счетов; `creator` берётся из события сделки."""
+    """ПРОДАЖА sell_v2 -- 26 счетов; `creator` берётся из события сделки.
+
+    base_token_program ОБЯЗАТЕЛЕН -- то же семя, та же цена ошибки.
+    """
+    base_token_program = _проверить_программу_токена(base_token_program)
     к = {"base_mint": base_mint, "quote_mint": quote_mint,
          "base_token_program": base_token_program,
          "quote_token_program": quote_token_program, "user": user,
@@ -563,6 +688,100 @@ def pokupka_v_svezhij_pul(tx_pereezda: dict, *, nash_koshelek: str,
 
 
 # ------------------------------------------- живые образцы из репозитория
+
+# ------------------------- ЧТЕНИЕ ПОЛЕЙ СЧЁТА ПО РАСКЛАДКЕ IDL
+# ЗАЧЕМ. Два нужных нам значения лежат НЕ В ТРАНЗАКЦИИ, а В СЧЕТАХ:
+#   * `bonding_curve.creator` -- семя хранилища создателя у кривой (у него
+#     есть обход: кривая кладёт создателя в событие сделки);
+#   * `Pool.coin_creator` -- семя `coin_creator_vault_authority` и
+#     `coin_creator_vault_ata` у Pump AMM, и обхода у него НЕТ. Пока его не
+#     прочитать, НИ ОДИН образец AMM собрать нельзя: на 42 живых
+#     инструкциях AMM из репозитория сборка падала ровно этими двумя
+#     именами. Поэтому счёт пула читается с цепи, а поле берётся по
+#     раскладке IDL, а не по смещению, вбитому руками.
+РАЗМЕР_ПРОСТОГО = {"u8": 1, "i8": 1, "bool": 1, "u16": 2, "i16": 2,
+                   "u32": 4, "i32": 4, "f32": 4, "u64": 8, "i64": 8,
+                   "f64": 8, "u128": 16, "i128": 16, "pubkey": 32,
+                   "publicKey": 32}
+
+
+def razmer_tipa(тип) -> int | None:
+    """Размер типа в байтах. Переменная длина -- None, и дальше читать нельзя."""
+    if isinstance(тип, str):
+        return РАЗМЕР_ПРОСТОГО.get(тип)
+    if isinstance(тип, dict):
+        if "array" in тип:
+            внутри, сколько = тип["array"]
+            р = razmer_tipa(внутри)
+            return None if р is None else р * int(сколько)
+        # string, vec, option, defined -- длина переменная или зависит от
+        # другого типа. Угадывать её нельзя: вернём None и откажем по имени.
+    return None
+
+
+def smeshchenije_polja(imja_programmy: str, tip: str, pole: str) -> int:
+    """СМЕЩЕНИЕ ПОЛЯ В ТЕЛЕ СЧЁТА -- ПОСЧИТАНО ПО IDL, а не вбито руками.
+
+    Восемь байт дискриминатора счёта учтены. До нужного поля встретился
+    тип переменной длины -- отказ по имени: дальше смещение не определено.
+    """
+    идл = zagruzit_idl()[imja_programmy]
+    т = (идл.get("tipy") or {}).get(tip)
+    поля = (((т or {}).get("type") or {}).get("fields")) or []
+    if not поля:
+        raise ОшибкаСборки(f"в IDL {imja_programmy} нет типа {tip}")
+    сдвиг = 8
+    for п in поля:
+        if п["name"] == pole:
+            return сдвиг
+        р = razmer_tipa(п["type"])
+        if р is None:
+            raise ОшибкаСборки(
+                f"{tip}.{pole}: до него стоит поле {п['name']} переменной "
+                f"длины ({п['type']!r}) -- смещение не определено")
+        сдвиг += р
+    raise ОшибкаСборки(f"в типе {tip} нет поля {pole}")
+
+
+def pubkey_polja(imja_programmy: str, tip: str, pole: str, dannye) -> str:
+    """Pubkey из тела счёта. `dannye` -- base64 или байты, как отдаёт узел."""
+    import base64  # noqa: PLC0415
+
+    б = (base64.b64decode(dannye) if isinstance(dannye, str) else bytes(dannye))
+    см = smeshchenije_polja(imja_programmy, tip, pole)
+    if len(б) < см + 32:
+        raise ОшибкаСборки(f"тело счёта короче, чем {tip}.{pole}: "
+                           f"{len(б)} байт, нужно {см + 32}")
+    return b58e(б[см:см + 32])
+
+
+# ХВОСТ ЦЕПИ: СКОЛЬКО СЧЕТОВ У РАЗВЁРНУТОЙ ПРОГРАММЫ СВЕРХ IDL.
+# ИЗМЕРЕНО, А НЕ ОБЪЯВЛЕНО (09.10):
+#   * migrate_v2 -- 29 против 27 на 24 настоящих переездах с цепи
+#     (data/pereezdy_po_cepi.json, снял Code-1). Оба лишних ВЫВОДЯТСЯ:
+#       место 27 = boost_vault_authority = PDA(["boost_vault", pool]) под
+#                  pAMMBay -- сошлось 24 из 24 (имя взято из pump_amm IDL,
+#                  инструкции boost_buy_and_burn и init_boost);
+#       место 28 = ATA(место 27, quote_token_program, quote_mint)
+#                  -- сошлось 24 из 24.
+#   * у кривой pump.buy, pump.buy_exact_sol_in, pump.sell -- хвост 2;
+#   * у Pump AMM buy, buy_exact_quote_in, sell -- хвост 3 (у двух образцов
+#     buy_exact_quote_in из 28 -- 2: на цепи живут обе длины).
+# ПРЕФИКС ПРИ ЭТОМ ЦЕЛ: выведенные счета мест 0..N-1 сошлись адрес в адрес
+# 383 из 383 на живых образцах репозитория и 456 из 456 на переездах.
+# Поэтому «длиннее IDL» -- это ХВОСТ, а не другая раскладка. «Короче IDL»
+# -- наоборот, РАСКЛАДКА СТАРШЕ нашего IDL, и там имена мест уже не те.
+ХВОСТ_ПО_ЦЕПИ = {("pump", "migrate_v2"): 2, ("pump", "buy"): 2,
+                  ("pump", "buy_exact_sol_in"): 2, ("pump", "sell"): 2,
+                  ("pump_amm", "buy"): 3, ("pump_amm", "sell"): 3,
+                  ("pump_amm", "buy_exact_quote_in"): 3}
+
+
+def hvost_pereezda(*, pool: str, quote_mint: str, quote_token_program: str) -> list:
+    """ДВА ЛИШНИХ СЧЁТА migrate_v2 -- выведены, а не скопированы."""
+    авторитет, _ = pda([b"boost_vault", b58d(pool)], ПРОГ_AMM)
+    return [авторитет, ata(авторитет, quote_token_program, quote_mint)]
+
 
 СОБЫТИЕ_СДЕЛКИ_ДИСК = bytes.fromhex("bddb7fd34ee661ee")
 АНКОР_СОБЫТИЕ_ДИСК = bytes.fromhex("e445a52e51cb9a1d")
@@ -694,6 +913,118 @@ def svod_po_zhivym(*, tranzakcii: list | None = None) -> dict:
     return из_
 
 
+ТОРГОВЫЕ_ВАРИАНТЫ = tuple(sorted({
+    ("pump", "buy"), ("pump", "buy_v2"), ("pump", "buy_v3"),
+    ("pump", "buy_exact_sol_in"), ("pump", "buy_exact_quote_in"),
+    ("pump", "buy_exact_quote_in_v2"), ("pump", "buy_exact_quote_in_v3"),
+    ("pump", "sell"), ("pump", "sell_v2"), ("pump", "sell_v3"),
+    ("pump_amm", "buy"), ("pump_amm", "buy_v2"),
+    ("pump_amm", "buy_exact_quote_in"), ("pump_amm", "buy_exact_quote_in_v2"),
+    ("pump_amm", "sell"), ("pump_amm", "sell_v2"),
+}))
+
+
+def perepis_raskladok(*, tranzakcii: list | None = None) -> dict:
+    """ПЕРЕПИСЬ: ЧТО НА ЦЕПИ ПРОТИВ ТОГО, ЧТО В IDL -- по каждому варианту.
+
+    Для каждой пары (программа, разновидность) считается, сколько живых
+    инструкций пришло с каким ЧИСЛОМ СЧЕТОВ и какой ДЛИНОЙ ДАННЫХ, и это
+    ставится рядом с числами закреплённого IDL. Приговор по варианту:
+      * `po_idl`     -- живое совпало с IDL;
+      * `hvost_cepi` -- счетов БОЛЬШЕ, лишние в конце, префикс выведен;
+      * `starshe_idl`-- счетов или байт МЕНЬШЕ: раскладка старше нашего IDL;
+      * `raznocenie` -- на цепи живут сразу несколько длин.
+    Ничего не усредняется и не округляется: в ответе стоят все встреченные
+    пары (счетов, байт) со своими числами.
+    """
+    тх = zhivyje_tranzakcii() if tranzakcii is None else tranzakcii
+    идл = zagruzit_idl()
+    из_: dict = {}
+    for tx in тх:
+        for имя_п, адрес_п in (("pump", ПРОГ_КРИВОЙ), ("pump_amm", ПРОГ_AMM)):
+            for их in instrukcii_programmy(tx, адрес_п):
+                дан = их.get("data")
+                if not дан:
+                    continue
+                try:
+                    б = b58d(дан)
+                except ОшибкаСборки:
+                    continue
+                if len(б) < 8:
+                    continue
+                вариант = variant_po_disku(имя_п, б[:8])
+                if not вариант:
+                    continue
+                ключ = f"{имя_п}.{вариант}"
+                спец = идл[имя_п]["ix"][вариант]
+                стр = из_.setdefault(ключ, {
+                    "programma": имя_п, "variant": вариант,
+                    "schetov_idl": len(спец["accounts"]),
+                    "bajt_idl": _bajt_po_idl(имя_п, вариант),
+                    "obrazcov": 0, "pary": {}, "torgovyj":
+                        (имя_п, вариант) in ТОРГОВЫЕ_ВАРИАНТЫ})
+                стр["obrazcov"] += 1
+                пара = f"{len(их.get('accounts') or [])}/{len(б)}"
+                стр["pary"][пара] = стр["pary"].get(пара, 0) + 1
+    return prigovory_perepisi(из_)
+
+
+def pustaja_stroka_perepisi(imja_programmy: str, variant: str) -> dict:
+    """Пустая строка переписи -- с числами IDL, но без ни одного образца."""
+    спец = zagruzit_idl()[imja_programmy]["ix"][variant]
+    return {"programma": imja_programmy, "variant": variant,
+            "schetov_idl": len(спец["accounts"]),
+            "bajt_idl": _bajt_po_idl(imja_programmy, variant),
+            "obrazcov": 0, "pary": {},
+            "torgovyj": (imja_programmy, variant) in ТОРГОВЫЕ_ВАРИАНТЫ}
+
+
+def prigovory_perepisi(из_: dict) -> dict:
+    """ПРИГОВОР ПО КАЖДОЙ СТРОКЕ. Отдельной функцией -- чтобы живой прогон
+    копил пары по ходу чтения, а приговор ставился тем же кодом, что и
+    на образцах репозитория."""
+    for стр in из_.values():
+        if not стр["pary"]:
+            стр.update(hvost_cepi=[], hvost_po_zamery=ХВОСТ_ПО_ЦЕПИ.get(
+                (стр["programma"], стр["variant"])),
+                raznica_schetov=[], raznica_bajt=[],
+                prigovor="obrazcov_net")
+            continue
+        счета = {int(п.split("/")[0]) for п in стр["pary"]}
+        байты = {int(п.split("/")[1]) for п in стр["pary"]}
+        дс = счета - {стр["schetov_idl"]}
+        дб = байты - {стр["bajt_idl"]}
+        стр["hvost_cepi"] = sorted(с - стр["schetov_idl"] for с in счета
+                                   if с > стр["schetov_idl"])
+        стр["hvost_po_zamery"] = ХВОСТ_ПО_ЦЕПИ.get(
+            (стр["programma"], стр["variant"]))
+        стр["raznica_schetov"] = sorted(с - стр["schetov_idl"] for с in дс)
+        стр["raznica_bajt"] = sorted(
+            б - стр["bajt_idl"] for б in дб if стр["bajt_idl"] is not None)
+        # ПРИГОВОР ПО ТОМУ, ЧТО ВИДНО, а не по догадке, какая сторона старше.
+        if not дс and not дб:
+            стр["prigovor"] = "po_idl"
+        elif len(стр["pary"]) > 1:
+            стр["prigovor"] = "raznocenie"
+        elif дс and not дб and all(с > стр["schetov_idl"] for с in дс):
+            стр["prigovor"] = "hvost_cepi"
+        elif дб and not дс:
+            стр["prigovor"] = "dlina_dannyh_ne_ta"
+        else:
+            стр["prigovor"] = "rashoditsja_po_oboim"
+    return из_
+
+
+def _bajt_po_idl(imja_programmy: str, variant: str) -> int | None:
+    """Сколько байт данных у этой разновидности ПО IDL. Не сложилось -- None."""
+    их = zagruzit_idl()[imja_programmy]["ix"][variant]
+    try:
+        return len(zakodirovat_argumenty(
+            imja_programmy, variant, {а["name"]: 0 for а in их["args"]}))
+    except ОшибкаСборки:
+        return None
+
+
 def krivaja_iz_minta_v_zhivyh(*, tranzakcii: list | None = None) -> dict:
     """Счёт кривой, выведенный ИЗ МИНТА, обязан стоять в живой инструкции.
 
@@ -733,7 +1064,13 @@ def krivaja_iz_minta_v_zhivyh(*, tranzakcii: list | None = None) -> dict:
 
 # ------------------------------------------------------------- самопроверка
 
-ZHDEM_PROVEROK = 24
+# 24 у Code-3 + 7 про программу токена базового минта (правка 09.10, Code-1):
+# два адреса одного минта, четыре доказанных красных и два пути получения.
+# + 10 на раскладку по цепи против IDL (п.3, правка 09.10, Code-3): измеренная
+# программа токена, два смещения по IDL и доказанный красный на переменную
+# длину, целость префикса на 383 выведенных счетах, четыре на перепись и
+# выведенный хвост переезда.
+ZHDEM_PROVEROK = 41
 # ЧИСЛА ЗАМЕРА ПО ЖИВЫМ ОБРАЗЦАМ РЕПОЗИТОРИЯ (09.10). Меньше -- значит образцы
 # подменили или разбор сломался; больше -- значит образцов прибавилось, и это
 # тоже надо увидеть, а не проглотить.
@@ -851,8 +1188,12 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     # ---------------------------------------------- 6. НАШИ СБОРКИ
     МИНТ = ОТКАЗ_08_10["minty"][1]
     НАШ = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
+    # МИНТЫ ОТКАЗА 08.10 -- Token-2022: так их назвал журнал детектора
+    # ("token_program": TokenzQdB…). Поэтому и здесь стоит Token-2022, иначе
+    # самопроверка шла бы по случаю, которого в жизни не было.
     пок = pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
-                            spendable_quote_in=10 ** 8, min_tokens_out=1)
+                            spendable_quote_in=10 ** 8, min_tokens_out=1,
+                            base_token_program=ПРОГ_ТОКЕНА_2022)
     chk("НАША ПОКУПКА v3 собирается БЕЗ ТРАНЗАКЦИИ ИСТОЧНИКА -- из шести "
         "значений, и в ней ровно 17 счетов с названным провенансом",
         пок["schetov"] == 17
@@ -866,7 +1207,8 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
         (пок["bajt_dannyh"], пок["data_hex"][:20]))
     прод = prodazha_krivoj_v3(base_mint=МИНТ, user=НАШ,
                               buyback_fee_recipient=НАШ, amount=1000,
-                              min_sol_output=1)
+                              min_sol_output=1,
+                              base_token_program=ПРОГ_ТОКЕНА_2022)
     chk("наша продажа sell_v3 -- те же 17 счетов и 24 байта данных",
         прод["schetov"] == 17 and прод["bajt_dannyh"] == 24, прод["bajt_dannyh"])
     плохие_в = []
@@ -881,6 +1223,186 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     chk("аргументы нашей сборки читаются обратно теми же числами",
         круг["spendable_quote_in"] == 10 ** 8 and круг["min_tokens_out"] == 1
         and круг["_hvost"] == 0, круг)
+    # ---------- ПРОГРАММА ТОКЕНА: ДВА АДРЕСА ОДНОГО МИНТА (правка 09.10)
+    т2 = pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                           spendable_quote_in=10 ** 8, min_tokens_out=1,
+                           base_token_program=ПРОГ_ТОКЕНА_2022)
+    кл = pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                           spendable_quote_in=10 ** 8, min_tokens_out=1,
+                           base_token_program=ПРОГ_ТОКЕНА)
+    по_имени_т2 = {а["imja"]: а["pubkey"] for а in т2["accounts"]}
+    по_имени_кл = {а["imja"]: а["pubkey"] for а in кл["accounts"]}
+    разные = [и for и in ("associated_base_bonding_curve", "associated_base_user")
+              if по_имени_т2[и] != по_имени_кл[и]]
+    chk("программа токена МЕНЯЕТ адреса: у Token-2022 и классического Token "
+        "associated_base_bonding_curve и associated_base_user РАЗНЫЕ -- именно "
+        "на этом 09.10 вышли три красных 3012 AccountNotInitialized",
+        разные == ["associated_base_bonding_curve", "associated_base_user"],
+        разные)
+    упало_тп = None
+    try:
+        pokupka_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                          spendable_quote_in=10 ** 8, min_tokens_out=1)
+    except ОшибкаСборки as сбой:
+        упало_тп = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: без программы токена покупка НЕ собирается -- "
+        "значения по умолчанию больше нет",
+        упало_тп and WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА in упало_тп, упало_тп)
+    упало_тп2 = None
+    try:
+        prodazha_krivoj_v3(base_mint=МИНТ, user=НАШ, buyback_fee_recipient=НАШ,
+                           amount=1, min_sol_output=1)
+    except ОшибкаСборки as сбой:
+        упало_тп2 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: то же у продажи sell_v3",
+        упало_тп2 and WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА in упало_тп2, упало_тп2)
+    упало_тп3 = None
+    try:
+        programma_tokena_minta(МИНТ, iz_signala="ЧужаяПрограмма")
+    except ОшибкаСборки as сбой:
+        упало_тп3 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: чужая программа из сигнала не принимается",
+        упало_тп3 and "не Token и не Token-2022" in упало_тп3, упало_тп3)
+    chk("программа токена из сигнала берётся, когда она настоящая",
+        programma_tokena_minta(МИНТ, iz_signala=ПРОГ_ТОКЕНА_2022)
+        == ПРОГ_ТОКЕНА_2022)
+    chk("программа токена читается с цепи владельцем счёта минта",
+        programma_tokena_minta(МИНТ, chitatel=lambda _м: ПРОГ_ТОКЕНА_2022)
+        == ПРОГ_ТОКЕНА_2022)
+    упало_тп4 = None
+    try:
+        programma_tokena_minta(МИНТ, chitatel=lambda _м: None)
+    except ОшибкаСборки as сбой:
+        упало_тп4 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: владелец счёта минта не прочитался -- отказ, "
+        "а не классический Token наугад",
+        упало_тп4 and WHY_НЕТ_ПРОГРАММЫ_ТОКЕНА in упало_тп4, упало_тп4)
+
+    # ------------- 6в. РАСКЛАДКА ПО ЦЕПИ ПРОТИВ IDL (п.3, правка Code-3)
+    # ИЗМЕРЕНИЕ, А НЕ ПАМЯТЬ: какая программа токена базы стоит в живых
+    # инструкциях кривой. Code-1 закрыл умолчание; здесь -- число, на
+    # котором это стоит.
+    тп_живые = {}
+    for tx in zhivyje_tranzakcii():
+        р = razbor_istochnika(tx)
+        if р.get("ok") and р["programma"] == "pump":
+            з = (р["scheta"] or {}).get("base_token_program")
+            if з:
+                тп_живые[з] = тп_живые.get(з, 0) + 1
+    chk(f"ИЗМЕРЕНО: у всех {sum(тп_живые.values())} живых инструкций кривой "
+        "base_token_program = TokenzQdB… (Token-2022), классический Token не "
+        "встретился НИ РАЗУ -- поэтому умолчания у него и не может быть",
+        тп_живые.get(ПРОГ_ТОКЕНА_2022) == sum(тп_живые.values())
+        and sum(тп_живые.values()) >= 11, тп_живые)
+    chk("СМЕЩЕНИЕ creator В СОБЫТИИ СДЕЛКИ, СВЕРЕННОЕ НА 23 ЖИВЫХ "
+        f"ИНСТРУКЦИЯХ, ВОСПРОИЗВОДИТСЯ РАСКЛАДКОЙ IDL: {СМЕЩЕНИЕ_CREATOR} + 8 "
+        f"байт дискриминатора = {smeshchenije_polja('pump', 'TradeEvent', 'creator')} "
+        "-- два независимых пути дали одно число",
+        smeshchenije_polja("pump", "TradeEvent", "creator")
+        == СМЕЩЕНИЕ_CREATOR + 8,
+        (СМЕЩЕНИЕ_CREATOR, smeshchenije_polja("pump", "TradeEvent", "creator")))
+    chk("Pool.coin_creator -- семя двух счетов AMM, которых НЕТ в транзакции; "
+        "смещение посчитано по IDL: "
+        f"{smeshchenije_polja('pump_amm', 'Pool', 'coin_creator')} = 8 "
+        "дискриминатора + bump 1 + index 2 + шесть pubkey + lp_supply 8",
+        smeshchenije_polja("pump_amm", "Pool", "coin_creator")
+        == 8 + 1 + 2 + 32 * 6 + 8)
+    упало_пер = None
+    try:
+        smeshchenije_polja("pump", "TradeEvent", "quote_mint")
+    except ОшибкаСборки as сбой:
+        упало_пер = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: за полем переменной длины смещение НЕ определено "
+        "-- отказ по имени поля, а не чтение наугад",
+        упало_пер and "переменной" in упало_пер and "ix_name" in упало_пер,
+        упало_пер)
+    # ПРЕФИКС ЦЕЛ -- ЭТО И ЕСТЬ ОСНОВАНИЕ СЧИТАТЬ ЛИШНИЕ СЧЕТА ХВОСТОМ.
+    # Если бы они вставлялись в середину, наш кошелёк уехал бы на чужое
+    # место. Поэтому проверка не на слово, а на все выводимые счета всех
+    # живых образцов -- включая те, где счетов БОЛЬШЕ, чем в IDL.
+    вывед = сошл = 0
+    не_сошл: dict = {}
+    for tx in zhivyje_tranzakcii():
+        for имя_п, адрес_п in (("pump", ПРОГ_КРИВОЙ), ("pump_amm", ПРОГ_AMM)):
+            for их_ in instrukcii_programmy(tx, адрес_п):
+                try:
+                    б_ = b58d(их_.get("data") or "")
+                except ОшибкаСборки:
+                    continue
+                if len(б_) < 8:
+                    continue
+                в_ = variant_po_disku(имя_п, б_[:8])
+                if not в_:
+                    continue
+                спец = zagruzit_idl()[имя_п]["ix"][в_]["accounts"]
+                сч_ = list(их_.get("accounts") or [])
+                if len(сч_) < len(спец):
+                    continue
+                вывод_имена = {а["name"] for а in спец
+                               if а.get("address") or а.get("pda")
+                               or а["name"] in КАК_ATA}
+                кон_ = {а["name"]: сч_[и] for и, а in enumerate(спец)
+                        if а["name"] not in вывод_имена}
+                нужен_ = any((с_.get("path") or "") == "bonding_curve.creator"
+                             for а in спец
+                             for с_ in ((а.get("pda") or {}).get("seeds") or []))
+                if нужен_:
+                    созд_ = creator_iz_sobytija(tx)
+                    if not созд_:
+                        continue
+                    кон_["bonding_curve.creator"] = созд_
+                try:
+                    гот_ = sobrat_scheta(имя_п, в_, кон_)
+                except ОшибкаСборки:
+                    continue
+                for и, а in enumerate(гот_["accounts"]):
+                    if а["otkuda"] == ПРОВ_ПЕРЕДАН:
+                        continue
+                    вывед += 1
+                    if а["pubkey"] == сч_[и]:
+                        сошл += 1
+                    else:
+                        не_сошл[f"{и}:{а['imja']}"] = (
+                            не_сошл.get(f"{и}:{а['imja']}", 0) + 1)
+    chk("ПРЕФИКС ЦЕЛ ДАЖЕ ТАМ, ГДЕ СЧЕТОВ БОЛЬШЕ IDL: выведенные счета "
+        f"сошлись адрес в адрес {сошл} из {вывед} на живых образцах -- значит "
+        "лишние счета стоят В КОНЦЕ, а не вставлены в середину (вставка "
+        "увела бы наш кошелёк на чужое место)",
+        вывед >= 383 and сошл == вывед, (вывед, сошл, не_сошл))
+    пер = perepis_raskladok()
+    торг = {к: в for к, в in пер.items() if в["torgovyj"]}
+    chk(f"ПЕРЕПИСЬ РАСКЛАДОК: торговых разновидностей в живых образцах "
+        f"{len(торг)}, и у КАЖДОЙ названы число счетов и длина данных против "
+        "IDL -- ни одной «примерно»",
+        len(торг) == 8
+        and all(в["pary"] and в["prigovor"] for в in торг.values()), sorted(торг))
+    chk("ПЕРЕПИСЬ НАЗЫВАЕТ РАСХОЖДЕНИЕ ЧИСЛОМ: у pump.sell на цепи 16 счетов "
+        "против 14 в IDL (хвост 2), у pump_amm.sell -- 24 против 21 (хвост 3), "
+        "а у pump.sell_v2 всё по IDL",
+        пер["pump.sell"]["hvost_cepi"] == [2]
+        and пер["pump_amm.sell"]["hvost_cepi"] == [3]
+        and пер["pump.sell_v2"]["prigovor"] == "po_idl",
+        {к: пер[к]["pary"] for к in ("pump.sell", "pump_amm.sell",
+                                     "pump.sell_v2")})
+    chk("ПЕРЕПИСЬ ВИДИТ ДВЕ ДЛИНЫ СРАЗУ: у pump.buy_exact_quote_in_v2 на цепи "
+        "живут и 25 байт, и 24 -- приговор «разноцение», а не одна цифра",
+        пер["pump.buy_exact_quote_in_v2"]["prigovor"] == "raznocenie"
+        and set(пер["pump.buy_exact_quote_in_v2"]["pary"]) == {"27/25", "27/24"},
+        пер["pump.buy_exact_quote_in_v2"]["pary"])
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: вариант, которого в образцах нет вовсе, получает "
+        "приговор «образцов нет» -- а не «по IDL» молча",
+        prigovory_perepisi({"x": pustaja_stroka_perepisi(
+            "pump_amm", "sell_v2")})["x"]["prigovor"] == "obrazcov_net")
+    # ДВА ЛИШНИХ СЧЁТА migrate_v2 ВЫВОДЯТСЯ, а не копируются. 24 из 24 --
+    # сверено на настоящих переездах цепи, см. ХВОСТ_ПО_ЦЕПИ.
+    хв = hvost_pereezda(pool="H4MUUPfRze2KHnmDQLrcB6FXxNBe6yvG54NSfH7sw68j",
+                        quote_mint=WSOL, quote_token_program=ПРОГ_ТОКЕНА)
+    chk("ХВОСТ migrate_v2 (29 на цепи против 27 в IDL) ВЫВОДИТСЯ: "
+        "boost_vault_authority = PDA(['boost_vault', pool]) под pAMMBay и его "
+        "ATA по котировке -- ровно те адреса, что стоят местами 27 и 28 в "
+        "настоящем переезде 31HX7jHP…",
+        хв == ["BzoFDKSt4KVSaJrfAt2tVAhsU232eTYj8dDjEL1b3eM7",
+               "5UZaWawKHMXoXDoAvpAK99za2zdV6EjHqaVcjeGaoYk4"], хв)
     # ---------------------------------------------- 7. ДОКАЗАННЫЕ КРАСНЫЕ
     упало = None
     try:
@@ -898,7 +1420,8 @@ def self_test() -> int:  # noqa: C901, PLR0912, PLR0915
     try:
         prodazha_krivoj_v2(base_mint=МИНТ, user=НАШ, fee_recipient=НАШ,
                            buyback_fee_recipient=НАШ, creator="", amount=1,
-                           min_sol_output=1)
+                           min_sol_output=1,
+                           base_token_program=ПРОГ_ТОКЕНА_2022)
     except ОшибкаСборки as сбой:
         упало2 = str(сбой)
     chk("ДОКАЗАННЫЙ КРАСНЫЙ: sell_v2 без создателя кривой НЕ собирается -- "

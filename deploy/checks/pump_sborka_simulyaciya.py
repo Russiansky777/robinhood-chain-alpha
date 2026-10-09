@@ -142,7 +142,44 @@ def oshibki_idl(*, zanovo: bool = False) -> dict:
     return _ОШИБКИ
 
 
-def klass_ishoda(err, *, programma: str) -> dict:
+def imja_iz_logov(logi) -> dict:
+    """ИМЯ ОШИБКИ -- ИЗ ЛОГОВ ЦЕПИ, где программа назвала его сама.
+
+    Anchor печатает в логи ровно то, чего нет в нашей таблице:
+      AnchorError caused by account: associated_base_bonding_curve.
+      Error Code: AccountNotInitialized. Error Number: 3012. ...
+    Пока разбор шёл только по числу Custom, в отчёт уходило «код 3012 не
+    описан», и причину приходилось искать глазами. Теперь имя счёта и имя
+    ошибки берутся из строки САМОЙ ПРОГРАММЫ -- это данные цепи, а не наша
+    догадка. Вернётся пусто -- значит программа ничего не написала, и тогда
+    остаётся только число.
+
+    Ещё логи говорят, ЧЬЯ ошибка: если последней упала НЕ наша программа, а
+    та, которую она позвала (CPI), то о НАШЕЙ раскладке это не говорит
+    ничего -- наши счета программа к тому моменту уже приняла.
+    """
+    из_ = {"imja": None, "kod": None, "schjot": None, "upavshaja": None,
+           "nazvanie_ix": None}
+    for строка in (logi or []):
+        т = str(строка)
+        if "Error Code: " in т:
+            хвост = т.split("Error Code: ", 1)[1]
+            из_["imja"] = хвост.split(".", 1)[0].strip() or None
+        if "Error Number: " in т:
+            хвост = т.split("Error Number: ", 1)[1]
+            чис = "".join(с for с in хвост if с.isdigit())
+            из_["kod"] = int(чис) if чис else None
+        if "caused by account: " in т:
+            хвост = т.split("caused by account: ", 1)[1]
+            из_["schjot"] = хвост.split(".", 1)[0].strip() or None
+        if "Program log: Instruction: " in т:
+            из_["nazvanie_ix"] = т.split("Program log: Instruction: ", 1)[1].strip()
+        if т.startswith("Program ") and " failed" in т:
+            из_["upavshaja"] = т.split(" ", 2)[1]
+    return из_
+
+
+def klass_ishoda(err, *, programma: str, logi=None) -> dict:
     """ИСХОД СИМУЛЯЦИИ ПО ИМЕНИ, А НЕ ПО ВИДУ. Код без имени -- так и сказан."""
     if err is None:
         return {"ishod": ИСХОД_ПРОШЛО, "kod": None, "imja": None,
@@ -176,13 +213,32 @@ def klass_ishoda(err, *, programma: str) -> dict:
     код = int(код)
     своя = oshibki_idl().get(programma) or {}
     имя = (своя.get(код) or {}).get("name")
+    из_логов = imja_iz_logov(logi)
+    # ЧУЖАЯ ОШИБКА -- НЕ НАША РАСКЛАДКА. Если упала не наша программа, а
+    # та, которую она позвала, значит наши счета она уже приняла.
+    сама = СБ.programma_po_imeni(programma)
+    чужая = из_логов["upavshaja"] and из_логов["upavshaja"] != сама
+    if чужая:
+        return {"ishod": ИСХОД_ЭКОНОМИКА, "kod": код,
+                "imja": из_логов["imja"],
+                "pochemu": (f"упала программа {из_логов['upavshaja']}, "
+                            f"которую позвала {programma}: наши счета она "
+                            "уже приняла, отказ не про раскладку")}
     if имя is None:
-        # РАМОЧНАЯ ОШИБКА ANCHOR (2000--5999) ИЛИ КОД, КОТОРОГО В IDL НЕТ.
-        # Имени ему я НЕ ВЫДУМЫВАЮ: в отчёт уходит число.
-        return {"ishod": ИСХОД_РАСКЛАДКА, "kod": код, "imja": None,
-                "pochemu": (f"код {код} в таблице ошибок {programma} не описан "
-                            "(рамочная Anchor или новее нашего IDL) -- "
-                            "считаем раскладку отвергнутой")}
+        # КОДА НЕТ В ТАБЛИЦЕ IDL -- БЕРЁМ ИМЯ ИЗ ЛОГОВ ЦЕПИ. Сам выдумывать
+        # имя не буду: либо программа его написала, либо в отчёт уходит
+        # число.
+        если_имя = из_логов["imja"]
+        счёт = из_логов["schjot"]
+        почему = (f"код {код}: {если_имя}"
+                  + (f" на счёте {счёт}" if счёт else "")
+                  + " -- сказано САМОЙ программой в логах цепи"
+                  ) if если_имя else (
+            f"код {код} в таблице ошибок {programma} не описан "
+            "(рамочная Anchor или новее нашего IDL), и в логах программа "
+            "его не назвала -- считаем раскладку отвергнутой")
+        return {"ishod": ИСХОД_РАСКЛАДКА, "kod": код, "imja": если_имя,
+                "schjot": счёт, "pochemu": почему}
     if имя in (ИМЕНА_ЭКОНОМИКИ.get(programma) or ()):
         return {"ishod": ИСХОД_ЭКОНОМИКА, "kod": код, "imja": имя,
                 "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала "
@@ -236,6 +292,50 @@ def tx_base64(*, programma: str, scheta: list, dannye: bytes,
     сырое = bytes(vtx)
     return {"tx_base64": base64.b64encode(сырое).decode(), "bajt": len(сырое),
             "podpisej": n}
+
+
+def ata_idempotent_scheta(*, payer: str, owner: str, mint: str,
+                          token_program: str) -> dict:
+    """CreateIdempotent ATA -- ТЕМИ ЖЕ БАЙТАМИ И СЧЕТАМИ, что в денежном пути.
+
+    ЗАЧЕМ (правка 09.10). Наша покупка в бою уходит НЕ ОДНОЙ инструкцией:
+    c2_swap_build.py:803 всегда ставит перед свопом ata_idempotent на базовый
+    минт. Симуляция же посылала одну инструкцию, и на кошельке, который этого
+    минта никогда не держал, программа честно отвечала 3012
+    AccountNotInitialized по associated_base_user -- то есть красный был у
+    ОСНАСТКИ, а не у сборки. Теперь проверяется то, что мы и отправляем.
+    Байты (один байт 1) и порядок счетов взяты из денежного пути, а не придуманы
+    здесь: c2_swap_build.ata_idempotent.
+    """
+    адрес = СБ.ata(owner, token_program, mint)
+    return {"programma": СБ.ПРОГ_ATA, "dannye": bytes([1]), "scheta": [
+        {"pubkey": payer, "isSigner": True, "isWritable": True},
+        {"pubkey": адрес, "isSigner": False, "isWritable": True},
+        {"pubkey": owner, "isSigner": False, "isWritable": False},
+        {"pubkey": mint, "isSigner": False, "isWritable": False},
+        {"pubkey": СБ.СИСТЕМНАЯ, "isSigner": False, "isWritable": False},
+        {"pubkey": token_program, "isSigner": False, "isWritable": False}]}
+
+
+def tx_base64_mnogo(*, instrukcii: list, platelshchik: str) -> dict:
+    """Несколько инструкций в одном неподписанном v0 -- как в бою."""
+    (Hash, AccountMeta, Instruction, MessageV0, Pubkey, Signature,
+     VersionedTransaction) = _solders()
+    спис = []
+    for и in instrukcii:
+        metas = [AccountMeta(Pubkey.from_string(а["pubkey"]),
+                             is_signer=bool(а["isSigner"]),
+                             is_writable=bool(а["isWritable"]))
+                 for а in и["scheta"]]
+        спис.append(Instruction(Pubkey.from_string(и["programma"]),
+                                bytes(и["dannye"]), metas))
+    msg = MessageV0.try_compile(Pubkey.from_string(platelshchik), спис, [],
+                                Hash.default())
+    n = msg.header.num_required_signatures
+    vtx = VersionedTransaction.populate(msg, [Signature.default()] * n)
+    сырое = bytes(vtx)
+    return {"tx_base64": base64.b64encode(сырое).decode(), "bajt": len(сырое),
+            "podpisej": n, "instrukciy": len(спис)}
 
 
 # ------------------------------------------------- наша копия образца
@@ -295,13 +395,28 @@ def svodka_sborki(собрано: dict) -> dict:
 
 # ------------------------------------------------- сбор образцов с цепи
 
+# ПРЕДЕЛ ЧТЕНИЙ ДЕЛИТСЯ МЕЖДУ ПРОГРАММАМИ, А НЕ ТРАТИТСЯ ЦЕЛИКОМ НА ПЕРВУЮ.
+# ЧТО СЛОМАЛОСЬ 09.10 (прогон 37919883220). Предел стоял общий, и внешний
+# цикл шёл сначала по кривой: кривая съела ВСЕ 900 чтений, а на pAMMBay…
+# не осталось ни одного -- и три варианта AMM получили РОВНО НОЛЬ образцов.
+# В отчёте это выглядело как "на цепи их нет", хотя их просто не читали: за
+# 900 транзакций кривой счётчик `прочитано` упёрся в предел ДО того, как
+# цикл дошёл до второй программы, и первая же её подпись сразу ломала
+# внутренний цикл. Поэтому у каждой программы СВОЯ доля предела, и доля
+# считается от того, сколько программ ЕЩЁ не добрали своё, -- тогда
+# недобравшая программа получает и остаток чужой доли.
+def _svoi_varianty(imja_programmy: str) -> list:
+    return [f"{п}.{в}" for п, в in ВАРИАНТЫ if п == imja_programmy]
+
+
 def sobrat_obrazcy(zov, *, stranic: int, na_stranicu: int, predel_tx: int,
                    pauza: float, cel: int, pechat=None) -> dict:
     """ЖИВЫЕ ТРАНЗАКЦИИ С ЦЕПИ, РАЗЛОЖЕННЫЕ ПО ВАРИАНТАМ.
 
-    Подписи берутся у ОБЕИХ программ, транзакции читаются по одной, пока
-    каждый вариант не наберёт `cel` -- или пока не упёрлись в `predel_tx`.
-    Недобор НЕ скрывается: он уходит в отчёт числом.
+    Подписи берутся у ОБЕИХ программ -- У КАЖДОЙ СВОЯ ДОЛЯ предела чтений,
+    иначе первая программа съедает его целиком (см. выше). Транзакции
+    читаются по одной, пока каждый вариант не наберёт `cel` или пока доля
+    программы не кончится. Недобор НЕ скрывается: он уходит в отчёт числом.
     """
     нужно = {f"{п}.{в}": [] for п, в in ВАРИАНТЫ}
     пропущено: dict = {}
@@ -309,8 +424,26 @@ def sobrat_obrazcy(zov, *, stranic: int, na_stranicu: int, predel_tx: int,
     видели = set()
     прочитано = 0
     подписей = 0
-    for имя_п in ("pump", "pump_amm"):
+    по_программam: dict = {}
+    # ПЕРЕПИСЬ РАСКЛАДОК КОПИТСЯ ПО ХОДУ: п.3 владельца -- сверить по
+    # КАЖДОМУ торговому варианту длину данных и число счетов с живыми
+    # транзакциями. Копим ПАРЫ (счетов/байт), а не сами транзакции: 900
+    # разобранных транзакций в памяти держать незачем, а пара -- две цифры.
+    перепись = {f"{п}.{в}": СБ.pustaja_stroka_perepisi(п, в)
+                for п, в in ВАРИАНТЫ}
+    порядок = ["pump", "pump_amm"]
+    for номер, имя_п in enumerate(порядок):
         адрес = СБ.programma_po_imeni(имя_п)
+        свои = _svoi_varianty(имя_п)
+        if all(len(нужно[к]) >= cel for к in свои):
+            по_программam[имя_п] = {"prochitano": 0, "dolja": 0,
+                                    "why_not": "свои варианты уже набраны"}
+            continue
+        # ДОЛЯ -- ОСТАТОК, ПОДЕЛЁННЫЙ НА ЧИСЛО ЕЩЁ НЕ ОБСЛУЖЕННЫХ ПРОГРАММ.
+        осталось_программ = len(порядок) - номер
+        доля = max(1, (predel_tx - прочитано) // осталось_программ)
+        предел_свой = прочитано + доля
+        своих_прочитано = 0
         до = None
         for _ in range(stranic):
             парам = {"limit": int(na_stranicu)}
@@ -328,20 +461,32 @@ def sobrat_obrazcy(zov, *, stranic: int, na_stranicu: int, predel_tx: int,
                 подпись = с.get("signature")
                 if not подпись or подпись in видели:
                     continue
-                if прочитано >= predel_tx:
+                if прочитано >= предел_свой or прочитано >= predel_tx:
                     break
-                if all(len(в) >= cel for в in нужно.values()):
+                if all(len(нужно[к]) >= cel for к in свои):
                     break
                 видели.add(подпись)
                 tx = _prochitat_tx(zov, подпись, pauza)
                 прочитано += 1
+                своих_прочитано += 1
                 if not tx:
                     continue
                 разбор = СБ.razbor_istochnika(tx)
                 if not разбор.get("ok"):
                     continue
                 ключ = f"{разбор['programma']}.{разбор['variant']}"
-                if ключ not in нужно or len(нужно[ключ]) >= cel:
+                if ключ not in нужно:
+                    continue
+                # В ПЕРЕПИСЬ ИДЁТ КАЖДАЯ ВСТРЕЧЕННАЯ ИНСТРУКЦИЯ, даже когда
+                # цель уже набрана и образец в близнецы не берётся: иначе
+                # перепись врала бы о том, какие длины на цепи ЕСТЬ.
+                пс = перепись[ключ]
+                арг_ = разбор.get("argumenty") or {}
+                длина = int(арг_.get("_bajt") or 0) + int(арг_.get("_hvost") or 0)
+                пара = f"{разбор['schetov']}/{длина}"
+                пс["obrazcov"] += 1
+                пс["pary"][пара] = пс["pary"].get(пара, 0) + 1
+                if len(нужно[ключ]) >= cel:
                     continue
                 # ОБРАЗЕЦ СТАРШЕ НЫНЕШНЕГО IDL -- НЕ КРАСНЫЙ И НЕ ПРОПУСК.
                 # На цепи есть сделки, собранные ПРЕЖНЕЙ раскладкой: у
@@ -365,16 +510,69 @@ def sobrat_obrazcy(zov, *, stranic: int, na_stranicu: int, predel_tx: int,
                 нужно[ключ].append(разбор)
                 if pechat:
                     pechat(f"  образец {ключ}: {len(нужно[ключ])} из {cel}")
-            if прочитано >= predel_tx or all(len(в) >= cel
-                                             for в in нужно.values()):
+            if (прочитано >= предел_свой or прочитано >= predel_tx
+                    or all(len(нужно[к]) >= cel for к in свои)):
                 break
+        по_программam[имя_п] = {
+            "prochitano": своих_прочитано, "dolja": доля,
+            "nabrali": {к: len(нужно[к]) for к in свои},
+            "why_not": (None if all(len(нужно[к]) >= cel for к in свои)
+                        else f"доля чтений {доля} израсходована, цель {cel} "
+                             "не набрана")}
     return {"obrazcy": нужно, "prochitano_tx": прочитано,
             "podpisej_prosmotreno": подписей, "predel_tx": predel_tx,
             "cel": cel, "propushcheno": пропущено,
-            "propushcheno_po_variantu": пропущено_по_variantu}
+            "propushcheno_po_variantu": пропущено_по_variantu,
+            "po_programmam": по_программam,
+            "perepis": СБ.prigovory_perepisi(перепись)}
 
 
 WHY_СТАРАЯ_РАСКЛАДКА = "раскладка образца старше нынешнего IDL -- не сравним"
+# ОБРАЗЕЦ, У КОТОРОГО ТОРГОВЕЦ ДЕРЖИТ НЕ-ATA. Единственное расхождение -- его
+# СВОЙ счёт токена: он торгует не с канонического ATA, а с произвольного счёта.
+# Наша сборка выводит канонический ATA (и это верно для НАС: денежный путь его
+# же и создаёт идемпотентно перед свопом, c2_swap_build.py:803), но на чужом
+# кошельке такого счёта нет -- симуляция нашего близнеца упирается в 3012, а
+# чужого в состояние пула. Такой образец говорит о ВЫБОРЕ СЧЁТА ТОРГОВЦА, а не о
+# нашей арифметике, поэтому он не сравним. Правило УЗКОЕ: расхождение ровно
+# одно и ровно в пользовательском счёте токена; любое другое остаётся красным.
+WHY_ЧУЖОЙ_НЕ_ATA = ("торговец образца держит токен НЕ на каноническом ATA -- "
+                    "сравнивать нечего: это его выбор счёта, а не наша сборка")
+СЧЕТА_ПОЛЬЗОВАТЕЛЯ = frozenset(СБ.КАК_ATA)
+
+
+WHY_ОБРАЗЕЦ_УСТАРЕЛ = ("счетов образца на цепи больше нет: ОБА близнеца не "
+                       "дошли до программы с одной и той же ошибкой, а "
+                       "раскладка сошлась -- сравнивать нечего")
+
+
+def ne_sravnim_ustarevshiy(nash: dict, chuzhoj: dict, razoshlis_imena) -> bool:
+    """Образец устарел: ОБА близнеца не дошли до программы одинаково.
+
+    Чужой близнец собран из счетов САМОЙ транзакции -- это истина на момент
+    сделки. Если и он не доходит до программы (кривая уже закрыта, счёт закрыт
+    и возвращена рента), то образец говорит только о том, что цепь ушла вперёд.
+    Правило УЗКОЕ: нужны (1) оба исхода "до программы", (2) ОДНО И ТО ЖЕ имя
+    ошибки, (3) НИ ОДНОГО расхождения в раскладке. Любая асимметрия -- красный:
+    если наш близнец не дошёл, а чужой дошёл, это наша ошибка, и она красная.
+    """
+    if not (nash and chuzhoj) or razoshlis_imena:
+        return False
+    return (nash.get("ishod") == ИСХОД_ДО_ПРОГРАММЫ
+            and chuzhoj.get("ishod") == ИСХОД_ДО_ПРОГРАММЫ
+            and nash.get("imja") == chuzhoj.get("imja")
+            and bool(nash.get("imja")))
+
+
+def ne_sravnim_chuzhoj_schyot(razoshlis_imena, kod) -> bool:
+    """Образец не сравним: расхождение ТОЛЬКО в счёте токена торговца и 3012.
+
+    Правило нарочно узкое. Любое другое расхождение -- хоть одно имя вне
+    СЧЕТА_ПОЛЬЗОВАТЕЛЯ, хоть другой код -- остаётся КРАСНЫМ: иначе это была бы
+    щель, в которую уехала бы настоящая ошибка раскладки.
+    """
+    имена = set(razoshlis_imena or ())
+    return bool(имена) and имена <= СЧЕТА_ПОЛЬЗОВАТЕЛЯ and kod == 3012
 WHY_ДРУГАЯ_ДЛИНА = "длина данных образца не та, что у нынешнего IDL -- не сравним"
 
 
@@ -423,12 +621,25 @@ def simulirovat(zov, tx64: str) -> dict:
 
 
 def proverit_variant(zov, *, imja_programmy: str, variant: str,
-                     obrazcy: list, cel: int, pauza: float) -> dict:
+                     obrazcy: list, cel: int, pauza: float,
+                     cel_t2022: int = 0) -> dict:
     """ОДИН ВАРИАНТ: близнецы на каждом образце, итог числами."""
+    # TOKEN-2022 СЧИТАЕТСЯ ОТДЕЛЬНО (слово владельца 09.10, п.2: "из них >= 10
+    # на минтах Token-2022"). Программа токена входит семенем в оба
+    # associated_base_*, поэтому вариант, проверенный только на классическом
+    # Token, про Token-2022 не говорит НИЧЕГО -- а именно на нём 09.10 и вышли
+    # три красных 3012.
+    t2022 = sum(1 for р in obrazcy
+                if (р.get("scheta") or {}).get("base_token_program")
+                == СБ.ПРОГ_ТОКЕНА_2022)
     из_ = {"variant": f"{imja_programmy}.{variant}", "obrazcov": len(obrazcy),
-           "cel": cel, "proverok": 0, "proshlo": 0, "krasnyh": 0,
-           "raskladka_soshlas": 0, "bajt_v_bajt": 0, "stroki": [],
-           "nedobor": len(obrazcy) < cel, "why_not": None}
+           "cel": cel, "obrazcov_token2022": t2022, "cel_token2022": cel_t2022,
+           "proverok": 0, "proshlo": 0, "krasnyh": 0,
+           "raskladka_soshlas": 0, "bajt_v_bajt": 0, "propushcheno": 0,
+           "stroki": [],
+           "nedobor": len(obrazcy) < cel,
+           "nedobor_token2022": (cel_t2022 > 0 and t2022 < cel_t2022),
+           "why_not": None}
     if not obrazcy:
         из_["why_not"] = WHY_НЕТ_ОБРАЗЦОВ
         return из_
@@ -489,9 +700,28 @@ def proverit_variant(zov, *, imja_programmy: str, variant: str,
             из_["proverok"] += 1
             из_["krasnyh"] += 1
             continue
-        и_наш = klass_ishoda(наш.get("err"), programma=imja_programmy)
-        и_чужой = klass_ishoda(чужой.get("err"), programma=imja_programmy)
+        и_наш = klass_ishoda(наш.get("err"), programma=imja_programmy,
+                             logi=наш.get("logi"))
+        и_чужой = klass_ishoda(чужой.get("err"), programma=imja_programmy,
+                               logi=чужой.get("logi"))
         сошлись = bliznecy_soshlis(и_наш, и_чужой)
+        # НЕ СРАВНИМ, А НЕ КРАСНЫЙ: см. WHY_ЧУЖОЙ_НЕ_ATA.
+        разошлись_имена = {р["imja"] for р in (копия.get("razoshlis") or [])}
+        if not сошлись and ne_sravnim_chuzhoj_schyot(разошлись_имена,
+                                                     и_наш.get("kod")):
+            строка.update(ok=None, nash=и_наш, chuzhoj=и_чужой,
+                          why_not=WHY_ЧУЖОЙ_НЕ_ATA,
+                          razoshlis=копия.get("razoshlis"))
+            из_["propushcheno"] = из_.get("propushcheno", 0) + 1
+            из_["stroki"].append(строка)
+            continue
+        if not сошлись and ne_sravnim_ustarevshiy(и_наш, и_чужой,
+                                                  разошлись_имена):
+            строка.update(ok=None, nash=и_наш, chuzhoj=и_чужой,
+                          why_not=WHY_ОБРАЗЕЦ_УСТАРЕЛ)
+            из_["propushcheno"] = из_.get("propushcheno", 0) + 1
+            из_["stroki"].append(строка)
+            continue
         строка.update(ok=bool(сошлись), nash=и_наш, chuzhoj=и_чужой,
                       units=наш.get("units"),
                       logi=(None if сошлись else наш.get("logi")),
@@ -503,6 +733,10 @@ def proverit_variant(zov, *, imja_programmy: str, variant: str,
         из_["stroki"].append(строка)
     if из_["nedobor"]:
         из_["why_not"] = f"{WHY_МАЛО}: {len(obrazcy)} из {cel}"
+    elif из_["nedobor_token2022"]:
+        из_["why_not"] = (f"{WHY_МАЛО}: образцов Token-2022 {t2022} из "
+                          f"{cel_t2022} -- вариант проверен почти только на "
+                          "классическом Token")
     return из_
 
 
@@ -547,10 +781,38 @@ def svoja_pokupka_dlja_otkazannyh(zov, *, obrazcy: dict,
     из_["buyback_iz_obrazca"] = получатель
     for минт in СБ.ОТКАЗ_08_10["minty"]:
         строка = {"mint": минт, "ok": False, "why_not": None}
+        # ПРОГРАММА ТОКЕНА -- С ЦЕПИ, ВЛАДЕЛЬЦЕМ СЧЁТА МИНТА (правка 09.10).
+        # Было: обёртка звалась без неё и подставляла классический Token
+        # значением по умолчанию -- на трёх минтах Token-2022 это дало чужие
+        # associated_base_* и AnchorError 3012 AccountNotInitialized. Теперь
+        # значения по умолчанию нет вовсе, и программа читается.
+        def _владелец(м, _zov=zov):
+            # ЗОВ ОТДАЁТ ВЕСЬ КОНВЕРТ JSON-RPC (ТР.rpc_iz_url), поэтому
+            # владелец лежит в result.value.owner. 09.10 я сперва читал
+            # о["value"] -- выходило None, и три минта краснели не по делу:
+            # "программа токена не задана" там, где она прекрасно читается.
+            о = _zov("getAccountInfo", [м, {"encoding": "base64"}])
+            рез = (о or {}).get("result") if isinstance(о, dict) else None
+            зн = ((рез or {}).get("value") or {}) if isinstance(рез, dict) else {}
+            return зн.get("owner")
+
+        try:
+            тп = СБ.programma_tokena_minta(минт, chitatel=_владелец)
+        except СБ.ОшибкаСборки as сбой:
+            строка["why_not"] = str(сбой)
+            из_["minty"].append(строка)
+            из_["proverok"] += 1
+            из_["krasnyh"] += 1
+            continue
+        строка["base_token_program"] = тп
+        строка["token2022"] = (тп == СБ.ПРОГ_ТОКЕНА_2022)
+        if pauza:
+            time.sleep(pauza)
         try:
             собрано = СБ.pokupka_krivoj_v3(
                 base_mint=минт, user=koshelek,
                 buyback_fee_recipient=получатель,
+                base_token_program=тп,
                 spendable_quote_in=10_000_000, min_tokens_out=1)
         except СБ.ОшибкаСборки as сбой:
             строка["why_not"] = str(сбой)
@@ -558,9 +820,14 @@ def svoja_pokupka_dlja_otkazannyh(zov, *, obrazcy: dict,
             из_["proverok"] += 1
             из_["krasnyh"] += 1
             continue
-        tx = tx_base64(programma=СБ.ПРОГ_КРИВОЙ, scheta=собрано["accounts"],
-                       dannye=bytes.fromhex(собрано["data_hex"]),
-                       platelshchik=koshelek)
+        # ДВЕ ИНСТРУКЦИИ, КАК В БОЮ: создание ATA базового минта и сам своп.
+        tx = tx_base64_mnogo(instrukcii=[
+            ata_idempotent_scheta(payer=koshelek, owner=koshelek, mint=минт,
+                                  token_program=тп),
+            {"programma": СБ.ПРОГ_КРИВОЙ, "scheta": собрано["accounts"],
+             "dannye": bytes.fromhex(собрано["data_hex"])}],
+            platelshchik=koshelek)
+        строка["instrukciy"] = tx["instrukciy"]
         if pauza:
             time.sleep(pauza)
         отв = simulirovat(zov, tx["tx_base64"])
@@ -607,8 +874,14 @@ def suhoj_progon() -> dict:
     return из_
 
 
+# ПОРОГ TOKEN-2022 ТОЛЬКО ТАМ, ГДЕ ОН ОСМЫСЛЕН: у двух разновидностей v3,
+# которыми полоса и торгует (слово владельца 09.10, п.2). У прочих вариантов
+# порога нет -- не потому что не важно, а потому что их владелец ждать не велел.
+S_POROGOM_T2022 = ("pump.buy_exact_quote_in_v3", "pump.sell_v3")
+
+
 def zhivoj_progon(*, stranic: int, na_stranicu: int, predel_tx: int,
-                  pauza: float, cel: int, koshelek: str,
+                  pauza: float, cel: int, koshelek: str, cel_t2022: int = 0,
                   zov=None, pechat=print) -> dict:
     """ЖИВОЙ: подписи, транзакции, близнецы, отказанные минты."""
     url = uzel_iz_okruzheniya()
@@ -631,27 +904,45 @@ def zhivoj_progon(*, stranic: int, na_stranicu: int, predel_tx: int,
     for имя_п, вариант in ВАРИАНТЫ:
         ключ = f"{имя_п}.{вариант}"
         pechat(f"  {ключ}: образцов {len(сбор['obrazcy'][ключ])}")
-        итоги.append(proverit_variant(_зов, imja_programmy=имя_п,
-                                      variant=вариант,
-                                      obrazcy=сбор["obrazcy"][ключ],
-                                      cel=cel, pauza=pauza))
+        итоги.append(proverit_variant(
+            _зов, imja_programmy=имя_п, variant=вариант,
+            obrazcy=сбор["obrazcy"][ключ], cel=cel, pauza=pauza,
+            cel_t2022=(cel_t2022 if ключ in S_POROGOM_T2022 else 0)))
     отказ = svoja_pokupka_dlja_otkazannyh(_зов, obrazcy=сбор["obrazcy"],
                                           koshelek=koshelek, pauza=pauza)
     проверок = sum(и["proverok"] for и in итоги) + отказ["proverok"]
     прошло = sum(и["proshlo"] for и in итоги) + отказ["proshlo"]
     недобор = [и["variant"] for и in итоги if и["nedobor"]]
+    недобор_t2022 = [и["variant"] for и in итоги if и["nedobor_token2022"]]
     из_ = {"rezhim": "zhivoj", "uzel": zateret(url),
            "setevyh_vyzovov": вызовов["n"],
            "prochitano_tx": сбор["prochitano_tx"],
+           "po_programmam": сбор["po_programmam"],
+           "perepis": сбор["perepis"],
            "propushcheno": сбор["propushcheno"],
            "propushcheno_po_variantu": сбор["propushcheno_po_variantu"],
-           "cel_na_variant": cel, "varianty": итоги, "otkazannye": отказ,
+           "cel_na_variant": cel, "cel_token2022": cel_t2022,
+           "nedobor_token2022": недобор_t2022,
+           "varianty": итоги, "otkazannye": отказ,
            "proverok": проверок, "proshlo": прошло,
            "krasnyh": проверок - прошло, "nedobor": недобор,
            "why_not": None}
-    if недобор:
-        из_["why_not"] = (f"{WHY_МАЛО}: {len(недобор)} вариантов не набрали "
-                          f"{cel} -- {', '.join(недобор)}")
+    # ЧТО СЧИТАЕТСЯ ЗЕЛЁНЫМ (слово владельца 09.10, п.2). Ждём добора только у
+    # двух разновидностей v3, которыми полоса торгует, и Token-2022 у них же.
+    # AMM-варианты и старые v2 не ждём: НЕИЗВЕСТНЫЙ ВАРИАНТ -- ОТКАЗ СБОРКИ, то
+    # есть полоса по нему просто не покупает. Недобор по ним печатается числом,
+    # но зелёное им не мешает -- иначе гейт стоял бы вечно на том, чего владелец
+    # ждать не велел. Красные при этом перекрывают всё: они везде красные.
+    ждём = [и for и in итоги if и["variant"] in S_POROGOM_T2022]
+    недобор_ждём = [и["variant"] for и in ждём if и["nedobor"]]
+    недобор_t2022_ждём = [и["variant"] for и in ждём if и["nedobor_token2022"]]
+    из_["nedobor_ne_zhdjom"] = [и for и in недобор if и not in недобор_ждём]
+    if недобор_ждём:
+        из_["why_not"] = (f"{WHY_МАЛО}: не набрали {cel} -- "
+                          f"{', '.join(недобор_ждём)}")
+    elif недобор_t2022_ждём:
+        из_["why_not"] = (f"{WHY_МАЛО}: образцов Token-2022 меньше "
+                          f"{cel_t2022} -- {', '.join(недобор_t2022_ждём)}")
     elif проверок != прошло:
         из_["why_not"] = f"{проверок - прошло} проверок из {проверок} красные"
     return из_
@@ -659,10 +950,11 @@ def zhivoj_progon(*, stranic: int, na_stranicu: int, predel_tx: int,
 
 def tablica(итог: dict) -> str:
     """Таблица «вариант -> проверок / прошло симуляцию»."""
-    строки = [f"{'вариант':<40} {'образцов':>8} {'проверок':>8} {'прошло':>7} "
-              f"{'раскладка':>9} {'байты':>6}"]
+    строки = [f"{'вариант':<40} {'образцов':>8} {'t2022':>6} {'проверок':>8} "
+              f"{'прошло':>7} {'раскладка':>9} {'байты':>6}"]
     for и in итог.get("varianty") or []:
-        строки.append(f"{и['variant']:<40} {и['obrazcov']:>8} {и['proverok']:>8} "
+        строки.append(f"{и['variant']:<40} {и['obrazcov']:>8} "
+                      f"{и.get('obrazcov_token2022', 0):>6} {и['proverok']:>8} "
                       f"{и['proshlo']:>7} {и['raskladka_soshlas']:>9} "
                       f"{и['bajt_v_bajt']:>6}")
     о = итог.get("otkazannye") or {}
@@ -672,7 +964,34 @@ def tablica(итог: dict) -> str:
                       f"{о.get('proshlo', 0):>7} {'-':>9} {'-':>6}")
     строки.append(f"{'ИТОГО':<40} {'':>8} {итог.get('proverok', 0):>8} "
                   f"{итог.get('proshlo', 0):>7}")
+    пер = итог.get("perepis") or {}
+    if пер:
+        строки.append("")
+        строки.append("ПЕРЕПИСЬ РАСКЛАДОК: что на цепи против того, что в IDL")
+        строки.append(f"{'вариант':<40} {'IDL сч/байт':>12} {'обр':>5} "
+                      f"{'приговор':<20} пары счетов/байт с цепи")
+        for к in sorted(пер):
+            р = пер[к]
+            идл = f"{р['schetov_idl']}/{р['bajt_idl']}"
+            пары = ", ".join(f"{п}×{н}" for п, н in sorted(
+                р["pary"].items(), key=lambda кв: -кв[1])) or "-"
+            строки.append(f"{к:<40} {идл:>12} {р['obrazcov']:>5} "
+                          f"{р['prigovor']:<20} {пары}")
+    по_пр = итог.get("po_programmam") or {}
+    if по_пр:
+        строки.append("")
+        строки.append("ДОЛЯ ЧТЕНИЙ ПО ПРОГРАММАМ (чтобы кривая не съела всё)")
+        for имя, р in по_пр.items():
+            строки.append(f"  {имя:<10} доля {р.get('dolja')}, прочитано "
+                          f"{r_(р)}, {р.get('why_not') or 'цель набрана'}")
     return "\n".join(строки)
+
+
+    return "\n".join(строки)
+
+
+def r_(р: dict) -> str:
+    return str(р.get("prochitano"))
 
 
 # ------------------------------------------------- самопроверка
@@ -680,7 +999,10 @@ def tablica(итог: dict) -> str:
 # ЧИСЛО ОБЪЯВЛЕНО. Проверок стало меньше -- значит проверку убрали и этого
 # никто не заметил; больше -- значит добавили и не сказали. И то и другое
 # здесь ПРОВАЛ, а не «всё зелено».
-ZHDEM_PROVEROK = 25
+# 25 у Code-3 + 4 на счёт торговца + 4 на устаревший образец (правка 09.10,
+# Code-1) + 6 на долю чтений по программам, перепись и имя ошибки из логов
+# цепи (правка 09.10, Code-3).
+ZHDEM_PROVEROK = 39
 
 # ПОДДЕЛЬНЫЕ ОТВЕТЫ УЗЛА: формы ровно те, что отдаёт Solana RPC. Проверяются
 # ими и разбор, и счёт вызовов -- без сети.
@@ -806,15 +1128,27 @@ def self_test() -> int:  # noqa: C901, PLR0915
         "бы комиссию чужому)",
         пусто["why_not"] == WHY_НЕТ_BUYBACK and пусто["proverok"] == 0, пусто)
 
+    chk("НЕ СРАВНИМ только при расхождении в счёте токена торговца и 3012",
+        ne_sravnim_chuzhoj_schyot({"associated_base_user"}, 3012) is True)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: расхождение в ЛЮБОМ другом счёте остаётся красным, "
+        "даже с тем же кодом -- щели для ошибки раскладки нет",
+        ne_sravnim_chuzhoj_schyot({"associated_base_user", "bonding_curve"},
+                                  3012) is False
+        and ne_sravnim_chuzhoj_schyot({"creator_vault"}, 3012) is False)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: тот же счёт, но другой код -- красный",
+        ne_sravnim_chuzhoj_schyot({"associated_base_user"}, 6005) is False)
+    chk("без расхождений правило не срабатывает вовсе",
+        ne_sravnim_chuzhoj_schyot(set(), 3012) is False)
     chk(f"минтов отказа 08.10 ровно три, и они названы: "
         f"{', '.join(м[:8] + '…' for м in СБ.ОТКАЗ_08_10['minty'])}",
         len(СБ.ОТКАЗ_08_10["minty"]) == 3)
 
     # СБОРКА СООБЩЕНИЯ v0 -- НА НАСТОЯЩИХ АДРЕСАХ, ЧЕРЕЗ solders.
+    # Token-2022: минты отказа 08.10 именно такие (журнал детектора).
     собрано = СБ.pokupka_krivoj_v3(
         base_mint=СБ.ОТКАЗ_08_10["minty"][0], user=КОШЕЛЁК_ПОЛОСЫ,
         buyback_fee_recipient=КОШЕЛЁК_ПОЛОСЫ, spendable_quote_in=10_000_000,
-        min_tokens_out=1)
+        min_tokens_out=1, base_token_program=СБ.ПРОГ_ТОКЕНА_2022)
     постр = tx_base64(programma=СБ.ПРОГ_КРИВОЙ, scheta=собрано["accounts"],
                       dannye=bytes.fromhex(собрано["data_hex"]),
                       platelshchik=КОШЕЛЁК_ПОЛОСЫ)
@@ -899,6 +1233,97 @@ def self_test() -> int:  # noqa: C901, PLR0915
         len(корочеns) == 2, [(р["programma"], р["variant"],
                               р["argumenty"]["_hvost"]) for р in корочеns])
 
+    _дп = {"ishod": ИСХОД_ДО_ПРОГРАММЫ, "imja": "AccountNotFound"}
+    chk("УСТАРЕВШИЙ ОБРАЗЕЦ: оба близнеца не дошли до программы одинаково и "
+        "раскладка сошлась -- не сравним",
+        ne_sravnim_ustarevshiy(_дп, dict(_дп), set()) is True)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: наш не дошёл, а ЧУЖОЙ дошёл -- это наша ошибка",
+        ne_sravnim_ustarevshiy(_дп, {"ishod": ИСХОД_ПРОШЛО}, set()) is False)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: оба не дошли, но имена ошибок РАЗНЫЕ -- красный",
+        ne_sravnim_ustarevshiy(_дп, {"ishod": ИСХОД_ДО_ПРОГРАММЫ,
+                                     "imja": "InsufficientFundsForRent"},
+                               set()) is False)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: есть расхождение в раскладке -- не устаревший, "
+        "а красный",
+        ne_sravnim_ustarevshiy(_дп, dict(_дп), {"bonding_curve"}) is False)
+
+    # ---------------- ДОЛЯ ЧТЕНИЙ: ТО, ЧТО СЛОМАЛО ПРОГОН 37919883220
+    счёт_пр = {"pump": 0, "pump_amm": 0}
+
+    def _mnogo_podpisej(метод, параметры):
+        if метод == "getSignaturesForAddress":
+            адрес = параметры[0]
+            if (параметры[1] or {}).get("before"):
+                return {"result": []}
+            имя = "pump" if адрес == СБ.ПРОГ_КРИВОЙ else "pump_amm"
+            return {"result": [{"signature": f"{имя}-{и:04d}", "err": None}
+                               for и in range(500)]}
+        if метод == "getTransaction":
+            имя = str(параметры[0]).split("-", 1)[0]
+            счёт_пр[имя] = счёт_пр.get(имя, 0) + 1
+            return {"result": None}
+        return {"result": {"value": {"err": None}}}
+
+    сбор_д = sobrat_obrazcy(_mnogo_podpisej, stranic=1, na_stranicu=500,
+                            predel_tx=100, pauza=0, cel=ЦЕЛЬ_НА_ВАРИАНТ)
+    chk("ДОЛЯ ЧТЕНИЙ ДЕЛИТСЯ: при пределе 100 кривая прочитала "
+        f"{счёт_пр['pump']}, а pAMMBay -- {счёт_пр['pump_amm']}. ЭТО И БЫЛА "
+        "ПРИЧИНА «0 образцов AMM» в прогоне 37919883220: предел стоял ОБЩИЙ, "
+        "кривая съедала все 900 чтений, и до второй программы чтение не "
+        "доходило ни разу",
+        счёт_пр["pump"] == 50 and счёт_пр["pump_amm"] == 50
+        and сбор_д["prochitano_tx"] == 100,
+        (счёт_пр, сбор_д["prochitano_tx"]))
+    chk("доля и прочитанное названы ПО КАЖДОЙ ПРОГРАММЕ, а не одним числом",
+        set(сбор_д["po_programmam"]) == {"pump", "pump_amm"}
+        and all("dolja" in в and "prochitano" in в
+                for в in сбор_д["po_programmam"].values()),
+        сбор_д["po_programmam"])
+    chk("ПЕРЕПИСЬ идёт и в живом прогоне -- строка на каждый из девяти "
+        "вариантов, с числами IDL, даже когда образцов ноль",
+        set(сбор_д["perepis"]) == {f"{п}.{в}" for п, в in ВАРИАНТЫ}
+        and all("schetov_idl" in в and "prigovor" in в
+                for в in сбор_д["perepis"].values()),
+        sorted(сбор_д["perepis"]))
+
+    # ---------------- ИМЯ ОШИБКИ -- ИЗ ЛОГОВ ЦЕПИ
+    ЛОГИ_3012 = [
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+        "Program log: Instruction: BuyExactQuoteInV3",
+        "Program log: AnchorError caused by account: "
+        "associated_base_bonding_curve. Error Code: AccountNotInitialized. "
+        "Error Number: 3012. Error Message: The program expected this "
+        "account to be already initialized.",
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: "
+        "custom program error: 0xbc4"]
+    и3012 = klass_ishoda({"InstructionError": [0, {"Custom": 3012}]},
+                         programma="pump", logi=ЛОГИ_3012)
+    chk("ИМЯ ОШИБКИ И СЧЁТ БЕРУТСЯ ИЗ ЛОГОВ ЦЕПИ, где программа назвала их "
+        "сама: 3012 = AccountNotInitialized на associated_base_bonding_curve. "
+        "Раньше в отчёт уходило «код 3012 не описан», и причину трёх красных "
+        "09.10 приходилось искать глазами",
+        и3012["imja"] == "AccountNotInitialized"
+        and и3012["schjot"] == "associated_base_bonding_curve"
+        and и3012["ishod"] == ИСХОД_РАСКЛАДКА, и3012)
+    chk("без логов тот же код остаётся ЧИСЛОМ -- имени я ему не выдумываю",
+        klass_ishoda({"InstructionError": [0, {"Custom": 3012}]},
+                     programma="pump")["imja"] is None)
+    ЛОГИ_ЧУЖОЙ = [
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+        "Program log: Instruction: BuyExactQuoteInV3",
+        "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+        "Program log: Error: insufficient funds",
+        "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA failed: "
+        "custom program error: 0x1"]
+    ичуж = klass_ishoda({"InstructionError": [0, {"Custom": 1}]},
+                        programma="pump", logi=ЛОГИ_ЧУЖОЙ)
+    chk("УПАЛА НЕ НАША ПРОГРАММА, А ТА, КОТОРУЮ ОНА ПОЗВАЛА (Custom 1 у "
+        "программы токена -- не хватило средств): наши счета она уже приняла, "
+        "и это НЕ отказ по раскладке. Именно так выглядели 20 близнецов v3 "
+        "в прогоне 09.10",
+        ичуж["ishod"] == ИСХОД_ЭКОНОМИКА and "Tokenkeg" in ичуж["pochemu"],
+        ичуж)
+
     print(f"\nпроверок {было}, ждали {ZHDEM_PROVEROK}, не прошло {плохо}")
     if упавшие:
         for и in упавшие:
@@ -955,8 +1380,13 @@ def _parser() -> argparse.ArgumentParser:
                    help="предел чтений getTransaction за прогон")
     п.add_argument("--pauza", type=float, default=0.05,
                    help="пауза между вызовами узла, секунды")
+    п.add_argument("--cel-t2022", type=int, default=0,
+                   help="сколько образцов Token-2022 ждать у двух "
+                        "разновидностей v3 (0 -- не ждать)")
     п.add_argument("--koshelek", default=КОШЕЛЁК_ПОЛОСЫ,
                    help="кошелёк для своей покупки по минтам отказа")
+    п.add_argument("--perepis", action="store_true",
+                   help="перепись раскладок по образцам репозитория, без сети")
     п.add_argument("--json", action="store_true", help="только JSON")
     return п
 
@@ -965,10 +1395,25 @@ def main() -> int:
     дов = _parser().parse_args()
     if дов.self_test:
         return 1 if self_test() else 0
+    if дов.perepis:
+        пер = СБ.perepis_raskladok()
+        if not дов.json:
+            print("ПЕРЕПИСЬ РАСКЛАДОК по живым образцам РЕПОЗИТОРИЯ "
+                  "(сети не касаюсь):")
+            print(f"{'вариант':<40}{'торг':>5}{'IDL сч/байт':>13}{'обр':>5}  "
+                  f"{'приговор':<21}пары счетов/байт")
+            for к in sorted(пер, key=lambda к: (not пер[к]["torgovyj"], к)):
+                р = пер[к]
+                print(f"{к:<40}{'да' if р['torgovyj'] else '-':>5}"
+                      f"{str(р['schetov_idl']) + '/' + str(р['bajt_idl']):>13}"
+                      f"{р['obrazcov']:>5}  {р['prigovor']:<21}{р['pary']}")
+        print(json.dumps(пер, ensure_ascii=False, indent=1, default=str))
+        return 0
     if дов.live:
         итог = zhivoj_progon(stranic=дов.stranic, na_stranicu=дов.na_stranicu,
                              predel_tx=дов.predel_tx, pauza=дов.pauza,
                              cel=дов.cel, koshelek=дов.koshelek,
+                             cel_t2022=дов.cel_t2022,
                              pechat=(lambda *_: None) if дов.json else print)
         if not дов.json:
             print()
