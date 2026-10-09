@@ -5,18 +5,26 @@
    "--rezhim",
    "sverka",
    "--skolko",
-   "40",
+   "60",
    "--slotov",
-   "5"
+   "10",
+   "--dlinno",
+   "1121",
+   "--obrazcov",
+   "40",
+   "--metka",
+   "2026-10-09b"
   ],
   [
    "--rezhim",
    "tempy",
    "--blokov",
-   "120"
+   "150",
+   "--metka",
+   "2026-10-09b"
   ]
  ],
- "helius_rps_na_paket": 3,
- "parallelno": 2,
- "zachem": "Punkty 1b i 1v: sverka arhiva s cepyu na 40 sluchajnyh pereezdah (po ravnoj dole iz kazhdyh sutok) i temp pereezdov po cepi. Podpisi pula berutsya pryamym pereborom getSignaturesForAddress do samoj staroj -- nezavisimo ot arhiva, inache proverka byla by krugovoj. Helius 3 rps na paket, dva paketa = 6 rps summarno -- potolok vladelca. Rezhim tempy chitaet programmy pulov iz rezultata sverki, poetomu stavitsya vtorym."
+ "helius_rps_na_paket": 6,
+ "parallelno": 1,
+ "zachem": "Pereproverka 1b-1v. Pervyy progon dal dva rezultata i odnu moyu oshibku. Rezultaty: ceny arhiva i cepi sovpadayut do 0.0001 p.p. (34 pula), i v stvore i +1/+2 deystvitelno pochti ne torguyut -- pokupki nachinayutsya s +3. Oshibka: parallelno 2 zapustilo rezhim tempy ODNOVREMENNO so sverkoy, i on prochital pustoy spisok programm pulov -- otsyuda temp 0. Teper parallelno 1, tempy strogo posle sverki. Glavnoe: programma pump.fun (6EF8...) vstretilas vsego 2 raza na 187 tranzakciy, znachit bolshinstvo pulov v sreze 'pereezd' mozhet byt VOVSE NE pereezdom krivoy. Teper proverka po KAZHDOMU pulu otdelno: est li instrukciya 6EF8 v tranzakcii stvora. Okno rasshireno do 1121 slota (300 s) -- vykup BOOST idyot pyat minut partiyami, v pyati slotah ego i ne moglo byt vidno."
 }
