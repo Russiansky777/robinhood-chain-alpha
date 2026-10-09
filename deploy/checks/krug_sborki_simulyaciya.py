@@ -688,9 +688,10 @@ def main() -> int:
     а = п.parse_args()
     if а.self_test:
         return самопроверка()
-    if not а.live:
-        print("СТОП: нужен --live или --self-test", file=sys.stderr)
-        return 2
+    # ПОДПИСИ И ИСТОЧНИК -- ЭТО СВОЙ ЖИВОЙ РЕЖИМ, и он НЕ требует --live:
+    # --live значит "найди минты сам", а здесь минты названы снаружи. Проверка
+    # на --live стояла выше этой ветки и съела весь прогон 37957981526: код 2
+    # "нужен --live", ноль вызовов узла, а прогон при этом зелёный.
     спис = [x for x in а.podpisi.replace(";", ",").split(",") if x.strip()]
     сбор_ист = None
     if а.istochnik.strip():
@@ -715,6 +716,10 @@ def main() -> int:
         if а.out:
             Path(а.out).write_text(текст + "\n", encoding="utf-8")
         return 0 if (из_["proshlo"] and not из_["why_not"]) else 1
+    if not а.live:
+        print("СТОП: нужен --live, --self-test, --podpisi или --istochnik",
+              file=sys.stderr)
+        return 2
     из_ = живой(skolko=а.skolko, koshelek=а.koshelek,
                  bilet_lamportov=а.bilet_lamportov, cu=а.cu, pauza=а.pauza)
     текст = json.dumps(из_, ensure_ascii=False, indent=1)
