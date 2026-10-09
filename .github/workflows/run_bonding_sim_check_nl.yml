@@ -8,9 +8,44 @@ name: "Кривая pump.fun: примет ли программа нашу сб
 # Свежие сигналы кривой берём потоком из живого журнала решений на хосте (там
 # детектор отказывается по типу пула и пишет подпись источника, минт и адрес).
 # Журнал в память не читается: grep -F под nice, наружу только хвост.
+#
+# ЗАДАЧА pump_sborka (слово владельца 09.10, п.2). Оснастка Code-3
+# (deploy/checks/pump_sborka_simulyaciya.py) судит сборку ТЕМ ЖЕ способом, что
+# и этот прогон -- simulateTransaction без отправки, -- только по девяти
+# разновидностям IDL сразу. Она живёт на ветке claude/stroiteli вместе со
+# сборщиком, закреплённым IDL и образцами, и доезжает сюда git-ом из той ветки.
+#
+# ПОЧЕМУ ЗДЕСЬ, А НЕ run_razovyj_shablon_nl.yml, КАК БЫЛО ЗАДУМАНО. Тот файл
+# лежит ТОЛЬКО на claude/stroiteli, на ветке по умолчанию его нет, поэтому
+# GitHub не регистрирует прогон вовсе: dispatch по имени отвечает 404 (проверено
+# 09.10). Положить его на ветку по умолчанию я не могу -- правка общей ветки
+# закрыта. Этот прогон на ветке по умолчанию есть, значит запускается с
+# ref=claude/nifty-sagan-r0polg и берёт МОЮ версию файла.
+#
+# УЗЕЛ -- НЕ ХОСТОВЫЙ, И ЭТО НЕ ОБХОД. Цепь здесь и так открыта ключом
+# secrets.HELIUS_API: прогон всегда считал симуляцию на облачном бегунке, а к
+# хосту ходил только за журналом. Оснастка Code-3 берёт узел ТОЛЬКО из
+# BLOOM_TREKKER_RPC (в argv узла нет вовсе -- ключ в списке процессов виден
+# всем), поэтому URL собирается в окружении шага.
 on:
   workflow_dispatch:
     inputs:
+      zadacha:
+        description: "'bonding' -- как было (сборщик кривой на свежих сигналах); 'pump_sborka' -- оснастка Code-3 на девяти разновидностях IDL"
+        required: false
+        default: "bonding"
+      cel:
+        description: "pump_sborka: сколько образцов на вариант считать целью"
+        required: false
+        default: "20"
+      predel_tx:
+        description: "pump_sborka: предел прочитанных транзакций"
+        required: false
+        default: "150"
+      pauza:
+        description: "pump_sborka: пауза между вызовами узла, с"
+        required: false
+        default: "0.4"
       limit:
         description: "сколько последних сигналов кривой проверить"
         required: false
@@ -54,9 +89,62 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/bs_venv"
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
+          if [ "${{ inputs.zadacha }}" = "pump_sborka" ]; then
+            echo "задача pump_sborka: самопроверки оснастки Code-3 ниже, после доставки"
+            exit 0
+          fi
           "$RUNNER_TEMP/bs_venv/bin/python" analysis/c2_swap_build.py --self-test | tail -6
 
+      # ОСНАСТКА CODE-3 -- ИЗ ЕГО ВЕТКИ, А НЕ КОПИЕЙ В МОЮ. Копия разошлась бы
+      # со сборщиком при первой же его правке; git-ом видно, какой именно
+      # коммит проверялся, и он печатается в отчёт.
+      - name: "pump_sborka: привезти оснастку Code-3 из claude/stroiteli"
+        if: ${{ inputs.zadacha == 'pump_sborka' }}
+        run: |
+          set -e
+          set -o pipefail
+          git fetch --depth=1 origin claude/stroiteli
+          echo "коммит оснастки: $(git rev-parse --short FETCH_HEAD) $(git log -1 --format=%s FETCH_HEAD)"
+          git checkout FETCH_HEAD -- \
+            analysis/c3_pump_sborka.py analysis/c3_kapital_trekker.py \
+            deploy/checks/pump_sborka_simulyaciya.py \
+            data/idl data/c2_pool_samples data/c3_usdc_noga data/samples \
+            data/bloom_regression_txs.json data/bloom_tx_raw.json \
+            data/c2_curve_variant_samples.json data/nogi_shablony.json \
+            data/obrazcy_vidov_instrukciy.json data/solana_raw_tx_dump_vyvod.json
+          ls -1 data/idl | sed 's/^/  idl: /'
+          # САМОПРОВЕРКИ ОБЕИХ ЧАСТЕЙ -- ДО ЛЮБОГО ВЫЗОВА УЗЛА. Объявлено
+          # Code-3: сборщик 24 из 24, оснастка 23 из 23.
+          PYTHONPATH=analysis $PY analysis/c3_pump_sborka.py --self-test | tail -2
+          PYTHONPATH=analysis $PY deploy/checks/pump_sborka_simulyaciya.py --self-test | tail -2
+          # СУХОЙ ПРОГОН: ноль сетевых вызовов, сверяет число образцов.
+          PYTHONPATH=analysis $PY deploy/checks/pump_sborka_simulyaciya.py --dry-run | tail -20
+
+      - name: "pump_sborka: живой прогон симуляции узлом"
+        if: ${{ inputs.zadacha == 'pump_sborka' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          # УЗЕЛ ТОЛЬКО ОКРУЖЕНИЕМ, в argv его нет: так велит оснастка, и у неё
+          # на это своя проверка. Ключ в вывод не попадает -- оснастка затирает.
+          export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
+          # ВЫХОД 1 У ОСНАСТКИ -- ЭТО ОТВЕТ, А НЕ ПОЛОМКА ПРОГОНА: так она
+          # говорит "недобор образцов" или "близнецы разошлись", и ровно эту
+          # таблицу надо увидеть. Поэтому код ловится, а не роняет шаг.
+          set +e
+          PYTHONPATH=analysis $PY deploy/checks/pump_sborka_simulyaciya.py --live \
+            --cel "${{ inputs.cel }}" --predel-tx "${{ inputs.predel_tx }}" \
+            --pauza "${{ inputs.pauza }}" > /tmp/pump_sborka.txt 2>&1
+          RC=$?
+          set -e
+          tail -80 /tmp/pump_sborka.txt
+          echo "код выхода оснастки: $RC (0 -- все девять вариантов набрали цель и сошлись)"
+
       - name: "SSH key"
+        if: ${{ inputs.zadacha != 'pump_sborka' }}
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -68,6 +156,7 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Свежие сигналы кривой из живого журнала (потоком)"
+        if: ${{ inputs.zadacha != 'pump_sborka' }}
         run: |
           set -e
           set -o pipefail
@@ -86,6 +175,7 @@ jobs:
           wc -l < /tmp/bsim/curve.jsonl
 
       - name: "Симуляция нашей покупки на кривой"
+        if: ${{ inputs.zadacha != 'pump_sborka' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
@@ -105,6 +195,16 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ "${{ inputs.zadacha }}" = "pump_sborka" ]; then
+            # ОТЧЁТ ОСНАСТКИ -- В ВЕТКУ, а привезённые из claude/stroiteli
+            # файлы НЕ коммитим: их хозяин Code-3, копия тут же разошлась бы.
+            mkdir -p data
+            cp /tmp/pump_sborka.txt data/pump_sborka_simulyaciya.txt || true
+            git checkout -- analysis data 2>/dev/null || true
+            git clean -fd analysis data 2>/dev/null || true
+            cp /tmp/pump_sborka.txt data/pump_sborka_simulyaciya.txt || true
+            git add data/pump_sborka_simulyaciya.txt || true
+          fi
           for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json; do
             [ -f "$F" ] && git add "$F"
           done
