@@ -419,6 +419,28 @@ def sobrat_obrazcy(zov, *, stranic: int, na_stranicu: int, predel_tx: int,
 
 
 WHY_СТАРАЯ_РАСКЛАДКА = "раскладка образца старше нынешнего IDL -- не сравним"
+# ОБРАЗЕЦ, У КОТОРОГО ТОРГОВЕЦ ДЕРЖИТ НЕ-ATA. Единственное расхождение -- его
+# СВОЙ счёт токена: он торгует не с канонического ATA, а с произвольного счёта.
+# Наша сборка выводит канонический ATA (и это верно для НАС: денежный путь его
+# же и создаёт идемпотентно перед свопом, c2_swap_build.py:803), но на чужом
+# кошельке такого счёта нет -- симуляция нашего близнеца упирается в 3012, а
+# чужого в состояние пула. Такой образец говорит о ВЫБОРЕ СЧЁТА ТОРГОВЦА, а не о
+# нашей арифметике, поэтому он не сравним. Правило УЗКОЕ: расхождение ровно
+# одно и ровно в пользовательском счёте токена; любое другое остаётся красным.
+WHY_ЧУЖОЙ_НЕ_ATA = ("торговец образца держит токен НЕ на каноническом ATA -- "
+                    "сравнивать нечего: это его выбор счёта, а не наша сборка")
+СЧЕТА_ПОЛЬЗОВАТЕЛЯ = frozenset(СБ.КАК_ATA)
+
+
+def ne_sravnim_chuzhoj_schyot(razoshlis_imena, kod) -> bool:
+    """Образец не сравним: расхождение ТОЛЬКО в счёте токена торговца и 3012.
+
+    Правило нарочно узкое. Любое другое расхождение -- хоть одно имя вне
+    СЧЕТА_ПОЛЬЗОВАТЕЛЯ, хоть другой код -- остаётся КРАСНЫМ: иначе это была бы
+    щель, в которую уехала бы настоящая ошибка раскладки.
+    """
+    имена = set(razoshlis_imena or ())
+    return bool(имена) and имена <= СЧЕТА_ПОЛЬЗОВАТЕЛЯ and kod == 3012
 WHY_ДРУГАЯ_ДЛИНА = "длина данных образца не та, что у нынешнего IDL -- не сравним"
 
 
@@ -481,7 +503,8 @@ def proverit_variant(zov, *, imja_programmy: str, variant: str,
     из_ = {"variant": f"{imja_programmy}.{variant}", "obrazcov": len(obrazcy),
            "cel": cel, "obrazcov_token2022": t2022, "cel_token2022": cel_t2022,
            "proverok": 0, "proshlo": 0, "krasnyh": 0,
-           "raskladka_soshlas": 0, "bajt_v_bajt": 0, "stroki": [],
+           "raskladka_soshlas": 0, "bajt_v_bajt": 0, "propushcheno": 0,
+           "stroki": [],
            "nedobor": len(obrazcy) < cel,
            "nedobor_token2022": (cel_t2022 > 0 and t2022 < cel_t2022),
            "why_not": None}
@@ -548,6 +571,16 @@ def proverit_variant(zov, *, imja_programmy: str, variant: str,
         и_наш = klass_ishoda(наш.get("err"), programma=imja_programmy)
         и_чужой = klass_ishoda(чужой.get("err"), programma=imja_programmy)
         сошлись = bliznecy_soshlis(и_наш, и_чужой)
+        # НЕ СРАВНИМ, А НЕ КРАСНЫЙ: см. WHY_ЧУЖОЙ_НЕ_ATA.
+        разошлись_имена = {р["imja"] for р in (копия.get("razoshlis") or [])}
+        if not сошлись and ne_sravnim_chuzhoj_schyot(разошлись_имена,
+                                                     и_наш.get("kod")):
+            строка.update(ok=None, nash=и_наш, chuzhoj=и_чужой,
+                          why_not=WHY_ЧУЖОЙ_НЕ_ATA,
+                          razoshlis=копия.get("razoshlis"))
+            из_["propushcheno"] = из_.get("propushcheno", 0) + 1
+            из_["stroki"].append(строка)
+            continue
         строка.update(ok=bool(сошлись), nash=и_наш, chuzhoj=и_чужой,
                       units=наш.get("units"),
                       logi=(None if сошлись else наш.get("logi")),
@@ -796,7 +829,8 @@ def tablica(итог: dict) -> str:
 # ЧИСЛО ОБЪЯВЛЕНО. Проверок стало меньше -- значит проверку убрали и этого
 # никто не заметил; больше -- значит добавили и не сказали. И то и другое
 # здесь ПРОВАЛ, а не «всё зелено».
-ZHDEM_PROVEROK = 25
+# 25 у Code-3 + 4 на узкое правило несравнимых образцов (правка 09.10, Code-1).
+ZHDEM_PROVEROK = 29
 
 # ПОДДЕЛЬНЫЕ ОТВЕТЫ УЗЛА: формы ровно те, что отдаёт Solana RPC. Проверяются
 # ими и разбор, и счёт вызовов -- без сети.
@@ -922,6 +956,17 @@ def self_test() -> int:  # noqa: C901, PLR0915
         "бы комиссию чужому)",
         пусто["why_not"] == WHY_НЕТ_BUYBACK and пусто["proverok"] == 0, пусто)
 
+    chk("НЕ СРАВНИМ только при расхождении в счёте токена торговца и 3012",
+        ne_sravnim_chuzhoj_schyot({"associated_base_user"}, 3012) is True)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: расхождение в ЛЮБОМ другом счёте остаётся красным, "
+        "даже с тем же кодом -- щели для ошибки раскладки нет",
+        ne_sravnim_chuzhoj_schyot({"associated_base_user", "bonding_curve"},
+                                  3012) is False
+        and ne_sravnim_chuzhoj_schyot({"creator_vault"}, 3012) is False)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: тот же счёт, но другой код -- красный",
+        ne_sravnim_chuzhoj_schyot({"associated_base_user"}, 6005) is False)
+    chk("без расхождений правило не срабатывает вовсе",
+        ne_sravnim_chuzhoj_schyot(set(), 3012) is False)
     chk(f"минтов отказа 08.10 ровно три, и они названы: "
         f"{', '.join(м[:8] + '…' for м in СБ.ОТКАЗ_08_10['minty'])}",
         len(СБ.ОТКАЗ_08_10["minty"]) == 3)
