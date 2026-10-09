@@ -277,6 +277,12 @@ def svod(stroki, *, s=None, do=None) -> dict:
            "s_pokupkoj_sozdatelya": 0, "sol_sozdateley": 0.0,
            "otryv_slotov": {"min": None, "max": None, "mediana": None,
                             "bez_chisla": 0},
+           # РАСХОД HELIUS -- ИЗ САМИХ ЗАПИСЕЙ, А НЕ ИЗ СЧЁТЧИКА ПРОЦЕССА.
+           # Счётчик обнуляется перезапуском службы, и "расход за первый час"
+           # после деплоя стал бы меньше правды. Байты лежат в каждой строке,
+           # тариф тот же, что у общего учёта: 2 кредита за 0.1 МиБ с
+           # округлением вверх.
+           "bajt": 0, "kreditov": 0, "bez_bajt": 0,
            "pervaja_utc": None, "poslednjaja_utc": None, "razvidnosti": {}}
     отрывы = []
     for сырая in stroki:
@@ -307,12 +313,19 @@ def svod(stroki, *, s=None, do=None) -> dict:
             из_["s_pokupkoj_sozdatelya"] += 1
             if isinstance(з.get("sol_sozdatelya"), (int, float)):
                 из_["sol_sozdateley"] += float(з["sol_sozdatelya"])
+        б = з.get("bajt")
+        if isinstance(б, int) and б > 0:
+            из_["bajt"] += б
+        else:
+            из_["bez_bajt"] += 1
         о = з.get("otryv_slotov")
         if isinstance(о, int):
             отрывы.append(о)
         else:
             из_["otryv_slotov"]["bez_chisla"] += 1
     из_["sol_sozdateley"] = round(из_["sol_sozdateley"], 9)
+    из_["kreditov"] = -(-из_["bajt"] // 104858) * 2 if из_["bajt"] else 0
+    из_["mb"] = round(из_["bajt"] / 1048576, 3)
     if отрывы:
         отрывы.sort()
         из_["otryv_slotov"].update(min=отрывы[0], max=отрывы[-1],
@@ -352,7 +365,7 @@ def zapis_iz_uvedomlenija(res: dict, *, t_polucheno=None, slot_seti=None,
 
 # ------------------------------------------------------------- самопроверка
 
-ЖДЁМ_ПРОВЕРОК = 18
+ЖДЁМ_ПРОВЕРОК = 20
 
 
 def self_test() -> int:  # noqa: C901, PLR0915
@@ -493,6 +506,18 @@ def self_test() -> int:  # noqa: C901, PLR0915
     chk("ДОКАЗАННЫЙ КРАСНЫЙ: запись без числа отрыва считается отдельно, а не "
         "как ноль",
         svod(стр)["otryv_slotov"]["bez_chisla"] == 1, svod(стр))
+    стр_б = [json.dumps({"ts_utc": "2026-10-09T18:00:00Z", "sozdanie": "create",
+                         "bajt": 104858}),
+             json.dumps({"ts_utc": "2026-10-09T18:01:00Z", "sozdanie": "create",
+                         "bajt": 1})]
+    сб = svod(стр_б)
+    chk("расход считается ИЗ ЗАПИСЕЙ: 104 859 байт -- это 4 кредита (две "
+        "порции по 0.1 МиБ с округлением вверх), а не счётчик процесса",
+        сб["bajt"] == 104859 and сб["kreditov"] == 4, сб)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: запись без байтов считается отдельно, а не как "
+        "ноль расхода",
+        svod([json.dumps({"ts_utc": "2026-10-09T18:00:00Z",
+                          "sozdanie": "create"})])["bez_bajt"] == 1)
     chk("разновидности создания названы числами",
         svod(стр)["razvidnosti"] == {"create": 2, "create_v2": 1},
         svod(стр)["razvidnosti"])
