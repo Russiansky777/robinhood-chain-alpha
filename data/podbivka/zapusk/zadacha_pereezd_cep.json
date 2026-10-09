@@ -3,30 +3,42 @@
  "zapuski": [
   [
    "--rezhim",
-   "tempy",
-   "--blokov",
-   "200",
-   "--prefiks-krivoy",
-   "6EF8",
-   "--puly-programmy",
-   "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "sverka",
+   "--skolko",
+   "80",
+   "--slotov",
+   "3",
+   "--dlinno",
+   "1121",
+   "--obrazcov",
+   "12",
+   "--tolko-pul",
+   "pump-amm",
+   "--tolko-pravilo",
+   "создание:migrate",
    "--metka",
-   "pumpfun"
+   "pumpamm_migrate"
   ],
   [
    "--rezhim",
-   "tempy",
-   "--blokov",
-   "200",
-   "--prefiks-krivoy",
-   "dbcij",
-   "--puly-programmy",
-   "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+   "sverka",
+   "--skolko",
+   "60",
+   "--slotov",
+   "3",
+   "--dlinno",
+   "1121",
+   "--obrazcov",
+   "12",
+   "--tolko-pul",
+   "meteora-damm-v2",
+   "--tolko-pravilo",
+   "создание:migrate",
    "--metka",
-   "meteora"
+   "dammv2_migrate"
   ]
  ],
  "helius_rps_na_paket": 3,
  "parallelno": 2,
- "zachem": "Punkt 1v, tretya popytka -- i snova iz-za moey oshibki: rezhim pishetsya v svodku kak 'sverka' latinicey, a chital ya klyuch 'sverka' KIRILLICEY, poetomu spisok programm pulov dvazhdy vyhodil pustym i temp schitalsya nulyom. Klyuch ispravlen, i teper adresa programm peredayutsya YAVNO argumentom -- oni zamereny na tranzakciyah stvora 51 pula, a ne vpisany po pamyati. Dva progona: pereezd pump.fun (programma 6EF8 vmeste s PumpSwap) i pereezd dinamicheskoy krivoy Meteora (programma dbcij vmeste s cp-amm). Tak budet vidno, skolko v sutki kazhdogo iz nih protiv 3757 createPool i 6051 'pereezd krivoy' iz arhiva."
+ "zachem": "Punkt 1v, utochnenie doli. Blochnaya ocenka (40 tranzakciy s 6EF8 I PumpSwap na 200 blokov -> 64539 v sutki) nepravdopodobna i ya eyo otbrakoval: sovmestnaya vstrecha dvuh programm v tranzakcii -- eto ne obyazatelno pereezd, router mozhet zadevat obe. Nadyozhnee drugaya ocenka: dolya nastoyaschih pereezdov v KAZHDOY gruppe arhiva, umnozhennaya na suточnoe chislo gruppy. Po vyborke 51 pula vyshlo: pump-amm/createPool 0 iz 24, damm-v2/createPool 0 iz 11, damm-v2/migrate 0 iz 8 (zato 8 iz 8 -- pereezd krivoy Meteora DBC), pump-amm/migrate 2 iz 6. Imenno poslednyaya dolya i reshaet otvet, a shest pulov dlya neyo malo. Poetomu pricelnaya vyborka: 80 pulov tolko pump-amm/migrate i 60 tolko damm-v2/migrate."
 }

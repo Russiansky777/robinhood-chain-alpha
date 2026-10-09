@@ -267,8 +267,12 @@ def сверить_цену(п: dict, события: list) -> dict:
 def режим_сверка(rpc, темп: Темп, а) -> dict:
     """п.1б: выборка переездов, первые слоты по цепи против архива."""
     все = переезды_из_архива(П / "zapuski")
+    if а.tolko_pul:
+        все = [x for x in все if x["пул"] == а.tolko_pul]
+    if а.tolko_pravilo:
+        все = [x for x in все if x["правило"] == а.tolko_pravilo]
     if not все:
-        return {"ошибка": "нет собранных суток запусков"}
+        return {"ошибка": "нет подходящих переездов в собранных сутках"}
     рнд = random.Random(а.seed)
     # по равной доле из каждых суток -- чтобы выборка не села на один день
     по_суткам: dict = collections.defaultdict(list)
@@ -461,6 +465,8 @@ def main() -> int:
     р_ = argparse.ArgumentParser()
     р_.add_argument("--rezhim", choices=("sverka", "tempy"), required=True)
     р_.add_argument("--skolko", type=int, default=40, help="пулов в выборке (sverka)")
+    р_.add_argument("--tolko-pul", default="", help="только этот тип пула (sverka)")
+    р_.add_argument("--tolko-pravilo", default="", help="только это правило создания (sverka)")
     р_.add_argument("--slotov", type=int, default=10,
                     help="сколько слотов от створа брать ПОДРЯД (sverka)")
     р_.add_argument("--dlinno", type=int, default=1121,
