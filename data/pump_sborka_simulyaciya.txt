@@ -1,11 +1,11 @@
 узел: https://mainnet.helius-rpc.com/…
 собираю образцы: цель 20 на каждый из 9 вариантов
-прочитано транзакций: 900 (предел 900), подписей просмотрено 3000
+прочитано транзакций: 900 (предел 900), подписей просмотрено 4000
   pump.buy_v3: образцов 0
   pump.buy_exact_quote_in_v3: образцов 20
   pump.sell_v3: образцов 20
-  pump.buy_v2: образцов 12
-  pump.buy_exact_quote_in_v2: образцов 4
+  pump.buy_v2: образцов 0
+  pump.buy_exact_quote_in_v2: образцов 15
   pump.sell_v2: образцов 20
   pump_amm.buy_v2: образцов 0
   pump_amm.buy_exact_quote_in_v2: образцов 0
@@ -13,36 +13,39 @@
 
 вариант                                  образцов  t2022 проверок  прошло раскладка  байты
 pump.buy_v3                                     0      0        0       0         0      0
-pump.buy_exact_quote_in_v3                     20     20       20      20        19     20
+pump.buy_exact_quote_in_v3                     20     20       20      20        20     20
 pump.sell_v3                                   20     20       20      20        20     20
-pump.buy_v2                                    12     12       12      12        12     12
-pump.buy_exact_quote_in_v2                      4      4        4       4         4      4
-pump.sell_v2                                   20     20       20      20        15     20
+pump.buy_v2                                     0      0        0       0         0      0
+pump.buy_exact_quote_in_v2                     15     15       15      15        15     15
+pump.sell_v2                                   20     19       20      20        20     20
 pump_amm.buy_v2                                 0      0        0       0         0      0
 pump_amm.buy_exact_quote_in_v2                  0      0        0       0         0      0
 pump_amm.sell_v2                                0      0        0       0         0      0
 pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3       0         -      -
-ИТОГО                                                   79      76
+ИТОГО                                                   78      75
 
 {
  "rezhim": "zhivoj",
  "uzel": "https://mainnet.helius-rpc.com/…",
- "setevyh_vyzovov": 1058,
+ "setevyh_vyzovov": 1060,
  "prochitano_tx": 900,
  "propushcheno": {
-  "длина данных образца не та, что у нынешнего IDL -- не сравним": 53,
-  "раскладка образца старше нынешнего IDL -- не сравним": 11
+  "длина данных образца не та, что у нынешнего IDL -- не сравним": 76,
+  "раскладка образца старше нынешнего IDL -- не сравним": 16
  },
  "propushcheno_po_variantu": {
+  "pump.buy_v2": {
+   "длина данных образца не та, что у нынешнего IDL -- не сравним": 17
+  },
   "pump.buy_exact_quote_in_v2": {
-   "длина данных образца не та, что у нынешнего IDL -- не сравним": 45,
-   "раскладка образца старше нынешнего IDL -- не сравним": 10
+   "длина данных образца не та, что у нынешнего IDL -- не сравним": 53,
+   "раскладка образца старше нынешнего IDL -- не сравним": 15
   },
   "pump.sell_v2": {
    "раскладка образца старше нынешнего IDL -- не сравним": 1
   },
-  "pump.buy_v2": {
-   "длина данных образца не та, что у нынешнего IDL -- не сравним": 8
+  "pump.buy_v3": {
+   "длина данных образца не та, что у нынешнего IDL -- не сравним": 6
   }
  },
  "cel_na_variant": 20,
@@ -74,21 +77,15 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
    "proverok": 20,
    "proshlo": 20,
    "krasnyh": 0,
-   "raskladka_soshlas": 19,
+   "raskladka_soshlas": 20,
    "bajt_v_bajt": 20,
    "stroki": [
     {
-     "podpis": "4GA6HCDbRP2j8vxTW7nFJcaW2uhT695pXvtGqUni6hrbE3ewYaygK65rPrUD8pjYEEYSkCJDNi37bAZtSHiPBC2v",
+     "podpis": "eT3cg9zALz6oEcnXTWwNnK9Cbq7h7ZeWrjQm8kJPkqsVir5PJGMrRrvQ4NmSa6AyBzes39aPudD1hqxkExcsNzG",
      "ok": true,
      "why_not": null,
-     "raskladka_soshlas": false,
-     "razoshlis": [
-      {
-       "imja": "associated_base_user",
-       "nash": "5fUzXgoJ4LpyaDKnsaTGPKhs3SfxBFJ2RZTdYA89oq6L",
-       "chuzhoj": "ApuJrTTruy2uyZtdoCcnNacUKE6y9rFyQHesos3Gcq18"
-      }
-     ],
+     "raskladka_soshlas": true,
+     "razoshlis": [],
      "bajt_v_bajt": true,
      "nash": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
@@ -102,11 +99,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 10368,
+     "units": 10371,
      "logi": null
     },
     {
-     "podpis": "62qwS61YHHBE6Nim9BMHVPk4UZG89L9mnzRYGCxTttuLgmVNZqMPRoCTAYaaYmyYrzx7jJrhLds9ZPKyt55Wf7eA",
+     "podpis": "4LFm8oVYzFDMXPg23dcpHV4GNjYCyaFpMYimytZY7ExBi3aHaofNjmxveGTDhrDnP27VbL8j8e5kSarDiRti4B24",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -124,55 +121,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 46541,
+     "units": 37105,
      "logi": null
     },
     {
-     "podpis": "39dA9TuTJzE28XkoJkcN7fY2VZ4YUK58nqAGV9tYKSCb2LQ2NrMik7zyuRNSZUqkPp8Qu9VeFNxw4QmtH4aKpDea",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6005,
-      "imja": "BondingCurveComplete",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "chuzhoj": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6005,
-      "imja": "BondingCurveComplete",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "units": 32782,
-     "logi": null
-    },
-    {
-     "podpis": "H8iMWBAoACV567vjnEjSjfhMvcBqZSBm5ff85VEGjrRM9o1KrgfUdg853NDvkyJDRh1V3zDVH8WVAHKdNYDpSyM",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 56133,
-     "logi": null
-    },
-    {
-     "podpis": "3uiiUpRSgqbcQnN5uMwRooCuc4mGAuPGSUpSt7A4gmuynTCsAuppRnFTj5UXHBnDgiCgJUav7KhsPcfP2Se3WeR",
+     "podpis": "5EMWiqNg2NwYR61c32w5joobz9sywDgaJV4GY4FPXUUg8iGP2dv1zadcbRZE54J9Vey3NjMUynKifFQoT1msvzmg",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -190,11 +143,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "узел принял инструкцию"
      },
-     "units": 48375,
+     "units": 56598,
      "logi": null
     },
     {
-     "podpis": "2xDR627tcouRNDJZw1eX67keutpWY8Fj8wsVxSxnoxppDRkyD5BABamuT9RvbG5Z4ETk5QGLqWvyWBdBfy5kgTAN",
+     "podpis": "2cvmFmbFsC9aUNnhbmmure39Hx3xv4cq5cdgc7DoS3XWKpz9MHCm52LgZiMUkP3Qk392tLr6UXDZjoCf8YrWgyQe",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -212,55 +165,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 46551,
+     "units": 38688,
      "logi": null
     },
     {
-     "podpis": "MLpg3cLPY5k4evhMiXghhHcbKr3MTzhyJvYrAqtLuWLLwUCfmASPuLYTa5LD4X5UZ3MXz8hcnL3RA3SrSSJH2gd",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 45411,
-     "logi": null
-    },
-    {
-     "podpis": "3J51AgZqdFHGPh2V8sh5G5VuaL2Kkb6nvNK49N9pkXFmEG8HBF3jrpchfp7iuCsyCNk8GkWigJEveyBmArjURx4t",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 34188,
-     "logi": null
-    },
-    {
-     "podpis": "mFBgfWfaKyQCPgzZ4Qg9DVKWo5hqqXD8Azm2raWr1E9WUra7awuF3M1W3DSFDek7fqemBLJzfZS3TZ4vokqcFMr",
+     "podpis": "4JwbLMW2JUZ1xo4QHKexEdMGEBtBrHvDkwXbboAapLRXrtteK85HqVSbnPtAvHhdghhoGtpuqMRbp6LYU2D34kvT",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -278,11 +187,165 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "узел принял инструкцию"
      },
-     "units": 50597,
+     "units": 51880,
      "logi": null
     },
     {
-     "podpis": "3Kt5m2Mkawa8rikNDBhhmHiGtP2mraYbmJu763Kgwyezf45fWWfarLauwdu6Ysn3T3Ybp97HSQmKogH2Cq4mJmA6",
+     "podpis": "4ky1eu9vc3RQ9ajAvdKkD2u4F4c5RpMzcs2F6p5WihGEtTK6dN7eDoUY4X1pyfPyvZZAVrdt8fxnm4EDsBKBETE1",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 56650,
+     "logi": null
+    },
+    {
+     "podpis": "5adKGcCRXimxcUGSWrEeqd5hbPLDBJLYmarHipRtAoYiYrcEJEC5YAaPuWDNGyuRQsm7hs8wC433jzRLJ4FV4n7T",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 56598,
+     "logi": null
+    },
+    {
+     "podpis": "4izQSvdr3ijD7TTiD5ozAg8KFxf58vYSXV9V7eBMGc3kNmQaoZ8aYt8UuSn4St2KGPxtBaiJfKTybaXwDS9QZwpW",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 10371,
+     "logi": null
+    },
+    {
+     "podpis": "2fC6Dj5L9oapAeivgGZcRkeTyZBHDBb8fWggfNEz6TXVP4TovYfexyWkbC41ZRQyh1A7Rz5JoP1ZjfeoTCyPADHw",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 40188,
+     "logi": null
+    },
+    {
+     "podpis": "4oUpce4riTjAmFWQVkDyoZbtMfBnoFZtJmRr9P6Ni7Aq5RXJQJhxZsETPg8YZo6vukEPseTXqF6dQEBEVRpJDW8H",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 50579,
+     "logi": null
+    },
+    {
+     "podpis": "2Lq7M2CdMrsR4KzBFoWGcPRWghHM7paCQf4j7mAhFqj6ekmCPEuDqAPZjYKb2Rv1jBpAN8RqCbu1D4zwiXFhNvTm",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 52849,
+     "logi": null
+    },
+    {
+     "podpis": "63ZyX2XogGodHXtq53DreVfY7d8voMugzEywvB9MzaHtPK7bnZY3REJhz8cgDFyxmPDoh5WAaVBBd6ZUwug7J9sq",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 56624,
+     "logi": null
+    },
+    {
+     "podpis": "U4qQioRkiFbrpXPz6yH3VWS4Ss6VedDi6ZmyyjpR6zRNxNRScTUL4VJaYsRjoHXJVCskEB7VZjRrog4KgqLVahC",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -300,11 +363,99 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "BondingCurveComplete",
       "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
      },
-     "units": 32780,
+     "units": 28282,
      "logi": null
     },
     {
-     "podpis": "129mQ9sCWzmcDotSiuPPT2CK966t3rSguDaSYBBKbzY6T1EzzigsEZrm95i3q1TNbeCh9HSxDnu4qSLPzz1V5JLp",
+     "podpis": "2Qv2SxTWAC99of7eptjpC46o728qLe1intevtP9TxSkNXtG5Gdsc7hFJ8n95RrnGV8iQNnR92zmAQNiWdXS94Kwp",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 56597,
+     "logi": null
+    },
+    {
+     "podpis": "5Yjujm6x2nF44ffNQFGhdShmNrAH2WUoLzFDxDge4nhHePSyv7ddZJNWLhgn7ASn6D8oZw24Fjsyp2pz8dfsGDxg",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
+     },
+     "chuzhoj": {
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
+     },
+     "units": 31283,
+     "logi": null
+    },
+    {
+     "podpis": "4a8FqucbVu4dktu22jCMWEaZ1jwfYVfnJQajPKK5NuDUEMVcER2cAVmA9yfEh4NAUd86vkpuWge8HBd5VMYd5fLh",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 47700,
+     "logi": null
+    },
+    {
+     "podpis": "qxMM4UBfZiPmwiGhXEjBcbX67KrgX8efbXgBVyQ5pYhbpcxRZdCc3gAbW37wp88Fyi6t6G5jPH2Rk8Ce6ei23vm",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 49257,
+     "logi": null
+    },
+    {
+     "podpis": "455biTiiRWVw9armg6B7EHFsvwGtyhVqe3iuZ1Mb5SXfEdjynpAKFAkeUanbu5WfJsQiTn4WS5QWHrSQ6ZH7kVa6",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -312,131 +463,21 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
      "bajt_v_bajt": true,
      "nash": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "kod": 6042,
+      "imja": "BuySlippageBelowMinTokensOut",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
      "chuzhoj": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "kod": 6042,
+      "imja": "BuySlippageBelowMinTokensOut",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 10375,
+     "units": 42145,
      "logi": null
     },
     {
-     "podpis": "3HDCznqXYeUAvuo3EWAY9ZqLCHY83XjeY4xbG6zMEAcyZJbBdXrPJH4cXbP13H786nf6tQtJZ4KpFKkB9SfC1Azi",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 10375,
-     "logi": null
-    },
-    {
-     "podpis": "2aS8HDcsgUnmSp7eUKXZrsLgwJkSq9EAr4AV2MQzia613rxW3e4XNgpX8nLqqNoQPXsDSPpJhqKPVF9KuWzi4tqS",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 43921,
-     "logi": null
-    },
-    {
-     "podpis": "ys7yj5u4oMcFjEDEmBvpYikMacA69QirW6M4ovmRnkedwHGw6mNhQSyEr16Bsiqp9fXqTn6KiBnGDr7wNBW9d7E",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 42421,
-     "logi": null
-    },
-    {
-     "podpis": "ojXa9Bp4mrv2sYJvx5X6uwZn2ZtKNWLWjsBEeX34He1Rt6kRFqZp97ikoFzwhVDgVm5ugnEwKnZK1vopK1tHfTU",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 42411,
-     "logi": null
-    },
-    {
-     "podpis": "5gF6qgLDzUByazAYBADxnZuyPrMLJNuVWjb8XUyTi7mJL1yzjNKA79oQQeE9KiqDWeFim3fwEwUqWEwebemvAYrT",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 45421,
-     "logi": null
-    },
-    {
-     "podpis": "2bu21UFSFfXN4jHbLoehNcubC4oQRbuFSC66nPyybaUvhAGhrU1bQzuHJVp72PMHBiRKdSQry7JhMrqVS22Tg85J",
+     "podpis": "5oxth49wdNJ5LxVAruWdGDMbuU2wA1yD2j2tLEsyVnZoU1ES77Vd9QSdZUb5twiKo4MVtGQ4F9J6CADL7onoVu94",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -454,73 +495,29 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 43911,
+     "units": 43199,
      "logi": null
     },
     {
-     "podpis": "5DY17a6XiAhfeqYgXJtNmkLvTmVj9xph1v8dRiuLpNyx17LrkgdSbzB6qAoo52MAuk6cLRFrkNoVkyJ8haafEFbF",
+     "podpis": "33nEQVBoriFpkTL6S4Aayxqwc9yeqGPp5bmZzPBbfunkdE7doCweJshWFC6cAFLBJrqKy1iPqFHyDDwf7qaA5FUf",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
      "razoshlis": [],
      "bajt_v_bajt": true,
      "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
+      "ishod": "ПРОШЛО",
+      "kod": null,
       "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "pochemu": "узел принял инструкцию"
      },
      "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
+      "ishod": "ПРОШЛО",
+      "kod": null,
       "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "pochemu": "узел принял инструкцию"
      },
-     "units": 43911,
-     "logi": null
-    },
-    {
-     "podpis": "5oTLs99TwFZv5raDvP5MenxhtyswKkbhdxaXNVReDQXxrnD7W8x4jKTZUmp9o9TrTXQaKvWPMmrmQvutFi4LyS7Y",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 45411,
-     "logi": null
-    },
-    {
-     "podpis": "5i7fyxyWGSFEpaBZLkKWsGkVG3xUotp2jYTuweXPT8omr17M1dLgEeAsBb68oj9RjDuuwtdU59EJpaXhCUip1uNf",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 42411,
+     "units": 59624,
      "logi": null
     }
    ],
@@ -541,7 +538,7 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
    "bajt_v_bajt": 20,
    "stroki": [
     {
-     "podpis": "3v1kVbaRER84WbMLTSSx4WvPXBEcbeiuvXTV7HofGp676vEwaZJYnKESyBdWrsMco7txNcWC1AyVFDkGxcddqmV5",
+     "podpis": "47bwR6ybywGBDsWvdVdWedTo494Myy5wM9YFZYd19gAu76PfDu3LuszPpMWyrb14hz4wAG7Dxbunw8RbigoCdo26",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -559,11 +556,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 35571,
+     "units": 34099,
      "logi": null
     },
     {
-     "podpis": "bTeVc1VFKZmMH7E3phNWYiufjcT8ckn2ei8fpK5jx9ErjKHoYU85ndAmkmxrmmgJDfWkLBXYfyac8LTB9ta7Tsp",
+     "podpis": "4MFXBt9pXXLfqGUbuXG8Ab8riKyrsN9z8SP4cynALEZ3m5pbcFH83G86tuu4HQigHeKH1R5fAAHV8iBcYKUKDcYy",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -581,11 +578,33 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 38571,
+     "units": 34099,
      "logi": null
     },
     {
-     "podpis": "4aXeFPTwPn93QVfXiKsDp2undRxVznwdLxK16YfTXvP259sFcjHpLN7tkABYWzUMEucHsp2rX8SVx3wH6PGHFA1t",
+     "podpis": "4TXKEzLSY4ot9hBmxE2ybzvaqAPKURvvaFiZ8rWd1bSWs5u7pLuqB6jqH4Dm59Z7h6Kf43Zm9CAZmFDxs1Hn1b7G",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 10349,
+     "logi": null
+    },
+    {
+     "podpis": "2X4dzSDsmCBxwwzgngDtn8gn73AtnhgWcDRCr1pjKbz2UtFa5E2ooJyAURdof2oeyhdqs48KwWg9rc2MVFqDzUzg",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -603,11 +622,99 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 34071,
+     "units": 37104,
      "logi": null
     },
     {
-     "podpis": "oc9RXmAsyu3CKy7wsvfM5BbQNoTAWT4NB7WM1E1obofsQiiAFfTKXdhKb5pEfxL64R5KUogpoYm3mAgxhDt4g9N",
+     "podpis": "5uSfc5g9j1NdDmujQyji9n5MR2NG1wG8W2KT3BDtKxuy8cdvhQqPNjJpbb6YY8rUKhi476kVErrGB2JxfGYnCMM5",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 10349,
+     "logi": null
+    },
+    {
+     "podpis": "4zZteTb8x9QDMWKn33qahJmEBp8UupVbTfqUVducFMWAxgKHGWgyMVsfavQX9mexHXNRyDaYEckJNe7ZC5jHNWz8",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 52999,
+     "logi": null
+    },
+    {
+     "podpis": "5oCtr5sX4J5xggjpRiS7dw4YQJhosqBKmSDZJaLjxXyC3dz5fujk6874yeCabNH3UEsu9NtaLiE2SFm2pCFECdsQ",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 54629,
+     "logi": null
+    },
+    {
+     "podpis": "2BgQX3UbNtNEFTLPW4J9Tk6hRcY2uHcasGNu8SDFuU5iH4R6PScuerTeRKr3nxKQoDzsCbAgbgrrwxfhgvVVPT5F",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 54527,
+     "logi": null
+    },
+    {
+     "podpis": "51V9ANcsYDNxJhS2XoLCvj3tTpPdZP38A13geMZSCmL1jxKopH1vNybDLDHnW5VPcxQs6ssFAN4S383H5yge31gx",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -625,11 +732,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 34000,
+     "units": 32486,
      "logi": null
     },
     {
-     "podpis": "5gijNjz4AfrSnpD1UvYHTKW7TeQzS3E7jyjhY3qbofT6DwoJGRxx64YnoFknfTorPCRHTyZaVDGJTFnF5ev1YARV",
+     "podpis": "5BZmWVyupSFDE6YDRpQrGDiWmgVi4W2tJauorGeoMGYsjfAPeXczrLyov7xczxieUnJ5N3nLDNNqJF9uz8uwfUYn",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -647,11 +754,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 31000,
+     "units": 32490,
      "logi": null
     },
     {
-     "podpis": "2QLFTeUaUihHZhAeVoCQDfZ9XpEd7HjRHzmfwh2hhuzJVxqC2kTdHtMsGxp5zWvtxYZrBsaxvnDxo2XosTD8mJwS",
+     "podpis": "626ctNo2ATvca4HB4G4AHaiYFdYFR2os3kBSWwFBJkv9T91X4LivqbHdeHjDpYFkTYgfnKmtEeskmwDAdrAJcz81",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -669,11 +776,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 31000,
+     "units": 32490,
      "logi": null
     },
     {
-     "podpis": "3quF2NXxUFVC7NvCkgywaFUv7NUsgkBafN3BbfhrWBkXEi5TrD7joWRYhtenwnbN1SZQpsoPyXfLiMxqRrGULz8X",
+     "podpis": "5jRAZSjMRiboxSVNwGc6yWobs6SkgfunPsvRdrWrf7BhtKUBvUyqyQXrGyD2X8shipYoCzdVajQ3PL6aPSPgKMJc",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -691,11 +798,33 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 38571,
+     "units": 38599,
      "logi": null
     },
     {
-     "podpis": "6CRCajhEbhinvXySWR6SCTjWcviFJyZB2khjKkBm74TXrfdUivmGFenrMCcwwNN8XmWqqYvPScsVdHPcydZ6tvJ",
+     "podpis": "inG9icSE2836q9jAq4WT67NoQ1qhrVayFiGinQBUBa8yMeo2jUkWkem4K718q14wF94Njqhgyd6suqhnBvZo88n",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 10365,
+     "logi": null
+    },
+    {
+     "podpis": "4CXWfJ2RhRShncVL87w72rPPpCfP5nvyExijf2KneAisxEnF5ASsHJpC7pcp63Anadkn26nyZS9GsbfGGC3VKYoo",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -713,11 +842,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 34071,
+     "units": 32603,
      "logi": null
     },
     {
-     "podpis": "4w97EYF664eqsXgVyzT8h1yzcbNeBBHSiA6PfefUcrEnVprpomPcXLcuiaD3SkpLWaJQfwxPJXcG2DPUsnCeWidb",
+     "podpis": "3azZz8kpWAJfwMRP2m2BceR4cfnPLyX1tykzETYBtH4TRWNDz3hdYTqrqgJ1x1t57cpDM2ejqUzkAdH1P4axavaT",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -735,11 +864,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 35571,
+     "units": 37103,
      "logi": null
     },
     {
-     "podpis": "5a49RQFnA37R2nGM5TGSuG4JMYeroULmY1BgtZFc4ngzh9KLz1Az4Tnd7jofMKPToCtq7VBaAHr3oc6V9pmoBsna",
+     "podpis": "2oezSoVviMQ3fgXoeDBqTfe5rRRkkAWXGzchxuv9gWgVfLioiFZStDLQLaV4U1BUp9D8JBWsgR58Zf5b4DpdUYL4",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -757,77 +886,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 29600,
+     "units": 28092,
      "logi": null
     },
     {
-     "podpis": "5E3B44QowZa5mo5MfdGnpvrk8YqpLws1LLM7HdB6K2VuxVjdz7HqLVEd8Ehq2TxJS3PzUS5nivcmPKXgmQH2AUmH",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 35571,
-     "logi": null
-    },
-    {
-     "podpis": "2Z7NwjQthbXEhnuxuQKqKSSQB8xaJjZypBhfzfvaCF7bPPFGGgtGtozzDyDnWVYYSGFZNiWxAnomxWdKG2ZyUcWN",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 38571,
-     "logi": null
-    },
-    {
-     "podpis": "6t5MwcMUAmRLTk6Xo2F8VuEmpdSptuNbSuoyWMW8iGHfMc2eMxHPKsxEeaCBBXnGvyJJuLZrVpkzpnAt9XfoGh9",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 34071,
-     "logi": null
-    },
-    {
-     "podpis": "3GZAXpsFKNKH6aXGVU3PoTyvBXNVg7iAbJV5NPNjxxXyteG6jXMYEZvasowGF45fG1ptufzDFPDjTyJxVXZUq5yN",
+     "podpis": "4EF7BqD7rwnBK4JCVxcyiBBgNcuKthufTRHBpubZpSixbiULV77QL8KEqpK8LmmuqFoBRhwEt1TXxQXmdKwbisAt",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -845,33 +908,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "BondingCurveComplete",
       "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
      },
-     "units": 38776,
+     "units": 28276,
      "logi": null
     },
     {
-     "podpis": "7xNJdrWyZ6FnLtH4kYMe5JKjTMVci7c3oJdgN9XMqS9bqNKEM7eHbj4rdTR1AtcMYucrUcqDygigwNi3BbSEEpy",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6005,
-      "imja": "BondingCurveComplete",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "chuzhoj": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6005,
-      "imja": "BondingCurveComplete",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "units": 32776,
-     "logi": null
-    },
-    {
-     "podpis": "VXNAvPRigTuSqmE6gsYsP35f5RhYodc8dAzXKZWPFZQ7ypJeS5WcNuuxWcFK9izVJNQ4wQnvz5coR28bvGjt2WX",
+     "podpis": "27JZ3ygWN1qHuvCkkCKBXdFn8VA8kQv76VPkQMis89y6bAHa9gPFxCr223rYnoQKDzz9ZH4FDYkZnptXjgbTno9N",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -879,21 +920,21 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
      "bajt_v_bajt": true,
      "nash": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
      "chuzhoj": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 29512,
+     "units": 10365,
      "logi": null
     },
     {
-     "podpis": "VEjdPxxP8HGw955mbF5yN5ojAwfv9aMCp5PqhWvzPVwZehxwhY31dVPL4s1MFqPN5pfruuFjgadHPvuqKyCZkDF",
+     "podpis": "yvY9PoLJfB6V5ubwDVnfBTZ2PVGQXhKtAtaFjqma6ALB43M3QzK8Ue8qZB9iUqVZnrrzHoX6TiPzpm8gyepEwg1",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -911,11 +952,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": "NotEnoughTokensToSell",
       "pochemu": "ошибка программы не про числа -- значит про раскладку"
      },
-     "units": 35512,
+     "units": 29603,
      "logi": null
     },
     {
-     "podpis": "J5qf5MAA4Zo6LPeREJxyooCxYvK1cXYcQV88RQPve6enfyo93Ciczsd8Tdp8E3bJk4f584G6HganU9Vus3Cn8Rg",
+     "podpis": "31tnYs9XeDrn53TDJ46UarxHYAxdc7iu6ynQ5Zwn6RDpuiw7U5zWoib4cqxFcWrsyM7E1k8BdWQxiGxTDBxX4s4M",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -923,61 +964,17 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
      "bajt_v_bajt": true,
      "nash": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
      "chuzhoj": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 38571,
-     "logi": null
-    },
-    {
-     "podpis": "5pxF4BaGx3M5s2cD5Xqarqdce5hmieKyEZDpcsLbmr7ktrRecVWVSZqqQrGQMd6R7DjAE9gAypUYAQKspAsK4cBz",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 34071,
-     "logi": null
-    },
-    {
-     "podpis": "37T3JqZZCYMjP2XmEjhr4dHxsSCpHpXSJKbxXFkbFLh8SJTQDRwKeNjWXrsNNWQY4NaG8TPS6yfhNeowx4WAM6nP",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 35571,
+     "units": 10365,
      "logi": null
     }
    ],
@@ -987,299 +984,276 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
   },
   {
    "variant": "pump.buy_v2",
-   "obrazcov": 12,
+   "obrazcov": 0,
    "cel": 20,
-   "obrazcov_token2022": 12,
+   "obrazcov_token2022": 0,
    "cel_token2022": 0,
-   "proverok": 12,
-   "proshlo": 12,
+   "proverok": 0,
+   "proshlo": 0,
    "krasnyh": 0,
-   "raskladka_soshlas": 12,
-   "bajt_v_bajt": 12,
-   "stroki": [
-    {
-     "podpis": "5fHm1Myf6Bi4V2HdZudqjxztbLrxZXeSucayH4DFqgY14QLvW99KwuG7WD8XB8Zh6BNimFPpwnHw5dsstUFsNxkb",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 113769,
-     "logi": null
-    },
-    {
-     "podpis": "34D392L3qVEA2yNCopXdoWxXtCLEVkvt7HuSfJPVDR7LwyQd1cGrzHLRJRL4tvjwEZKaoViPY8svbY64qEetjFgP",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 119733,
-     "logi": null
-    },
-    {
-     "podpis": "4WPrB17pazynBN4C44Nt8jxycTUCXVZk4LmQa6D4NbEgBTwoKELuTD9Ti441XZmcsRvefo99Mrj8xBh2jeR4LEkB",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 113768,
-     "logi": null
-    },
-    {
-     "podpis": "XmxyDWWvpyYgB4qdLSh7Vu4QDbxNSSApPP5AZcWQykcFcb3ABgWCzYi2PGiNc4CNJgJQgDyYtbJcQiA4BaHV7Yr",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 113760,
-     "logi": null
-    },
-    {
-     "podpis": "3rcsXsBviisW6ZARXMcmXDYjabXeJfrteAcBb4eMMUCksfk7YhtkRQp9Mw8W1PqYNHFLuFF34qm2ZFqqLTxioZ7C",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 13024,
-     "logi": null
-    },
-    {
-     "podpis": "4sEQcRmPz7f4Vy2TPJ5j4qWdQ89dhQqBvtX2iYrdskmHLSnNt1YptjPwn7MiHv18onGfVHbMnFJJEjEYYGvbuuYL",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 113295,
-     "logi": null
-    },
-    {
-     "podpis": "jf6iC6rTzziBSMcCVkAhBdL7so15QZBKj6mLKY1Lr2qjdT5BRndzrSx2BnqjmuzwzNzsrEhxC75B1pdPtk5Apmp",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 119192,
-     "logi": null
-    },
-    {
-     "podpis": "PichsoCFpqCTtSE1gWB66a7pvEp42Fcxp2ExbJwXLN4S9n9hS4M8dmYRKrqgsMqQqGdvCCWLrJxi48LDeXXHZYb",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 119373,
-     "logi": null
-    },
-    {
-     "podpis": "hF2WNyFaTkp79V2H4oxc7sKc72wWLJFCZD7H7Hav3f3S5phJqFAiqTQwpL9WVo3Ni3EuLQFCvyDbfntDUyu6cL2",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 113243,
-     "logi": null
-    },
-    {
-     "podpis": "3j84dmgAwqgvdcYEnD2p4ZwBddzYfvyLPMBCuY4hGaaqSoTQZJYhegkAtamCANufVxYisCTbDKmxmw6JbC3SPXX8",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 119269,
-     "logi": null
-    },
-    {
-     "podpis": "4yrFMK3nmbTZt9i1qGoebz5HhcZ7Q1kicLzjL6C63p7oLPgjxiV8PfkDsmtFfFtxHw5ZZtJHYUnE7Kw41AtJPkZQ",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 116036,
-     "logi": null
-    },
-    {
-     "podpis": "5txDAePWzQR7cj4ac1eNLaEVWMNuZBpSWS6byqCFbfGRQsd2HhATbSAPgLiCzramKwZ2jzoJYxJqTnfJfgZfjrsb",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "chuzhoj": {
-      "ishod": "ПРОШЛО",
-      "kod": null,
-      "imja": null,
-      "pochemu": "узел принял инструкцию"
-     },
-     "units": 113295,
-     "logi": null
-    }
-   ],
+   "raskladka_soshlas": 0,
+   "bajt_v_bajt": 0,
+   "stroki": [],
    "nedobor": true,
    "nedobor_token2022": false,
-   "why_not": "образцов меньше цели: 12 из 20"
+   "why_not": "образцов не набрано -- судить не о чем"
   },
   {
    "variant": "pump.buy_exact_quote_in_v2",
-   "obrazcov": 4,
+   "obrazcov": 15,
    "cel": 20,
-   "obrazcov_token2022": 4,
+   "obrazcov_token2022": 15,
    "cel_token2022": 0,
-   "proverok": 4,
-   "proshlo": 4,
+   "proverok": 15,
+   "proshlo": 15,
    "krasnyh": 0,
-   "raskladka_soshlas": 4,
-   "bajt_v_bajt": 4,
+   "raskladka_soshlas": 15,
+   "bajt_v_bajt": 15,
    "stroki": [
     {
-     "podpis": "oi6sXBxCbuK42H4b8dvnKJ49ppK49rC7ZbxpXQYnKcfZ7dREAVLZ4XAJMVroMagS8SkmuQn96qWGCtVx4YcAmCg",
+     "podpis": "46Rz7r6creKoTtiRacd6tb3Px3iknnR5Dqa2VZJ9HSp4QrmYyHXx4FLATwHRwTiYCmrkd53fDz9yksiNBm4Dbm4y",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 99760,
+     "logi": null
+    },
+    {
+     "podpis": "4vWhUF4ztn74DNcXG83eiVrGuwSVyR773jhRQ8uPpaiYfHNDvRiw3td6pmLYsFXXthSWA6qgSDRdFG5MYdGRPGvV",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 98372,
+     "logi": null
+    },
+    {
+     "podpis": "51EKKz7VZSZMJN4s8WZiG6bxoudtofPqRPYpNsN47bUYnX1jhVGbZBsvsrsBYYDyZGdt9HJe3dKVBtKGnpq4Xcgk",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 84029,
+     "logi": null
+    },
+    {
+     "podpis": "4TLb9Spnx6eE3B4swrcxAEPtMHJ2PAZQqSjTrvZJ7W2r1Sey9bSUeZeMeR9rXhTsJfeL7LPr7QsRGNDVdrPDhLFn",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 85529,
+     "logi": null
+    },
+    {
+     "podpis": "5VN5HR1hGojhS4VpYqdz2jWgLHWHgZ272aK43kMtYukwtRd81XN34HSkKQh59Lkyk5cqQxutTG73Q3hYee2vXbJA",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 85615,
+     "logi": null
+    },
+    {
+     "podpis": "2HbgG5WAzYTPwGp2quvZyPaAWt7YQGoecCi7Xa8zppV8dSBPcFVNdHKyYEyyR4Vhes9Z1re4Q2QKLk7WvuBQMcND",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 79857,
+     "logi": null
+    },
+    {
+     "podpis": "3h1ccBi7AtUxghtwUBKZKHcUREwduwVox1AvjMLo8tXHBQkChvV3sktDVU1Ywywnc3bNJD9Fg8XWrYSGNT191rCa",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
+     },
+     "chuzhoj": {
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
+     },
+     "units": 61245,
+     "logi": null
+    },
+    {
+     "podpis": "T5RNMYwevUCHPeHEQmwnnZxDmPcquvYaK7ZBw8MvqsY9CHKS8JqwLwAyCFfQzJTHwwJFRffJqdLAGwFoC5VVZF2",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 82452,
+     "logi": null
+    },
+    {
+     "podpis": "4UGEaKH4qQ4nJQ8jRzyfRQKgP5RG1BFrugA4eUt6hd2RUAorXRLHyqmLMQkUmbUGM635hWZd6zU2UxdArivfgu77",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 87458,
+     "logi": null
+    },
+    {
+     "podpis": "3qRXono8pPo6jYuA6hiQ3rpZdaDGNfiFRBagHQSimV783N3bqwfJL2sK4yQ8SVAbvapc44CsffgsRQHdnhLNZtYi",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 1,
+      "imja": null,
+      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 82452,
+     "logi": null
+    },
+    {
+     "podpis": "BCCZyzUsbZtfzeiy6ZzB4UsE64Bx7f1rUbGPmDCzUYLGxNmbmBHcaFSnNXVme1UhUcNLbUTwhtH9FehodYTiUbU",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
+     },
+     "chuzhoj": {
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
+     },
+     "units": 56831,
+     "logi": null
+    },
+    {
+     "podpis": "3d9hsddAHaQBU6fPcEafVENRokcj5VBddcy6axGYETA79SHAJ18weqBVGEnhpRaYQByDGayMFx1WNjdzx7vYE2bJ",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -1301,7 +1275,7 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
      "logi": null
     },
     {
-     "podpis": "29W3AwmKbyKbtuYPQdqMU6ZErB1qTSuVuu8UqHXHrfbefXj5tiDxQ2Ch4FNvhUJAK9UgqRNHswx9uLGfg9hL6TT8",
+     "podpis": "523cTKuqJJzunJCUdihqNGhQ3Z49oujiQksXKBuvqYiXZZdRryUvvuE8pBiDVs1fC1V4Cd66EqnmSCTJatBVnwhX",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -1319,502 +1293,72 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 152107,
+     "units": 99760,
      "logi": null
     },
     {
-     "podpis": "41oQomq8MfhKtMQW7eixqGggLeFVVVwV2EUJ6is1czvT93gbfyMFa6yiwcht3xye7TkF11QEuAXiaApVJ4urpwi5",
+     "podpis": "3rCh3tWjg5DMY3e7xo3KnN1K6onLsjoUm7gn3ftDTvvW8VDdqK1nZ4KtNEDwoaQVzqF5Lz3HDLkBmcG5daKk1j7",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
      "razoshlis": [],
      "bajt_v_bajt": true,
      "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
      },
      "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
      },
-     "units": 80318,
+     "units": 65745,
      "logi": null
     },
     {
-     "podpis": "2ThHZhqMkoMVfEQPpCEobUfudLsQDQsfu9QUjByuoVdbbX9kii4HXAyQwUkUpS8fJKCCAZxr3DfMXVAnnkQGk5Yj",
+     "podpis": "5XiXM6KvWDLrW5ohMckQ3eojQ2R2SE2wJZ7NhRowZxcwyvSH7M6QKit2kc1LEs9gKxPpFs6Y4aUxicWpy8kXeVu6",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
      "razoshlis": [],
      "bajt_v_bajt": true,
      "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
      },
      "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 1,
-      "imja": null,
-      "pochemu": "код 1 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
+      "kod": 6005,
+      "imja": "BondingCurveComplete",
+      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
      },
-     "units": 84668,
+     "units": 61245,
      "logi": null
     }
    ],
    "nedobor": true,
    "nedobor_token2022": false,
-   "why_not": "образцов меньше цели: 4 из 20"
+   "why_not": "образцов меньше цели: 15 из 20"
   },
   {
    "variant": "pump.sell_v2",
    "obrazcov": 20,
    "cel": 20,
-   "obrazcov_token2022": 20,
+   "obrazcov_token2022": 19,
    "cel_token2022": 0,
    "proverok": 20,
    "proshlo": 20,
    "krasnyh": 0,
-   "raskladka_soshlas": 15,
+   "raskladka_soshlas": 20,
    "bajt_v_bajt": 20,
    "stroki": [
     {
-     "podpis": "5KSe9k9cURgrMtr5TmCLeaSSDQxutYiYpucg9X3sUS61jHnqcyCnP2SHJhMQPkQvVovnA2pVVwTiDwpY1945sgaU",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12762,
-     "logi": null
-    },
-    {
-     "podpis": "43LZxmA2no5AcdPyymwq8gbmRvL66KwFruQzkzmND3unjwzwMbVNaxtnz8JvMBxvWq7oiKfVdhHFiKsg1iskuSV",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12763,
-     "logi": null
-    },
-    {
-     "podpis": "5GzyATbYAGeNVgvnrpcs652hTit2tJJoNQhqChEMA5VoAV8HHgEqjFc3aujJSxhKwph1CDDyDSds6T4dzYH1rPqj",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6003,
-      "imja": "TooLittleSolReceived",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "chuzhoj": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6003,
-      "imja": "TooLittleSolReceived",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "units": 98926,
-     "logi": null
-    },
-    {
-     "podpis": "3N8yMgMQuavwT2dzXnRReefjmoM9kuFRnB25xn1Z5FdPkvzZuJmqYbAWU8LHpT6ghyNQzvwWq77ZWZHLydTWVsaT",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 53881,
-     "logi": null
-    },
-    {
-     "podpis": "3VFQmAbtxNaug1C3nS9u9BkP5BabnsLgcmzLxTzNEMuczD4WVJABuLV4GgYqT6hCHFwTut2nHpFQfjMzAjaCaAQK",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": false,
-     "razoshlis": [
-      {
-       "imja": "associated_base_user",
-       "nash": "sY37QFNVNUUsEpvS5wpzzd1xSRQwmyMyKYsPjhdm9ap",
-       "chuzhoj": "BFCYHUapKjocuLcaX2kd3565iA4FQe3b6JFU4dJVfFsg"
-      },
-      {
-       "imja": "associated_quote_user",
-       "nash": "GUH7ccfgfhTbQ2UFMM7ha2mjnhX2YtoyGfGQJWnnK185",
-       "chuzhoj": "4wHEHvEETj6y6iXtdoGqfQJXHY6dyx7FtZuwePZie1CE"
-      }
-     ],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12767,
-     "logi": null
-    },
-    {
-     "podpis": "4kW4RnWsSVzFhobSuMadgwvuBntyQ1aoGB29fsMWcVUh7o9ozR5rwHJDqf3mSAd65MiaG8P5Mv2wGysgrcbGRqh9",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 56889,
-     "logi": null
-    },
-    {
-     "podpis": "KcHsQCe69jEUa7yQRjZtEM78qVXz5HpRtFwxQ7HKansF5gJrmHGWbXnyNdXxqaSfQpEyHcRZDBtJBoQb2D488PA",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 49381,
-     "logi": null
-    },
-    {
-     "podpis": "3TJkEbZ5J5FepXWkH3MXTE6zQwbrw5UP45D3H4r5tkf7oE6kWH89FWtNhw5P3RXyEHvnMJ9Q22RLq1nJwCrvoJpP",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12762,
-     "logi": null
-    },
-    {
-     "podpis": "4VamG5gJTKrBWAsC2zGoyZi7RJUXnHUMcfkaCFfNUmbETs6jqSY3Et3DGCbTNMdRD36s9UMD2wFEW6BykfzbjD5",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 46389,
-     "logi": null
-    },
-    {
-     "podpis": "4WjjfjsAypyXZnUKYXMvrqngjSFHPafg89S2bGq9b1grJh3YdStZrrPcjbBXr5foHQnYmzNMYroFuGmrDn4f7AL6",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6005,
-      "imja": "BondingCurveComplete",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "chuzhoj": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6005,
-      "imja": "BondingCurveComplete",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "units": 52565,
-     "logi": null
-    },
-    {
-     "podpis": "4VvvebPndRs4PFqYw39oH5XiMSVFtu72XFb1B9iQdMudc8pYjFEVx3VbfPpnqg3vMv6zXraPsBPqSQcNG9tYEcpQ",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12768,
-     "logi": null
-    },
-    {
-     "podpis": "4dYm8Z9bceGwmm577T84581hbUad1Uwr4KGYG4cuyWvbFCE3oDM43i3xt7NFjeQuei4T7LBrju1S6TKphNTANGjK",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12762,
-     "logi": null
-    },
-    {
-     "podpis": "394U9RA4h678KvZvYo8gxA8zt3xExvMhsaAF4DUpHzttqLi5w6ADP8r7FAMQ8ozCj12ssWbuHxJzwXnt1uaR2g6a",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": false,
-     "razoshlis": [
-      {
-       "imja": "associated_base_user",
-       "nash": "sY37QFNVNUUsEpvS5wpzzd1xSRQwmyMyKYsPjhdm9ap",
-       "chuzhoj": "BFCYHUapKjocuLcaX2kd3565iA4FQe3b6JFU4dJVfFsg"
-      },
-      {
-       "imja": "associated_quote_user",
-       "nash": "GUH7ccfgfhTbQ2UFMM7ha2mjnhX2YtoyGfGQJWnnK185",
-       "chuzhoj": "4wHEHvEETj6y6iXtdoGqfQJXHY6dyx7FtZuwePZie1CE"
-      }
-     ],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12767,
-     "logi": null
-    },
-    {
-     "podpis": "HXzvZPHcRoikhNNA5sKWATGM1yeAYvFNWyhi3BvmeRCH6cKUnGHUVagtcoxowPfYTgBzTxVrR3VbreGjno1ywHM",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": false,
-     "razoshlis": [
-      {
-       "imja": "associated_base_user",
-       "nash": "8HgQNBqs9ZFjGjj7zUSiuPzV9SD9KZyakh4GXx94t1Gz",
-       "chuzhoj": "EW1zmVvEyJ3hdnZfWR9q3TunwtMgUofPMaG7bs5fpmCX"
-      }
-     ],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12767,
-     "logi": null
-    },
-    {
-     "podpis": "HEzRsgkPCrheEooG6m5Adx95CQMteAmsXUFRy3SaT5WpQj7gSNMkAkAh3WnzevwkxG35mYQq8efbt1Rr7ADjD7A",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": false,
-     "razoshlis": [
-      {
-       "imja": "associated_base_user",
-       "nash": "DTPnqcxqF2YK5kt5Wmhtn28frTn6YV1AxSBqRBz51Nhv",
-       "chuzhoj": "GySFUJiWiUR73YcZ5RzzUQVxV3uBzZKkLKgXZ9fHFbrX"
-      }
-     ],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 3012,
-      "imja": null,
-      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
-     },
-     "units": 12767,
-     "logi": null
-    },
-    {
-     "podpis": "5Mxw4XhRbGin21BErAPXHZbn7EqT7M5A1Lp7qDHEgD431rGfJiBqCYfvsRUp93iZXd9aiivxSsh4xDzWvRYk8MX",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 50889,
-     "logi": null
-    },
-    {
-     "podpis": "47sdQkWrCfbJKvAbc9BAnuyTJoPSAPm6q5zHYXoAgHS49Rydy5Mea2YP2RyiHGCNFYxmC913iorKvb2Zw67eCkNj",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6003,
-      "imja": "TooLittleSolReceived",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "chuzhoj": {
-      "ishod": "ЭКОНОМИКА/СОСТОЯНИЕ",
-      "kod": 6003,
-      "imja": "TooLittleSolReceived",
-      "pochemu": "программа РАЗОБРАЛА счета и аргументы и отказала на числах или состоянии"
-     },
-     "units": 95860,
-     "logi": null
-    },
-    {
-     "podpis": "3oq6kAysMawodpRnBzdud6TfCMFoA6agbvnXkSNZFphMSqa2h2L99mCbzpF8Hn9xZrPBu5tpAUBiMA5kvB2vZ2ui",
-     "ok": true,
-     "why_not": null,
-     "raskladka_soshlas": true,
-     "razoshlis": [],
-     "bajt_v_bajt": true,
-     "nash": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "chuzhoj": {
-      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
-      "kod": 6023,
-      "imja": "NotEnoughTokensToSell",
-      "pochemu": "ошибка программы не про числа -- значит про раскладку"
-     },
-     "units": 59889,
-     "logi": null
-    },
-    {
-     "podpis": "4LTAYAd7XEpc7jzwuJaePjUFvJBi4hTnAEsZtSKPMmWuaMAZ9Gvsyc9CniagPEfMUyVSEhBoAqnKKJBvwGy8RBMZ",
+     "podpis": "3UpWkfCt3RcACc8V6nAFhcamXuUmubemECEaaGBg6L6dvcE96KhYKa7hnCaxqhcrXLrYiFW5mveZgRzpmknx11SB",
      "ok": true,
      "why_not": null,
      "raskladka_soshlas": true,
@@ -1836,17 +1380,11 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
      "logi": null
     },
     {
-     "podpis": "4c8SVtWKnL5tXNfG7oNDD8pVPkKPWgDaKdDnz5bNZjcT88oYHaYMM6M1DVtncB38eaRMDxvD5MF6YWQ6n2rLiMFE",
+     "podpis": "41db7yNf4cja3R4A9Gy271ZPkr45sbPJbPiktJoyuJXaEfC825KS4kefeBTNGSW1QpsMhogBcbL7CPPBwLefp5uM",
      "ok": true,
      "why_not": null,
-     "raskladka_soshlas": false,
-     "razoshlis": [
-      {
-       "imja": "associated_base_user",
-       "nash": "55Hvt6aMKRP9HhNRTUsqDpEhMZJBTVaEMMUvPE4uEM3o",
-       "chuzhoj": "9zKw4rQW6DiyDGzYupdjhQz9L2gpt8bHA3VazME77ppu"
-      }
-     ],
+     "raskladka_soshlas": true,
+     "razoshlis": [],
      "bajt_v_bajt": true,
      "nash": {
       "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
@@ -1860,7 +1398,403 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
       "imja": null,
       "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
      },
-     "units": 12767,
+     "units": 12763,
+     "logi": null
+    },
+    {
+     "podpis": "3rFQdsxPi7rb5qQgebU4SKJ5DXgbrgqLRvy17h2TmeYoonnXnGD8nZRMjySjynXNBZ4x9jLSYwmsTWudMk3NA2F8",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 12763,
+     "logi": null
+    },
+    {
+     "podpis": "2825DfKYJGMp58nCPtbHXXtrq5rxwH7xaiveWUTejFU6WM8oaNAPCFWNnAx9La8HdQgeaeUYEzxrzhS1cofFDcGy",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 12762,
+     "logi": null
+    },
+    {
+     "podpis": "47tcs83RZuTL5kj6jVxZeQb3fZTfrQPsb5ZDc34zQ2WDyR1UeopYFP1ZwgB3fQVfxxKZGuMEiQJNyq4mn7d6K5uD",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 12763,
+     "logi": null
+    },
+    {
+     "podpis": "4dF5kgE2beDZbjvwwWRSSdzT2qEQxCaT56SjjbDkowJgg9zm2BKMcjf4MtKsWMJbEmiZ9zD4CJobP2CiNzZFdbEJ",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 61393,
+     "logi": null
+    },
+    {
+     "podpis": "3fzPkUDSky2jJSKLeYt2QVGex1r15yALEEFNAkChpetkTadhJQmTofywpBiZcCSu3i9PqBSWcFBbpsXWKHbQYZXt",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 59889,
+     "logi": null
+    },
+    {
+     "podpis": "4eBCFs5FC8hz5XLZ9MoTXrGisHRtS9cehNU2FvDER2tCiBbsdRBzYKwUnKDhSkPb6y9KwTh1tsPTCU36vnkvxVeo",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 62893,
+     "logi": null
+    },
+    {
+     "podpis": "KCFWtVN9Hr2CN5qCTbk5Qt83MmC9HbizpoGVJTzcKP6G8WQ3p8HocT7ymFhUSGGk4THRYM2GcZFwQjYcPbBHQo5",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 52275,
+     "logi": null
+    },
+    {
+     "podpis": "3W6f61ewGbK5wwkMDaY9Ndph2dGEfHCgNCVZMvzm7vPTX5ad6EMUhUwyiV1JvjoQ1JKgwwtpBXARGPzuPyuuhGXe",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 12762,
+     "logi": null
+    },
+    {
+     "podpis": "2S5DTSqhEKCy1NVkbuCyYsHvu8yY9CxNzAWDrQ4aZZANqSnxUemNRZ8M8B3zeK74kEL7sMaQ8n1RuHas1sQE8SWg",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6024,
+      "imja": "Overflow",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6024,
+      "imja": "Overflow",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 58829,
+     "logi": null
+    },
+    {
+     "podpis": "3ggqS2kysdYo3N1Z2XosPD9ZiVuGdrrPJ4Wb8qmbAFmgKzGbsJYaHeEm9yU24U2YAAiiYWSFDqced3AFAZt9hge4",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6024,
+      "imja": "Overflow",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6024,
+      "imja": "Overflow",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 61806,
+     "logi": null
+    },
+    {
+     "podpis": "2RevtakXmzRCkh6JxXGRnTFuhY76mBLvcfEBg2ZjrHBs3LhH3arPwDbC3gWt5L54DLumEyD9J2eHZNpwiLnDgCUh",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 51058,
+     "logi": null
+    },
+    {
+     "podpis": "3yHv43sjqxDCsiHUde5cdyZqwPKhjpLkMvQr6iVeZc2pbDjvP31mTPqLPRe7QkMPn1P1VCKebmM6c4H98L1CwoYq",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "chuzhoj": {
+      "ishod": "ПРОШЛО",
+      "kod": null,
+      "imja": null,
+      "pochemu": "узел принял инструкцию"
+     },
+     "units": 68993,
+     "logi": null
+    },
+    {
+     "podpis": "5aRoY3g56BgRMH6EhdfNSCJobgs2YKzw83E7jBYPPj7Z2y2qKPYBXBtDnBsB45NEwNusfWDfUFZkTPgC2cjnq5Ce",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 55558,
+     "logi": null
+    },
+    {
+     "podpis": "4ApzoAfmzhUYjGWXHqEKgnAUX1q1LrXjK3wzhyH535p7gacYFXrKjSNTM9qMuyZRvpH2aSauHAW9VvTGdb8Yyf5r",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 3012,
+      "imja": null,
+      "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+     },
+     "units": 12762,
+     "logi": null
+    },
+    {
+     "podpis": "2kKvAgQz3pcathmvYpdTVpw6oE45dCUyTbzKsqDwsrXKZkKm8vP9xBv7VbCtX9mHjKipefzLPWMB68UwnZZap8mr",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 51058,
+     "logi": null
+    },
+    {
+     "podpis": "4iJfutuNCXyNNPK98fJYno7Lc4BEr1aNfMnHvfj4JzMuzQdv2wT6qQXBParR4UtGxKj9sbmEphNnXZA6V5h8GaWH",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 55389,
+     "logi": null
+    },
+    {
+     "podpis": "582Ty11S9o1LMKJrwhxcJmJGGwCivn4931kwunkQxvru5hrKNas8iSCMBU7qHSXLe6s3sVaskzeWWUfrWgo9NwMd",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 51066,
+     "logi": null
+    },
+    {
+     "podpis": "2P1uWXtsUB7SDzmgh3b2XhGYv1FFSWcXX6N7sdBAixuuG8eq4h2be1oPsLqzoveEXNcuRhaQRLwZoQvPAKzV9okn",
+     "ok": true,
+     "why_not": null,
+     "raskladka_soshlas": true,
+     "razoshlis": [],
+     "bajt_v_bajt": true,
+     "nash": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "chuzhoj": {
+      "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+      "kod": 6023,
+      "imja": "NotEnoughTokensToSell",
+      "pochemu": "ошибка программы не про числа -- значит про раскладку"
+     },
+     "units": 54925,
      "logi": null
     }
    ],
@@ -1924,27 +1858,81 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
    {
     "mint": "835HxB85aavDHapqypzY6Kc6Ss9Jxo1C6Ea7Gv9tNNit",
     "ok": false,
-    "why_not": "программа токена базового минта не задана: её нельзя подставить классическим Token -- она входит СЕМЕНЕМ в associated_base_bonding_curve и associated_base_user, и у минта Token-2022 адреса выйдут чужие: владелец счёта минта 835HxB85aavDHapqypzY6Kc6Ss9Jxo1C6Ea7Gv9tNNit прочитан как None"
+    "why_not": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой",
+    "base_token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "token2022": true,
+    "ishod": {
+     "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+     "kod": 3012,
+     "imja": null,
+     "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+    },
+    "schetov": 17,
+    "bajt_dannyh": 25,
+    "units": 10368,
+    "logi": [
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+     "Program log: Instruction: BuyExactQuoteInV3",
+     "Program log: AnchorError caused by account: associated_base_user. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 10368 of 200000 compute units",
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0xbc4"
+    ]
    },
    {
     "mint": "EUDqn3D6PdFdPJoWz7qqohJntquwHnvy63qZjFEX7Nzj",
     "ok": false,
-    "why_not": "программа токена базового минта не задана: её нельзя подставить классическим Token -- она входит СЕМЕНЕМ в associated_base_bonding_curve и associated_base_user, и у минта Token-2022 адреса выйдут чужие: владелец счёта минта EUDqn3D6PdFdPJoWz7qqohJntquwHnvy63qZjFEX7Nzj прочитан как None"
+    "why_not": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой",
+    "base_token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "token2022": true,
+    "ishod": {
+     "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+     "kod": 3012,
+     "imja": null,
+     "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+    },
+    "schetov": 17,
+    "bajt_dannyh": 25,
+    "units": 10368,
+    "logi": [
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+     "Program log: Instruction: BuyExactQuoteInV3",
+     "Program log: AnchorError caused by account: associated_base_user. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 10368 of 200000 compute units",
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0xbc4"
+    ]
    },
    {
     "mint": "G95jsFkxJfTogGKdbEa81An13bYM9NZNeYdCMrJGH5ib",
     "ok": false,
-    "why_not": "программа токена базового минта не задана: её нельзя подставить классическим Token -- она входит СЕМЕНЕМ в associated_base_bonding_curve и associated_base_user, и у минта Token-2022 адреса выйдут чужие: владелец счёта минта G95jsFkxJfTogGKdbEa81An13bYM9NZNeYdCMrJGH5ib прочитан как None"
+    "why_not": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой",
+    "base_token_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "token2022": true,
+    "ishod": {
+     "ishod": "РАСКЛАДКА ОТВЕРГНУТА",
+     "kod": 3012,
+     "imja": null,
+     "pochemu": "код 3012 в таблице ошибок pump не описан (рамочная Anchor или новее нашего IDL) -- считаем раскладку отвергнутой"
+    },
+    "schetov": 17,
+    "bajt_dannyh": 25,
+    "units": 10369,
+    "logi": [
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+     "Program log: Instruction: BuyExactQuoteInV3",
+     "Program log: AnchorError caused by account: associated_base_user. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 10369 of 200000 compute units",
+     "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0xbc4"
+    ]
    }
   ],
   "proverok": 3,
   "proshlo": 0,
   "krasnyh": 3,
   "why_not": null,
-  "buyback_iz_obrazca": "3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR"
+  "buyback_iz_obrazca": "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"
  },
- "proverok": 79,
- "proshlo": 76,
+ "proverok": 78,
+ "proshlo": 75,
  "krasnyh": 3,
  "nedobor": [
   "pump.buy_v3",
@@ -1954,7 +1942,7 @@ pump.buy_exact_quote_in_v3 (минты отказа 08.10)        3        3    
   "pump_amm.buy_exact_quote_in_v2",
   "pump_amm.sell_v2"
  ],
- "why_not": "3 проверок из 79 красные",
+ "why_not": "3 проверок из 78 красные",
  "nedobor_ne_zhdjom": [
   "pump.buy_v3",
   "pump.buy_v2",
