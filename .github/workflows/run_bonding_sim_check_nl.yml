@@ -31,9 +31,13 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' -- наш круг [ATA, покупка, продажа] одной транзакцией от нашего адреса | 'otkazy_puti' -- отказанные сигналы источника денежным путём"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции (только чтение)"
         required: false
         default: "bonding"
+      chitat:
+        description: "chem_sobrana: подписи НАШИХ транзакций через запятую -- чем они собраны (только чтение, без симуляции)"
+        required: false
+        default: ""
       istochnik:
         description: "otkazy_puti: адрес источника, чьи отказанные сигналы прогнать"
         required: false
@@ -106,7 +110,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy|krug_sborki|otkazy_puti)
+            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -223,6 +227,20 @@ jobs:
           # Отчёт коммитится шагом ниже, а красным прогон помечается ПОСЛЕ него.
           echo "OTKAZY_RC=$RC" >> "$GITHUB_ENV"
 
+      - name: "chem_sobrana: чем собраны НАШИ транзакции (только чтение)"
+        if: ${{ inputs.zadacha == 'chem_sobrana' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          [ -n "${{ inputs.chitat }}" ] || { echo "СБОЙ: нужны подписи во входе chitat"; exit 1; }
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --self-test | tail -2
+          export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py \
+            --chitat "${{ inputs.chitat }}" --out /tmp/chem.json | tail -80
+
       - name: "pereezdy: архив Code-2 и сборщик Code-3"
         if: ${{ inputs.zadacha == 'pereezdy' }}
         run: |
@@ -261,7 +279,7 @@ jobs:
           echo "код выхода: $RC"
 
       - name: "SSH key"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' }}
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -273,7 +291,7 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Свежие сигналы кривой из живого журнала (потоком)"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' }}
         run: |
           set -e
           set -o pipefail
@@ -292,7 +310,7 @@ jobs:
           wc -l < /tmp/bsim/curve.jsonl
 
       - name: "Симуляция нашей покупки на кривой"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |

@@ -396,6 +396,66 @@ def sostoyanie_krivoj(bazovyj_vault: str, mint: str) -> dict:
     return из_
 
 
+def chem_kupleno(podpisi: list, *, pauza: float) -> dict:
+    """ЧЕМ собрана НАША транзакция: имя инструкции кривой по IDL и счета.
+
+    Только чтение цепи, ни одной симуляции. Нужно, чтобы про СВОЮ севшую
+    покупку говорить именем разновидности, а не выводить его из того, что
+    полоса отказывала раньше. Разбор -- по дискриминатору против IDL, то есть
+    тем же способом, которым врезка узнаёт сделку источника.
+    """
+    из_ = {"podpisej": len(podpisi), "nashi": [], "why_not": None}
+    идл = СБ.zagruzit_idl()["pump"]["ix"]
+    по_диску = {зн["disc"].hex(): имя for имя, зн in идл.items()}
+    for п in podpisi:
+        п = str(п).strip()
+        if not п:
+            continue
+        т = зов("getTransaction", [п, {"encoding": "jsonParsed",
+                                        "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX,
+                                        "commitment": "confirmed"}])
+        if not т["ok"] or not т.get("result"):
+            из_["nashi"].append({"podpis": п, "why_not": f"не прочитана: "
+                                                         f"{т.get('why_not')}"})
+            continue
+        р = т["result"]
+        соо = ((р.get("transaction") or {}).get("message") or {})
+        ключи = [k.get("pubkey") if isinstance(k, dict) else k
+                 for k in (соо.get("accountKeys") or [])]
+        инстр = list(соо.get("instructions") or [])
+        for вн in (р.get("meta") or {}).get("innerInstructions") or []:
+            инстр.extend(вн.get("instructions") or [])
+        зп = {"podpis": п, "slot": р.get("slot"), "err": (р.get("meta") or {}).get("err"),
+              "krivaya": [], "programmy": sorted({и.get("programId") for и in инстр
+                                                  if и.get("programId")})}
+        for и in инстр:
+            данные = и.get("data")
+            if и.get("programId") != СБ.ПРОГ_КРИВОЙ or not isinstance(данные, str):
+                continue
+            try:
+                сырые = СБ.b58d(данные)
+            except Exception:  # noqa: BLE001
+                continue
+            имя = по_диску.get(сырые[:8].hex())
+            счета = [ключи[с] if isinstance(с, int) and с < len(ключи) else с
+                     for с in (и.get("accounts") or [])]
+            стр = {"imya": имя or "НЕ В IDL", "disc": сырые[:8].hex(),
+                   "schetov": len(счета)}
+            if имя and имя in идл:
+                имена = [а["name"] for а in идл[имя]["accounts"]]
+                по_именам = dict(zip(имена, счета, strict=False))
+                стр.update(base_mint=по_именам.get("base_mint"),
+                           base_token_program=по_именам.get("base_token_program"),
+                           user=по_именам.get("user"))
+            зп["krivaya"].append(стр)
+        из_["nashi"].append(зп)
+        if pauza:
+            time.sleep(pauza)
+    if not any(з.get("krivaya") for з in из_["nashi"]):
+        из_["why_not"] = "ни в одной транзакции инструкции кривой не нашлось"
+    return из_
+
+
 def krug_denezhnogo_puti(*, tx_istochnika: dict, mint: str, token_program: str,
                          bazovyj_vault: str, koshelek: str,
                          bilet_lamportov: int, cu: int, pauza: float) -> dict:
@@ -838,6 +898,9 @@ def main() -> int:
     п.add_argument("--podpisi", default="",
                     help="подписи отказанных сигналов через запятую: каждая "
                          "прогоняется денежным путём до симуляции")
+    п.add_argument("--chitat", default="",
+                    help="ТОЛЬКО ЧТЕНИЕ: подписи наших транзакций -- чем они "
+                         "собраны (имя разновидности по IDL), без симуляции")
     п.add_argument("--out", default="")
     а = п.parse_args()
     if а.self_test:
@@ -846,6 +909,16 @@ def main() -> int:
     # --live значит "найди минты сам", а здесь минты названы снаружи. Проверка
     # на --live стояла выше этой ветки и съела весь прогон 37957981526: код 2
     # "нужен --live", ноль вызовов узла, а прогон при этом зелёный.
+    if а.chitat.strip():
+        из_ = chem_kupleno(
+            [x for x in а.chitat.replace(";", ",").split(",") if x.strip()],
+            pauza=а.pauza)
+        из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        return 0 if not из_["why_not"] else 1
     спис = [x for x in а.podpisi.replace(";", ",").split(",") if x.strip()]
     сбор_ист = None
     if а.istochnik.strip():
