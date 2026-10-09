@@ -347,6 +347,13 @@ jobs:
             cp /tmp/pereezdy.json data/pereezdy_po_cepi.json 2>/dev/null || true
             git add data/pereezdy_po_cepi.json || true
           fi
+          if [ "${{ inputs.zadacha }}" = "chem_sobrana" ]; then
+            git checkout -- analysis data 2>/dev/null || true
+            git clean -fd analysis data 2>/dev/null || true
+            mkdir -p data
+            cp /tmp/chem.json data/chem_sobrana_nashi_tx.json 2>/dev/null || true
+            git add data/chem_sobrana_nashi_tx.json || true
+          fi
           if [ "${{ inputs.zadacha }}" = "otkazy_puti" ]; then
             git checkout -- analysis data 2>/dev/null || true
             git clean -fd analysis data 2>/dev/null || true
