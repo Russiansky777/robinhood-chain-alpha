@@ -338,9 +338,15 @@ def _bez_budzheta(instrukcii: list) -> list:
     "6005": "BondingCurveComplete -- кривая добрана и переехала в пул",
     "6004": "MintDoesNotMatchBondingCurve -- счёта кривой этого минта уже нет",
 }
-# complete -- bool после дискриминатора (8) и пяти u64: смещение 48. Раскладка
-# из IDL (тип BondingCurve), а не на глаз.
+# Раскладка счёта кривой -- ИЗ IDL (тип BondingCurve), а не на глаз:
+# дискриминатор 8, пять u64 (40), complete bool, creator 32, is_mayhem_mode,
+# is_cashback_coin, quote_mint 32. Отсюда смещения.
 СМЕЩЕНИЕ_COMPLETE = 48
+СМЕЩЕНИЕ_CREATOR = 49
+СМЕЩЕНИЕ_MAYHEM = 81
+СМЕЩЕНИЕ_QUOTE_MINT = 83
+ДЛИНА_СЧЁТА_КРИВОЙ = 166
+WSOL = "So11111111111111111111111111111111111111112"
 
 
 def klass_otkaza(logi: list) -> dict:
@@ -393,6 +399,22 @@ def sostoyanie_krivoj(bazovyj_vault: str, mint: str) -> dict:
     из_["dlina"] = len(сырые)
     if len(сырые) > СМЕЩЕНИЕ_COMPLETE:
         из_["complete"] = bool(сырые[СМЕЩЕНИЕ_COMPLETE])
+    # КОТИРОВКА КРИВОЙ -- ИЗ САМОГО СЧЁТА. Наша сборка v3 кладёт WSOL; если у
+    # кривой котировка другая, программа отвечает 6004
+    # MintDoesNotMatchBondingCurve -- тем же номером, что и при отсутствии
+    # счёта. Отличить одно от другого можно только прочитав поле.
+    if len(сырые) >= СМЕЩЕНИЕ_QUOTE_MINT + 32:
+        try:
+            from solders.pubkey import Pubkey  # noqa: PLC0415
+
+            из_["quote_mint"] = str(Pubkey(
+                сырые[СМЕЩЕНИЕ_QUOTE_MINT:СМЕЩЕНИЕ_QUOTE_MINT + 32]))
+            из_["quote_wsol"] = (из_["quote_mint"] == WSOL)
+            из_["creator"] = str(Pubkey(
+                сырые[СМЕЩЕНИЕ_CREATOR:СМЕЩЕНИЕ_CREATOR + 32]))
+            из_["is_mayhem_mode"] = bool(сырые[СМЕЩЕНИЕ_MAYHEM])
+        except Exception:  # noqa: BLE001
+            из_["quote_mint"] = None
     return из_
 
 
@@ -815,8 +837,13 @@ def самопроверка() -> int:
         "не «закончилась» -- молчание не оправдание",
         klass_otkaza(["Program failed"])["klass"] == "raskladka"
         and klass_otkaza([])["kod"] is None)
-    chk("смещение complete взято из раскладки IDL: дискриминатор и пять u64",
-        СМЕЩЕНИЕ_COMPLETE == 8 + 5 * 8)
+    chk("смещения счёта кривой взяты из раскладки IDL, а не на глаз",
+        СМЕЩЕНИЕ_COMPLETE == 8 + 5 * 8
+        and СМЕЩЕНИЕ_CREATOR == СМЕЩЕНИЕ_COMPLETE + 1
+        and СМЕЩЕНИЕ_MAYHEM == СМЕЩЕНИЕ_CREATOR + 32
+        and СМЕЩЕНИЕ_QUOTE_MINT == СМЕЩЕНИЕ_MAYHEM + 2
+        and ДЛИНА_СЧЁТА_КРИВОЙ == СМЕЩЕНИЕ_QUOTE_MINT + 32 + 8 + 1 + 1 + 8
+        + 8 + 1 + 8 + 8 + 8)
     chk("ключ узла в выводе затирается",
         "СЕК" not in затереть("https://x/?api-key=СЕК"))
     # ОСТАТОК ТОКЕНА: amount -- u64 с 64-го байта счёта SPL.
