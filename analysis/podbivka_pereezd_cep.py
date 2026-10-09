@@ -157,17 +157,38 @@ def программы(tx: dict) -> set:
     return из_
 
 
-def разобрать_пул(rpc, темп: Темп, п: dict, слотов: int) -> dict:
-    """Все события пула до створ+слотов по цепи: кто, сколько, резервы, программы."""
+def разобрать_пул(rpc, темп: Темп, п: dict, слотов: int, длинно: int,
+                  образцов: int) -> dict:
+    """События пула по цепи: створ подробно, дальше -- гистограмма и выборка.
+
+    Три вопроса сразу. (1) Переезд ли это: в транзакции СТВОРА должна быть инструкция
+    программы pump.fun (адрес на 6EF8) -- она и делает migrate. (2) Торгуют ли в створе и
+    в +1/+2. (3) Виден ли выкуп BOOST: он идёт пять минут партиями, поэтому мало смотреть
+    первые слоты -- берём гистограмму подписей до створ+длинно и выборку транзакций из
+    этого окна.
+    """
     подписи, страниц = самые_старые_подписи(rpc, темп, п["poolId"])
     если_обрезано = страниц >= 20 and len(подписи) >= 20_000
-    в_окне = sorted((s for s in подписи
-                     if п["блок"] <= (s.get("slot") or 0) <= п["блок"] + слотов),
-                    key=lambda s: (s.get("slot") or 0))
     мин_слот = min((s.get("slot") or 0) for s in подписи) if подписи else None
+    б0 = п["блок"]
+    в_окне = sorted((s for s in подписи if б0 <= (s.get("slot") or 0) <= б0 + слотов),
+                    key=lambda s: (s.get("slot") or 0))
+    длинные = sorted((s for s in подписи
+                      if б0 + слотов < (s.get("slot") or 0) <= б0 + длинно),
+                     key=lambda s: (s.get("slot") or 0))
+    # гистограмма по сотням слотов -- бесплатно, слот есть в самой подписи
+    гист: collections.Counter = collections.Counter()
+    for s in подписи:
+        сдв = (s.get("slot") or 0) - б0
+        if 0 <= сдв <= длинно:
+            гист[сдв // 100 * 100] += 1
+    # выборка из длинного окна, равномерно
+    шаг = max(1, len(длинные) // max(1, образцов))
+    образцы = длинные[::шаг][:образцов]
+    брать = [s["signature"] for s in в_окне] + [s["signature"] for s in образцы]
     события: list = []
-    for нач in range(0, len(в_окне), 20):
-        часть = [s["signature"] for s in в_окне[нач:нач + 20]]
+    for нач in range(0, len(брать), 20):
+        часть = брать[нач:нач + 20]
         темп.ждать(len(часть))
         txs = rpc.get_txs(часть)
         for sig in часть:
@@ -184,17 +205,26 @@ def разобрать_пул(rpc, темп: Темп, п: dict, слотов: i
             дsol = d.get(WSOL, 0.0)
             подп = ((tx.get("transaction") or {}).get("message") or {}).get("accountKeys") or []
             кто = next((a.get("pubkey") for a in подп if a.get("signer")), None)
+            прог = sorted(программы(tx))
             события.append({
                 "подпись": sig, "слот": tx.get("slot"),
-                "сдвиг": (tx.get("slot") or 0) - п["блок"],
+                "сдвиг": (tx.get("slot") or 0) - б0,
                 "кто": кто, "дельта_токен": round(дтокен, 6), "дельта_sol": round(дsol, 9),
                 "сторона": ("buy" if дтокен < 0 and дsol > 0
                             else "sell" if дтокен > 0 and дsol < 0 else "иное"),
                 "резерв_sol": round(рез.get(WSOL, 0.0), 9),
                 "резерв_токен": round(рез.get(п["минт"], 0.0), 6),
-                "программы": sorted(программы(tx))})
+                "pumpfun": any(x.startswith(ПРЕФИКС_PUMPFUN) for x in прог),
+                "программы": прог})
+    створ_события = [e for e in события if e.get("сдвиг") == 0]
     return {"подписей_всего": len(подписи), "страниц": страниц, "обрезано": если_обрезано,
-            "самый_старый_слот": мин_слот, "в_окне": len(в_окне), "события": события}
+            "самый_старый_слот": мин_слот, "в_окне": len(в_окне),
+            "длинных_подписей": len(длинные), "образцов": len(образцы),
+            "гистограмма_слотов": dict(sorted(гист.items())),
+            "створ_с_pumpfun": any(e.get("pumpfun") for e in створ_события),
+            "створ_программы": sorted({x for e in створ_события
+                                       for x in (e.get("программы") or [])}),
+            "события": события}
 
 
 def по_слотам(события: list, слотов: int) -> dict:
@@ -256,9 +286,11 @@ def режим_сверка(rpc, темп: Темп, а) -> dict:
     ряды, кошельки, программы_счёт = [], collections.Counter(), collections.Counter()
     сумма_кошелька: dict = collections.defaultdict(float)
     пулов_кошелька: collections.Counter = collections.Counter()
+    в_длинном: collections.Counter = collections.Counter()
+    sol_в_длинном: dict = collections.defaultdict(float)
     for i, п_ in enumerate(выборка, 1):
         try:
-            из_ = разобрать_пул(rpc, темп, п_, а.slotov)
+            из_ = разобрать_пул(rpc, темп, п_, а.slotov, а.dlinno, а.obrazcov)
         except Exception as exc:  # noqa: BLE001
             ряды.append({**{k: п_[k] for k in ("сутки", "минт", "poolId", "пул", "правило")},
                          "ошибка": f"{type(exc).__name__}: {str(exc)[:120]}"})
@@ -270,6 +302,11 @@ def режим_сверка(rpc, темп: Темп, а) -> dict:
         цена = сверить_цену(п_, соб)
         пулов_кошелька.update({e["кто"] for e in соб
                                if e.get("сторона") == "buy" and e.get("кто")})
+        долгие = [e for e in соб if (e.get("сдвиг") or 0) > а.slotov]
+        for e in долгие:
+            if e.get("сторона") == "buy" and e.get("кто"):
+                в_длинном[e["кто"]] += 1
+                sol_в_длинном[e["кто"]] += e["дельта_sol"]
         for e in соб:
             if e.get("сторона") == "buy" and e.get("кто"):
                 кошельки[e["кто"]] += 1
@@ -279,6 +316,10 @@ def режим_сверка(rpc, темп: Темп, а) -> dict:
         ряды.append({
             **{k: п_[k] for k in ("сутки", "минт", "poolId", "пул", "правило", "блок")},
             "архив_событий_230": п_.get("событий"),
+            "створ_с_pumpfun": из_["створ_с_pumpfun"],
+            "створ_программы": из_["створ_программы"],
+            "длинных_подписей": из_["длинных_подписей"], "образцов": из_["образцов"],
+            "гистограмма_слотов": из_["гистограмма_слотов"],
             "архив_в_блоке_создания": п_["в_блоке_создания"].get("покупок"),
             "подписей_всего": из_["подписей_всего"], "страниц": из_["страниц"],
             "обрезано": из_["обрезано"], "самый_старый_слот": из_["самый_старый_слот"],
@@ -297,12 +338,17 @@ def режим_сверка(rpc, темп: Темп, а) -> dict:
     всего = max(1, len(годные))
     частые = [{"кошелёк": k, "пулов": v, "доля_пулов": round(100 * v / всего, 1),
                "покупок": кошельки[k], "sol_всего": round(сумма_кошелька[k], 4),
+               "покупок_в_длинном": в_длинном[k],
+               "sol_в_длинном": round(sol_в_длинном[k], 4),
                "sol_на_пул": round(сумма_кошелька[k] / v, 4) if v else None}
               for k, v in пулов_кошелька.most_common(20)]
     return {"переездов_в_архиве": len(все), "в_выборке": len(выборка),
             "годных": len(годные), "ряды": ряды,
             "частые_кошельки": частые,
-            "программы": dict(программы_счёт.most_common(15))}
+            "программы": dict(программы_счёт.most_common(20)),
+            "створ_с_pumpfun": sum(1 for r in годные if r.get("створ_с_pumpfun")),
+            "створ_без_pumpfun": sum(1 for r in годные
+                                     if r.get("створ_с_pumpfun") is False)}
 
 
 def блоки_окна(папка: Path) -> tuple:
@@ -414,7 +460,12 @@ def main() -> int:
     р_ = argparse.ArgumentParser()
     р_.add_argument("--rezhim", choices=("sverka", "tempy"), required=True)
     р_.add_argument("--skolko", type=int, default=40, help="пулов в выборке (sverka)")
-    р_.add_argument("--slotov", type=int, default=5, help="слотов от створа (sverka)")
+    р_.add_argument("--slotov", type=int, default=10,
+                    help="сколько слотов от створа брать ПОДРЯД (sverka)")
+    р_.add_argument("--dlinno", type=int, default=1121,
+                    help="длинное окно в слотах (300 с) -- гистограмма и выборка")
+    р_.add_argument("--obrazcov", type=int, default=40,
+                    help="транзакций из длинного окна на пул")
     р_.add_argument("--blokov", type=int, default=120, help="блоков в выборке (tempy)")
     р_.add_argument("--seed", type=int, default=20261009)
     р_.add_argument("--metka", default="")
