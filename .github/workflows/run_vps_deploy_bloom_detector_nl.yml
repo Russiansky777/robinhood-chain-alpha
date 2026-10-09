@@ -318,6 +318,10 @@ jobs:
           # ПРЕЖНИЙ вид строки: чат работает, но новый формат не появляется, и
           # понять это по чату нельзя. Именно на этом деплой 148 и отказал --
           # проверка списка доставки поймала отсутствие модуля ДО хоста.
+          # c1_zapusk_zhurnal -- ТЕНЕВОЙ ЖУРНАЛ ЗАПУСКОВ (п.7 задания 09.10):
+          # создания токенов pump.fun, БЕЗ ПОКУПОК. Без модуля детектор пишет
+          # причину в признак жизни и работает как раньше, но журнала не будет
+          # вовсе -- а первый час журнала владелец ждёт числами.
           # c3_pump_sborka -- СБОРЩИК ПО ИМЕНАМ IDL. Его зовут и покупка
           # (c2_swap_build), и продажа (c3_prodavec_sborka) на кривой v2/v3:
           # без него врезка отказывает словами "сборщик по IDL не доступен", и
@@ -328,7 +332,7 @@ jobs:
           # Без них полоса не подписывает, а без самого модуля детектор
           # честно пишет ModuleNotFoundError в признак жизни -- ровно это и
           # случилось в прогоне 36080386872.
-          for f in selftest_guard.py bloom_notify.py bloom_trevogi.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py bloom_close_on_sell.py bloom_region_send.py bloom_token_name.py bloom_slot_peers.py bloom_copiers.py c2_cl_quote.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_entry_premium.py bloom_lane_jupiter.py bloom_lane_two_step.py bloom_queue_price.py bloom_nogi_shablony.py close_empty_token_accounts.py c2_followers_growth.py c2_dlmm_tochnaya_kotirovka.py podbivka_dlmm_quote.py c2_clmm_stroitel.py c2_whirlpool_stroitel.py c2_dbc_stroitel.py podbivka_clmm_quote.py podbivka_dbc_quote.py podbivka_whirlpool_quote.py c2_dlmm_odno_chtenie.py c2_ammv4_stroitel.py c2_nalog_2022.py c2_doklad_format.py c2_itog_po_cepi.py c2_dlmm_bez_chteniy.py c2_usdc_noga.py c3_bilet_ot_rezerva.py vtoroe_mnenie_reestr.py c3_kotirovka_prodazhi.py c3_prodavec_sborka.py c3_usdc_noga_signaly.py c3_pump_sborka.py; do
+          for f in selftest_guard.py bloom_notify.py bloom_trevogi.py bloom_exec_state.py bloom_api.py bloom_seller.py bloom_detector.py bloom_telegram_cmd.py bloom_executor.py bloom_reconcile.py solana_rpc_client.py c2_common.py c2_pool_programs.py c2_swap_build.py c2_shadow_build.py bloom_own_send.py bloom_jupiter_sell.py dbot_rescue.py bloom_route_tax.py bloom_price_curve.py bloom_block_position.py bloom_senders.py bloom_source_groups.py bloom_close_on_sell.py bloom_region_send.py bloom_token_name.py bloom_slot_peers.py bloom_copiers.py c2_cl_quote.py bloom_tg_format.py bloom_tg_format3.py bloom_doklad.py bloom_entry_premium.py bloom_lane_jupiter.py bloom_lane_two_step.py bloom_queue_price.py bloom_nogi_shablony.py close_empty_token_accounts.py c2_followers_growth.py c2_dlmm_tochnaya_kotirovka.py podbivka_dlmm_quote.py c2_clmm_stroitel.py c2_whirlpool_stroitel.py c2_dbc_stroitel.py podbivka_clmm_quote.py podbivka_dbc_quote.py podbivka_whirlpool_quote.py c2_dlmm_odno_chtenie.py c2_ammv4_stroitel.py c2_nalog_2022.py c2_doklad_format.py c2_itog_po_cepi.py c2_dlmm_bez_chteniy.py c2_usdc_noga.py c3_bilet_ot_rezerva.py vtoroe_mnenie_reestr.py c3_kotirovka_prodazhi.py c3_prodavec_sborka.py c3_usdc_noga_signaly.py c3_pump_sborka.py c1_zapusk_zhurnal.py; do
             [ -s "analysis/$f" ] || { echo "СБОЙ: локальный analysis/$f пуст"; exit 1; }
             local_sum=$(sha256sum "analysis/$f" | cut -d' ' -f1)
             # СОВПАЛО -- НЕ ПЕРЕПИСЫВАЕМ. Переписать файл тем же содержимым

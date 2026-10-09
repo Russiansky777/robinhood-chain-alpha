@@ -166,6 +166,16 @@ try:
 except ImportError:  # pragma: no cover
     websockets = None
 
+# ТЕНЕВОЙ ЖУРНАЛ ЗАПУСКОВ pump.fun (задание владельца 09.10, п.7). Без модуля
+# журнала нет, и это НАЗВАННОЕ состояние, а не тихий откат: торговля от него не
+# зависит ни на один байт -- он только пишет строки о созданиях токенов.
+ZH_ПОЧЕМУ_НЕТ = None
+try:
+    import c1_zapusk_zhurnal as ZH
+except Exception as _exc_zh:  # noqa: BLE001
+    ZH = None
+    ZH_ПОЧЕМУ_НЕТ = f"{type(_exc_zh).__name__}: {str(_exc_zh)[:160]}"
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("bloom_detector")
 
@@ -2115,6 +2125,50 @@ class Детектор:
         self.длина_слота_почему = ""
         self.ног_кредитов_день = ST.day_key()[0]
         self._прочитать_кредиты_ног()
+        # ТЕНЕВОЙ ЖУРНАЛ ЗАПУСКОВ (задание владельца 09.10, п.7): создания
+        # токенов pump.fun, БЕЗ ПОКУПОК. Подписка -- на ОДИН счёт, PDA
+        # mint_authority: он есть только в create и create_v2 и ни в одной из
+        # остальных 54 инструкций программы (проверка в c1_zapusk_zhurnal
+        # считает это по самому IDL). Подписаться на всю программу значило бы
+        # получать каждую покупку и продажу всех её минтов.
+        #
+        # ВКЛЮЧЁН ПО УМОЛЧАНИЮ, И ЭТО НАМЕРЕННО. Деплой идёт с keep_env=yes --
+        # env не трогается, и новой переменной там взяться негде. Выключается
+        # BLOOM_ZAPUSK_ZHURNAL=0 при следующей правке окружения.
+        self.zapusk_vkljuchen = (ZH is not None
+                                  and ST.env_int("BLOOM_ZAPUSK_ZHURNAL", 1) == 1)
+        self.zapusk_pochemu_net = (ZH_ПОЧЕМУ_НЕТ if ZH is None else
+                                    ("выключен BLOOM_ZAPUSK_ZHURNAL=0"
+                                     if not self.zapusk_vkljuchen else None))
+        self.zapusk_adres = None
+        if self.zapusk_vkljuchen:
+            try:
+                self.zapusk_adres = ZH.pda_mint_authority()
+            except Exception as _e_pda:  # noqa: BLE001
+                self.zapusk_vkljuchen = False
+                self.zapusk_pochemu_net = (f"PDA mint_authority не вывелся: "
+                                            f"{type(_e_pda).__name__}")
+        # УЗОСТЬ ПОДПИСКИ ПРОВЕРЯЕТСЯ, А НЕ ПРЕДПОЛАГАЕТСЯ: если программа
+        # однажды поставит mint_authority ещё куда-то, журнал начнёт получать
+        # посторонний поток, и узнать это надо здесь, а не по счёту Helius.
+        self.zapusk_uzost = (ZH.odin_tolko_u_sozdanij()
+                              if self.zapusk_vkljuchen else
+                              {"ok": False, "why_not": self.zapusk_pochemu_net})
+        if self.zapusk_vkljuchen and not self.zapusk_uzost.get("ok"):
+            self.zapusk_vkljuchen = False
+            self.zapusk_pochemu_net = self.zapusk_uzost.get("why_not")
+        self.zapusk_bajt = 0
+        self.zapusk_zapisej = 0
+        self.zapusk_sozdanij = 0
+        self.zapusk_s_pokupkoj = 0
+        self.zapusk_kreditov = 0
+        self.zapusk_otkazov = 0
+        self.zapusk_poslednij_otkaz = ""
+        # Бюджет замера на сутки -- такой же предохранитель, как у кэша ног.
+        # Создания идут десятками в минуту, и журнал обязан иметь потолок.
+        self.zapusk_budzhet = ST.env_int("BLOOM_ZAPUSK_CREDITS", 20000)
+        self.zapusk_otkljuchen = False
+        self.zapusk_otkljuchen_pochemu = ""
         # ТЕНЬ ЗА ЧАС (слово владельца 25.09): сигналов / собрала / не собрала
         # по причинам / симуляция упала. Счётчики за процесс не годятся: после
         # перезапуска они обнуляются, и "за час собрано ноль" стало бы не видно.
@@ -3142,6 +3196,27 @@ class Детектор:
         st["kill_bloom_path"] = str(self.состояние.kill_bloom_path)
         st["kill_bloom_active"] = убит_б
         st["kill_bloom_note"] = причина_б
+        # ТЕНЕВОЙ ЖУРНАЛ ЗАПУСКОВ -- В ПРИЗНАК ЖИЗНИ ЧИСЛАМИ. Без этого
+        # "журнал работает" пришлось бы брать на веру: включён ли, на какой
+        # адрес подписан, узкая ли подписка, сколько создано, у скольких
+        # создатель купил и сколько кредитов это стоило.
+        st["zapusk_zhurnal"] = {
+            "vkljuchen": bool(getattr(self, "zapusk_vkljuchen", False)),
+            "why_not": getattr(self, "zapusk_pochemu_net", None),
+            "adres": getattr(self, "zapusk_adres", None),
+            "uzost": getattr(self, "zapusk_uzost", None),
+            "sozdanij": int(getattr(self, "zapusk_sozdanij", 0)),
+            "s_pokupkoj_sozdatelya": int(getattr(self, "zapusk_s_pokupkoj", 0)),
+            "zapisej": int(getattr(self, "zapusk_zapisej", 0)),
+            "otkazov": int(getattr(self, "zapusk_otkazov", 0)),
+            "poslednij_otkaz": getattr(self, "zapusk_poslednij_otkaz", ""),
+            "bajt": int(getattr(self, "zapusk_bajt", 0)),
+            "kreditov": int(getattr(self, "zapusk_kreditov", 0)),
+            "budzhet": int(getattr(self, "zapusk_budzhet", 0)),
+            "otkljuchen": bool(getattr(self, "zapusk_otkljuchen", False)),
+            "otkljuchen_pochemu": getattr(self, "zapusk_otkljuchen_pochemu", ""),
+            "pokupok_net": True,
+        }
         st["net_slot"] = self.слот_сети
         st["slot_notifications"] = self.слот_уведомлений
         # РАЗРЕЗ ТРАФИКА ПОДПИСОК ПО ВИДАМ (спрос владельца 28.09). Байты за
@@ -4047,6 +4122,89 @@ class Детектор:
             # хранилищ котировок -- тем же путём, что и смена источников.
             self.поколение += 1
             log.warning("кэш ног отключён: %s", self.ног_отключён_почему)
+
+    def zapusk_uchest(self, res: dict, *, bajt: int, t_polucheno: float) -> dict:
+        """Создание токена -- в теневой журнал. НИ ОДНОЙ ПОКУПКИ.
+
+        Этот путь не решает ничего: он не зовёт гейт, не собирает байты сделки,
+        не трогает позиции. Он разбирает уже полученную транзакцию и
+        дописывает строку в журнал. Включение торговли по созданиям -- отдельная
+        группа zapusk_dev и только по слову владельца (п.8 задания 09.10).
+        """
+        из_ = {"ok": False, "why_not": None}
+        if not self.zapusk_vkljuchen or ZH is None or self.zapusk_otkljuchen:
+            из_["why_not"] = (self.zapusk_otkljuchen_pochemu
+                               or self.zapusk_pochemu_net or "журнал выключен")
+            return из_
+        # УЧЁТ БАЙТОВ -- СВОИМ СЧЁТОМ, как у кэша ног: расход замера нельзя
+        # смешивать с расходом на торговлю, иначе при перерасходе выключать
+        # пришлось бы не то.
+        if bajt > 0:
+            self.zapusk_bajt += int(bajt)
+            ПОРЦИЯ = 104858                 # 0.1 МиБ -- тариф общего учёта
+            self.zapusk_kreditov = -(-self.zapusk_bajt // ПОРЦИЯ) * 2
+            if (self.zapusk_budzhet > 0
+                    and self.zapusk_kreditov >= self.zapusk_budzhet):
+                self.zapusk_otkljuchen = True
+                self.zapusk_otkljuchen_pochemu = (
+                    f"бюджет журнала запусков исчерпан: "
+                    f"{self.zapusk_kreditov} кредитов из {self.zapusk_budzhet} "
+                    f"за {self.zapusk_bajt // 1048576} МБ")
+                # Поколение поднимается -- подписка переподнимется уже без
+                # счёта создания, тем же путём, что и смена источников.
+                self.поколение += 1
+                log.warning("журнал запусков отключён: %s",
+                            self.zapusk_otkljuchen_pochemu)
+        try:
+            зп = ZH.zapis_iz_uvedomlenija(
+                res, t_polucheno=t_polucheno, slot_seti=self.слот_сети,
+                vozrast_slota_s=(round(time.time() - self.t_слот, 3)
+                                 if getattr(self, "t_слот", None) else None),
+                dlina_slota_s=self._dlina_slota_dlja_zapuska(), bajt=bajt)
+        except Exception as сбой:  # noqa: BLE001
+            self.zapusk_otkazov += 1
+            self.zapusk_poslednij_otkaz = (f"{type(сбой).__name__}: "
+                                            f"{str(сбой)[:160]}")
+            из_["why_not"] = self.zapusk_poslednij_otkaz
+            return из_
+        if not зп.get("ok"):
+            # Не создание -- не запись. Молча считаем, чтобы было видно, что
+            # подписка принесла что-то постороннее.
+            self.zapusk_otkazov += 1
+            self.zapusk_poslednij_otkaz = str(зп.get("why_not"))[:160]
+            из_["why_not"] = self.zapusk_poslednij_otkaz
+            return из_
+        р = ZH.zapisat(зп, state_dir=self.состояние.base)
+        if not р.get("ok"):
+            self.zapusk_otkazov += 1
+            self.zapusk_poslednij_otkaz = str(р.get("why_not"))[:160]
+            из_["why_not"] = self.zapusk_poslednij_otkaz
+            return из_
+        self.zapusk_zapisej += 1
+        self.zapusk_sozdanij += 1
+        if зп.get("kupil_v_sozdanii"):
+            self.zapusk_s_pokupkoj += 1
+        из_.update(ok=True, zapis=зп)
+        return из_
+
+    def _dlina_slota_dlja_zapuska(self):
+        """Длина слота ИЗ ЗАМЕРА, а не из константы. Нет замера -- None.
+
+        Отрыв в слотах тогда не считается и причина называется -- выдать
+        константу за замер значило бы соврать числом.
+        """
+        зн = (self.длина_слота_замер or {}).get("длина_слота_с")
+        if isinstance(зн, (int, float)) and зн > 0:
+            return float(зн)
+        if OS is not None:
+            try:
+                п = OS.длина_слота_подробно(state_dir=self.состояние.base)
+                зн = п.get("длина_слота_с")
+                if isinstance(зн, (int, float)) and зн > 0:
+                    return float(зн)
+            except Exception:  # noqa: BLE001
+                return None
+        return None
 
     def прогреть_таблицы_ног(self) -> None:
         """Таблицы адресов -- ОДИН getMultipleAccounts при старте, вне
@@ -7167,7 +7325,18 @@ def адреса_подписки(детектор: "Детектор") -> list:
     # купленного количества.
     без_подписки = набор_без_подписки()
     источники = {а for а in детектор.источники if а not in без_подписки}
-    return sorted(источники | {ST.EXECUTOR_WALLET} | полоса | хранилища)
+    # СЧЁТ СОЗДАНИЙ -- ОДНИМ АДРЕСОМ, и это ЧЕТВЁРТОЕ назначение списка:
+    # теневой журнал запусков (п.7 задания владельца 09.10). PDA
+    # mint_authority есть только в create и create_v2, поэтому поток по нему --
+    # ровно создания и ничего больше. Покупок по нему нет ни одной: уведомления
+    # этого адреса уходят в журнал ДО всякого торгового пути.
+    запуски = ({детектор.zapusk_adres}
+               if getattr(детектор, "zapusk_vkljuchen", False)
+               and getattr(детектор, "zapusk_adres", None)
+               and not getattr(детектор, "zapusk_otkljuchen", False)
+               else set())
+    return sorted(источники | {ST.EXECUTOR_WALLET} | полоса | хранилища
+                  | запуски)
 
 
 def набор_без_подписки() -> set:
@@ -7332,6 +7501,17 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                     params = msg.get("params") or {}
                     res = params.get("result") or {}
                     источник = подписка_адреса.get(params.get("subscription"))
+                    # ТЕНЕВОЙ ЖУРНАЛ ЗАПУСКОВ -- ПЕРВОЙ ВЕТКОЙ, ДО торговых.
+                    # Создание токена не сигнал и не сделка: по нему не
+                    # покупают. Ветка стоит здесь именно чтобы уведомление
+                    # счёта создания НИКОГДА не дошло до пути покупки.
+                    if (источник is not None
+                            and источник == getattr(детектор, "zapusk_adres", None)):
+                        детектор.zapusk_uchest(
+                            res, bajt=(len(raw) if isinstance(raw, (str, bytes))
+                                       else 0),
+                            t_polucheno=t_получено)
+                        continue
                     if источник in детектор.кэш_ног_адреса:
                         детектор.учесть_байты_ног(
                             len(raw) if isinstance(raw, (str, bytes)) else 0)
@@ -12095,6 +12275,45 @@ def self_test() -> int:
             "SRC" in адреса_подписки(детектор_б)
             and ST.EXECUTOR_WALLET in адреса_подписки(детектор_б),
             адреса_подписки(детектор_б))
+        # ТЕНЕВОЙ ЖУРНАЛ ЗАПУСКОВ (п.7 задания владельца 09.10). Проверяется
+        # три вещи, и каждая стоила бы денег, будь она сломана: счёт создания в
+        # подписке ОДИН, выключенный журнал не добавляет его вовсе, и
+        # уведомление этого счёта разбирается ДО всякого торгового пути.
+        _был_zap = детектор_б.zapusk_vkljuchen
+        _был_adr = детектор_б.zapusk_adres
+        try:
+            детектор_б.zapusk_vkljuchen = True
+            детектор_б.zapusk_adres = "СЧЁТ_СОЗДАНИЯ"
+            детектор_б.zapusk_otkljuchen = False
+            chk("счёт создания в подписке -- ровно один адрес",
+                адреса_подписки(детектор_б).count("СЧЁТ_СОЗДАНИЯ") == 1,
+                адреса_подписки(детектор_б))
+            детектор_б.zapusk_vkljuchen = False
+            chk("ДОКАЗАННЫЙ КРАСНЫЙ: журнал выключен -- счёта создания в "
+                "подписке нет вовсе, и платить за него нечем",
+                "СЧЁТ_СОЗДАНИЯ" not in адреса_подписки(детектор_б),
+                адреса_подписки(детектор_б))
+            детектор_б.zapusk_vkljuchen = True
+            детектор_б.zapusk_otkljuchen = True
+            chk("бюджет журнала исчерпан -- счёт создания из подписки уходит",
+                "СЧЁТ_СОЗДАНИЯ" not in адреса_подписки(детектор_б),
+                адреса_подписки(детектор_б))
+        finally:
+            детектор_б.zapusk_vkljuchen = _был_zap
+            детектор_б.zapusk_adres = _был_adr
+            детектор_б.zapusk_otkljuchen = False
+        # ПОРЯДОК ВЕТОК -- ПО ИСХОДНИКУ, А НЕ НА ВЕРУ. Если ветка журнала
+        # окажется ПОСЛЕ вызова торгового пути, создание дойдёт до покупки.
+        _ист = Path(__file__).read_text(encoding="utf-8")
+        _и_zh = _ист.find("детектор.zapusk_uchest(")
+        _и_торг = _ист.find("await детектор.обработать_бережно(")
+        chk("ветка журнала запусков стоит ДО первого вызова торгового пути -- "
+            "создание токена никогда не доходит до покупки",
+            0 < _и_zh < _и_торг, (_и_zh, _и_торг))
+        chk("в самом журнале запусков слова sendTransaction нет вовсе",
+            "sendTransaction" not in (REPO_ROOT / "analysis"
+                                      / "c1_zapusk_zhurnal.py").read_text(
+                                          encoding="utf-8"))
         # КОШЕЛЁК ПОЛОСЫ В ПОДПИСКЕ. С 25.09 полоса покупает своим адресом.
         # Нет его в подписке -- нет в потоке ни её транзакции, ни круга, ни
         # купленного количества: сторож не продаст, и замер выйдет пустым.
