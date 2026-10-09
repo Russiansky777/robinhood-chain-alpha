@@ -379,7 +379,7 @@ def программы_переезда() -> list:
         return []
     из_: collections.Counter = collections.Counter()
     for тело in д.values():
-        for пр, n in ((тело.get("сверка") or {}).get("программы") or {}).items():
+        for пр, n in ((тело.get("sverka") or {}).get("программы") or {}).items():
             if not пр.startswith(ПРЕФИКС_PUMPFUN):
                 из_[пр] += n
     # пулы PumpSwap и DAMM v2 -- самые частые программы в транзакциях переезда после
@@ -394,7 +394,8 @@ def режим_темпы(rpc, темп: Темп, а) -> dict:
     нач, кон = блоки_окна(П / "zapuski")
     if not нач or not кон:
         return {"ошибка": "нет собранных суток запусков"}
-    пулы_пр = программы_переезда()
+    пулы_пр = ([x.strip() for x in а.puly_programmy.split(",") if x.strip()]
+               or программы_переезда())
     рнд = random.Random(а.seed)
     слоты = sorted(рнд.sample(range(нач, кон + 1), min(а.blokov, кон - нач)))
     print(f"окно слотов {нач}..{кон} ({кон - нач} слотов), в выборке {len(слоты)} блоков; "
@@ -424,7 +425,7 @@ def режим_темпы(rpc, темп: Темп, а) -> dict:
             if (tx.get("meta") or {}).get("err"):
                 continue
             пр = программы(tx)
-            pf = [x for x in пр if x.startswith(ПРЕФИКС_PUMPFUN)]
+            pf = [x for x in пр if x.startswith(а.prefiks_krivoy)]
             if not pf:
                 continue
             счёт["с_pumpfun"] += 1
@@ -467,6 +468,11 @@ def main() -> int:
     р_.add_argument("--obrazcov", type=int, default=40,
                     help="транзакций из длинного окна на пул")
     р_.add_argument("--blokov", type=int, default=120, help="блоков в выборке (tempy)")
+    р_.add_argument("--prefiks-krivoy", default=ПРЕФИКС_PUMPFUN,
+                    help="префикс адреса программы кривой: 6EF8 -- pump.fun, dbcij -- "
+                         "динамическая кривая Meteora (DBC)")
+    р_.add_argument("--puly-programmy", default="",
+                    help="адреса программ пулов через запятую; пусто -- брать из сверки")
     р_.add_argument("--seed", type=int, default=20261009)
     р_.add_argument("--metka", default="")
     а = р_.parse_args()

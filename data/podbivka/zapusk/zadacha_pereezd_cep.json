@@ -3,28 +3,30 @@
  "zapuski": [
   [
    "--rezhim",
-   "sverka",
-   "--skolko",
-   "60",
-   "--slotov",
-   "10",
-   "--dlinno",
-   "1121",
-   "--obrazcov",
-   "40",
+   "tempy",
+   "--blokov",
+   "200",
+   "--prefiks-krivoy",
+   "6EF8",
+   "--puly-programmy",
+   "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
    "--metka",
-   "2026-10-09b"
+   "pumpfun"
   ],
   [
    "--rezhim",
    "tempy",
    "--blokov",
-   "150",
+   "200",
+   "--prefiks-krivoy",
+   "dbcij",
+   "--puly-programmy",
+   "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
    "--metka",
-   "2026-10-09b"
+   "meteora"
   ]
  ],
- "helius_rps_na_paket": 6,
- "parallelno": 1,
- "zachem": "Pereproverka 1b-1v. Pervyy progon dal dva rezultata i odnu moyu oshibku. Rezultaty: ceny arhiva i cepi sovpadayut do 0.0001 p.p. (34 pula), i v stvore i +1/+2 deystvitelno pochti ne torguyut -- pokupki nachinayutsya s +3. Oshibka: parallelno 2 zapustilo rezhim tempy ODNOVREMENNO so sverkoy, i on prochital pustoy spisok programm pulov -- otsyuda temp 0. Teper parallelno 1, tempy strogo posle sverki. Glavnoe: programma pump.fun (6EF8...) vstretilas vsego 2 raza na 187 tranzakciy, znachit bolshinstvo pulov v sreze 'pereezd' mozhet byt VOVSE NE pereezdom krivoy. Teper proverka po KAZHDOMU pulu otdelno: est li instrukciya 6EF8 v tranzakcii stvora. Okno rasshireno do 1121 slota (300 s) -- vykup BOOST idyot pyat minut partiyami, v pyati slotah ego i ne moglo byt vidno."
+ "helius_rps_na_paket": 3,
+ "parallelno": 2,
+ "zachem": "Punkt 1v, tretya popytka -- i snova iz-za moey oshibki: rezhim pishetsya v svodku kak 'sverka' latinicey, a chital ya klyuch 'sverka' KIRILLICEY, poetomu spisok programm pulov dvazhdy vyhodil pustym i temp schitalsya nulyom. Klyuch ispravlen, i teper adresa programm peredayutsya YAVNO argumentom -- oni zamereny na tranzakciyah stvora 51 pula, a ne vpisany po pamyati. Dva progona: pereezd pump.fun (programma 6EF8 vmeste s PumpSwap) i pereezd dinamicheskoy krivoy Meteora (programma dbcij vmeste s cp-amm). Tak budet vidno, skolko v sutki kazhdogo iz nih protiv 3757 createPool i 6051 'pereezd krivoy' iz arhiva."
 }
