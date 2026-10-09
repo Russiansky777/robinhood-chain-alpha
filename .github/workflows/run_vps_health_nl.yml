@@ -116,10 +116,15 @@ jobs:
             echo "--- память по службам (байты; MemoryPeak -- с последнего старта) ---"
           } >> data/vps_health_nl.txt
           for SVC in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
+            # БЕЗ --value, И ЭТО НЕ МЕЛОЧЬ. С четырьмя -p и --value systemd
+            # печатает ЧЕТЫРЕ ЧИСЛА БЕЗ ИМЁН, и порядок не тот, в котором
+            # заданы флаги. 09.10 я на этом прочитал "MemoryMax=infinity,
+            # MemoryHigh=512M" там, где в юните стоит MemoryMax=512M и
+            # MemoryHigh не задан вовсе. Имя рядом со значением -- обязательно.
             OUT=$(ssh -n $SSH_OPTS root@$HOST "
               systemctl show $SVC -p MemoryCurrent -p MemoryPeak -p MemoryMax -p MemoryHigh \
-                --value | tr '\n' ' '" || echo "ssh не ответил")
-            echo "$SVC: current/peak/max/high = $OUT" | tee -a data/vps_health_nl.txt
+                | tr '\n' ' '" || echo "ssh не ответил")
+            echo "$SVC: $OUT" | tee -a data/vps_health_nl.txt
           done
           # ОТКУДА ВЗЯТ ПРЕДЕЛ. 09.10 живой юнит детектора показал
           # MemoryMax=infinity при MemoryHigh=512M, хотя прогон деплоя пишет
