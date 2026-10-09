@@ -74,12 +74,12 @@ WSOL = "So11111111111111111111111111111111111111112"
 
 def сутки_файла(метка: str) -> str:
     """zap_2026-10-07T06 -> 2026-10-07 (окно суток начинается в 06Z, как у den_)."""
-    return метка.replace("zap_", "").split("T")[0]
+    return метка.split("_", 1)[-1].split("T")[0]
 
 
-def загрузить(папка: Path) -> tuple:
+def загрузить(папка: Path, префикс: str = "zap_") -> tuple:
     дни, словарь, счёт = {}, collections.Counter(), collections.Counter()
-    for ф in sorted(папка.glob("zap_*.json.gz")):
+    for ф in sorted(папка.glob(f"{префикс}*.json.gz")):
         with gzip.open(ф, "rt", encoding="utf-8") as о:
             д = json.load(о)
         м = ф.name.replace(".json.gz", "")
@@ -547,12 +547,15 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     import podbivka_run as R  # noqa: PLC0415
     р_ = argparse.ArgumentParser()
     р_.add_argument("--papka", default=str(ПАПКА))
+    р_.add_argument("--prefiks", default="zap_",
+                    help="zap_ -- обычный проход (230 слотов); dolgo_ -- длинное окно "
+                         "по переезду кривой (до 1100 слотов, то есть 300 секунд)")
     р_.add_argument("--metka", default="")
     р_.add_argument("--proverka-s", default=ПРОВЕРКА_С)
     а = р_.parse_args()
     ПРОВЕРКА_С = а.proverka_s
 
-    дни, словарь, счёт_сбора = загрузить(Path(а.papka))
+    дни, словарь, счёт_сбора = загрузить(Path(а.papka), а.prefiks)
     if not дни:
         print("нет собранных суток в " + а.papka, flush=True)
         return 1
@@ -628,6 +631,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     ф = П / "zapuski_itog.json"
     ф.write_text(json.dumps(тело, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     R.записано(ф)
+    тело["префикс"] = а.prefiks
     страницы(тело, а.metka)
     return 0
 
@@ -728,8 +732,10 @@ def страницы(т: dict, метка: str) -> None:
                "удержании и билете из сетки.")
     м += ["", f"**Вердикт по запускам:** {вер}", "",
           f"**SOL/сутки на проверке:** {ф(стр[0]['sol_в_сутки']) if стр else '—'}"]
-    (д / "podbivka_zapuski.md").write_text("\n".join(м) + "\n", encoding="utf-8")
-    R.записано(д / "podbivka_zapuski.md")
+    имя_в = ("podbivka_zapuski_dolgo.md" if т.get("префикс") == "dolgo_"
+             else "podbivka_zapuski.md")
+    (д / имя_в).write_text("\n".join(м) + "\n", encoding="utf-8")
+    R.записано(д / имя_в)
 
     # ---- п.3: переезд и арбитраж
     а2 = т["арбитраж"]
