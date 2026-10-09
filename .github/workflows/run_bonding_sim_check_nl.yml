@@ -31,9 +31,21 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' -- наш круг [ATA, покупка, продажа] одной транзакцией от нашего адреса"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' -- наш круг [ATA, покупка, продажа] одной транзакцией от нашего адреса | 'otkazy_puti' -- отказанные сигналы источника денежным путём"
         required: false
         default: "bonding"
+      istochnik:
+        description: "otkazy_puti: адрес источника, чьи отказанные сигналы прогнать"
+        required: false
+        default: "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+      chasov:
+        description: "otkazy_puti: окно в часах"
+        required: false
+        default: "24"
+      podpisi:
+        description: "otkazy_puti: подписи из журнала решений, через запятую (добавляются к найденным с цепи)"
+        required: false
+        default: ""
       cel:
         description: "pump_sborka: сколько образцов на вариант считать целью"
         required: false
@@ -94,7 +106,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy|krug_sborki)
+            pump_sborka|pereezdy|krug_sborki|otkazy_puti)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -186,6 +198,27 @@ jobs:
           tail -60 /tmp/krug.txt
           echo "код выхода: $RC (0 -- круг прошёл хотя бы на части минтов и без красных)"
 
+      - name: "otkazy_puti: отказанные сигналы -- денежным путём до симуляции"
+        if: ${{ inputs.zadacha == 'otkazy_puti' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          PYTHONPATH=analysis $PY analysis/c3_pump_sborka.py --self-test | tail -2
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --self-test | tail -2
+          export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
+          set +e
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py \
+            --istochnik "${{ inputs.istochnik }}" --chasov "${{ inputs.chasov }}" \
+            --podpisi "${{ inputs.podpisi }}" \
+            --out /tmp/otkazy.json > /tmp/otkazy.txt 2>&1
+          RC=$?
+          set -e
+          tail -80 /tmp/otkazy.txt
+          echo "код выхода: $RC (0 -- все отказанные сигналы прошли денежным путём)"
+
       - name: "pereezdy: архив Code-2 и сборщик Code-3"
         if: ${{ inputs.zadacha == 'pereezdy' }}
         run: |
@@ -224,7 +257,7 @@ jobs:
           echo "код выхода: $RC"
 
       - name: "SSH key"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' }}
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -236,7 +269,7 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Свежие сигналы кривой из живого журнала (потоком)"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' }}
         run: |
           set -e
           set -o pipefail
@@ -255,7 +288,7 @@ jobs:
           wc -l < /tmp/bsim/curve.jsonl
 
       - name: "Симуляция нашей покупки на кривой"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
@@ -291,6 +324,13 @@ jobs:
             mkdir -p data
             cp /tmp/pereezdy.json data/pereezdy_po_cepi.json 2>/dev/null || true
             git add data/pereezdy_po_cepi.json || true
+          fi
+          if [ "${{ inputs.zadacha }}" = "otkazy_puti" ]; then
+            git checkout -- analysis data 2>/dev/null || true
+            git clean -fd analysis data 2>/dev/null || true
+            mkdir -p data
+            cp /tmp/otkazy.json data/otkazy_denezhnogo_puti.json 2>/dev/null || true
+            git add data/otkazy_denezhnogo_puti.json || true
           fi
           if [ "${{ inputs.zadacha }}" = "krug_sborki" ]; then
             git checkout -- analysis data 2>/dev/null || true

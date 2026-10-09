@@ -497,6 +497,53 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
     return из_
 
 
+def podpisi_istochnika(*, istochnik: str, chasov: float, predel: int,
+                       pauza: float) -> dict:
+    """Покупки v3 ИСТОЧНИКА за окно -- с цепи, по его же подписям.
+
+    ЗАЧЕМ НЕ ТОЛЬКО ЖУРНАЛ. Воронка полосы держит ПРИМЕРЫ отказов, а не все
+    подписи: за сутки группа vol_4vw отказала 34 раза, а подписей в отчёте
+    три. Население у двух списков одно и то же -- сигнал полосы это и есть
+    покупка источника, -- и цепь отдаёт его целиком. Подписи из журнала при
+    этом никуда не деваются: их можно подать режимом --podpisi.
+    """
+    из_ = {"istochnik": istochnik, "podpisi": [], "prosmotreno": 0,
+           "v_okne": 0, "why_not": None}
+    о = зов("getSignaturesForAddress", [istochnik, {"limit": int(predel)}])
+    if not о["ok"]:
+        из_["why_not"] = f"подписи источника не прочитаны: {о['why_not']}"
+        return из_
+    порог = None
+    записи = о.get("result") or []
+    if записи and chasov > 0:
+        свежая = max((int(з.get("blockTime") or 0) for з in записи), default=0)
+        порог = свежая - int(chasov * 3600) if свежая else None
+    for з in записи:
+        if з.get("err"):
+            continue
+        вр = int(з.get("blockTime") or 0)
+        if порог is not None and вр and вр < порог:
+            continue
+        из_["v_okne"] += 1
+        п = з.get("signature")
+        if not п:
+            continue
+        из_["prosmotreno"] += 1
+        if pauza:
+            time.sleep(pauza)
+        т = зов("getTransaction", [п, {"encoding": "jsonParsed",
+                                        "maxSupportedTransactionVersion": 0,
+                                        "commitment": "confirmed"}])
+        if not т["ok"] or not т.get("result"):
+            continue
+        if _kriwaja_iz_tx(т["result"])["ok"]:
+            из_["podpisi"].append(п)
+    if not из_["podpisi"]:
+        из_["why_not"] = (f"покупок {ПОКУПКА} у источника за окно нет "
+                          f"(просмотрено {из_['prosmotreno']})")
+    return из_
+
+
 def живой(*, skolko: int, koshelek: str, bilet_lamportov: int, cu: int,
           pauza: float) -> dict:
     из_ = {"rezhim": "zhivoj", "uzel": затереть(узел()), "koshelek": koshelek,
@@ -629,6 +676,11 @@ def main() -> int:
                     help="трата покупки в лампортах (0.01 SOL по умолчанию)")
     п.add_argument("--cu", type=int, default=600_000)
     п.add_argument("--pauza", type=float, default=0.12)
+    п.add_argument("--istochnik", default="",
+                    help="адрес источника: его покупки v3 за окно берутся с "
+                         "цепи и прогоняются денежным путём")
+    п.add_argument("--chasov", type=float, default=24.0)
+    п.add_argument("--predel-podpisej", type=int, default=1000)
     п.add_argument("--podpisi", default="",
                     help="подписи отказанных сигналов через запятую: каждая "
                          "прогоняется денежным путём до симуляции")
@@ -639,12 +691,25 @@ def main() -> int:
     if not а.live:
         print("СТОП: нужен --live или --self-test", file=sys.stderr)
         return 2
-    if а.podpisi.strip():
+    спис = [x for x in а.podpisi.replace(";", ",").split(",") if x.strip()]
+    сбор_ист = None
+    if а.istochnik.strip():
+        сбор_ист = podpisi_istochnika(istochnik=а.istochnik.strip(),
+                                      chasov=а.chasov,
+                                      predel=а.predel_podpisej, pauza=а.pauza)
+        for п_ in сбор_ист["podpisi"]:
+            if п_ not in спис:
+                спис.append(п_)
+    if спис:
         из_ = otkazy_cherez_denezhnyj_put(
-            podpisi=[x for x in а.podpisi.replace(";", ",").split(",") if x.strip()],
+            podpisi=спис,
             koshelek=а.koshelek, bilet_lamportov=а.bilet_lamportov,
             cu=а.cu, pauza=а.pauza)
         из_["uzel"] = затереть(узел())
+        if сбор_ист is not None:
+            из_["sbor_istochnika"] = {k: v for k, v in сбор_ист.items()
+                                      if k != "podpisi"}
+            из_["sbor_istochnika"]["podpisej_najdeno"] = len(сбор_ист["podpisi"])
         текст = json.dumps(из_, ensure_ascii=False, indent=1)
         print(текст)
         if а.out:
