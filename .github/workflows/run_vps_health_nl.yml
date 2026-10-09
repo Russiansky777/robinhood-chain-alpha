@@ -329,7 +329,8 @@ jobs:
                       "/home/bot/data/sources_2026-09-25.json data/sources_live.json" \
                       "$TAJM_DIR/uchet/data/ledger_status.json data/ledger_status_hosta.json" \
                       "$TAJM_DIR/uborshchik_sutki.json data/uborshchik_sutki_hosta.json" \
-                      "/home/bot/bloom_executor_live_data/trevogi.jsonl data/trevogi_hosta.jsonl"; do
+                      "/home/bot/bloom_executor_live_data/trevogi.jsonl data/trevogi_hosta.jsonl" \
+                      "/home/bot/bloom_executor_live_data/zapusk_zhurnal.jsonl data/zapusk_zhurnal_hosta.jsonl"; do
             OTKUDA=$(echo "$PARA" | cut -d' ' -f1)
             KUDA=$(echo "$PARA" | cut -d' ' -f2)
             if ssh -n $SSH_OPTS root@$HOST "test -s $OTKUDA"; then
@@ -462,6 +463,32 @@ jobs:
             *СТАРЫЙ_КОД_В_ПАМЯТИ*) echo "ТРЕВОГА: служба работает со старым кодом" ;;
             *) echo "все службы стартовали позже своих модулей" ;;
           esac
+
+      - name: "Теневой журнал запусков: свод за час (только чтение)"
+        if: always()
+        run: |
+          set -e
+          # ЗАЧЕМ. Журнал пишется на хосте построчно, и без свода "он работает"
+          # пришлось бы брать на веру. Здесь числа: созданий, из них с покупкой
+          # создателя, сколько SOL создатели вложили и наш отрыв в слотах.
+          # Окно -- последний час по часам БЕГУНКА: журнал пишет ts_utc, и
+          # сравнение идёт строкой ISO, как и в воронке полосы.
+          {
+            echo ""
+            echo "--- теневой журнал запусков: свод за час ---"
+          } >> data/vps_health_nl.txt
+          if [ ! -s data/zapusk_zhurnal_hosta.jsonl ]; then
+            echo "журнала запусков на хосте нет или он пуст -- свода не будет" \
+              | tee -a data/vps_health_nl.txt
+          else
+            S=$(python3 -c "import time; print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(time.time()-3600)))")
+            echo "окно: с $S" | tee -a data/vps_health_nl.txt
+            PYTHONPATH=analysis python3 analysis/c1_zapusk_zhurnal.py --svod \
+              data/zapusk_zhurnal_hosta.jsonl "$S" | tee -a data/vps_health_nl.txt
+            echo "--- он же за весь журнал ---" | tee -a data/vps_health_nl.txt
+            PYTHONPATH=analysis python3 analysis/c1_zapusk_zhurnal.py --svod \
+              data/zapusk_zhurnal_hosta.jsonl | tee -a data/vps_health_nl.txt
+          fi
 
       - name: "Врезка кривой v2/v3 жива на хосте (только чтение)"
         if: always()
