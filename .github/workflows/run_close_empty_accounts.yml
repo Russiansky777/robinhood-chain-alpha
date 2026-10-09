@@ -46,6 +46,10 @@ on:
         description: "окно молодости в секундах (0 -- по политикам групп: max(hold_slots)*0.4 + 600)"
         required: false
         default: "0"
+      po_mintam:
+        description: "'yes' -- ПОШТУЧНОЕ правило (слово владельца 05.10): без общего окна, но только минты без открытой/зависшей позиции и без нашей сделки за 10 мин"
+        required: false
+        default: "no"
 
 concurrency:
   group: close-empty-accounts
@@ -55,6 +59,12 @@ env:
   CODE_DIR: /home/bot/bloom_executor
   ENV_DIR: /etc/bloom-executor
   TARGET_HOST: 127.0.0.1
+  # СУТОЧНЫЙ ЖУРНАЛ -- ТОТ ЖЕ, ЧТО У ТАЙМЕРА (найдено 05.10 в 10:20Z). Без
+  # --zhurnal модуль кладёт сумму рядом с --result, то есть в /tmp: ночные
+  # проходы вернули 0.275 SOL, а строка владельцу в 21:55Z читает журнал
+  # таймера и об этих деньгах не узнала бы вовсе. Журнал один на ручные
+  # проходы и на таймер.
+  TAJM_DIR: /home/bot/host_tajmery
 
 jobs:
   close:
@@ -114,6 +124,10 @@ jobs:
           if [ "${{ inputs.while_trading }}" = "yes" ]; then TRADING="CLOSE_ACCOUNTS_WHILE_TRADING=1"; fi
           FIRST=""
           if [ "${{ inputs.first_one }}" = "yes" ]; then FIRST="--first-one"; fi
+          # ПОШТУЧНОЕ ПРАВИЛО -- ОТДЕЛЬНЫМ ВХОДОМ, А НЕ ВМЕСТО ОКНА. Старый путь
+          # (общее окно) остаётся по умолчанию: его и зовёт прежняя оснастка.
+          POMINTAM=""
+          if [ "${{ inputs.po_mintam }}" = "yes" ]; then POMINTAM="--po-mintam"; fi
           # Кошелёк: полоса берётся из окружения службы (OWN_SEND_WALLET),
           # исполнитель -- по умолчанию в самом модуле.
           WALLET_ARG=""
@@ -131,12 +145,13 @@ jobs:
               $LIVE $TRADING \
               PYTHONPATH=$CODE_DIR \
               /home/bot/robinhood-chain-alpha/venv/bin/python close_empty_token_accounts.py \
-                $WALLET_ARG $FIRST \
+                $WALLET_ARG $FIRST $POMINTAM \
                 --min-age-s '${{ inputs.min_age_s }}' \
                 --batch '${{ inputs.batch }}' \
                 --max-batches '${{ inputs.max_batches }}' \
                 --out /tmp/close_accounts_plan.json \
-                --result /tmp/close_accounts_result.json
+                --result /tmp/close_accounts_result.json \
+                --zhurnal $TAJM_DIR/uborshchik_sutki.json
           " | tee data/close_accounts_last_run.txt
 
       - name: "Забрать план и результат с хоста"

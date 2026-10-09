@@ -1,11 +1,43 @@
 {
- "zachem": "Слово владельца 05.10 (дополнение к правилу продажи), п.4: krug_001 выключить (lane_trades=false) -- круг своей продажи больше не нужен. Правило 4 новой редакции снимает дверь «обкатано» с пути ПРОДАЖИ (п.6 того же слова), то есть первая продажа нового типа своим путём больше не требует отдельной группы с билетом 0.01.",
- "chto_ne_menyaetsya": "У krug_001 всё остальное остаётся как стоит: lane_sol и lane_size 0.01, per_day 3, lane_open_max 1, sell_own_first 1, min_target_sol 2.0, 11 типов пулов, адрес 5YRgrP3m. Группа не удаляется и адрес никуда не переносится -- снимается только признак торговли полосой. Другие группы и env не трогаются вовсе.",
+ "pochemu": "Novaya gruppa vol_4vw: adres 4vw54Bmo perenesyon iz log_only, hold_slots 36, dopusk 0.40, porog 2.0, bilet 0.01 po Pravilu 8 (slovo vladelca 09.10).",
  "pravki": [
   {
-   "gruppa": "krug_001",
-   "pole": "lane_trades",
-   "znachenie": "0"
+   "sozdat": "vol_4vw",
+   "politika": {
+    "lane_size": 0.01,
+    "lane_trades": true,
+    "bloom_trades": false,
+    "bloom_sol": null,
+    "fanout": false,
+    "min_target_sol": 2.0,
+    "max_slots_from_source": 3,
+    "skip_flippers": true,
+    "allow_taxed_route": true,
+    "slippage": 0.4,
+    "min_pool_sol_reserve": null,
+    "lane_open_max": 3,
+    "hold_slots": 36,
+    "lane_pools": [
+     "amm_v4",
+     "bonding",
+     "clmm",
+     "cpmm",
+     "damm2",
+     "dbc",
+     "dlmm",
+     "launchlab",
+     "pump_amm",
+     "two_step",
+     "whirlpool"
+    ],
+    "note": "Группа объёмного источника 4vw54Bmo (слово владельца 09.10): поля как у lane_s0, своё -- удержание 36 слотов (~10 с при длине слота 0.274 с), допуск по цене 0.40, порог входа 2.0 SOL-экв. По Правилу 8 первая сделка идёт билетом 0.01 полным кругом (покупка, продажа по таймеру, закрытие счёта, итог по цепи), после неё билет 0.3 без нового слова. Адрес перенесён из log_only.",
+    "lane_sol": 0.01
+   }
+  },
+  {
+   "perenesti": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9",
+   "v": "vol_4vw",
+   "pometka": "перенесён из log_only по слову владельца 09.10: объёмный источник, круг 0.01 по Правилу 8"
   }
  ]
 }

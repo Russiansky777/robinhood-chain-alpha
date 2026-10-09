@@ -3,8 +3,8 @@
   "decision": "Финальный план живого теста, владелец 27.09. Четыре группы: leader, batch5, lane_s0 и off; Bloom не торгует ни по одной (bloom_trades=false), веер выключен (fanout=false), Jupiter в покупке не участвует ни на одной группе. Прежние группы speed_only, bloom_lane, lane_only и candidates упразднены.",
   "groups": {
     "leader": {
-      "lane_size": 0.3,
-      "lane_trades": true,
+      "lane_size": 0.01,
+      "lane_trades": false,
       "bloom_trades": false,
       "bloom_sol": null,
       "fanout": false,
@@ -33,11 +33,11 @@
           "from": "названо владельцем"
         }
       },
-      "lane_sol": 0.3
+      "lane_sol": 0.01
     },
     "batch5": {
       "lane_size": 0.3,
-      "lane_trades": true,
+      "lane_trades": false,
       "bloom_trades": false,
       "bloom_sol": null,
       "fanout": false,
@@ -114,7 +114,7 @@
     },
     "lane_s0": {
       "lane_size": 0.5,
-      "lane_trades": true,
+      "lane_trades": false,
       "bloom_trades": false,
       "bloom_sol": null,
       "fanout": false,
@@ -671,10 +671,6 @@
           "also": "список 543: Исторический ранг есть; прежнее ДА"
         },
         "4vUSqvRtjGcZXqdJta28XrCdyyLM1CYzQufF2wK5eU2d": {
-          "from": "прежний файл: log_only",
-          "also": "список 543: Исторический ранг есть; прежнее ДА"
-        },
-        "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9": {
           "from": "прежний файл: log_only",
           "also": "список 543: Исторический ранг есть; прежнее ДА"
         },
@@ -2436,7 +2432,8 @@
         "7HmkKn8P6aZSMg7jn9esjdPQ9cBqg9LQgNECzoDeJiGQ": "log_only 02.10",
         "Gf2wYM2k5ojfPzN5Uqi3mbP1nWEdZhhzMyDBsKrHA3kC": "kust s DYAn4XpA, slovo vladelca 02.10",
         "GM7Hrz2bDq33ezMtL6KGidSWZXMWgZ6qBuugkb5H8NvN": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать",
-        "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать"
+        "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh": "слово владельца 03.10 п.4: только лог сигналов, полосой не торговать",
+        "HTYho9ioTJcS4Dymi57HB65RBFu549gjyQ7kncfkknti": "слово владельца 06.10: из cand2 в log_only. По цепи за 11.5 ч гибкого билета: 16 сделок, средний билет 1.8153, итог -0.8867 SOL, 37.5 % в плюсе, худшая -0.6216"
       },
       "subscribe": false
     },
@@ -2481,7 +2478,7 @@
       "hold_slots": 108
     },
     "cand1": {
-      "lane_trades": true,
+      "lane_trades": false,
       "lane_size": 0.1,
       "lane_sol": 0.1,
       "min_target_sol": 2.0,
@@ -2512,7 +2509,7 @@
       "per_day": 150
     },
     "cand1_03": {
-      "lane_trades": 1,
+      "lane_trades": false,
       "bloom_trades": 0,
       "subscribe": 1,
       "fanout": 0,
@@ -2539,7 +2536,8 @@
         "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy": "куст DYAn4XpA, из cand1 по слову владельца 02.10",
         "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt": "куст DYAn4XpA (корень), из cand1 по слову владельца 02.10"
       },
-      "min_target_sol": 2.0
+      "min_target_sol": 2.0,
+      "slippage": 0.2
     },
     "cand1_05": {
       "lane_trades": 0,
@@ -2569,7 +2567,7 @@
       "addresses": {}
     },
     "cand2": {
-      "lane_trades": true,
+      "lane_trades": false,
       "subscribe": true,
       "bloom_trades": false,
       "bloom_sol": null,
@@ -2611,7 +2609,6 @@
         "6yfEx8iX7g7WMsUd7Auybn7e1etwxH17T53MM1adtX87": "таблица А (правило на билете 0.1): Fomo, n 50, среднее +4.32 п.п., медиана +4.24 п.п., в плюсе 64 %, толпа 0.94",
         "83Y8aqfDxz8XSerVACBubyinHm8rQ6REg9j5YXvT8b57": "таблица А (правило на билете 0.1): Fomo, n 65, среднее +6.04 п.п., медиана +2.29 п.п., в плюсе 57 %, толпа 0.94",
         "2kv8X2a9bxnBM8NKLc6BBTX2z13GFNRL4oRotMUJRva9": "таблица Б (правило по медиане билета 0.3): 543, GMGN, n 80, среднее +2.15 п.п., медиана +3.14 п.п., в плюсе 56 %, толпа 0.97; НА БИЛЕТЕ 0.1 медиана +1.78 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
-        "HTYho9ioTJcS4Dymi57HB65RBFu549gjyQ7kncfkknti": "таблица Б (правило по медиане билета 0.3): Fomo, n 61, среднее +9.30 п.п., медиана +2.79 п.п., в плюсе 59 %, толпа 0.82; НА БИЛЕТЕ 0.1 медиана +1.38 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
         "JDFDma1TMb1tWNFY1pruwCsHBybMdzwxveythZB2dcaG": "таблица Б (правило по медиане билета 0.3): снайперы, n 193, среднее +6.37 п.п., медиана +2.28 п.п., в плюсе 53 %, толпа 0.95; НА БИЛЕТЕ 0.1 медиана +0.90 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
         "AxtZoNYhAxvpv416hW7yzpTdcJeY45t8JyGUYMJXL9G": "таблица Б (правило по медиане билета 0.3): 543, n 54, среднее +8.85 п.п., медиана +2.27 п.п., в плюсе 57 %, толпа 0.94; НА БИЛЕТЕ 0.1 медиана +0.94 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
         "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ": "таблица Б (правило по медиане билета 0.3): Fomo, n 50, среднее +5.19 п.п., медиана +2.24 п.п., в плюсе 54 %, толпа 0.84; НА БИЛЕТЕ 0.1 медиана +0.85 п.п. -- ниже порога +2, правило билета 0.1 не проходит, заведён по слову владельца",
@@ -2621,7 +2618,7 @@
       }
     },
     "cand3": {
-      "lane_trades": true,
+      "lane_trades": false,
       "subscribe": true,
       "bloom_trades": false,
       "bloom_sol": null,
@@ -2653,7 +2650,7 @@
       }
     },
     "cand2_03": {
-      "lane_trades": 1,
+      "lane_trades": false,
       "bloom_trades": 0,
       "subscribe": 1,
       "fanout": 0,
@@ -2670,7 +2667,7 @@
       }
     },
     "krug_001": {
-      "lane_trades": 1,
+      "lane_trades": false,
       "bloom_trades": 0,
       "subscribe": 1,
       "fanout": 0,
@@ -2701,7 +2698,7 @@
       ]
     },
     "konveyer": {
-      "lane_trades": 1,
+      "lane_trades": false,
       "bloom_trades": 0,
       "subscribe": 1,
       "fanout": 0,
@@ -2716,6 +2713,39 @@
         "ALL1V7x5gH59qUHdpAK5M1js9YMGhb94xarqoi8PTKqy": "слово владельца 03.10 вечером, п.4: адрес из суточного прохода Code-2 (data/konveyer/2026-10-03.json, раздел «добавить»); порядок тот же, что будет у применителя c3_konveyer_primenitel"
       },
       "lane_open_max": 3
+    },
+    "vol_4vw": {
+      "lane_size": 0.01,
+      "lane_trades": true,
+      "bloom_trades": false,
+      "bloom_sol": null,
+      "fanout": false,
+      "min_target_sol": 2.0,
+      "max_slots_from_source": 3,
+      "skip_flippers": true,
+      "allow_taxed_route": true,
+      "slippage": 0.4,
+      "min_pool_sol_reserve": null,
+      "lane_open_max": 3,
+      "hold_slots": 36,
+      "lane_pools": [
+        "amm_v4",
+        "bonding",
+        "clmm",
+        "cpmm",
+        "damm2",
+        "dbc",
+        "dlmm",
+        "launchlab",
+        "pump_amm",
+        "two_step",
+        "whirlpool"
+      ],
+      "note": "Группа объёмного источника 4vw54Bmo (слово владельца 09.10): поля как у lane_s0, своё -- удержание 36 слотов (~10 с при длине слота 0.274 с), допуск по цене 0.40, порог входа 2.0 SOL-экв. По Правилу 8 первая сделка идёт билетом 0.01 полным кругом (покупка, продажа по таймеру, закрытие счёта, итог по цепи), после неё билет 0.3 без нового слова. Адрес перенесён из log_only.",
+      "lane_sol": 0.01,
+      "addresses": {
+        "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9": "перенесён из log_only по слову владельца 09.10: объёмный источник, круг 0.01 по Правилу 8"
+      }
     }
   },
   "prefixes_resolved": {
