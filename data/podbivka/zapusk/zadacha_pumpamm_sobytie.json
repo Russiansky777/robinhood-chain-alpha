@@ -1,4 +1,15 @@
-{"skript": "podbivka_pumpamm_sobytie.py",
- "zapuski": [["--celi", "data/podbivka/pumpamm_sverka_celi.json", "--skolko", "12", "--metka", "p1"]],
+{
+ "skript": "podbivka_pumpamm_sobytie.py",
+ "zapuski": [
+  [
+   "--celi",
+   "data/podbivka/pumpamm_sverka_celi.json",
+   "--skolko",
+   "12",
+   "--metka",
+   "p2"
+  ]
+ ],
  "helius_rps_na_paket": 2.0,
- "zachem": "Chem PumpSwap schitaet cenu. Po cepi ustanovleno: pri prodazhe v pump-amm dayut na 7-10 % bolshe SOL, chem dayot para rezervov, a rezervy arhiva sovpadayut s balansami token-schetov pula ROVNO (37 prodazh, otnoshenie 1.0). Znachit postoyannoe proizvedenie schitaetsya ne po balansam schetov. Prohod dostayot sobytie samoy programmy iz logov (Program data: base64), pechataet vse u64 i sam ishchet, kakaya para polей dayot ROVNO cenu ispolneniya -- razmetka opredelyaetsya perebo'rom, a ne dogadkoy. Ot etogo zavisit ves segment (a) pereezda i stroka «sozdatel kupil sam»."}
+ "zachem": "POVTOR p2: proshlaya proverka derzhala po odnomu balansu na mint i PEREZATIRALA scheta. Esli u pula dva scheta odnogo minta (hranilishche krivoy i schyot nakoplennyh sborov), to krivaya schitaet po hranilishchu, a arhiv otdayot drugoe chislo -- otsyuda i razryv 7.9 %. Teper vydayutsya VSE token-scheta pula s adresami i balansami."
+}
