@@ -1457,9 +1457,22 @@ def budzhet_iz_instrukcij(инструкции: list) -> dict:
             continue
         из_["instrukcij_budzheta"] += 1
         разобрано = ((и or {}).get("parsed") or {})
-        из_["tipy"].append(str(разобрано.get("type")
-                                or ((и or {}).get("data") or "")[:8]
-                                or "без type и без data"))
+        # ТИП -- ЦЕЛИКОМ, НЕ ОБРЕЗАННЫЙ. Обрезка до 8 знаков 10.10 не дала
+        # ответить, лимит это или цена: по base58 обрезок не разобрать.
+        _сырое = (и or {}).get("data") or ""
+        _код = None
+        if _сырое:
+            try:
+                _б = base58_v_bajty(_сырое)
+                _код = (_б[0] if _б else None)
+            except ValueError:
+                _код = "не base58"
+        из_["tipy"].append({"type": разобрано.get("type"),
+                             "data": _сырое,
+                             "kod": _код,
+                             "bajt": (len(base58_v_bajty(_сырое))
+                                      if (_сырое and _код not in (None, "не base58"))
+                                      else None)})
         тип = (разобрано.get("type") or "")
         сведения = (разобрано.get("info") or {})
         if тип == "setComputeUnitPrice" and сведения.get("microLamports") is not None:
@@ -2404,15 +2417,16 @@ def самопроверка() -> int:
         {"programId": ПРОГРАММА_БЮДЖЕТА, "program": "computeBudget",
          "parsed": {"type": "setComputeUnitPrice",
                      "info": {"microLamports": 63636}}}])
-    chk("типы инструкций бюджета названы списком -- иначе 'одна инструкция "
-        "бюджета' не проверить",
-        _рз0["tipy"] == ["setComputeUnitLimit", "setComputeUnitPrice"]
-        if (_рз0 := budzhet_iz_instrukcij([
-            {"programId": ПРОГРАММА_БЮДЖЕТА,
-             "parsed": {"type": "setComputeUnitLimit", "info": {"units": 1}}},
-            {"programId": ПРОГРАММА_БЮДЖЕТА,
-             "parsed": {"type": "setComputeUnitPrice",
-                         "info": {"microLamports": 2}}}])) else False)
+    _рз0 = budzhet_iz_instrukcij([
+        {"programId": ПРОГРАММА_БЮДЖЕТА,
+         "parsed": {"type": "setComputeUnitLimit", "info": {"units": 1}}},
+        предел_ix])
+    chk("каждая инструкция бюджета названа типом ИЛИ кодом и полным data -- "
+        "по обрезанному base58 лимит от цены не отличить",
+        [т.get("type") for т in _рз0["tipy"]] == ["setComputeUnitLimit", None]
+        and _рз0["tipy"][1]["kod"] == БЮДЖЕТ_ПРЕДЕЛ_CU
+        and _рз0["tipy"][1]["bajt"] == 5
+        and _рз0["tipy"][1]["data"] == предел_ix["data"], _рз0["tipy"])
     chk("jsonParsed: цена и предел CU читаются из parsed, где data нет вовсе",
         _рз["cu_cena_mikrolamport"] == 63636 and _рз["cu_predel"] == 110000
         and _рз["iz_parsed"] == 2 and _рз["iz_base58"] == 0, _рз)
