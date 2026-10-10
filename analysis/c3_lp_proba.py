@@ -44,6 +44,7 @@ import math
 import os
 import statistics
 import sys
+import time
 from pathlib import Path
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
@@ -512,11 +513,325 @@ def ст_code2(e: dict):
     return _КЭШ["A"].ст(e)
 
 
+# ============================================================ РЯД СДЕЛОК
+# ЗАЧЕМ ОТДЕЛЬНЫЙ СЧЁТ ПО РЯДУ, А НЕ ПО ДВУМ СНИМКАМ.
+# По двум снимкам доход от оборота выводится из роста k. Это оказалось
+# НЕНАДЁЖНЫМ СЧЁТЧИКОМ, и это измерено: на 16 481 позиции суточного архива
+# k ПАДАЕТ в 6 193 случаях (37.6 %), хотя сделка растить k обязана -- комиссия
+# LP остаётся в пуле. Падения не мелкие: медиана 0.39 %, p90 4.6 %, p99 31 %,
+# максимум 85.7 %; больше 1 % падают 1 946 окон, больше 10 % -- 286, больше
+# 50 % -- 16. Значит в резервах сидит ещё что-то, кроме сделок: снятие чужой
+# ликвидности и сбор накопленных комиссий (Pool.protocol_fees и
+# Pool.creator_fees лежат в том же счёте пула). ПОЭТОМУ ПО РЯДУ СДЕЛОК ОБОРОТ
+# СУММИРУЕТСЯ НАПРЯМУЮ (quoteAmount каждой сделки), а k не используется вовсе.
+#
+# ВХОД -- РЯД СОБЫТИЙ ОДНОГО ПУЛА В ТОМ ВИДЕ, В КАКОМ ИХ ОТДАЁТ ЧИТАЛКА
+# CODE-2 (podbivka_arhiv_den.КЛЮЧИ): action, quoteAmount, tokenAmount,
+# quoteInPool, tokensInPool, poolFeeRate, block, timestamp. Своего формата не
+# придумываю.
+
+ГОРИЗОНТЫ_СЕКУНД = (600, 3600, 21600, 86400)   # 10 мин, 1 ч, 6 ч, 24 ч
+ПОРОГ_ОКНО_СЕКУНД = 600                        # «события первых 10 минут»
+
+# BOOST -- НЕ ОБОРОТ. Выкуп за счёт BOOST двигает цену и резервы, но это не
+# сделка торговца, и комиссии LP с него нет. Дискриминаторы посчитаны по
+# sha256('global:имя') и sha256('event:Имя'), как и везде:
+#   boost_buy_and_burn   инструкция 694406af000723a2
+#   BoostBuyAndBurnEvent событие    3f451c16305cc2b9
+# Снятие и вклад ликвидности -- тоже не оборот:
+#   deposit  f223c68952e1f2b6 / DepositEvent  78f83d531f8e6b90
+#   withdraw b712469c946da122 / WithdrawEvent 1609851aa02c47c0
+НЕ_ОБОРОТ_ДЕЙСТВИЯ = frozenset({
+    "boost_buy_and_burn", "boost", "init_boost",
+    "deposit", "withdraw", "add_liquidity", "remove_liquidity"})
+ОБОРОТ_ДЕЙСТВИЯ = frozenset({"buy", "sell"})
+
+
+def _rez(e: dict) -> tuple | None:
+    """Резервы события -- через функцию Code-2, если путь к нему задан."""
+    try:
+        return ст_code2(e)
+    except НетДанных:
+        x, y = e.get("quoteInPool"), e.get("tokensInPool")
+        if not x or not y:
+            return None
+        return float(x), float(y)
+
+
+def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
+                lp_bps: int = LP_BPS_ИЗМЕРЕНО,
+                fee_torgovli: float | None = None) -> dict:
+    """ИТОГ ПОЗИЦИИ LP ПО РЯДУ СДЕЛОК ПУЛА. Вход -- первое событие ряда.
+
+    Оборот суммируется ИЗ СДЕЛОК, а не из роста k. BOOST и движения
+    ликвидности в оборот НЕ идут и считаются отдельно. Наша доля
+    пересчитывается на каждом движении чужой ликвидности -- в этом и смысл
+    ряда: по двум снимкам такое движение неотличимо от оборота.
+    """
+    события = [е for е in rjad if _rez(е)]
+    if len(события) < 2:
+        raise НетДанных("в ряду меньше двух событий с резервами")
+    события.sort(key=lambda е: (е.get("block") or 0, е.get("timestamp") or 0))
+    первое = события[0]
+    # МЕТКА ВРЕМЕНИ ОБЯЗАТЕЛЬНА, И ПРОВЕРЯЕТСЯ НА None, А НЕ НА ЛОЖЬ.
+    # Здесь стояло `or 0`, и у события с меткой 0 горизонт отключался
+    # ЦЕЛИКОМ: все сделки попадали в любой горизонт, 10 минут и сутки давали
+    # один и тот же оборот. На живых данных метки в миллисекундах и не нули,
+    # поэтому молча сошло бы за правду -- ровно то, чего быть не должно.
+    т0 = первое.get("timestamp")
+    if т0 is None:
+        raise НетДанных("у первого события ряда нет метки времени -- горизонт "
+                        "в секундах считать нечем")
+    р0 = _rez(первое)
+    y0, x0 = р0[0], р0[1]
+    if min(y0, x0) <= 0:
+        raise НетДанных(WHY_НЕТ_СОСТОЯНИЙ)
+    фи = (float(fee_torgovli) if fee_torgovli is not None
+          else float(первое.get("poolFeeRate") or 0.0))
+    X = float(razmer)
+    p0 = y0 / x0
+    # НАША ДОЛЯ -- ПО КОТИРОВОЧНОЙ СТОРОНЕ, как и в счёте по двум снимкам.
+    доля = X / (y0 + X)
+    оборот = доход = 0.0
+    без_метки = за_горизонтом = 0
+    буст_объём = буст_событий = 0.0
+    ликв_событий = 0
+    ликв_сдвиг_доли = 0.0
+    y, x = y0, x0
+    последнее = первое
+    событий_в_окне_порога = 0
+    for е in события[1:]:
+        т = е.get("timestamp")
+        if т is None:
+            # Событие без метки времени в горизонт отнести нельзя: пропускаем
+            # и считаем, а не приписываем его к началу ряда.
+            без_метки += 1
+            continue
+        прошло = (т - т0) / 1000.0
+        if прошло <= ПОРОГ_ОКНО_СЕКУНД:
+            событий_в_окне_порога += 1
+        if прошло > gorizont_sekund:
+            # ПРОПУСК, А НЕ ВЫХОД ИЗ ЦИКЛА. Здесь стоял break, и он молча
+            # обрезал ряд, если метки времени не строго по блокам: первая же
+            # сделка за горизонтом прекращала счёт, и всё, что лежало за ней
+            # по порядку блоков, но В горизонте, терялось -- вместе с
+            # движениями чужой ликвидности. На живых данных метка растёт
+            # вместе с блоком, и разницы не было бы; но данных, на которых
+            # это можно проверить, у меня нет, поэтому порядок не
+            # предполагается.
+            за_горизонтом += 1
+            continue
+        р = _rez(е)
+        yн, xн = р[0], р[1]
+        действие = str(е.get("action") or "").lower()
+        q = abs(float(е.get("quoteAmount") or 0.0))
+        if действие in ОБОРОТ_ДЕЙСТВИЯ:
+            оборот += q
+            доход += (lp_bps / 10_000) * q * доля
+        elif действие in НЕ_ОБОРОТ_ДЕЙСТВИЯ:
+            if "boost" in действие:
+                буст_объём += q
+                буст_событий += 1
+            else:
+                # ЧУЖАЯ ЛИКВИДНОСТЬ: наша доля размывается или растёт.
+                # Цена при этом не меняется, меняется глубина.
+                if yн > 0 and y > 0:
+                    было = доля
+                    наша_котировка = доля * y
+                    доля = (наша_котировка / yн) if yн > 0 else доля
+                    доля = min(max(доля, 0.0), 1.0)
+                    ликв_событий += 1
+                    ликв_сдвиг_доли += доля - было
+        y, x = yн, xн
+        последнее = е
+    if последнее is первое:
+        raise НетДанных("на горизонте не нашлось ни одного события после входа")
+    p1 = y / x
+    r = p1 / p0
+    # СТОИМОСТЬ ПОЗИЦИИ: наша доля конечных резервов плюс накопленный доход.
+    # Доход считается отдельно, а не через рост k, поэтому из резервов его
+    # вычитать не надо -- он в них УЖЕ лежит, но и доля его уже учитывает.
+    позиция = 2 * X * math.sqrt(r)
+    вклад = 2 * X
+    потеря_цены = -X * (math.sqrt(r) - 1) ** 2
+    # КРУГ ВХОДА-ВЫХОДА -- как и в счёте по снимкам.
+    комиссия_ноги = фи * X * (1 + math.sqrt(r))
+    сдвиг_входа = X * X / (y0 + X)
+    нога_на_выходе = X * math.sqrt(r)
+    сдвиг_выхода = нога_на_выходе ** 2 / (y + нога_на_выходе) if y > 0 else 0.0
+    сеть = ИЗДЕРЖКИ_ТРАНЗАКЦИИ * ТРАНЗАКЦИЙ_В_КРУГЕ
+    расходы = комиссия_ноги + сдвиг_входа + сдвиг_выхода + сеть
+    итог = позиция + доход - вклад - расходы
+    return {"sobytij": len(события), "gorizont_sekund": gorizont_sekund,
+            "p0": p0, "p1": p1, "r": r,
+            "oborot": оборот, "dohod": доход,
+            "boost_objom": буст_объём, "boost_sobytij": буст_событий,
+            "likv_sobytij": ликв_событий, "likv_sdvig_doli": ликв_сдвиг_доли,
+            "dolja_pula_vhod": X / (y0 + X), "dolja_pula_vyhod": доля,
+            "pozicija": позиция, "vklad": вклад,
+            "poterja_ceny": потеря_цены,
+            "protiv_derzhat": позиция + доход - X * (1 + r),
+            "komissija_nogi": комиссия_ноги, "sdvig_vhoda": сдвиг_входа,
+            "sdvig_vyhoda": сдвиг_выхода, "set": сеть, "rashody": расходы,
+            "itog": итог,
+            "sobytij_pervyh_10_min": событий_в_окне_порога,
+            "sobytij_bez_metki": без_метки,
+            "sobytij_za_gorizontom": за_горизонтом}
+
+
+def rjady_iz_fajla(put: Path) -> dict:
+    """РЯДЫ ПУЛОВ ИЗ ФАЙЛА ЧИТАЛКИ CODE-2: {poolId: [события]}.
+
+    Ждём ровно то, что его читалка умеет писать: либо {"ряды": {...}}, либо
+    {"ленты_минтов": {...}}, либо плоский список событий с полем poolId.
+    Другого формата не придумываю: придёт иное -- отказ по имени.
+    """
+    открыть = gzip.open if str(put).endswith(".gz") else open
+    with открыть(put, "rt", encoding="utf-8") as ф:
+        д = json.load(ф)
+    if isinstance(д, dict):
+        for ключ in ("ряды", "ряды_целей", "ленты_минтов", "rjady"):
+            если = д.get(ключ)
+            if isinstance(если, dict) and если:
+                return {к: list(в) for к, в in если.items()}
+        если = д.get("события") or д.get("sobytija")
+        if isinstance(если, list) and если:
+            д = если
+    if isinstance(д, list):
+        из_: dict = {}
+        for е in д:
+            к = е.get("poolId") or е.get("pool_id")
+            if к:
+                из_.setdefault(к, []).append(е)
+        if из_:
+            return из_
+    raise НетДанных(
+        "в файле не нашлось рядов пулов: ждал ключ 'ряды' / 'ленты_минтов' "
+        "или плоский список событий с poolId -- того, что пишет читалка "
+        "Code-2. Своего формата не придумываю")
+
+
+def sutki_rjada(rjad: list) -> str:
+    """Сутки позиции -- по метке времени ПЕРВОГО события ряда (UTC)."""
+    for е in rjad:
+        т = е.get("timestamp")
+        if т is not None:
+            return time.strftime("%Y-%m-%d", time.gmtime(т / 1000.0))
+    return "?"
+
+
+def progon_rjady(puti: list, *, razmery: tuple = (1.0, 5.0, 20.0)) -> dict:
+    """ВЕСЬ РАСЧЁТ ПО РЯДАМ: горизонты x размеры, отбор, подбор и проверка.
+
+    Отбор -- по числу событий ПЕРВЫХ 10 МИНУТ (п.3 задания). Подбор порога на
+    ПЕРВОЙ ПОЛОВИНЕ суток, проверка на второй: иначе порог подогнан под свой
+    же шум.
+    """
+    ряды: dict = {}
+    for п in puti:
+        for пул, р in rjady_iz_fajla(Path(п)).items():
+            ряды.setdefault(пул, []).extend(р)
+    if not ряды:
+        raise НетДанных("ни одного ряда пула не прочитано")
+    по_суткам: dict = {}
+    for пул, р in ряды.items():
+        по_суткам.setdefault(sutki_rjada(р), []).append((пул, р))
+    сутки = sorted(по_суткам)
+    полов = max(1, len(сутки) // 2)
+    калибр, проверка = сутки[:полов], сутки[полов:]
+    из_ = {"fajlov": [str(п) for п in puti], "pulov": len(ряды),
+           "sutok": сутки, "kalibr": калибр, "proverka": проверка,
+           "po_gorizontam": {}, "porog": {}}
+
+    def счёт(дни, X, H, порог):
+        строки, пропущено = [], {"malo_sobytij": 0, "net_dannyh": 0}
+        for д in дни:
+            for _пул, р in по_суткам[д]:
+                try:
+                    из__ = lp_po_rjadu(р, razmer=X, gorizont_sekund=H)
+                except НетДанных:
+                    пропущено["net_dannyh"] += 1
+                    continue
+                if из__["sobytij_pervyh_10_min"] < порог:
+                    пропущено["malo_sobytij"] += 1
+                    continue
+                из__["den"] = д
+                строки.append(из__)
+        return строки, пропущено
+
+    for X in razmery:
+        for H in ГОРИЗОНТЫ_СЕКУНД:
+            стр, проп = счёт(сутки, X, H, 0)
+            если = [с["itog"] for с in стр]
+            if not если:
+                из_["po_gorizontam"][f"{X:g}SOL|{H}"] = {
+                    "why_not": "ни одной позиции", "propushcheno": проп}
+                continue
+            ср_дни = {}
+            for с in стр:
+                ср_дни.setdefault(с["den"], []).append(с["itog"])
+            из_["po_gorizontam"][f"{X:g}SOL|{H}"] = {
+                "razmer": X, "gorizont_sekund": H, "pozicij": len(если),
+                "stat_itog": _стат(если),
+                "stat_protiv_derzhat": _стат([с["protiv_derzhat"] for с in стр]),
+                "dohod_med": statistics.median([с["dohod"] for с in стр]),
+                "oborot_med": statistics.median([с["oborot"] for с in стр]),
+                "rashody_med": statistics.median([с["rashody"] for с in стр]),
+                "boost_objom_med": statistics.median(
+                    [с["boost_objom"] for с in стр]),
+                "pulov_s_boost": sum(1 for с in стр if с["boost_sobytij"]),
+                "pulov_s_dvizhenijem_likvidnosti": sum(
+                    1 for с in стр if с["likv_sobytij"]),
+                "dolja_vhod_med": statistics.median(
+                    [с["dolja_pula_vhod"] for с in стр]),
+                "dolja_vyhod_med": statistics.median(
+                    [с["dolja_pula_vyhod"] for с in стр]),
+                "v_pljuse": sum(1 for х in если if х > 0) / len(если),
+                "propushcheno": проп,
+                "di_po_sutkam": di_po_sutkam(
+                    [statistics.fmean(в) for в in ср_дни.values()]),
+                "za_sutki": statistics.fmean(
+                    [statistics.fmean(в) * len(в) for в in ср_дни.values()])}
+    for X in razmery:
+        подбор = []
+        for порог in (0, 10, 25, 50, 100, 200, 400):
+            стр, _ = счёт(калибр, X, 86400, порог)
+            если = [с["itog"] for с in стр]
+            подбор.append({"porog_sobytij": порог, "pozicij": len(если),
+                           "stat": _стат(если),
+                           "v_pljuse": (sum(1 for х in если if х > 0) / len(если)
+                                        if если else None)})
+        годные = [с for с in подбор if (с["stat"].get("n") or 0) >= 30]
+        лучший = max(годные, key=lambda с: с["stat"]["ус"]) if годные else None
+        рез = None
+        if лучший:
+            стр, проп = счёт(проверка, X, 86400, лучший["porog_sobytij"])
+            если = [с["itog"] for с in стр]
+            по_дням: dict = {}
+            for с in стр:
+                по_дням.setdefault(с["den"], []).append(с["itog"])
+            рез = {"porog_sobytij": лучший["porog_sobytij"],
+                   "pozicij": len(если), "propushcheno": проп,
+                   "stat": _стат(если) if если else {"n": 0},
+                   "v_pljuse": (sum(1 for х in если if х > 0) / len(если)
+                                if если else None),
+                   "pozicij_v_sutki": (len(если) / len(по_дням)
+                                       if по_дням else None),
+                   "za_sutki": (statistics.fmean(
+                       [statistics.fmean(в) * len(в) for в in по_дням.values()])
+                       if по_дням else None),
+                   "di_za_sutki": di_po_sutkam(
+                       [statistics.fmean(в) * len(в) for в in по_дням.values()])}
+        из_["porog"][f"{X:g}SOL"] = {"podbor": подбор, "luchshij": лучший,
+                                     "proverka": рез}
+    return из_
+
+
 # ------------------------------------------------- самопроверка
 
 # ЧИСЛО ОБЪЯВЛЕНО. Меньше -- проверку убрали и никто не заметил; больше --
 # добавили и не сказали. И то и другое здесь ПРОВАЛ.
-ZHDEM_PROVEROK = 23
+ZHDEM_PROVEROK = 33
 
 
 def self_test() -> int:  # noqa: C901, PLR0915
@@ -700,6 +1015,98 @@ def self_test() -> int:  # noqa: C901, PLR0915
                                 "rashody_med": 1.0}]},
                    gorizont=150).get("nuzhno_minut") is None)
 
+    # ----- 8. СЧЁТ ПО РЯДУ СДЕЛОК: проверяется рядами с известным ответом
+    def сд(действие, q, y, x, t, blok):
+        return {"action": действие, "quoteAmount": q, "quoteInPool": y,
+                "tokensInPool": x, "poolFeeRate": 0.0, "timestamp": t,
+                "block": blok, "pool": "pump-amm"}
+
+    # Ряд, где цена не двигается, а оборот есть: доход обязан быть ровно
+    # 20 б.п. * оборот * наша доля, и ни копейкой больше.
+    ряд = [сд("buy", 0, 100.0, 1000.0, 0, 1)]
+    ряд += [сд("buy", 10.0, 100.0, 1000.0, 1000 * и, 1 + и) for и in range(1, 11)]
+    р = lp_po_rjadu(ряд, razmer=1.0, gorizont_sekund=86400)
+    доля = 1.0 / 101.0
+    ждём_доход = 0.0020 * 100.0 * доля
+    chk(f"ДОХОД ПО РЯДУ = 20 б.п. * ОБОРОТ * НАША ДОЛЯ, и ничего больше: "
+        f"оборот {р['oborot']:.0f} SOL, доля {доля * 100:.3f} %, доход "
+        f"{р['dohod']:.6f} = {ждём_доход:.6f}",
+        abs(р["oborot"] - 100.0) < 1e-9
+        and abs(р["dohod"] - ждём_доход) < 1e-12, р)
+    chk("ОБОРОТ СУММИРУЕТСЯ ИЗ СДЕЛОК, А НЕ ИЗ РОСТА k -- на этом ряду k не "
+        "меняется вовсе, и прежний счёт показал бы доход НОЛЬ",
+        abs(р["r"] - 1.0) < 1e-12 and р["dohod"] > 0)
+    # BOOST в оборот не идёт.
+    ряд_б = list(ряд) + [сд("boost_buy_and_burn", 500.0, 100.0, 1000.0,
+                            11000, 12)]
+    рб = lp_po_rjadu(ряд_б, razmer=1.0, gorizont_sekund=86400)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: ВЫКУП BOOST -- НЕ ОБОРОТ: 500 SOL выкупа оборот "
+        f"не изменили ({рб['oborot']:.0f} SOL, как и было), а посчитаны "
+        f"отдельно ({рб['boost_objom']:.0f} SOL, {рб['boost_sobytij']:.0f} "
+        "событие)",
+        abs(рб["oborot"] - р["oborot"]) < 1e-9
+        and abs(рб["boost_objom"] - 500.0) < 1e-9
+        and рб["boost_sobytij"] == 1, рб)
+    # ЧУЖОЙ ВКЛАД РАЗМЫВАЕТ НАШУ ДОЛЮ.
+    ряд_л = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+             сд("deposit", 0, 300.0, 3000.0, 1000, 2),
+             сд("buy", 10.0, 300.0, 3000.0, 2000, 3)]
+    рл = lp_po_rjadu(ряд_л, razmer=1.0, gorizont_sekund=86400)
+    chk("ЧУЖОЙ ВКЛАД РАЗМЫВАЕТ НАШУ ДОЛЮ, и по ряду это ВИДНО: пул втрое "
+        f"глубже -- доля с {рл['dolja_pula_vhod'] * 100:.3f} % до "
+        f"{рл['dolja_pula_vyhod'] * 100:.3f} %. По двум снимкам такое "
+        "движение неотличимо от оборота",
+        рл["likv_sobytij"] == 1
+        and рл["dolja_pula_vyhod"] < рл["dolja_pula_vhod"] / 2.5, рл)
+    упало4 = None
+    try:
+        lp_po_rjadu([сд("buy", 0, 100.0, 1000.0, 0, 1)], razmer=1.0,
+                    gorizont_sekund=86400)
+    except НетДанных as сбой:
+        упало4 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: в ряду одно событие -- отказ по имени, а не "
+        "итог из воздуха",
+        упало4 and "меньше двух" in упало4, упало4)
+    упало5 = None
+    try:
+        rjady_iz_fajla(КОРЕНЬ / "data" / "idl" / "pump_amm.json")
+    except НетДанных as сбой:
+        упало5 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: файл не того формата -- отказ с перечислением "
+        "ожидаемых ключей читалки Code-2, а не разбор наугад",
+        упало5 and "Своего формата не придумываю" in упало5, упало5)
+    chk("ГОРИЗОНТЫ РЯДА -- РОВНО ЗАКАЗАННЫЕ ЧЕТЫРЕ: 10 мин, 1 ч, 6 ч, 24 ч "
+        "в секундах, и порог считается по первым 10 минутам",
+        ГОРИЗОНТЫ_СЕКУНД == (600, 3600, 21600, 86400)
+        and ПОРОГ_ОКНО_СЕКУНД == 600)
+    # РЯД НА СУТКИ: сделки на 5-й минуте, 15-й минуте и 2-м часе.
+    ряд_сут = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+               сд("buy", 10.0, 100.0, 1000.0, 300_000, 2),
+               сд("buy", 10.0, 100.0, 1000.0, 900_000, 3),
+               сд("buy", 10.0, 100.0, 1000.0, 7_200_000, 4)]
+    р10 = lp_po_rjadu(ряд_сут, razmer=1.0, gorizont_sekund=600)
+    р1ч = lp_po_rjadu(ряд_сут, razmer=1.0, gorizont_sekund=3600)
+    р24 = lp_po_rjadu(ряд_сут, razmer=1.0, gorizont_sekund=86400)
+    chk("ГОРИЗОНТ РЕЖЕТ РЯД ПО ВРЕМЕНИ, А НЕ ПО ЧИСЛУ СОБЫТИЙ: сделки на 5-й "
+        f"минуте, 15-й и 2-м часе дают оборот {р10['oborot']:.0f} / "
+        f"{р1ч['oborot']:.0f} / {р24['oborot']:.0f} SOL на 10 мин / 1 ч / 24 ч",
+        abs(р10["oborot"] - 10.0) < 1e-9 and abs(р1ч["oborot"] - 20.0) < 1e-9
+        and abs(р24["oborot"] - 30.0) < 1e-9, (р10, р1ч, р24))
+    # МЕТКИ НЕ ПО ПОРЯДКУ БЛОКОВ: ряд НЕ должен обрезаться.
+    ряд_кривой = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+                  сд("buy", 10.0, 100.0, 1000.0, 50_000_000, 2),
+                  сд("buy", 10.0, 100.0, 1000.0, 300_000, 3)]
+    ркр = lp_po_rjadu(ряд_кривой, razmer=1.0, gorizont_sekund=3600)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: метки времени НЕ по порядку блоков -- сделка за "
+        "горизонтом НЕ обрезает ряд: оборот 10 SOL (вторая сделка, что в "
+        f"горизонте), за горизонтом посчитано {ркр['sobytij_za_gorizontom']}",
+        abs(ркр["oborot"] - 10.0) < 1e-9
+        and ркр["sobytij_za_gorizontom"] == 1, ркр)
+    chk("СОБЫТИЯ ПЕРВЫХ 10 МИНУТ СЧИТАЮТСЯ ОТДЕЛЬНО ОТ ГОРИЗОНТА -- это то, "
+        "по чему идёт отбор: на суточном горизонте их всё равно одно",
+        р24["sobytij_pervyh_10_min"] == 1
+        and р10["sobytij_pervyh_10_min"] == 1, (р24, р10))
+
     print(f"\nпроверок {было}, ждали {ZHDEM_PROVEROK}, не прошло {плохо}")
     for и in упавшие:
         print(f"УПАЛИ: {и}")
@@ -785,11 +1192,20 @@ def main() -> int:
                    help="каталог с суточными файлами Code-2 (konv_*.json.gz)")
     p.add_argument("--prefiks", default="konv")
     p.add_argument("--sutok", type=int, default=7)
+    p.add_argument("--rjady", default=None,
+                   help="файл(ы) читалки Code-2 с рядами сделок пулов на 24 ч, "
+                        "через запятую: тогда считаются горизонты 10 мин/1 ч/"
+                        "6 ч/24 ч, а не окно суточного файла")
     p.add_argument("--self-test", action="store_true")
     p.add_argument("--json", action="store_true")
     a = p.parse_args()
     if a.self_test:
         return 1 if self_test() else 0
+    if a.rjady:
+        итог = progon_rjady([п for п in a.rjady.split(",") if п],
+                            razmery=РАЗМЕРЫ)
+        print(json.dumps(итог, ensure_ascii=False, indent=1, default=str))
+        return 0
     if not a.arhiv:
         p.print_help()
         print("\nНУЖЕН --arhiv: суточные файлы лежат на ветке claude/podbivka "
@@ -804,3 +1220,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
