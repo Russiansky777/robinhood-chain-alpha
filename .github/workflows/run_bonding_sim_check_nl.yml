@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение)"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение) | 'blocksubscribe' -- даёт ли наш план Helius подписку на блоки (только чтение)"
         required: false
         default: "bonding"
       sravnit:
@@ -143,7 +143,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy)
+            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy|blocksubscribe)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -361,6 +361,20 @@ jobs:
             --pauza "${{ inputs.pauza }}" \
             --out data/chaevye_zhivy.json | tail -80
 
+      - name: "blocksubscribe: даёт ли наш план Helius подписку на блоки (только чтение)"
+        if: ${{ inputs.zadacha == 'blocksubscribe' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          "$RUNNER_TEMP/bs_venv/bin/pip" install -q websockets
+          $PY deploy/checks/blocksubscribe_proba.py --self-test | tail -2
+          $PY deploy/checks/blocksubscribe_proba.py \
+            --sekund 12 \
+            --out data/blocksubscribe_proba.json | tail -60
+
       - name: "pereezdy: архив Code-2 и сборщик Code-3"
         if: ${{ inputs.zadacha == 'pereezdy' }}
         run: |
@@ -488,7 +502,7 @@ jobs:
             cp /tmp/krug.json data/krug_sborki_simulyaciya.json 2>/dev/null || true
             git add data/krug_sborki_simulyaciya.json || true
           fi
-          for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json data/versii_razbora.json data/mayhem_krivoj.json data/mesta_v_bloke.json; do
+          for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json data/versii_razbora.json data/mayhem_krivoj.json data/mesta_v_bloke.json data/chaevye_zhivy.json data/blocksubscribe_proba.json; do
             [ -f "$F" ] && git add "$F"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
