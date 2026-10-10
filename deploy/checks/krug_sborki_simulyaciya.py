@@ -1407,6 +1407,263 @@ def svod_golovy(строки: list, *, чаевые_счета: dict | None = No
     return из_
 
 
+# --------------------------------------------- ПЛАТЕЛЬЩИКИ ГОЛОВЫ: ОДНА ТАБЛИЦА
+
+АЛФАВИТ58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+ПРОГРАММА_БЮДЖЕТА = "ComputeBudget111111111111111111111111111111"
+# ЦЕНА CU ЖИВЁТ В ИНСТРУКЦИИ ComputeBudget, А НЕ В ПОЛЕ ОТВЕТА УЗЛА. Номера
+# инструкций -- из программы бюджета: 2 -- предел CU (u32), 3 -- цена CU в
+# микролампортах за единицу (u64). Их приходится разбирать самим: jsonParsed
+# инструкции бюджета не разворачивает, отдаёт голый base58.
+БЮДЖЕТ_ПРЕДЕЛ_CU = 2
+БЮДЖЕТ_ЦЕНА_CU = 3
+БАЗОВАЯ_КОМИССИЯ_ЛАМПОРТОВ = 5000
+
+
+def base58_v_bajty(текст: str) -> bytes:
+    """base58 -> байты. Нужен ровно для разбора данных инструкции бюджета."""
+    число = 0
+    for знак in str(текст or ""):
+        место = АЛФАВИТ58.find(знак)
+        if место < 0:
+            raise ValueError(f"не base58: {знак!r}")
+        число = число * 58 + место
+    тело = число.to_bytes((число.bit_length() + 7) // 8, "big") if число else b""
+    нулей = 0
+    for знак in str(текст or ""):
+        if знак == АЛФАВИТ58[0]:
+            нулей += 1
+        else:
+            break
+    return b"\x00" * нулей + тело
+
+
+def budzhet_iz_instrukcij(инструкции: list) -> dict:
+    """Предел и цена CU из инструкций программы бюджета -- числами."""
+    из_ = {"cu_predel": None, "cu_cena_mikrolamport": None,
+            "instrukcij_budzheta": 0, "why_not": None}
+    for и in (инструкции or []):
+        if (и or {}).get("programId") != ПРОГРАММА_БЮДЖЕТА:
+            continue
+        из_["instrukcij_budzheta"] += 1
+        данные = (и or {}).get("data")
+        if not данные:
+            continue
+        try:
+            байты = base58_v_bajty(данные)
+        except ValueError as сбой:
+            из_["why_not"] = f"данные инструкции бюджета не разобрались: {сбой}"
+            continue
+        if not байты:
+            continue
+        код = байты[0]
+        if код == БЮДЖЕТ_ПРЕДЕЛ_CU and len(байты) >= 5:
+            из_["cu_predel"] = int.from_bytes(байты[1:5], "little")
+        elif код == БЮДЖЕТ_ЦЕНА_CU and len(байты) >= 9:
+            из_["cu_cena_mikrolamport"] = int.from_bytes(байты[1:9], "little")
+    if из_["instrukcij_budzheta"] == 0:
+        из_["why_not"] = "инструкций ComputeBudget в транзакции нет"
+    return из_
+
+
+def cu_po_podpisi(подпись: str, *, таймаут: float = 30.0) -> dict:
+    """Цена CU одной транзакции: из инструкции бюджета И из комиссии.
+
+    Два независимых пути на одно число -- чтобы не поверить ошибке разбора:
+    инструкция даёт цену напрямую, комиссия минус базовая даёт приоритет в
+    лампортах, и из него с пределом CU цена считается обратно.
+    """
+    из_ = {"podpis": подпись, "ok": False, "why_not": None,
+            "cu_predel": None, "cu_cena_mikrolamport": None,
+            "cu_potracheno": None, "fee_lamportov": None,
+            "podpisantov": None, "prioritet_lamportov": None,
+            "cena_iz_komissii_mikrolamport": None}
+    # ПОТОЛОК ВЕРСИИ -- ОБЩИЙ, А НЕ НОЛЬ. На нуле узел отказал 468 раз подряд:
+    # транзакции головы версионные, и это ровно тот случай, под который в этом
+    # модуле стоит проверка s_tx_version_vezde().
+    о = зов("getTransaction",
+             [подпись, {"encoding": "jsonParsed",
+                         "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX}],
+             таймаут=таймаут)
+    if not о.get("ok") or not о.get("result"):
+        из_["why_not"] = о.get("why_not") or "узел не отдал транзакцию"
+        return из_
+    т = о["result"]
+    сооб = ((т.get("transaction") or {}).get("message") or {})
+    инстр = list(сооб.get("instructions") or [])
+    б = budzhet_iz_instrukcij(инстр)
+    из_.update(cu_predel=б["cu_predel"],
+                cu_cena_mikrolamport=б["cu_cena_mikrolamport"])
+    мета = т.get("meta") or {}
+    из_["cu_potracheno"] = мета.get("computeUnitsConsumed")
+    из_["fee_lamportov"] = мета.get("fee")
+    подписанты = [с for с in (сооб.get("accountKeys") or [])
+                   if (с or {}).get("signer")]
+    из_["podpisantov"] = len(подписанты) or None
+    if из_["fee_lamportov"] is not None and из_["podpisantov"]:
+        приоритет = (int(из_["fee_lamportov"])
+                      - БАЗОВАЯ_КОМИССИЯ_ЛАМПОРТОВ * int(из_["podpisantov"]))
+        из_["prioritet_lamportov"] = приоритет
+        предел = из_["cu_predel"] or из_["cu_potracheno"]
+        if предел:
+            из_["cena_iz_komissii_mikrolamport"] = round(
+                приоритет * 1_000_000.0 / float(предел), 1)
+    из_["ok"] = (из_["cu_cena_mikrolamport"] is not None
+                  or из_["cena_iz_komissii_mikrolamport"] is not None)
+    if not из_["ok"] and not из_["why_not"]:
+        из_["why_not"] = б.get("why_not") or "цена CU не нашлась"
+    return из_
+
+
+def _lovit_isklyuchenie(что, тип) -> bool:
+    """Нужен самопроверке: ждём исключение нужного типа, а не тихий результат."""
+    try:
+        что()
+    except тип:
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+    return False
+
+
+def platelshchiki_golovy(данные: dict, *, verhnih: int = 10,
+                          porog_pozicii: int = 100) -> dict:
+    """Верхние плательщики головы: доля в блоке источника, место, цена CU.
+
+    Слово владельца 10.10 (п.2): "для верхних 10 плательщиков -- доля их
+    покупок в том же блоке, что источник; их priority fee (CU price); в
+    скольких сделках они стоят раньше, чем 100-я позиция после источника".
+
+    ЧЕСТНО ПРО ПЕРВУЮ ДОЛЮ. Голова собрана как "первые N покупок того же минта
+    ПОСЛЕ транзакции источника В ЕГО БЛОКЕ" -- значит ВСЕ записанные покупки по
+    построению лежат в блоке источника, и доля "в том же блоке" равна 1.00 не
+    потому, что так вышло, а потому, что другого в выборке нет. Поэтому рядом
+    стоит число, которое действительно отвечает на вопрос: в какой доле СДЕЛОК
+    этот плательщик успел попасть в блок источника вообще.
+    """
+    из_ = {"sdelok_vsego": 0, "golov_vsego": 0, "verhnih": verhnih,
+            "porog_pozicii": porog_pozicii, "ryady": [],
+            "dolya_v_bloke_istochnika_pochemu":
+                ("по построению выборки 1.00: голова -- только покупки В БЛОКЕ "
+                 "источника, покупок из других блоков в ней нет"),
+            "why_not": None}
+    строки = (данные or {}).get("stroki") or []
+    if not строки:
+        из_["why_not"] = "в выгрузке головы нет строк"
+        return из_
+    сделок = {с.get("source_sig") for с in строки if с.get("source_sig")}
+    из_["sdelok_vsego"] = len(сделок)
+    по_пл: dict = {}
+    for с in строки:
+        подпись_сделки = с.get("source_sig")
+        for г in (с.get("golova") or []):
+            пл = г.get("platelshchik")
+            if not пл:
+                continue
+            из_["golov_vsego"] += 1
+            з = по_пл.setdefault(пл, {
+                "platelshchik": пл, "pokupok": 0, "obyom_sol": 0.0,
+                "chaevyh_pokupok": 0, "chaevye_sol": 0.0, "kanaly": {},
+                "pozicii": [], "sdelki": set(), "sdelki_ranee_poroga": set(),
+                "ploshchadki": {}, "fee_sol": [], "podpisi": []})
+            з["pokupok"] += 1
+            з["obyom_sol"] += float(г.get("pokupka_sol") or 0.0)
+            if float(г.get("chaevye_sol") or 0.0) > 0:
+                з["chaevyh_pokupok"] += 1
+                з["chaevye_sol"] += float(г.get("chaevye_sol") or 0.0)
+            for к in (г.get("kanaly") or []):
+                имя = (к or {}).get("служба") or (к or {}).get("sluzhba") or "?"
+                з["kanaly"][имя] = з["kanaly"].get(имя, 0) + 1
+            for пл_щ in (г.get("ploshchadki") or []):
+                з["ploshchadki"][пл_щ] = з["ploshchadki"].get(пл_щ, 0) + 1
+            поз = г.get("posle_istochnika")
+            if isinstance(поз, int):
+                з["pozicii"].append(поз)
+                if поз < int(porog_pozicii):
+                    з["sdelki_ranee_poroga"].add(подпись_сделки)
+            if подпись_сделки:
+                з["sdelki"].add(подпись_сделки)
+            if г.get("fee_sol") is not None:
+                з["fee_sol"].append(float(г["fee_sol"]))
+            if г.get("podpis"):
+                з["podpisi"].append(г["podpis"])
+    весь_объём = sum(з["obyom_sol"] for з in по_пл.values()) or 0.0
+    ряды = []
+    for з in по_пл.values():
+        сделок_пл = len(з["sdelki"])
+        ряды.append({
+            "platelshchik": з["platelshchik"],
+            "pokupok": з["pokupok"],
+            "obyom_sol": round(з["obyom_sol"], 4),
+            "dolya_obyoma_golovy": (round(з["obyom_sol"] / весь_объём, 4)
+                                     if весь_объём else None),
+            "sdelok": сделок_пл,
+            "dolya_sdelok": (round(сделок_пл / из_["sdelok_vsego"], 4)
+                              if из_["sdelok_vsego"] else None),
+            # ДОЛЯ В БЛОКЕ ИСТОЧНИКА: по построению выборки единица, и причина
+            # названа в ответе рядом, а не подразумевается.
+            "dolya_v_bloke_istochnika": 1.0,
+            "sdelok_v_bloke_istochnika": сделок_пл,
+            "pozicij": len(з["pozicii"]),
+            "index_posle_istochnika_median": _mediana(з["pozicii"]),
+            "index_posle_istochnika_min": (min(з["pozicii"]) if з["pozicii"] else None),
+            "sdelok_ranee_poroga": len(з["sdelki_ranee_poroga"]),
+            "dolya_sdelok_ranee_poroga": (
+                round(len(з["sdelki_ranee_poroga"]) / сделок_пл, 4)
+                if сделок_пл else None),
+            "chaevyh_pokupok": з["chaevyh_pokupok"],
+            "chaevye_sol": round(з["chaevye_sol"], 6),
+            "kanaly": dict(sorted(з["kanaly"].items(), key=lambda п: -п[1])),
+            "ploshchadki": dict(sorted(з["ploshchadki"].items(),
+                                        key=lambda п: -п[1])),
+            "fee_sol_median": _mediana(з["fee_sol"]),
+            "podpisi": з["podpisi"][:8],
+            "cu": None})
+    ряды.sort(key=lambda р: -(р["obyom_sol"] or 0.0))
+    из_["platelshchikov_vsego"] = len(ряды)
+    из_["ryady"] = ряды[:max(1, int(verhnih))]
+    return из_
+
+
+def cu_verhnim(ряды: list, *, podpisej: int = 4, pauza: float = 0.12) -> dict:
+    """Цена CU верхним плательщикам -- по их НАСТОЯЩИМ транзакциям.
+
+    Читается до `podpisej` подписей на плательщика; в ряд кладётся медиана по
+    тем, где цена нашлась, и отдельно -- сколько транзакций вообще без
+    инструкции бюджета (такие платят только базовую комиссию).
+    """
+    из_ = {"prochitano": 0, "s_cenoj": 0, "bez_budzheta": 0, "oshibok": 0}
+    for р in (ряды or []):
+        цены, из_комиссии, пределы, без_бюджета, сбои = [], [], [], 0, []
+        for подпись in (р.get("podpisi") or [])[:max(1, int(podpisej))]:
+            о = cu_po_podpisi(подпись)
+            из_["prochitano"] += 1
+            if о.get("cu_cena_mikrolamport") is not None:
+                цены.append(int(о["cu_cena_mikrolamport"]))
+            if о.get("cena_iz_komissii_mikrolamport") is not None:
+                из_комиссии.append(float(о["cena_iz_komissii_mikrolamport"]))
+            if о.get("cu_predel") is not None:
+                пределы.append(int(о["cu_predel"]))
+            if (о.get("why_not") or "").startswith("инструкций ComputeBudget"):
+                без_бюджета += 1
+            elif not о.get("ok"):
+                сбои.append(о.get("why_not"))
+            time.sleep(max(0.0, float(pauza)))
+        р["cu"] = {
+            "podpisej_prochitano": min(len(р.get("podpisi") or []),
+                                        max(1, int(podpisej))),
+            "cena_mikrolamport_median": _mediana(цены),
+            "cena_iz_komissii_median": _mediana(из_комиссии),
+            "cu_predel_median": _mediana(пределы),
+            "bez_instrukcii_budzheta": без_бюджета,
+            "sboev": len([с for с in сбои if с]),
+            "why_not": (сбои[0] if сбои else None)}
+        из_["s_cenoj"] += 1 if цены else 0
+        из_["bez_budzheta"] += без_бюджета
+        из_["oshibok"] += len([с for с in сбои if с])
+    return из_
+
+
 def mesta_v_bloke(*, vygruzka: str, pauza: float) -> dict:
     """Место сделки ИСТОЧНИКА и нашей в их блоках + соседи по минту.
 
@@ -2037,6 +2294,95 @@ def самопроверка() -> int:
         _г["pervye_pyat_po_sdelkam"])
     chk("голова: площадки считаются по головам и сортируются по частоте",
         list(_г["ploshchadki"]) == ["Pump.fun", "Jupiter v6"], _г["ploshchadki"])
+    # ----- ПЛАТЕЛЬЩИКИ ГОЛОВЫ: ТАБЛИЦА И ЦЕНА CU -----
+    # БАЗА58 РАЗБИРАЕТСЯ ПРАВИЛЬНО. От этого зависит ВСЯ цена CU: ошибка здесь
+    # дала бы красивое, но выдуманное число.
+    chk("base58: ведущие единицы -- это нулевые байты",
+        base58_v_bajty("11") == b"\x00\x00", base58_v_bajty("11"))
+    chk("base58: '2' -- это байт 0x01", base58_v_bajty("2") == b"\x01")
+    chk("base58: чужой знак -- исключение, а не тихий ноль",
+        _lovit_isklyuchenie(lambda: base58_v_bajty("0OIl"), ValueError))
+    # ИНСТРУКЦИЯ ЦЕНЫ CU: код 3, затем u64 little-endian.
+    def _b58(байты: bytes) -> str:
+        число = int.from_bytes(байты, "big")
+        из_с = ""
+        while число:
+            число, ост = divmod(число, 58)
+            из_с = АЛФАВИТ58[ост] + из_с
+        нулей = 0
+        for б in байты:
+            if б == 0:
+                нулей += 1
+            else:
+                break
+        return АЛФАВИТ58[0] * нулей + (из_с or "")
+
+    цена_ix = {"programId": ПРОГРАММА_БЮДЖЕТА,
+               "data": _b58(bytes([БЮДЖЕТ_ЦЕНА_CU]) + (123456).to_bytes(8, "little"))}
+    предел_ix = {"programId": ПРОГРАММА_БЮДЖЕТА,
+                 "data": _b58(bytes([БЮДЖЕТ_ПРЕДЕЛ_CU]) + (300000).to_bytes(4, "little"))}
+    б = budzhet_iz_instrukcij([предел_ix, цена_ix,
+                               {"programId": "Pump", "data": "3"}])
+    chk("цена CU и предел CU читаются из инструкций бюджета числами",
+        б["cu_cena_mikrolamport"] == 123456 and б["cu_predel"] == 300000
+        and б["instrukcij_budzheta"] == 2, б)
+    chk("нет инструкций бюджета -- причина словами, а не нулевая цена",
+        budzhet_iz_instrukcij([{"programId": "Pump", "data": "3"}])
+        ["why_not"].startswith("инструкций ComputeBudget"),
+        budzhet_iz_instrukcij([{"programId": "Pump", "data": "3"}]))
+    chk("обрезанные данные цены -- не разбираются молча в мусор",
+        budzhet_iz_instrukcij([{"programId": ПРОГРАММА_БЮДЖЕТА,
+                                "data": _b58(bytes([БЮДЖЕТ_ЦЕНА_CU, 1]))}])
+        ["cu_cena_mikrolamport"] is None)
+
+    # ТАБЛИЦА ПЛАТЕЛЬЩИКОВ -- НА ГОТОВЫХ СТРОКАХ, БЕЗ СЕТИ.
+    _пл_стр = [
+        {"source_sig": "S1", "ist": {"platelshchik": "IST"},
+         "golova": [
+             {"platelshchik": "A", "pokupka_sol": 3.0, "chaevye_sol": 0.001,
+              "kanaly": [{"служба": "jito"}], "ploshchadki": ["Pump.fun"],
+              "posle_istochnika": 5, "fee_sol": 0.001, "podpis": "p1"},
+             {"platelshchik": "B", "pokupka_sol": 1.0, "chaevye_sol": 0.0,
+              "kanaly": [], "ploshchadki": ["Pump.fun"],
+              "posle_istochnika": 500, "fee_sol": 0.000005, "podpis": "p2"}]},
+        {"source_sig": "S2", "ist": {"platelshchik": "IST"},
+         "golova": [
+             {"platelshchik": "A", "pokupka_sol": 2.0, "chaevye_sol": 0.0,
+              "kanaly": [], "ploshchadki": ["Pump.fun"],
+              "posle_istochnika": 300, "fee_sol": 0.001, "podpis": "p3"}]}]
+    _пл = platelshchiki_golovy({"stroki": _пл_стр}, verhnih=10)
+    _по = {р["platelshchik"]: р for р in _пл["ryady"]}
+    chk("сделок и голов считаются по выгрузке, а не по числу плательщиков",
+        _пл["sdelok_vsego"] == 2 and _пл["golov_vsego"] == 3, _пл)
+    chk("объём и доля объёма головы -- числом",
+        _по["A"]["obyom_sol"] == 5.0
+        and _по["A"]["dolya_obyoma_golovy"] == round(5.0 / 6.0, 4), _по["A"])
+    chk("сделок у плательщика -- РАЗНЫЕ сделки, а не покупки",
+        _по["A"]["sdelok"] == 2 and _по["A"]["pokupok"] == 2, _по["A"])
+    chk("раньше 100-й позиции -- считается по СДЕЛКАМ: у A одна из двух",
+        _по["A"]["sdelok_ranee_poroga"] == 1
+        and _по["A"]["dolya_sdelok_ranee_poroga"] == 0.5, _по["A"])
+    chk("кто ни в одной сделке не встал раньше 100-й -- ноль, а не None",
+        _по["B"]["sdelok_ranee_poroga"] == 0, _по["B"])
+    chk("медианный индекс после источника -- по всем его покупкам",
+        _по["A"]["index_posle_istochnika_median"] == 152.5, _по["A"])
+    chk("доля в блоке источника -- 1.00 И причина названа рядом, а не молча",
+        all(р["dolya_v_bloke_istochnika"] == 1.0 for р in _пл["ryady"])
+        and "по построению" in _пл["dolya_v_bloke_istochnika_pochemu"],
+        _пл["dolya_v_bloke_istochnika_pochemu"])
+    chk("каналы чаевых плательщика названы по службам",
+        _по["A"]["kanaly"] == {"jito": 1}, _по["A"]["kanaly"])
+    chk("ряды отсортированы по объёму: A впереди B",
+        [р["platelshchik"] for р in _пл["ryady"]] == ["A", "B"])
+    chk("verhnih режет таблицу",
+        len(platelshchiki_golovy({"stroki": _пл_стр}, verhnih=1)["ryady"]) == 1)
+    chk("пустая выгрузка -- причина словами, а не пустая таблица молча",
+        platelshchiki_golovy({"stroki": []})["why_not"] is not None)
+    chk("цена CU в таблице пустая, пока узел не прочитан -- она НЕ в выгрузке",
+        all(р["cu"] is None for р in _пл["ryady"]))
+    chk("подписи плательщика лежат в ряду -- по ним и читается цена CU",
+        _по["A"]["podpisi"] == ["p1", "p3"], _по["A"]["podpisi"])
+
     _г0 = svod_golovy([], чаевые_счета={})
     chk("голова: пустой вход -- доли None, а не нули (делить не на что)",
         _г0["golov"] == 0 and _г0["dolya_platelshchika_istochnika"] is None
@@ -2124,6 +2470,14 @@ def main() -> int:
                          "плательщик, подписанты, площадка, чаевые, размер")
     п.add_argument("--golov-skolko", type=int, default=30,
                     help="сколько покупок головы брать на сделку (по умолчанию 30)")
+    п.add_argument("--platelshchiki", default="",
+                    help="путь к выгрузке головы (data/golova_ocheredi.json) -- "
+                         "одна таблица по верхним плательщикам")
+    п.add_argument("--verhnih", type=int, default=10,
+                    help="platelshchiki: сколько верхних плательщиков по объёму")
+    п.add_argument("--podpisej-na-platelshchika", type=int, default=4,
+                    help="platelshchiki: сколько их транзакций читать на цену CU "
+                         "(0 -- не читать узел вовсе)")
     п.add_argument("--golov-sdelok", type=int, default=0,
                     help="взять только последние N сделок выгрузки (0 -- все)")
     п.add_argument("--chaevye-zhivy", default="",
@@ -2160,6 +2514,28 @@ def main() -> int:
     if а.mesta_v_bloke.strip():
         из_ = mesta_v_bloke(vygruzka=а.mesta_v_bloke.strip(), pauza=а.pauza)
         из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        return 0
+    if а.platelshchiki.strip():
+        путь_г = Path(а.platelshchiki.strip())
+        try:
+            данные = json.loads(путь_г.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as сбой:
+            print(f"СТОП: выгрузка головы не прочитана: {сбой}")
+            return 1
+        из_ = platelshchiki_golovy(данные, verhnih=а.verhnih)
+        # ЦЕНА CU -- ТОЛЬКО С ЦЕПИ. В выгрузке головы её нет: блок читался
+        # режимом accounts, в котором инструкций нет вовсе.
+        если_читать = int(а.podpisej_na_platelshchika or 0) > 0
+        из_["cu_chtenie"] = (cu_verhnim(из_["ryady"],
+                                         podpisej=а.podpisej_na_platelshchika,
+                                         pauza=а.pauza)
+                              if если_читать else
+                              {"why_not": "чтение узла не запрашивалось "
+                                           "(--podpisej-na-platelshchika 0)"})
         текст = json.dumps(из_, ensure_ascii=False, indent=1)
         print(текст)
         if а.out:
