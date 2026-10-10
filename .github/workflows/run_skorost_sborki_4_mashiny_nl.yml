@@ -1,0 +1,206 @@
+name: "Скорость сборки: четыре машины рядом (только чтение)"
+
+# ЗАЧЕМ (слово владельца 10.10, п.1): "Ту же полную сборку прогнать на бегунках
+# AMS и Miami (ExtraVM) и в контейнере -- четыре числа рядом. Если причина --
+# железо, назвать".
+#
+# ЧЕТЫРЕ МАШИНЫ: контейнер облачного бегунка, рабочий NL-хост (там живёт полоса),
+# лаборатория AMS, лаборатория Miami. На всех четырёх считается ОДИН И ТОТ ЖЕ
+# образец ОДНИМ И ТЕМ ЖЕ кодом из этой ветки -- иначе сравнение ничего не
+# значит. Плюс на каждой машине снимается эталон без зависимостей: цикл на
+# чистом Python, sha256 и прочее. Он отвечает, медленнее ли машина ВООБЩЕ или
+# медленнее именно наша сборка.
+#
+# НИ ОДНОЙ ПРАВКИ НИ НА ОДНОЙ МАШИНЕ. Код уезжает во временный каталог и
+# удаляется в конце; службы не трогаются; сети в самом замере нет (rpc_call
+# бросает). На лабораториях ставится временный venv и удаляется вместе с
+# каталогом -- рабочий venv лаборатории не трогается.
+on:
+  workflow_dispatch:
+    inputs:
+      povtorov:
+        description: "сколько повторов сборки на машину (медиана из них)"
+        required: false
+        default: "31"
+      sekund:
+        description: "окно замера нагрузки и соседей, с"
+        required: false
+        default: "10"
+      mashiny:
+        description: "'vse' или через запятую: kontejner,nl,ams,miami"
+        required: false
+        default: "vse"
+
+concurrency:
+  group: skorost-sborki-4
+  cancel-in-progress: false
+
+env:
+  NL_HOST: 45.59.170.76
+  AMS_HOST: 216.73.157.61
+  MIAMI_HOST: 169.128.191.158
+  RABOTA: /tmp/skorost_sborki_zamer
+  OUT_FILE: data/skorost_sborki_4_mashiny.json
+
+jobs:
+  chetyre:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "Проверка входов до любой работы"
+        run: |
+          set -e
+          case "${{ inputs.povtorov }}" in
+            ''|*[!0-9]*) echo "OTKAZ: povtorov ne chislo"; exit 1 ;;
+          esac
+          case "${{ inputs.sekund }}" in
+            ''|*[!0-9]*) echo "OTKAZ: sekund ne chislo"; exit 1 ;;
+          esac
+          MASHINY="${{ inputs.mashiny }}"
+          [ "$MASHINY" = "vse" ] && MASHINY="kontejner,nl,ams,miami"
+          for M in $(echo "$MASHINY" | tr ',' ' '); do
+            case "$M" in
+              kontejner|nl|ams|miami) ;;
+              *) echo "OTKAZ: mashina '$M' neizvestna"; exit 1 ;;
+            esac
+          done
+          echo "MASHINY=$MASHINY" >> "$GITHUB_ENV"
+          echo "mashiny: $MASHINY"
+
+      - name: "Самопроверка модуля замера"
+        run: |
+          set -e
+          set -o pipefail
+          python3 deploy/checks/skorost_sborki.py --self-test | tail -2
+
+      - name: "Контейнер: venv и замер"
+        if: ${{ !cancelled() }}
+        run: |
+          set -e
+          set -o pipefail
+          echo "$MASHINY" | tr ',' '\n' | grep -qx kontejner || { echo "propushcheno"; exit 0; }
+          python3 -m venv "$RUNNER_TEMP/zv"
+          "$RUNNER_TEMP/zv/bin/pip" install -q requests solders
+          "$RUNNER_TEMP/zv/bin/python" deploy/checks/skorost_sborki.py --self-test | tail -1
+          "$RUNNER_TEMP/zv/bin/python" deploy/checks/skorost_sborki.py \
+            --povtorov ${{ inputs.povtorov }} --sekund ${{ inputs.sekund }} \
+            --out /tmp/sk_kontejner.json > /dev/null
+          python3 deploy/checks/skorost_sborki_stroka.py /tmp/sk_kontejner.json kontejner
+
+      - name: "Ключи трёх машин"
+        env:
+          KLJUCH_NL: ${{ secrets.VPS_SSH_KEY }}
+          KLJUCH_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+        run: |
+          set -e
+          install -d -m 700 ~/.ssh
+          # КАЖДЫЙ КЛЮЧ -- СВОЕЙ СТРОКОЙ, без упаковки в общую переменную:
+          # ключ многострочный, и любая склейка его только испортит.
+          ulozhit() {
+            IMJA="$1"
+            TELO="$2"
+            echo "$MASHINY" | tr ',' '\n' | grep -qx "$IMJA" || return 0
+            if [ -z "$TELO" ]; then
+              echo "NET KLJUCHA dlja $IMJA -- mashina budet propushchena"
+              return 0
+            fi
+            printf '%s\n' "$TELO" > ~/.ssh/"$IMJA"_key
+            chmod 600 ~/.ssh/"$IMJA"_key
+            echo "kljuch $IMJA ulozhen, strok $(wc -l < ~/.ssh/${IMJA}_key)"
+          }
+          ulozhit nl "$KLJUCH_NL"
+          ulozhit ams "$KLJUCH_AMS"
+          ulozhit miami "$KLJUCH_MIAMI"
+          echo "SSH_BASE=-o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Посылка с кодом: модуль, analysis и один образец"
+        run: |
+          set -e
+          mkdir -p /tmp/posylka/deploy/checks /tmp/posylka/analysis /tmp/posylka/data/c2_pool_samples
+          cp deploy/checks/skorost_sborki.py /tmp/posylka/deploy/checks/
+          cp analysis/*.py /tmp/posylka/analysis/
+          cp data/c2_pool_samples/pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA.json \
+             /tmp/posylka/data/c2_pool_samples/
+          tar -C /tmp/posylka -czf /tmp/posylka.tgz .
+          ls -l /tmp/posylka.tgz
+
+      - name: "NL-хост: тот же замер"
+        if: ${{ !cancelled() }}
+        run: |
+          set -e
+          set -o pipefail
+          echo "$MASHINY" | tr ',' '\n' | grep -qx nl || { echo "propushcheno"; exit 0; }
+          [ -f ~/.ssh/nl_key ] || { echo "kljucha NL net -- propushcheno"; exit 0; }
+          OPTS="-i $HOME/.ssh/nl_key $SSH_BASE"
+          ssh -n $OPTS root@"$NL_HOST" "rm -rf $RABOTA; install -d -m 755 $RABOTA"
+          ssh $OPTS root@"$NL_HOST" "tar -C $RABOTA -xzf -" < /tmp/posylka.tgz
+          # ПИТОН БЕРЁТСЯ РАБОЧИЙ -- тот самый, на котором едет полоса: иначе
+          # замер отвечал бы про чужой интерпретатор.
+          ssh -n $OPTS root@"$NL_HOST" "set -o pipefail; /home/bot/robinhood-chain-alpha/venv/bin/python $RABOTA/deploy/checks/skorost_sborki.py --self-test --koren $RABOTA | tail -1" || true
+          ssh -n $OPTS root@"$NL_HOST" "/home/bot/robinhood-chain-alpha/venv/bin/python $RABOTA/deploy/checks/skorost_sborki.py --koren $RABOTA --povtorov ${{ inputs.povtorov }} --sekund ${{ inputs.sekund }} --out $RABOTA/out.json > /dev/null"
+          ssh -n $OPTS root@"$NL_HOST" "cat $RABOTA/out.json" > /tmp/sk_nl.json
+          ssh -n $OPTS root@"$NL_HOST" "rm -rf $RABOTA"
+          python3 deploy/checks/skorost_sborki_stroka.py /tmp/sk_nl.json nl
+
+      - name: "Лаборатории AMS и Miami: тот же замер во временном venv"
+        if: ${{ !cancelled() }}
+        run: |
+          set -e
+          set -o pipefail
+          for IMJA in ams miami; do
+            echo "$MASHINY" | tr ',' '\n' | grep -qx "$IMJA" || continue
+            [ -f ~/.ssh/"$IMJA"_key ] || { echo "kljucha $IMJA net -- propushcheno"; continue; }
+            case "$IMJA" in
+              ams) HOST="$AMS_HOST" ;;
+              miami) HOST="$MIAMI_HOST" ;;
+            esac
+            OPTS="-i $HOME/.ssh/${IMJA}_key $SSH_BASE"
+            echo "=== $IMJA ($HOST) ==="
+            ssh -n $OPTS root@"$HOST" "rm -rf $RABOTA; install -d -m 755 $RABOTA" || { echo "$IMJA ne otvetil"; continue; }
+            ssh $OPTS root@"$HOST" "tar -C $RABOTA -xzf -" < /tmp/posylka.tgz
+            # ВРЕМЕННЫЙ VENV: рабочий питон лаборатории не трогаем, и всё
+            # удаляется вместе с каталогом в конце шага.
+            ssh -n $OPTS root@"$HOST" "python3 -m venv $RABOTA/venv && $RABOTA/venv/bin/pip install -q requests solders" || { echo "$IMJA: venv ne sobralsja"; }
+            ssh -n $OPTS root@"$HOST" "$RABOTA/venv/bin/python $RABOTA/deploy/checks/skorost_sborki.py --koren $RABOTA --povtorov ${{ inputs.povtorov }} --sekund ${{ inputs.sekund }} --out $RABOTA/out.json > /dev/null" || echo "$IMJA: zamer upal"
+            ssh -n $OPTS root@"$HOST" "cat $RABOTA/out.json 2>/dev/null || true" > /tmp/sk_"$IMJA".json || true
+            ssh -n $OPTS root@"$HOST" "rm -rf $RABOTA"
+            python3 deploy/checks/skorost_sborki_stroka.py /tmp/sk_"$IMJA".json "$IMJA" || true
+          done
+
+      - name: "Четыре числа рядом"
+        if: ${{ !cancelled() }}
+        run: |
+          set -e
+          set -o pipefail
+          ARGI=""
+          for IMJA in kontejner nl ams miami; do
+            [ -s /tmp/sk_"$IMJA".json ] && ARGI="$ARGI --svod $IMJA=/tmp/sk_$IMJA.json"
+          done
+          [ -n "$ARGI" ] || { echo "SBOY: ni odnoj mashiny ne izmereno"; exit 1; }
+          python3 deploy/checks/skorost_sborki.py $ARGI --out "$OUT_FILE" | tail -80
+          mkdir -p data/skorost_sborki
+          for IMJA in kontejner nl ams miami; do
+            [ -s /tmp/sk_"$IMJA".json ] && cp /tmp/sk_"$IMJA".json data/skorost_sborki/"$IMJA".json
+          done
+
+      - name: "Коммит"
+        if: ${{ !cancelled() }}
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$OUT_FILE" data/skorost_sborki || true
+          git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
+          git commit -m "Skorost sborki: chetyre mashiny rjadom [automated]"
+          for N in 1 2 3 4; do
+            git push origin HEAD:claude/nifty-sagan-r0polg && break
+            sleep $((2 ** N))
+            git pull --rebase origin claude/nifty-sagan-r0polg || true
+          done
