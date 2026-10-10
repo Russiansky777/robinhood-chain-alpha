@@ -2123,6 +2123,7 @@ class Детектор:
         # возраст сама.
         self.blockhash = None
         self.blockhash_ts = None
+        self.kolco_pochemu = ""
         self.blockhash_почему = "ещё не обновлялся"
         self.blockhash_обновлений = 0
         # КЭШ ШАБЛОНОВ ПЕРВОГО ШАГА (SOL -> Q) для двухшаговой тени.
@@ -3581,6 +3582,17 @@ class Детектор:
                             "would_fail": self.полос_тень_сим_отказов},
             "blockhash_age_s": (round(time.time() - self.blockhash_ts, 1)
                                  if self.blockhash_ts else None),
+            # КОЛЬЦО ЗАБОРА S+0 -- ЧИСЛАМИ В ПРИЗНАК ЖИЗНИ. Без этого
+            # "кольцо копится" и "кольцо пустое" читались бы одинаково, а
+            # включать забор по слову владельца пришлось бы наугад.
+            # ЗАГЛУШКА ПОЛОСЫ ЭТОГО НЕ УМЕЕТ, И СПРАШИВАТЬ НАДО ЧЕРЕЗ
+            # hasattr: в самопроверке OS -- заглушка, и прямой вызов падал бы
+            # AttributeError на пути признака жизни, то есть на пути доклада.
+            "zabor_s0_kolco": ((OS.кольцо_свод()
+                                 if OS is not None
+                                 and hasattr(OS, "кольцо_свод") else None)
+                                or {"записей": 0}),
+            "zabor_s0_kolco_pochemu": getattr(self, "kolco_pochemu", "") or None,
             "blockhash_updates": self.blockhash_обновлений,
             "blockhash_why_not": self.blockhash_почему,
             "last": dict(self.полос_последняя),
@@ -4969,6 +4981,27 @@ class Детектор:
         try:
             о = self.helius.call("getLatestBlockhash", [{"commitment": "confirmed"}])
             хеш = ((о or {}).get("value") or {}).get("blockhash")
+            # КОЛЬЦО ЗАБОРА S+0 -- ИЗ ТОГО ЖЕ ОТВЕТА, БЕЗ ЛИШНЕГО ВЫЗОВА.
+            # getLatestBlockhash и так отдаёт lastValidBlockHeight и слот
+            # контекста; забору нужны именно они, и брать их отдельным
+            # запросом значило бы платить за то, что уже в руках. Кольцо
+            # наполняется ВНЕ пути сделки -- этими же часами, что тёплый хеш.
+            # Флаг zabor_s0 у групп выключен, поэтому кольцо пока только
+            # копится и ни одного решения не меняет.
+            _зн = (о or {}).get("value") or {}
+            _lv = _зн.get("lastValidBlockHeight")
+            _слот_к = ((о or {}).get("context") or {}).get("slot")
+            if OS is not None and хеш and isinstance(_lv, int):
+                try:
+                    OS.положить_в_кольцо(blockhash=хеш, last_valid=int(_lv),
+                                          слот=(int(_слот_к)
+                                                if isinstance(_слот_к, int)
+                                                else None))
+                except Exception as _сбой_к:  # noqa: BLE001
+                    # КОЛЬЦО -- НЕ ДЕНЬГИ: его сбой не должен ронять обновление
+                    # тёплого хеша, которым подписываются ВСЕ покупки.
+                    self.kolco_pochemu = (f"{type(_сбой_к).__name__}: "
+                                           f"{str(_сбой_к)[:120]}")
         except Exception as exc:  # noqa: BLE001
             # Старый хеш НЕ стираем: он ещё может быть годен по возрасту, а
             # проверку возраста делает сама полоса перед подписью.
