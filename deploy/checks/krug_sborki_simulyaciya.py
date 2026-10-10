@@ -1439,16 +1439,38 @@ def base58_v_bajty(текст: str) -> bytes:
 
 
 def budzhet_iz_instrukcij(инструкции: list) -> dict:
-    """Предел и цена CU из инструкций программы бюджета -- числами."""
+    """Предел и цена CU из инструкций программы бюджета -- числами.
+
+    ДВА ВИДА ОТВЕТА УЗЛА, И ОБА БЫВАЮТ. При encoding=jsonParsed Solana
+    РАЗВОРАЧИВАЕТ инструкции ComputeBudget в поле `parsed`
+    (`setComputeUnitPrice` с `info.microLamports`, `setComputeUnitLimit` с
+    `info.units`), и поля `data` в них тогда НЕТ ВОВСЕ. Прогон 10.10 23:4xZ
+    упёрся ровно в это: инструкции бюджета нашлись у всех десяти плательщиков
+    (bez_budzheta 0), а цена -- только у трёх, потому что читалось одно `data`.
+    Поэтому сначала читается `parsed`, а голый base58 остаётся запасным путём.
+    """
     из_ = {"cu_predel": None, "cu_cena_mikrolamport": None,
-            "instrukcij_budzheta": 0, "why_not": None}
+            "instrukcij_budzheta": 0, "why_not": None, "iz_parsed": 0,
+            "iz_base58": 0}
     for и in (инструкции or []):
         if (и or {}).get("programId") != ПРОГРАММА_БЮДЖЕТА:
             continue
         из_["instrukcij_budzheta"] += 1
+        разобрано = ((и or {}).get("parsed") or {})
+        тип = (разобрано.get("type") or "")
+        сведения = (разобрано.get("info") or {})
+        if тип == "setComputeUnitPrice" and сведения.get("microLamports") is not None:
+            из_["cu_cena_mikrolamport"] = int(сведения["microLamports"])
+            из_["iz_parsed"] += 1
+            continue
+        if тип == "setComputeUnitLimit" and сведения.get("units") is not None:
+            из_["cu_predel"] = int(сведения["units"])
+            из_["iz_parsed"] += 1
+            continue
         данные = (и or {}).get("data")
         if not данные:
             continue
+        из_["iz_base58"] += 1
         try:
             байты = base58_v_bajty(данные)
         except ValueError as сбой:
@@ -1477,7 +1499,9 @@ def cu_po_podpisi(подпись: str, *, таймаут: float = 30.0) -> dict:
             "cu_predel": None, "cu_cena_mikrolamport": None,
             "cu_potracheno": None, "fee_lamportov": None,
             "podpisantov": None, "prioritet_lamportov": None,
-            "cena_iz_komissii_mikrolamport": None}
+            "cena_iz_komissii_mikrolamport": None,
+            "cena_po_potrachennomu_mikrolamport": None,
+            "why_predel_net": None, "rashozhdenie_putej_pct": None}
     # ПОТОЛОК ВЕРСИИ -- ОБЩИЙ, А НЕ НОЛЬ. На нуле узел отказал 468 раз подряд:
     # транзакции головы версионные, и это ровно тот случай, под который в этом
     # модуле стоит проверка s_tx_version_vezde().
@@ -1504,10 +1528,27 @@ def cu_po_podpisi(подпись: str, *, таймаут: float = 30.0) -> dict:
         приоритет = (int(из_["fee_lamportov"])
                       - БАЗОВАЯ_КОМИССИЯ_ЛАМПОРТОВ * int(из_["podpisantov"]))
         из_["prioritet_lamportov"] = приоритет
-        предел = из_["cu_predel"] or из_["cu_potracheno"]
-        if предел:
+        # ТОЛЬКО ПО ОБЪЯВЛЕННОМУ ПРЕДЕЛУ. Подставлять ПОТРАЧЕННОЕ CU нельзя:
+        # цепь берёт приоритет с ЗАЯВЛЕННОГО предела, и подстановка давала бы
+        # число в разы больше настоящего -- именно такие (до 571 млн
+        # микролампортов за CU) и вышли в прогоне 10.10 23:4xZ.
+        if из_["cu_predel"]:
             из_["cena_iz_komissii_mikrolamport"] = round(
-                приоритет * 1_000_000.0 / float(предел), 1)
+                приоритет * 1_000_000.0 / float(из_["cu_predel"]), 1)
+        elif из_["cu_potracheno"]:
+            из_["cena_po_potrachennomu_mikrolamport"] = round(
+                приоритет * 1_000_000.0 / float(из_["cu_potracheno"]), 1)
+            из_["why_predel_net"] = ("предел CU в транзакции не объявлен -- "
+                                      "цена посчитана по ПОТРАЧЕННОМУ CU и "
+                                      "является верхней оценкой")
+    # ДВА ПУТИ НА ОДНО ЧИСЛО: расхождение называется, а не прячется.
+    if (из_["cu_cena_mikrolamport"] is not None
+            and из_["cena_iz_komissii_mikrolamport"] is not None
+            and из_["cu_cena_mikrolamport"] > 0):
+        из_["rashozhdenie_putej_pct"] = round(
+            abs(из_["cena_iz_komissii_mikrolamport"]
+                - из_["cu_cena_mikrolamport"])
+            * 100.0 / float(из_["cu_cena_mikrolamport"]), 2)
     из_["ok"] = (из_["cu_cena_mikrolamport"] is not None
                   or из_["cena_iz_komissii_mikrolamport"] is not None)
     if not из_["ok"] and not из_["why_not"]:
@@ -1635,6 +1676,7 @@ def cu_verhnim(ряды: list, *, podpisej: int = 4, pauza: float = 0.12) -> dic
     из_ = {"prochitano": 0, "s_cenoj": 0, "bez_budzheta": 0, "oshibok": 0}
     for р in (ряды or []):
         цены, из_комиссии, пределы, без_бюджета, сбои = [], [], [], 0, []
+        по_потраченному, расхождения = [], []
         for подпись in (р.get("podpisi") or [])[:max(1, int(podpisej))]:
             о = cu_po_podpisi(подпись)
             из_["prochitano"] += 1
@@ -1644,6 +1686,10 @@ def cu_verhnim(ряды: list, *, podpisej: int = 4, pauza: float = 0.12) -> dic
                 из_комиссии.append(float(о["cena_iz_komissii_mikrolamport"]))
             if о.get("cu_predel") is not None:
                 пределы.append(int(о["cu_predel"]))
+            if о.get("cena_po_potrachennomu_mikrolamport") is not None:
+                по_потраченному.append(float(о["cena_po_potrachennomu_mikrolamport"]))
+            if о.get("rashozhdenie_putej_pct") is not None:
+                расхождения.append(float(о["rashozhdenie_putej_pct"]))
             if (о.get("why_not") or "").startswith("инструкций ComputeBudget"):
                 без_бюджета += 1
             elif not о.get("ok"):
@@ -1655,6 +1701,8 @@ def cu_verhnim(ряды: list, *, podpisej: int = 4, pauza: float = 0.12) -> dic
             "cena_mikrolamport_median": _mediana(цены),
             "cena_iz_komissii_median": _mediana(из_комиссии),
             "cu_predel_median": _mediana(пределы),
+            "cena_po_potrachennomu_median": _mediana(по_потраченному),
+            "rashozhdenie_putej_pct_median": _mediana(расхождения),
             "bez_instrukcii_budzheta": без_бюджета,
             "sboev": len([с for с in сбои if с]),
             "why_not": (сбои[0] if сбои else None)}
@@ -2330,6 +2378,22 @@ def самопроверка() -> int:
         budzhet_iz_instrukcij([{"programId": "Pump", "data": "3"}])
         ["why_not"].startswith("инструкций ComputeBudget"),
         budzhet_iz_instrukcij([{"programId": "Pump", "data": "3"}]))
+    # ОТВЕТ УЗЛА В ВИДЕ parsed -- ГЛАВНЫЙ ПУТЬ, И ИМЕННО ОН БЫЛ ПРОПУЩЕН.
+    _рз = budzhet_iz_instrukcij([
+        {"programId": ПРОГРАММА_БЮДЖЕТА, "program": "computeBudget",
+         "parsed": {"type": "setComputeUnitLimit", "info": {"units": 110000}}},
+        {"programId": ПРОГРАММА_БЮДЖЕТА, "program": "computeBudget",
+         "parsed": {"type": "setComputeUnitPrice",
+                     "info": {"microLamports": 63636}}}])
+    chk("jsonParsed: цена и предел CU читаются из parsed, где data нет вовсе",
+        _рз["cu_cena_mikrolamport"] == 63636 and _рз["cu_predel"] == 110000
+        and _рз["iz_parsed"] == 2 and _рз["iz_base58"] == 0, _рз)
+    chk("смешанный ответ: часть parsed, часть base58 -- берутся оба",
+        budzhet_iz_instrukcij([
+            {"programId": ПРОГРАММА_БЮДЖЕТА,
+             "parsed": {"type": "setComputeUnitPrice",
+                         "info": {"microLamports": 7}}},
+            предел_ix])["cu_predel"] == 300000)
     chk("обрезанные данные цены -- не разбираются молча в мусор",
         budzhet_iz_instrukcij([{"programId": ПРОГРАММА_БЮДЖЕТА,
                                 "data": _b58(bytes([БЮДЖЕТ_ЦЕНА_CU, 1]))}])
