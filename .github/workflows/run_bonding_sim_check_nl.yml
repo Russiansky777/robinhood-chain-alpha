@@ -117,6 +117,12 @@ jobs:
       - name: "Самопроверки сборки (без них проверять нечего)"
         run: |
           set -e
+          # set -o pipefail ОБЯЗАТЕЛЕН, А НЕ УКРАШЕНИЕ. Самопроверка идёт
+          # через `| tail -N`, и без pipefail код возврата шага берётся у
+          # tail, то есть ВСЕГДА 0: красная самопроверка не валила CI вовсе
+          # (найдено проходом по откату 10.10). Проверено прогоном: при
+          # нарочно сломанной проверке шаг теперь падает.
+          set -o pipefail
           python3 -m venv "$RUNNER_TEMP/bs_venv"
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"

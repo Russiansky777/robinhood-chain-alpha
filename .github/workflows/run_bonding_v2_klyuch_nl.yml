@@ -74,7 +74,11 @@ jobs:
           # НОВЫЙ СБОРЩИК ДОСТАВЛЯЕТСЯ РЯДОМ: в каталоге службы лежит ещё старая
           # версия без подстановки места 21, и импорт брал бы её.
           ssh $SSH_OPTS root@$TARGET_HOST "cat > $RABOTA/c2_swap_build.py" < analysis/c2_swap_build.py
-          ssh -n $SSH_OPTS root@$TARGET_HOST "cd $RABOTA && PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA c2_swap_build.py --self-test | tail -1"
+          # pipefail НУЖЕН ВНУТРИ СТРОКИ ssh, А НЕ ТОЛЬКО СНАРУЖИ: конвейер
+          # с tail исполняет УДАЛЁННЫЙ shell, и без этой оговорки код возврата
+          # у него -- от tail, то есть красная самопроверка на хосте
+          # возвращала 0 и шаг проходил (найдено проходом по откату 10.10).
+          ssh -n $SSH_OPTS root@$TARGET_HOST "set -o pipefail; cd $RABOTA && PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA c2_swap_build.py --self-test | tail -1"
           ARGI=""
           for P in ${{ inputs.podpisi }}; do ARGI="$ARGI --podpis $P"; done
           ssh -n $SSH_OPTS root@$TARGET_HOST "set -a; . $ENV_DIR/env; set +a; PYTHONPATH=$RABOTA:$KOD_HOSTA $PY_HOSTA $RABOTA/bonding_v2_uznat_klyuch.py $ARGI --koshelek '${{ inputs.koshelek }}' --sol '${{ inputs.sol }}' --fajl $STATE_DIR/bonding_v2_assoc.json --out $RABOTA/out.json" | tail -60
