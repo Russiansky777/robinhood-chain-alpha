@@ -100,9 +100,19 @@
     "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
     "6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG",
     "A9cWowVAiHe9pJfKAj3TJiN9VpbzMUq6E4kEvf5mUT22",
-    "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm"
+    "Gywj98ophM7GmkDdaWs4isqZnDdFCW7B46TXmKfvyqSm",
+    "68Pwb4jS7eZATjDfhmTXgRJjCiZmw1L7Huy4HNpnxJ3o",
+    "4ABhJh5rZPjv63RBJBuyWzBK3g9gWMUQdTZP2kiW31V9",
+    "B2M4NG5eyZp5SBQrSdtemzk5TqVuaWGQnowGaCBt8GyM",
+    "5jA59cXMKQqZAVdtopv8q3yyw9SYfiE3vUCbt7p8MfVf",
+    "5YktoWygr1Bp9wiS1xtMtUki1PeYuuzuCF98tqwYxf61",
+    "295Avbam4qGShBYK7E9H5Ldew4B3WyJGmgmXfiWdeeyV",
+    "EDi4rSy2LZgKJX74mbLTFk4mxoTgT6F7HxxzG2HBAFyK",
+    "BnGKHAC386n4Qmv9xtpBVbRaUTKixjBe3oagkPFKtoy6",
+    "Dd7K2Fp7AtoN8xCghKDRmyqr5U169t48Tw5fEd3wT9mq",
+    "AP6qExwrbRgBAVaehg4b5xHENX815sMabtBzUzVB4v8S"
    ],
-   "tip_accounts_note": "в документации их 14; полный список -- в data/sender_pool_candidates.json",
+   "tip_accounts_note": "ЧЕТЫРНАДЦАТЬ -- ПОЛНЫЙ СПИСОК ИЗ ЕГО ЖЕ ДОКУМЕНТАЦИИ: data/docs/senders/blockrazor_solana_priority_fee_and_tip.md (раздел Tip) и data/docs/senders/blockrazor_go_example.md:50-65 (tipAccounts в примере). Прежде у нас лежали ЧЕТЫРЕ -- и это были первые четыре из этого же списка, то есть НАШИ АДРЕСА БЫЛИ ВЕРНЫ, их просто было вчетверо меньше. Документация прямо просит ротировать счёт чаевых между отправками, чтобы адрес не становился узким местом; выбор у нас идёт по семени подписи источника, то есть у каждого сигнала свой адрес.",
    "docs": "data/docs/senders/blockrazor_solana_priority_fee_and_tip.md",
    "min_tip_pochemu": "100 000 -- ИЗМЕРЕННОЕ, А НЕ ВЗЯТОЕ ИЗ ДОКУМЕНТАЦИИ: ровно это число BlockRazor принимал одиннадцать отправок подряд в ночь 09->10.10 (http 200 на каждой). С 10.10 13:49:37Z он отказывает на нём же -- http 500, \"Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\". ЧИСЛО В ОШИБКЕ НЕ ЖИВОЙ ПОРОГ: пробы самопереводом 10.10 18:40-18:48Z дали отказ с ТЕМ ЖЕ текстом и ТЕМ ЖЕ числом при чаевых 101 000, 200 000 и 1 000 000 лампортов, то есть и при десятикратном минимуме. Значит дело не в сумме, и поднимать её бессмысленно. Остались два подозреваемых: адрес чаевых (у нас в списке 4, в документации их 14) и требование ставить инструкцию чаевых ПЕРВОЙ (tip_first у нас не задан). Пробы бесплатны: отказанная отправка не платит ни комиссии, ни чаевых."
   },
