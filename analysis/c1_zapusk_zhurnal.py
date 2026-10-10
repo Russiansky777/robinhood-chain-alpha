@@ -125,6 +125,27 @@ def _instrukcii(tx: dict) -> list:
     return из_
 
 
+def kodirovka_ne_ta(инстр: list) -> str | None:
+    """Инструкции есть, а программ у них нет -- пришла ЧУЖАЯ кодировка.
+
+    ЗАЧЕМ ОТДЕЛЬНОЙ ПРОВЕРКОЙ. Разбор читает и["programId"], а это поле есть
+    только у encoding="jsonParsed". Подписка просит именно его, но стоит
+    кому-то подать транзакцию с encoding "json" или "base64" -- и у КАЖДОЙ
+    инструкции programId выйдет None, ни одна не совпадёт с программой кривой,
+    и разбор честно скажет "создания в транзакции нет". Отличить "её там нет"
+    от "мы её не умеем прочитать" было бы НЕЧЕМ.
+
+    Этот репозиторий на этом уже обжигался: 28.09 своя продажа НИ РАЗУ не
+    нашла нашу покупку по той же причине (bloom_lane_sell:598).
+    """
+    if not инстр:
+        return None
+    if any(и.get("programId") for и in инстр):
+        return None
+    return (f"у всех {len(инстр)} инструкций нет programId -- пришла не "
+            "jsonParsed: разбор создания невозможен, а не «создания нет»")
+
+
 def _po_imenam(PS, имя: str, счета: list) -> dict:
     имена = [а["name"] for а in PS.zagruzit_idl()["pump"]["ix"][имя]["accounts"]]
     return dict(zip(имена, счета, strict=False))
@@ -193,6 +214,11 @@ def razbor_sozdanija(tx: dict, *, slot_sozdanija=None) -> dict:
         return из_
     по_диску = {зн["disc"].hex(): имя for имя, зн in ix.items()}
     инстр = _instrukcii(tx)
+    не_та = kodirovka_ne_ta(инстр)
+    if не_та:
+        из_["why_not"] = не_та
+        из_["kodirovka_ne_ta"] = True
+        return из_
     покупки = []
     for и in инстр:
         if и.get("programId") != ПРОГ_КРИВОЙ or not isinstance(и.get("data"), str):
@@ -529,7 +555,19 @@ def zapis_iz_uvedomlenija(res: dict, *, t_polucheno=None, slot_seti=None,
     о = nash_otryv(slot_sozdanija=р.get("slot_sozdanija"), slot_seti=slot_seti,
                    vozrast_slota_s=vozrast_slota_s, gotov_cherez_s=готов,
                    dlina_slota_s=dlina_slota_s)
-    р.update(ts_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(тепер)),
+    # ПОДПИСЬ СОЗДАНИЯ -- В ЗАПИСЬ. Без неё строку журнала не привязать к цепи
+    # вовсе: ни проверить разбор, ни прогнать сигнал денежным путём, ни отдать
+    # Code-2 подпись создания рядом с подписями сделки.
+    подпись = соо.get("signature")
+    if not подпись:
+        подпись = (((соо.get("transaction") or {}).get("transaction") or {})
+                   .get("signatures") or [None])[0]
+    if not подпись:
+        подпись = ((tx or {}).get("transaction") or {}).get("signatures", [None])[0]
+    р.update(signature=подпись,
+             signature_why_not=(None if подпись else
+                                "подписи создания в уведомлении не нашлось"),
+             ts_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(тепер)),
              gotov_cherez_ms=round(готов * 1000, 1),
              nash_slot_seti=slot_seti, net_slot_age_s=vozrast_slota_s,
              nash_slot_gotovnosti=о["nash_slot_gotovnosti"],
@@ -542,7 +580,7 @@ def zapis_iz_uvedomlenija(res: dict, *, t_polucheno=None, slot_seti=None,
 
 # ------------------------------------------------------------- самопроверка
 
-ЖДЁМ_ПРОВЕРОК = 36
+ЖДЁМ_ПРОВЕРОК = 38
 
 
 def self_test() -> int:  # noqa: C901, PLR0915
@@ -673,6 +711,17 @@ def self_test() -> int:  # noqa: C901, PLR0915
     chk("слота сети нет -- отрыв считается НИЖНЕЙ границей, и это сказано",
         о3["otryv_slotov"] == 1 and "НИЖНЕЙ" in (о3["why_not"] or ""), о3)
 
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: инструкции есть, а программ у них нет -- это "
+        "ЧУЖАЯ КОДИРОВКА, и так и сказано, а не «создания нет» (ровно так "
+        "28.09 своя продажа ни разу не нашла нашу покупку)",
+        razbor_sozdanija({"transaction": {"message": {
+            "accountKeys": [{"pubkey": "A" * 44}],
+            "instructions": [{"data": "xx", "accounts": [0]},
+                             {"data": "yy", "accounts": [0]}]}}}
+        ).get("kodirovka_ne_ta") is True)
+    chk("пустой список инструкций чужой кодировкой НЕ зовётся",
+        kodirovka_ne_ta([]) is None
+        and kodirovka_ne_ta([{"programId": ПРОГ_КРИВОЙ}]) is None)
     # --- MAYHEM ИЗ АРГУМЕНТОВ (слово владельца 10.10, п.2)
     _д2 = dannye_sozdanija("create_v2", mayhem=False)
     _д2м = dannye_sozdanija("create_v2", mayhem=True)
