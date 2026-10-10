@@ -182,6 +182,7 @@ sudo -u bot -E env PYTHONPATH="$CODE_DIR:$RABOTA" BLOOM_CODE_DIR="$CODE_DIR" \
   --raundov "$RAUNDOV" \
   --chaevye-lamporty "${CHAEVYE:-0}" \
   --chaevye-vperyod "${CHAEVYE_VPERYOD:-0}" \
+  --chaevye-rotaciya "${CHAEVYE_ROTACIYA:-0}" \
   --out "$RABOTA/out.json"
 KOD=$?
 set -e
