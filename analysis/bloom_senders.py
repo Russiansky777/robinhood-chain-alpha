@@ -809,42 +809,41 @@ def self_test() -> int:
             зовы.append({"url": адрес, "body": данные, "headers": dict(заг)})
             return 200, json.dumps({"signature": "ПОДПИСЬ_BR"})
 
-        # BLOCKRAZOR ВЫКЛЮЧЕН СЛОВОМ ВЛАДЕЛЬЦА 10.10 -- и это проверяется
-        # отдельно, по живому реестру: иначе "из набора" осталось бы словами.
-        р_выкл = отправить_через("blockrazor", "BBBB", отправитель=сендер_br)
-        chk("BlockRazor ВЫКЛЮЧЕН в живом реестре: отправки нет, причина в словах",
-            р_выкл["ok"] is False
-            and "выключен словом владельца" in (р_выкл.get("why_not") or "")
-            and not зовы, (р_выкл.get("why_not"), len(зовы)))
-        chk("выключенного нет и среди подключённых -- значит и чаевых ему не платим",
-            "blockrazor" not in подключённые(), подключённые())
-        # ПРОВОДКА ЕГО ПРОТОКОЛА ОСТАЁТСЯ ПРОВЕРЕННОЙ. Вернуть отправителя --
-        # это убрать ОДНО поле реестра, и к тому дню должно быть доказано, что
-        # тело, заголовок и разбор ответа у нас верные. Поэтому проверка идёт
-        # по КОПИИ реестра без поля vyklyuchen, а не по живому файлу.
-        import tempfile as _врем_br  # noqa: PLC0415
-        _сырое_br = json.loads(путь_реестра(None).read_text(encoding="utf-8"))
-        _сырое_br["senders"]["blockrazor"].pop("vyklyuchen", None)
-        with _врем_br.TemporaryDirectory() as _вр_br:
-            _п_br = Path(_вр_br) / "senders.json"
-            _п_br.write_text(json.dumps(_сырое_br, ensure_ascii=False),
-                              encoding="utf-8")
-            зовы.clear()
-            р2 = отправить_через("blockrazor", "BBBB", отправитель=сендер_br,
-                                  путь=str(_п_br))
-            chk("BlockRazor: своё тело с mode=fast, ключ в заголовке apikey",
-                р2["ok"] and зовы[-1]["body"] == {"transaction": "BBBB",
-                                                   "mode": "fast",
-                                                   "revertProtection": False}
-                and зовы[-1]["headers"].get("apikey") == "СЕКРЕТ_BR", зовы[-1])
-            chk("BlockRazor: подпись берётся из его поля signature",
-                р2["signature"] == "ПОДПИСЬ_BR", р2)
-            chk("ключ не попадает ни в url отчёта, ни в саму запись результата",
-                "СЕКРЕТ_BR" not in json.dumps(р2, ensure_ascii=False), р2)
-            chk("вернуть отправителя -- это убрать ОДНО поле: без vyklyuchen он "
-                "снова подключён",
-                готов("blockrazor",
-                       _сырое_br["senders"]["blockrazor"])["ok"] is True)
+        # BLOCKRAZOR ВЕРНУЛСЯ В НАБОР (слово владельца 10.10: "Если принял --
+        # реестр на это число, blockrazor обратно в набор"). Он отказывал с
+        # 13:49:37Z не из-за суммы и не из-за порядка инструкции, а потому что
+        # BlockRazor СНЯЛ из документации ровно те четыре счёта чаевых, которые
+        # были у нас единственными; проба 21:56:58Z на нынешнем счёте ушла в
+        # сеть дважды из двух. Проверяется по ЖИВОМУ реестру -- иначе "вернулся"
+        # осталось бы словами.
+        р2 = отправить_через("blockrazor", "BBBB", отправитель=сендер_br)
+        chk("BlockRazor В НАБОРЕ и шлёт: своё тело с mode=fast, ключ в "
+            "заголовке apikey",
+            р2["ok"] and зовы[-1]["body"] == {"transaction": "BBBB",
+                                               "mode": "fast",
+                                               "revertProtection": False}
+            and зовы[-1]["headers"].get("apikey") == "СЕКРЕТ_BR", зовы[-1])
+        chk("BlockRazor: подпись берётся из его поля signature",
+            р2["signature"] == "ПОДПИСЬ_BR", р2)
+        chk("ключ не попадает ни в url отчёта, ни в саму запись результата",
+            "СЕКРЕТ_BR" not in json.dumps(р2, ensure_ascii=False), р2)
+        chk("BlockRazor среди подключённых -- значит и чаевые ему платятся",
+            "blockrazor" in подключённые(), подключённые())
+        # СНЯТЫЕ ИМ СЧЕТА НЕ ДОЛЖНЫ ВЕРНУТЬСЯ ВМЕСТЕ С НИМ: отправка на снятый
+        # счёт и есть та самая поломка, и повтор её стоил бы суток отказов.
+        _з_br_ж = реестр().get("blockrazor") or {}
+        _снятые_ж = set(_з_br_ж.get("tip_accounts_ubrany") or [])
+        chk(f"снятых BlockRazor счетов среди рабочих НЕТ (снятых "
+            f"{len(_снятые_ж)}, рабочих {len(_з_br_ж.get('tip_accounts') or [])})",
+            bool(_снятые_ж)
+            and not (_снятые_ж & set(_з_br_ж.get("tip_accounts") or [])),
+            sorted(_снятые_ж & set(_з_br_ж.get("tip_accounts") or [])))
+        chk("счёт чаевых BlockRazor выбирается ТОЛЬКО из нынешних десяти",
+            all(счёт_чаевых("blockrazor", семя=f"с{и}")
+                in (_з_br_ж.get("tip_accounts") or []) for и in range(40))
+            and len({счёт_чаевых("blockrazor", семя=f"с{и}")
+                     for и in range(40)}) > 1,
+            len({счёт_чаевых("blockrazor", семя=f"с{и}") for и in range(40)}))
         зовы.clear()
 
         os.environ["ZEROX_API"] = "СЕКРЕТ_0S"
