@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import inspect
 import json
 import os
 import struct
@@ -713,6 +714,12 @@ def _snimok_shablona(ш: dict) -> dict:
              "arg0": ш.get("arg0"), "arg1": ш.get("arg1")}
 
 
+# ПОВТОРОВ ЗАМЕРА ВРЕМЕНИ НА ОДНУ ПОДПИСЬ. Разбор идёт десятки микросекунд,
+# один прогон измерял бы в основном шум; 25 повторов дают устойчивый минимум и
+# стоят миллисекунды на подпись, то есть замер не удлиняет прогон заметно.
+ПОВТОРОВ_ЗАМЕРА = 25
+
+
 def sravnit_versii_razbora(*, podpisi: list, ref_staryj: str,
                             pauza: float) -> dict:
     """ОДНИ транзакции -- ДВЕ версии разбора сделки источника.
@@ -760,6 +767,16 @@ def sravnit_versii_razbora(*, podpisi: list, ref_staryj: str,
             из_["sdelki"].append(ряд)
             continue
         снимки = {}
+        # ВРЕМЯ РАЗБОРА -- ВОПРОС ВЛАДЕЛЬЦА 10.10 (вечер, п.2в): "сравнение
+        # версий проверяло решения, не скорость. Прогнать обе версии на одних
+        # и тех же сигналах на время: мс на разбор, медиана и p99".
+        #
+        # ЗАМЕР БЕЗ СЕТИ: транзакция уже прочитана выше, extract_template --
+        # чистый разбор готового словаря. ПОВТОРОВ_ЗАМЕРА прогонов на каждую
+        # версию и каждую подпись, из них берётся МИНИМУМ: минимум -- это
+        # время самого разбора, а средняя по повторам мерила бы ещё и шум
+        # сборщика мусора на бегунке. Разброс сохраняется отдельно, чтобы
+        # "минимум" не выглядел подогнанным.
         for имя, мод in (("staraya", стар), ("novaya", нов)):
             try:
                 снимки[имя] = _snimok_shablona(
@@ -768,8 +785,21 @@ def sravnit_versii_razbora(*, podpisi: list, ref_staryj: str,
                 снимки[имя] = {"ok": False,
                                 "why_not": f"{type(сбой).__name__}: "
                                            f"{str(сбой)[:120]}"}
+            прогоны = []
+            for _ in range(ПОВТОРОВ_ЗАМЕРА):
+                _т0 = time.perf_counter()
+                try:
+                    мод.extract_template(tx, мод.BONDING, хранилище)
+                except Exception:  # noqa: BLE001, S110
+                    pass
+                прогоны.append((time.perf_counter() - _т0) * 1000.0)
+                ряд[f"ms_{имя}"] = round(min(прогоны), 4)
+                ряд[f"ms_{имя}_max"] = round(max(прогоны), 4)
         ряд["staraya"] = снимки["staraya"]
         ряд["novaya"] = снимки["novaya"]
+        if (ряд.get("ms_staraya") is not None
+                and ряд.get("ms_novaya") is not None):
+            ряд["ms_raznica"] = round(ряд["ms_novaya"] - ряд["ms_staraya"], 4)
         отличия = [к_ for к_ in sorted(set(снимки["staraya"])
                                         | set(снимки["novaya"]))
                     if снимки["staraya"].get(к_) != снимки["novaya"].get(к_)]
@@ -779,10 +809,59 @@ def sravnit_versii_razbora(*, podpisi: list, ref_staryj: str,
         из_["sdelki"].append(ряд)
         if pauza:
             time.sleep(pauza)
+    # СВОД ПО ВРЕМЕНИ. Медиана и p99 -- по тем подписям, где обе версии
+    # измерились; число таких названо рядом, чтобы медиана не читалась как
+    # "по всем".
+    пары = [(р["ms_staraya"], р["ms_novaya"]) for р in из_["sdelki"]
+            if р.get("ms_staraya") is not None
+            and р.get("ms_novaya") is not None]
+    if пары:
+        из_["vremya"] = {
+            "izmereno_podpisej": len(пары),
+            "povtorov_na_podpis": ПОВТОРОВ_ЗАМЕРА,
+            "staraya_ms_mediana": _mediana([а for а, _ in пары]),
+            "staraya_ms_p99": _procentil([а for а, _ in пары], 99),
+            "novaya_ms_mediana": _mediana([б for _, б in пары]),
+            "novaya_ms_p99": _procentil([б for _, б in пары], 99),
+            "raznica_ms_mediana": _mediana([б - а for а, б in пары]),
+            "raznica_ms_p99": _procentil([б - а for а, б in пары], 99),
+            "chto_znachit": (
+                "разница -- это НОВАЯ минус СТАРАЯ на одной и той же "
+                "транзакции; плюс значит, что правленый разбор медленнее"),
+        }
+    else:
+        из_["vremya"] = {"izmereno_podpisej": 0,
+                          "why_not": "ни одной подписи с обоими замерами"}
     if из_["razoshlos"]:
         из_["why_not"] = (f"решения разошлись на {из_['razoshlos']} подписях "
                            f"из {из_['podpisej']}")
     return из_
+
+
+def _mediana(числа: list):
+    """Медиана без numpy: он на бегунке не нужен ради одного числа."""
+    р = sorted(x for x in числа if isinstance(x, (int, float)))
+    if not р:
+        return None
+    н = len(р)
+    серёдка = (р[н // 2] if н % 2 else (р[н // 2 - 1] + р[н // 2]) / 2.0)
+    return round(серёдка, 4)
+
+
+def _procentil(числа: list, доля: int):
+    """Процентиль методом ближайшего ранга (как у замеров полосы).
+
+    БЕЗ ИНТЕРПОЛЯЦИИ нарочно: p99 по 10 числам -- это НАИБОЛЬШЕЕ из них, и
+    притворяться, что мы знаем девяносто девятый процентиль точнее, чем
+    позволяет выборка, нечестно. Число измерений печатается рядом.
+    """
+    р = sorted(x for x in числа if isinstance(x, (int, float)))
+    if not р:
+        return None
+    import math  # noqa: PLC0415
+
+    и = max(0, min(len(р) - 1, math.ceil(доля / 100.0 * len(р)) - 1))
+    return round(р[и], 4)
 
 
 def k_why(к: dict) -> str:
@@ -1089,6 +1168,34 @@ def самопроверка() -> int:
     except ImportError:
         chk("solders на машине нет -- склейка не проверялась (это пропуск, "
             "а не зелёный)", False)
+    # --- ЗАМЕР ВРЕМЕНИ РАЗБОРА (вопрос владельца 10.10, п.2в) ---
+    # МЕДИАНА И ПРОЦЕНТИЛЬ СВЕРЯЮТСЯ НА ЧИСЛАХ, ОТВЕТ У КОТОРЫХ ИЗВЕСТЕН
+    # НАПЕРЁД, а не сами с собой: чётная и нечётная длина, p99 по короткой
+    # выборке -- это НАИБОЛЬШЕЕ (ранг без интерполяции), p50 на нечётной --
+    # серёдка. Пустой список -- None, а не ноль: "нечего мерить" и "ноль
+    # миллисекунд" читаются по-разному.
+    chk("медиана: нечётная длина -- серёдка, чётная -- полусумма, пусто -- None",
+        _mediana([3, 1, 2]) == 2
+        and _mediana([4, 1, 2, 3]) == 2.5
+        and _mediana([]) is None
+        and _mediana(["нечисло", None]) is None)
+    chk("процентиль по ближайшему рангу: p99 короткой выборки -- наибольшее, "
+        "p50 -- серёдка, p1 -- наименьшее",
+        _procentil([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 99) == 10
+        and _procentil([1, 2, 3], 50) == 2
+        and _procentil([5, 1, 9], 1) == 1
+        and _procentil([], 99) is None)
+    # ЗАМЕР ПРОВЕДЁН ПО ОБЕИМ ВЕРСИЯМ И НА ОДНОЙ И ТОЙ ЖЕ ТРАНЗАКЦИИ.
+    # Текстом -- потому что без узла настоящий прогон здесь не сделать, а
+    # оборвать проводку (замерить одну версию или замерить до разбора) можно
+    # было бы незаметно.
+    _ист_ср = inspect.getsource(sravnit_versii_razbora)
+    chk("время мерится у ОБЕИХ версий тем же вызовом и на той же транзакции, "
+        "и разница считается как новая минус старая",
+        'ряд[f"ms_{имя}"]' in _ист_ср
+        and "ПОВТОРОВ_ЗАМЕРА" in _ист_ср
+        and 'ряд["ms_novaya"] - ряд["ms_staraya"]' in _ист_ср
+        and '"raznica_ms_mediana"' in _ист_ср)
     print(f"самопроверка круга сборки: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
