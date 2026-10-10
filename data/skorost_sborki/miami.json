@@ -1,5 +1,5 @@
 {
- "utc": "2026-10-10T23:26:59Z",
+ "utc": "2026-10-10T23:33:49Z",
  "mashina": "miami-code2",
  "zhelezo": {
   "processor": {
@@ -42,30 +42,30 @@
     10
    ]
   },
-  "uptime_s": 885127.2,
+  "uptime_s": 885537.0,
   "loadavg": [
-   0.07,
-   0.02,
+   0.0,
+   0.0,
    0.0
   ],
-  "davlenie_cpu": "some avg10=0.00 avg60=0.00 avg300=0.00 total=136845064\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+  "davlenie_cpu": "some avg10=0.00 avg60=0.00 avg300=0.00 total=136880901\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
   "pamyat_kib": 10183172,
   "doli_cpu_za_okno": {
    "steal_proc": 0.0,
-   "zanyato_proc": 0.0167,
+   "zanyato_proc": 0.05,
    "iowait_proc": 0.0,
    "why_not": null,
-   "taktov_v_okne": 6003
+   "taktov_v_okne": 6005
   },
   "kto_ryadom": {
    "sekund": 10.0,
    "processy": [
     {
-     "pid": 174132,
-     "imya": "kworker/3:1-events",
+     "pid": 175923,
+     "imya": "kworker/u12:2-events_power_efficient",
      "komanda": "",
      "nice": 0,
-     "yadra_razresheny": "3",
+     "yadra_razresheny": "0-5",
      "cpu_proc_odnogo_yadra": 0.1,
      "cpu_proc_mashiny": 0.02
     }
@@ -78,60 +78,76 @@
  },
  "etalon": {
   "cikl_python": {
-   "med": 5.405,
-   "min": 5.25,
-   "max": 5.44,
+   "med": 5.699,
+   "min": 5.24,
+   "max": 5.881,
    "n": 7,
    "why_not": null
   },
   "slovari": {
-   "med": 7.445,
-   "min": 7.356,
-   "max": 7.808,
+   "med": 7.731,
+   "min": 7.621,
+   "max": 7.811,
    "n": 7,
    "why_not": null
   },
   "sha256_4mib": {
-   "med": 1.606,
-   "min": 1.598,
-   "max": 1.651,
+   "med": 1.617,
+   "min": 1.615,
+   "max": 1.653,
    "n": 7,
    "why_not": null
   },
   "base64_1mib": {
-   "med": 0.66,
-   "min": 0.633,
-   "max": 0.885,
+   "med": 0.708,
+   "min": 0.698,
+   "max": 0.901,
    "n": 7,
    "why_not": null
   },
   "json_2000": {
-   "med": 0.958,
-   "min": 0.928,
-   "max": 0.995,
+   "med": 1.036,
+   "min": 1.008,
+   "max": 1.21,
    "n": 7,
    "why_not": null
   },
   "sortirovka_200k": {
-   "med": 22.653,
-   "min": 22.446,
-   "max": 24.049,
+   "med": 23.817,
+   "min": 23.223,
+   "max": 28.304,
    "n": 7,
    "why_not": null
   }
  },
  "sborka": {
-  "ok": false,
-  "why_not": "ни один образец не собрался без сети: #0: сборка: FileNotFoundError: [Errno 2] No such file or directo; #1: сборка: FileNotFoundError: [Errno 2] No such file or directo; #2: сборка: FileNotFoundError: [Errno 2] No such file or directo; #3: сборка: FileNotFoundError: [Errno 2] No such file or directo; #4: сборка: FileNotFoundError: [Errno 2] No such file or directo; #5: сборка: FileNotFoundError: [Errno 2] No such file or directo",
+  "ok": true,
+  "why_not": null,
   "fajl": "data/c2_pool_samples/pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA.json",
-  "n": null,
-  "polnaya_ms": null,
-  "iz_zagotovki_ms": null,
-  "size": null,
-  "pool_program": null,
-  "sborshchik": null,
+  "n": 0,
+  "polnaya_ms": {
+   "med": 0.693,
+   "min": 0.598,
+   "max": 0.968,
+   "n": 31,
+   "why_not": null
+  },
+  "iz_zagotovki_ms": {
+   "med": 0.085,
+   "min": 0.072,
+   "max": 0.138,
+   "n": 31,
+   "why_not": null
+  },
+  "size": 1139,
+  "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+  "sborshchik": "pryamoy",
   "setevyh_popytok": 0,
   "solders": "0.29.0",
-  "koren_koda": "/tmp/skorost_sborki_zamer/analysis"
+  "koren_koda": "/tmp/skorost_sborki_zamer/analysis",
+  "povtorov": 31,
+  "vygoda_raz": 8.15,
+  "shest_polnyh_ms": 4.16,
+  "shest_iz_zagotovki_ms": 0.51
  }
 }

@@ -1,5 +1,5 @@
 {
- "utc": "2026-10-10T23:26:06Z",
+ "utc": "2026-10-10T23:32:57Z",
  "mashina": "claude-nl",
  "zhelezo": {
   "processor": {
@@ -38,32 +38,32 @@
     10
    ]
   },
-  "uptime_s": 1256099.6,
+  "uptime_s": 1256510.5,
   "loadavg": [
-   0.58,
-   0.51,
-   0.44
+   0.38,
+   0.46,
+   0.45
   ],
-  "davlenie_cpu": "some avg10=1.14 avg60=1.36 avg300=1.18 total=10671665437\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+  "davlenie_cpu": "some avg10=0.48 avg60=0.59 avg300=1.01 total=10678008725\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
   "pamyat_kib": 4009864,
   "doli_cpu_za_okno": {
-   "steal_proc": 0.2023,
-   "zanyato_proc": 25.0885,
-   "iowait_proc": 3.1361,
+   "steal_proc": 0.0504,
+   "zanyato_proc": 9.5214,
+   "iowait_proc": 2.8715,
    "why_not": null,
-   "taktov_v_okne": 1977
+   "taktov_v_okne": 1985
   },
   "kto_ryadom": {
    "sekund": 10.0,
    "processy": [
     {
-     "pid": 276117,
+     "pid": 299643,
      "imya": "python",
-     "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/host_tajmery/uchet/analysis/solana_ledger_run.py",
+     "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u analysis/predmarket_collector_snapshot.py",
      "nice": 0,
      "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 34.4,
-     "cpu_proc_mashiny": 17.2
+     "cpu_proc_odnogo_yadra": 6.2,
+     "cpu_proc_mashiny": 3.1
     },
     {
      "pid": 130668,
@@ -71,8 +71,17 @@
      "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_detector.py --serve --config /home/bot/bloom_executor/konfig_snapshot.json",
      "nice": 0,
      "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 10.6,
-     "cpu_proc_mashiny": 5.3
+     "cpu_proc_odnogo_yadra": 1.2,
+     "cpu_proc_mashiny": 0.6
+    },
+    {
+     "pid": 52,
+     "imya": "kswapd0",
+     "komanda": "",
+     "nice": 0,
+     "yadra_razresheny": "0-1",
+     "cpu_proc_odnogo_yadra": 0.8,
+     "cpu_proc_mashiny": 0.4
     },
     {
      "pid": 2948556,
@@ -80,62 +89,17 @@
      "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/feed_probe/grpc_feed_probe.py --state-dir /home/bot/grpc_feed_probe_data --config /home/bot/feed_probe",
      "nice": 0,
      "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 0.7,
-     "cpu_proc_mashiny": 0.35
+     "cpu_proc_odnogo_yadra": 0.8,
+     "cpu_proc_mashiny": 0.4
     },
     {
-     "pid": 2678730,
-     "imya": "python",
-     "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_sold_guard/dbot_sold_position_guard.py",
-     "nice": 0,
-     "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 0.6,
-     "cpu_proc_mashiny": 0.3
-    },
-    {
-     "pid": 272,
-     "imya": "jbd2/vda1-8",
+     "pid": 201630,
+     "imya": "kworker/u4:3-flush-253:0",
      "komanda": "",
      "nice": 0,
      "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 0.5,
-     "cpu_proc_mashiny": 0.25
-    },
-    {
-     "pid": 2082476,
-     "imya": "systemd-resolve",
-     "komanda": "/usr/lib/systemd/systemd-resolved",
-     "nice": 0,
-     "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 0.4,
-     "cpu_proc_mashiny": 0.2
-    },
-    {
-     "pid": 17,
-     "imya": "rcu_preempt",
-     "komanda": "",
-     "nice": 0,
-     "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 0.2,
-     "cpu_proc_mashiny": 0.1
-    },
-    {
-     "pid": 131,
-     "imya": "kworker/0:1H-kblockd",
-     "komanda": "",
-     "nice": -20,
-     "yadra_razresheny": "0",
-     "cpu_proc_odnogo_yadra": 0.2,
-     "cpu_proc_mashiny": 0.1
-    },
-    {
-     "pid": 130980,
-     "imya": "python",
-     "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py",
-     "nice": 0,
-     "yadra_razresheny": "0-1",
-     "cpu_proc_odnogo_yadra": 0.2,
-     "cpu_proc_mashiny": 0.1
+     "cpu_proc_odnogo_yadra": 0.3,
+     "cpu_proc_mashiny": 0.15
     },
     {
      "pid": 277918,
@@ -147,18 +111,27 @@
      "cpu_proc_mashiny": 0.1
     },
     {
-     "pid": 2082455,
-     "imya": "systemd-journal",
-     "komanda": "/usr/lib/systemd/systemd-journald",
-     "nice": -1,
+     "pid": 2082476,
+     "imya": "systemd-resolve",
+     "komanda": "/usr/lib/systemd/systemd-resolved",
+     "nice": 0,
      "yadra_razresheny": "0-1",
      "cpu_proc_odnogo_yadra": 0.2,
      "cpu_proc_mashiny": 0.1
     },
     {
-     "pid": 212502,
-     "imya": "kworker/u4:4-flush-253:0",
-     "komanda": "",
+     "pid": 130980,
+     "imya": "python",
+     "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py",
+     "nice": 0,
+     "yadra_razresheny": "0-1",
+     "cpu_proc_odnogo_yadra": 0.1,
+     "cpu_proc_mashiny": 0.05
+    },
+    {
+     "pid": 2678745,
+     "imya": "python",
+     "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_detect_probe/solana_detect_probe.py",
      "nice": 0,
      "yadra_razresheny": "0-1",
      "cpu_proc_odnogo_yadra": 0.1,
@@ -166,17 +139,6 @@
     }
    ],
    "nashi": {
-    "ledger": [
-     {
-      "pid": 276117,
-      "imya": "python",
-      "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/host_tajmery/uchet/analysis/solana_ledger_run.py",
-      "nice": 0,
-      "yadra_razresheny": "0-1",
-      "cpu_proc_odnogo_yadra": 34.4,
-      "cpu_proc_mashiny": 17.2
-     }
-    ],
     "bloom_detector": [
      {
       "pid": 130668,
@@ -184,8 +146,8 @@
       "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_detector.py --serve --config /home/bot/bloom_executor/konfig_snapshot.json",
       "nice": 0,
       "yadra_razresheny": "0-1",
-      "cpu_proc_odnogo_yadra": 10.6,
-      "cpu_proc_mashiny": 5.3
+      "cpu_proc_odnogo_yadra": 1.2,
+      "cpu_proc_mashiny": 0.6
      }
     ],
     "bloom_seller": [
@@ -195,72 +157,88 @@
       "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py",
       "nice": 0,
       "yadra_razresheny": "0-1",
-      "cpu_proc_odnogo_yadra": 0.2,
-      "cpu_proc_mashiny": 0.1
+      "cpu_proc_odnogo_yadra": 0.1,
+      "cpu_proc_mashiny": 0.05
      }
     ]
    },
    "why_not": null,
-   "vseh_s_rashodom": 15,
-   "summa_proc_mashiny": 24.3
+   "vseh_s_rashodom": 9,
+   "summa_proc_mashiny": 4.95
   }
  },
  "etalon": {
   "cikl_python": {
-   "med": 6.407,
-   "min": 6.072,
-   "max": 6.88,
+   "med": 6.112,
+   "min": 5.961,
+   "max": 6.987,
    "n": 7,
    "why_not": null
   },
   "slovari": {
-   "med": 8.563,
-   "min": 8.268,
-   "max": 9.016,
+   "med": 8.427,
+   "min": 8.295,
+   "max": 8.769,
    "n": 7,
    "why_not": null
   },
   "sha256_4mib": {
-   "med": 1.825,
-   "min": 1.81,
-   "max": 1.849,
+   "med": 1.853,
+   "min": 1.835,
+   "max": 1.88,
    "n": 7,
    "why_not": null
   },
   "base64_1mib": {
-   "med": 0.848,
-   "min": 0.772,
-   "max": 1.229,
+   "med": 0.982,
+   "min": 0.802,
+   "max": 1.064,
    "n": 7,
    "why_not": null
   },
   "json_2000": {
-   "med": 1.121,
-   "min": 1.07,
-   "max": 1.167,
+   "med": 1.145,
+   "min": 1.086,
+   "max": 1.225,
    "n": 7,
    "why_not": null
   },
   "sortirovka_200k": {
-   "med": 28.991,
-   "min": 27.559,
-   "max": 30.535,
+   "med": 34.288,
+   "min": 29.94,
+   "max": 37.413,
    "n": 7,
    "why_not": null
   }
  },
  "sborka": {
-  "ok": false,
-  "why_not": "ни один образец не собрался без сети: #0: сборка: FileNotFoundError: [Errno 2] No such file or directo; #1: сборка: FileNotFoundError: [Errno 2] No such file or directo; #2: сборка: FileNotFoundError: [Errno 2] No such file or directo; #3: сборка: FileNotFoundError: [Errno 2] No such file or directo; #4: сборка: FileNotFoundError: [Errno 2] No such file or directo; #5: сборка: FileNotFoundError: [Errno 2] No such file or directo",
+  "ok": true,
+  "why_not": null,
   "fajl": "data/c2_pool_samples/pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA.json",
-  "n": null,
-  "polnaya_ms": null,
-  "iz_zagotovki_ms": null,
-  "size": null,
-  "pool_program": null,
-  "sborshchik": null,
+  "n": 0,
+  "polnaya_ms": {
+   "med": 0.771,
+   "min": 0.701,
+   "max": 1.189,
+   "n": 31,
+   "why_not": null
+  },
+  "iz_zagotovki_ms": {
+   "med": 0.085,
+   "min": 0.08,
+   "max": 0.135,
+   "n": 31,
+   "why_not": null
+  },
+  "size": 1139,
+  "pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+  "sborshchik": "pryamoy",
   "setevyh_popytok": 0,
   "solders": "0.29.0",
-  "koren_koda": "/tmp/skorost_sborki_zamer/analysis"
+  "koren_koda": "/tmp/skorost_sborki_zamer/analysis",
+  "povtorov": 31,
+  "vygoda_raz": 9.07,
+  "shest_polnyh_ms": 4.63,
+  "shest_iz_zagotovki_ms": 0.51
  }
 }
