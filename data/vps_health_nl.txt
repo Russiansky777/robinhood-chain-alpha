@@ -1,4 +1,4 @@
-=== NL-хост, живучесть служб, 2026-10-10T09:39:49Z ===
+=== NL-хост, живучесть служб, 2026-10-10T10:39:28Z ===
 dbot-sold-guard: active=active enabled=enabled restarts=0 since=Thu 2026-10-01 21:01:53 CEST
 dbot-detect-probe: active=active enabled=enabled restarts=0 since=Thu 2026-10-01 21:01:53 CEST
 bloom-seller: active=active enabled=enabled restarts=0 since=Sat 2026-10-10 03:59:30 CEST
@@ -7,15 +7,15 @@ grpc-feed-probe: active=active enabled=enabled restarts=10 since=Fri 2026-10-02 
 
 --- память хоста (MiB) ---
                total        used        free      shared  buff/cache   available
-Mem:            3915        1316         167          49        2775        2599
+Mem:            3915        1334         166          49        2759        2581
 Swap:              0           0           0
 
 --- память по службам (байты; MemoryPeak -- с последнего старта) ---
-bloom-detector: MemoryCurrent=462581760 MemoryPeak=463097856 MemoryHigh=infinity MemoryMax=1073741824 
+bloom-detector: MemoryCurrent=468140032 MemoryPeak=468672512 MemoryHigh=infinity MemoryMax=1073741824 
 bloom-seller: MemoryCurrent=58507264 MemoryPeak=59031552 MemoryHigh=infinity MemoryMax=536870912 
-dbot-sold-guard: MemoryCurrent=21143552 MemoryPeak=22372352 MemoryHigh=infinity MemoryMax=infinity 
-dbot-detect-probe: MemoryCurrent=312983552 MemoryPeak=363913216 MemoryHigh=infinity MemoryMax=infinity 
-grpc-feed-probe: MemoryCurrent=59944960 MemoryPeak=66719744 MemoryHigh=infinity MemoryMax=infinity 
+dbot-sold-guard: MemoryCurrent=21114880 MemoryPeak=22372352 MemoryHigh=infinity MemoryMax=infinity 
+dbot-detect-probe: MemoryCurrent=317313024 MemoryPeak=364494848 MemoryHigh=infinity MemoryMax=infinity 
+grpc-feed-probe: MemoryCurrent=60112896 MemoryPeak=66719744 MemoryHigh=infinity MemoryMax=infinity 
 
 --- откуда предел памяти детектора ---
 FragmentPath=/etc/systemd/system/bloom-detector.service
@@ -28,11 +28,11 @@ DropInPaths=
  обкатки круга 0.01 и запомненные связанные накопители
  кривой v2 -- по ним сверяется вывод места 21, слово
  владельца 03.10 п.4. Ключей в них нет: это адреса.)
-/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-10-10T09:39:02Z):
+/home/bot/bloom_executor_live_data/detector_status.json (изменён 2026-10-10T10:39:25Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-10-10T09:39:02Z",
-  "updated_ts": 1791625142.7058563,
+  "updated_utc": "2026-10-10T10:39:25Z",
+  "updated_ts": 1791628765.498682,
   "alive_since_utc": "2026-10-10T01:59:20Z",
   "mode": "live",
   "sources": 634,
@@ -718,55 +718,55 @@ DropInPaths=
   "sender_connections": {
     "by_sender": {
       "astralane": {
-        "age_s": 27582.5,
-        "last_use_s": 21033.1,
+        "age_s": 31205.3,
+        "last_use_s": 24655.9,
         "last_ping_s": 0.1,
-        "pings_ok": 458,
+        "pings_ok": 518,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "blockrazor": {
-        "age_s": 27582.5,
-        "last_use_s": 21033.1,
+        "age_s": 31205.3,
+        "last_use_s": 24655.9,
         "last_ping_s": 0.1,
-        "pings_ok": 458,
+        "pings_ok": 518,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "helius": {
-        "age_s": 27582.5,
-        "last_use_s": 21033.1,
+        "age_s": 31205.3,
+        "last_use_s": 24655.9,
         "last_ping_s": 0.1,
-        "pings_ok": 458,
+        "pings_ok": 518,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "jito": {
-        "age_s": 27582.5,
-        "last_use_s": 21033.1,
+        "age_s": 31205.3,
+        "last_use_s": 24655.9,
         "last_ping_s": 0.1,
-        "pings_ok": 458,
+        "pings_ok": 518,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
       },
       "nozomi": {
-        "age_s": 27582.4,
-        "last_use_s": 21033.1,
+        "age_s": 31205.2,
+        "last_use_s": 24655.8,
         "last_ping_s": 0.0,
-        "pings_ok": 457,
+        "pings_ok": 517,
         "pings_failed": 1,
         "reopened": 0,
         "last_error": "ConnectionError: HTTPSConnectionPool(host='ams1.nozomi.temporal.xyz', port=443): Max retries exceeded with url: / (Cause"
       },
       "zeroslot": {
-        "age_s": 27582.4,
-        "last_use_s": 21033.1,
+        "age_s": 31205.2,
+        "last_use_s": 24655.8,
         "last_ping_s": 0.0,
-        "pings_ok": 458,
+        "pings_ok": 518,
         "pings_failed": 0,
         "reopened": 0,
         "last_error": ""
@@ -785,26 +785,26 @@ DropInPaths=
   "subscribed_addresses": 78,
   "unsubscribed_addresses": 576,
   "credits": {
-    "за_сеанс": 259920,
-    "за_час": 4378,
-    "за_прошлый_час": 14914,
-    "за_сутки": 464529,
+    "за_сеанс": 267137,
+    "за_час": 5268,
+    "за_прошлый_час": 6327,
+    "за_сутки": 471746,
     "бюджет_за_сутки": 2000000,
     "why_not": null
   },
   "subscribe_method": "transactionSubscribe",
   "subscribe_drops": 3,
-  "signals_seen": 140050,
+  "signals_seen": 142584,
   "to_buy": 0,
   "by_code": {
-    "NOT_A_BUY": 135010,
-    "TOKEN_RECEIVED_NOT_BOUGHT": 523,
-    "TARGET_AMOUNT_OUT_OF_RANGE": 1209,
-    "INSUFFICIENT_BALANCE": 119,
-    "THRESHOLD_EDGE": 17,
-    "SKIP_TARGET_INCREASE_POSITION": 62,
+    "NOT_A_BUY": 137427,
+    "TOKEN_RECEIVED_NOT_BOUGHT": 600,
+    "TARGET_AMOUNT_OUT_OF_RANGE": 1237,
+    "INSUFFICIENT_BALANCE": 125,
+    "THRESHOLD_EDGE": 19,
+    "SKIP_TARGET_INCREASE_POSITION": 65,
     "STALE": 3106,
-    "AMBIGUOUS_TX": 4
+    "AMBIGUOUS_TX": 5
   },
   "by_code_test_source": {},
   "test_sources": [
@@ -827,12 +827,12 @@ DropInPaths=
   },
   "lane_cu_limit": 140000,
   "summary_minute": 2,
-  "summary_last_hour": "2026-10-10T08:00Z",
+  "summary_last_hour": "2026-10-10T09:00Z",
   "summary_write_error": null,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 109.80088727403279,
+  "rate_usd_sol": 109.613829868772,
   "rate_fresh": true,
-  "rate_stale_used": 1304,
+  "rate_stale_used": 1328,
   "rate_failures": [],
   "kill_path": "/etc/bloom-executor/KILL",
   "kill_readable": true,
@@ -854,54 +854,54 @@ DropInPaths=
       "instrukcij": 56,
       "why_not": null
     },
-    "sozdanij": 12341,
-    "s_pokupkoj_sozdatelya": 8300,
-    "zapisej": 12341,
-    "otkazov": 59,
+    "sozdanij": 13942,
+    "s_pokupkoj_sozdatelya": 9319,
+    "zapisej": 13942,
+    "otkazov": 66,
     "poslednij_otkaz": "create/create_v2 в транзакции не найдена",
-    "bajt": 333835611,
-    "kreditov": 6368,
+    "bajt": 376696329,
+    "kreditov": 7186,
     "budzhet": 20000,
     "otkljuchen": false,
     "otkljuchen_pochemu": "",
     "pokupok_net": true
   },
-  "net_slot": 455208869,
-  "slot_notifications": 126521,
+  "net_slot": 455225513,
+  "slot_notifications": 143165,
   "ws_baity_po_vidam": {
-    "источники": 6641147383,
-    "слоты": 18055872
+    "источники": 6785641675,
+    "слоты": 20470320
   },
   "dlina_slota": {
-    "измерено_с": 0.21303,
-    "слотов": 94,
-    "окно_с": 20.025,
-    "когда": 1791624883.3809578
+    "измерено_с": 0.21535,
+    "слотов": 93,
+    "окно_с": 20.028,
+    "когда": 1791628483.944184
   },
   "dlina_slota_v_rabote": {
-    "длина_слота_с": 0.21303,
+    "длина_слота_с": 0.21535,
     "источник": "замер",
-    "возраст_замера_с": 251.6,
+    "возраст_замера_с": 278.5,
     "константа_в_коде_с": 0.4
   },
-  "net_slot_age_s": 0.1,
+  "net_slot_age_s": 0.19,
   "balance_sol": 0.0,
-  "balance_age_s": 2.49,
-  "rpc_calls": 16604,
+  "balance_age_s": 2.18,
+  "rpc_calls": 18705,
   "rpc_by_method": {
-    "getMultipleAccounts": 5668,
-    "getBalance": 5486,
-    "getLatestBlockhash": 2290,
-    "getSlot": 184,
-    "getAccountInfo": 2298,
-    "simulateTransaction": 600,
+    "getMultipleAccounts": 6401,
+    "getBalance": 6206,
+    "getLatestBlockhash": 2590,
+    "getSlot": 209,
+    "getAccountInfo": 2598,
+    "simulateTransaction": 623,
     "getLeaderSchedule": 1,
     "getBlock": 49,
     "getSignatureStatuses": 8,
     "getTransaction": 16,
     "getAsset": 4
   },
-  "session_credits": 259920,
+  "session_credits": 267137,
   "handler_crashes": 0,
   "telegram": {
     "enabled": true,
@@ -910,7 +910,7 @@ DropInPaths=
     "format3": true,
     "tracked_messages": 4,
     "tracked_texts": 4,
-    "sent": 13,
+    "sent": 14,
     "failed": 0,
     "last_error": "",
     "off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
@@ -918,7 +918,7 @@ DropInPaths=
     "log_off_reason": "журнал не настроен: нет TELEGRAM_LOG_CHAT_ID -- построчные решения не идут никуда",
     "by_target": {
       "main": {
-        "sent": 13,
+        "sent": 14,
         "failed": 0,
         "last_error": ""
       },
@@ -947,7 +947,7 @@ DropInPaths=
     "hour_seconds": 0.0,
     "on_fallback_now": false,
     "report_threshold_s": 30.0,
-    "silent_ticks": 3159,
+    "silent_ticks": 3681,
     "tick_s": 2.0,
     "breaks_by_reason": {
       "соединение закрыто: ConnectionClosedError": 3
@@ -955,7 +955,7 @@ DropInPaths=
   },
   "shadow": {
     "enabled": true,
-    "built": 1409,
+    "built": 1448,
     "would_pass": 0,
     "over_cap": 0,
     "failed": 0,
@@ -973,21 +973,20 @@ DropInPaths=
       "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": 0
     },
     "hour": {
-      "since_ts": 1791622909.5633283,
-      "since_utc": "2026-10-10T09:01:49Z",
-      "signals": 22,
-      "built": 17,
-      "sim_failed": 17,
+      "since_ts": 1791626532.4769614,
+      "since_utc": "2026-10-10T10:02:12Z",
+      "signals": 20,
+      "built": 10,
+      "sim_failed": 10,
       "not_built": {
-        "шаблон: у источника инструкция 33e685a4017f83ad, не buy_exact_quote_in": 2,
-        "шаблон: счетов 28, ожидалось 27": 2,
-        "шаблон: у источника инструкция b817ee6167c5d33d, не buy_exact_quote_in": 1
+        "шаблон: счетов 28, ожидалось 27": 3,
+        "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2": 7
       },
       "crashed": 0
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 623,
+    "credits_day": 646,
     "credits_write_why_not": "FileNotFoundError"
   },
   "route_tax_filter": {
@@ -1004,25 +1003,25 @@ DropInPaths=
     "live": true,
     "module_loaded": true,
     "module_why_not": "",
-    "paths": 119,
-    "starts": 119,
+    "paths": 125,
+    "starts": 125,
     "threads_alive": 0,
     "sent": 4,
     "by_stage": {
-      "gate": 115,
+      "gate": 121,
       "sent": 4
     },
     "kandidatov": 4,
     "po_politike": {
-      "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)": 8,
+      "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)": 10,
       "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)": 1,
-      "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)": 7,
-      "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)": 48,
+      "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)": 8,
+      "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)": 50,
       "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)": 27,
       "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)": 2,
       "предел полосы: по группе cand1_03 полоса не торгует (lane_trades выключен)": 15,
       "предел полосы: по группе konveyer полоса не торгует (lane_trades выключен)": 1,
-      "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)": 5,
+      "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)": 6,
       "предел полосы: по группе batch5 полоса не торгует (lane_trades выключен)": 1
     },
     "bought_backfilled": 3,
@@ -1078,21 +1077,21 @@ DropInPaths=
       "открытых_без_числа": 0,
       "итог_с_открытыми_sol": 0.197663595
     },
-    "balance_age_s": 2.5,
+    "balance_age_s": 2.2,
     "sim_shadow": {
       "done": 4,
       "would_fail": 0
     },
-    "blockhash_age_s": 4.4,
-    "blockhash_updates": 2290,
+    "blockhash_age_s": 10.6,
+    "blockhash_updates": 2590,
     "blockhash_why_not": "",
     "last": {
       "stage": "gate",
       "ok": false,
-      "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
+      "why_not": "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)",
       "signature": null,
       "pool_program": null,
-      "ts_utc": "2026-10-10T09:36:41Z"
+      "ts_utc": "2026-10-10T10:35:41Z"
     },
     "lane_kill": [
       false,
@@ -1260,9 +1259,9 @@ DropInPaths=
       "shift_signature": null,
       "warm": {
         "есть": true,
-        "возраст_с": 4.34,
+        "возраст_с": 10.61,
         "почему": "",
-        "обновлений": 2290,
+        "обновлений": 2590,
         "взят_тёплым": 4,
         "взят_по_сети": 0,
         "срок_с": 30.0
@@ -1274,98 +1273,98 @@ DropInPaths=
     "pools": 17,
     "templates": {
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-        "age_s": 1.7,
+        "age_s": 3.6,
         "flipped": false,
         "sig": "5Z2dnoiBLyqBe63YnffNLVWWJAjAajpu4Vt7FP2gTpUCqPdUxen2aqJQeH5CDWo2gvznhCPdf6HqHFtxJCLsdgy4"
       },
       "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
-        "age_s": 57.6,
+        "age_s": 29.8,
         "flipped": false,
-        "sig": "5smyfwDXrsv2oHDrGdRBF7yT6ZhQbVETZH1LHziwrNZmdVYsz2ubVLN94GDAy6A2XdCVxGvPh1CqfgXZn6ggsJdX"
+        "sig": "3g3FViCJk7LYkMD26rfwzwVK94Up4igfs9a2Vhix3icknkZph67gE1hBVHMgVPyLX5LJQngEAKvsMRXgm16h8SN8"
       },
       "Cm6fNnMk7NfzStP9CZpsQA2v3jjzbcYGAxdJySmHpump": {
-        "age_s": 37.5,
+        "age_s": 22.5,
         "flipped": false,
-        "sig": "ihAiixRxLN5s7NMySC3nGJKXCqhjQ4g6ax33cpPDhzH34mrYYCafGb1KcBJrrPFypLv6rCpmoLN58wCnGxtyTX8"
+        "sig": "4dCRRWJxAUdDYRM7eKtXPSBBRCW22KAB3hmNJw8jnFvjPKFK1EFKfgYGE9h8i9C3pYVdjv5W4vVe7asEtxV722MP"
       },
       "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2": {
-        "age_s": 122.0,
+        "age_s": 32.4,
         "flipped": false,
-        "sig": "2mAjm9Q7Nugq717u3x7qrTLCJPotZQZzSUcwbQ1jTLQFyeb6mgmBxxBcR9v7uQ2DDv8JtNkNXq2zHE663RmYYgAv"
+        "sig": "kFWP6psua4uy54ochGKAz7hReDGcBnTpu4XhGHFTpk6P3hgCWUgtSv4yUUHjPChja2L6TfGe7v2n1mLASKj8JuX"
       },
       "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump": {
-        "age_s": 46.6,
+        "age_s": 27.3,
         "flipped": false,
-        "sig": "5x5poYAPz6jn6vL8fhi5RvDUhjKRKmoeUeHuLLVhgzUJMLer15x8AFibYkFEEt8CMJg4aWjJRnAQ8DoqhrUeH9TP"
+        "sig": "4r2DbsEgo1thc2yLW2wWsPAXwtjLXfrKr3Xj7EBrr8D6sMmkrSyQtPbhg6VWycZmkgrQ6Q9LgTD4gy28iCoMmdfx"
       },
       "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
-        "age_s": 122.0,
+        "age_s": 144.8,
         "flipped": false,
-        "sig": "CK3DcDK7xko1J82jPTvSUWbX7JZvsfwiY55yZmyWt4QFCqqucztmjqua73n3AXsdrkSCYq4vKGnq2Jzcdy4Jpzr"
+        "sig": "29VhqaKvUvU6PjJLH7gWwbQs1coo9kLFv8f5J1j7q4CVG7ErYUtSjdttckAx7ECfTF6EUtga7g9HXBoaJUpUPezh"
       },
       "J8PSdNP3QewKq2Z1JJJFDMaqF7KcaiJhR7gbr5KZpump": {
-        "age_s": 122.0,
+        "age_s": 19.1,
         "flipped": false,
-        "sig": "5kGbqT1aA4ZhiF1t6FyZYCCvL5iZv5ghWsVJgwj4KGBJzfXaVwPVsU3DeiqxHzHUrsAsqPrZfECnGRsUYMA2HNBV"
+        "sig": "5C6ffEDF8cag4zAQoiFRVXyeCXJxa5KcjPFW2kopCF7WixErmNtnsyqspNia3vkJLrvWvu5ZLctgjuGyGWhSB8rD"
       },
       "4N4DnNo3qpPks9aQCkcWkzoir8tnvT6diS4TnnZibonk": {
-        "age_s": 418.8,
+        "age_s": 344.4,
         "flipped": false,
-        "sig": "5BYsLcVPZgrEgxjN52TQhs3jYLukwDE4oQTS1WkWv6KYRSMqpnozX8Cwn277ER4ywcrJHjefbSNrEzc51hD834ZW"
+        "sig": "5Dev3NtVUfXDPk9ve2W2PVYHRCvBX1BFJpGFiY4M1nLGN11hfC2NDeENP1SDJnv3dBmBXSRrEe1WTSDeoAaSzdtB"
       },
       "AywAYdNJnSLSXwKWYxDciPjqGRnwp4iZdQptuuQTpump": {
-        "age_s": 2582.2,
+        "age_s": 103.9,
         "flipped": false,
         "sig": "65xDc5GCd8bC4n6f9M78nhbmvz5LTpVtBQomwmA4K6K4UYs6jt9jjffbgq8dnFQ7iKkg7qcd9PfxF3eJ2XvPDa5R"
       },
       "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump": {
-        "age_s": 113.0,
+        "age_s": 0.7,
         "flipped": false,
-        "sig": "4hJwet5aYdgzzcvgL3XQcrs7P5rAfDLSWC4mGz1FoEZ34sULcmhksR6Qd1PUdSpEC4ZCnhdcqAAWFqtAxJKCin88"
+        "sig": "34pbZKqez5spPdbWAd2HpqaMrRvMeV664AN6mNikWhqLrzNzyrVsZpEAmrdFZ4Md47yubtzqxwKHibKCEukeV5Qo"
       },
       "7n8kRipxAQBfpGQtcGA2AbkM2HASSVCzqZ5F3QEopump": {
-        "age_s": 3284.7,
+        "age_s": 6907.5,
         "flipped": false,
         "sig": "66pMxKhU2uGEyqeMJQpQrhKACXtpkiZ1YAibG3YMonpNA9BC9Q2TYBJhWjkd5J5mbRom5sJBGMQLDwjdhu1KDTiV"
       },
       "DitHyRMQiSDhn5cnKMJV2CDDt6sVct96YrECiM49pump": {
-        "age_s": 312.3,
+        "age_s": 183.0,
         "flipped": false,
-        "sig": "X8fHM42YWZHUHw77jojeupmWw9PvqEYGfckKHZvMxgdoXuE6DoQfSRoC2axHw16kt3n5ehgDjd2ZPHRsBceHtxp"
+        "sig": "6225hJQwgQf1EDuoRKpUrPfCwg9rPd8Zv35huZ3gZBwFTt9z8CG2NhqHzHQANrAF2Cn2vMSyafvNNQ9VG6xLjUnd"
       },
       "8J69rbLTzWWgUJziFY8jeu5tDwEPBwUz4pKBMr5rpump": {
-        "age_s": 328.0,
+        "age_s": 866.5,
         "flipped": false,
-        "sig": "3KSFzcepLFAm9CRcxc3rdZNxHbVF6z9foraJB3e5aMUbiHCCgJXrmtzYVJCj48d9Uf8kiqqx4GQBdMqjnpcR8afP"
+        "sig": "eFy8emviE6tijhJg5JUqfgK6yHKtJebZhhB4GdstL88vdu87HhHyRFhxYxDNY2ByJUEw8uf6HFcQUaYxEWqHT9i"
       },
       "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN": {
-        "age_s": 9374.4,
+        "age_s": 12997.2,
         "flipped": false,
         "sig": "oHT5ChLvYxuXStcTx1cim7ADKSWSmGr4tM87CniczaSaefbdUXHY4HVCmJQkE52wjKzpzUujWxJtJpoB22tuYRJ"
       },
       "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr": {
-        "age_s": 5390.1,
+        "age_s": 9012.8,
         "flipped": false,
         "sig": "2dvAXURmJC4T5MjbwCauM3Yrhg2Eo9Qj5UTAneRKSaEA8ZrvEyx5tYNzLM9iyrB93KBAncXLSZCdTcTTb9qcFnBE"
       },
       "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": {
-        "age_s": 6776.9,
+        "age_s": 10399.7,
         "flipped": false,
         "sig": "232iprA9fUJ9n3VCXfxkzfGcgJrt9PrFzkve3edghuwGMqmvAmeybP8zsRBKbrwQVeH1wgWfKT14bHD9WDLRtBDF"
       }
     },
-    "fed": 37647,
+    "fed": 38568,
     "no_tx": 0,
     "failed": 0,
-    "luts": 685,
+    "luts": 711,
     "luts_pending": 0,
     "luts_warmed": 18,
     "warm_why_not": "",
-    "luts_topped_up": 667,
+    "luts_topped_up": 693,
     "top_up_why_not": "",
-    "bytes": 879989576,
-    "credits": 16786,
-    "credits_day": 16986,
+    "bytes": 903944014,
+    "credits": 17242,
+    "credits_day": 17442,
     "credits_before_start": 200,
     "credits_write_why_not": "",
     "credit_budget": 0,
@@ -1373,8 +1372,8 @@ DropInPaths=
     "dropped": false,
     "dropped_why": "",
     "ingest_stats": {
-      "новый шаблон": 2178,
-      "не своп / счета не зависят от цены -- шаблон подтверждён": 35801,
+      "новый шаблон": 2417,
+      "не своп / счета не зависят от цены -- шаблон подтверждён": 36524,
       "шаблона нет": 31
     }
   },
@@ -1383,8 +1382,8 @@ DropInPaths=
     "obrazcov": 1,
     "zhivyh": 1,
     "bez_shablona": 0,
-    "obnovleniy": 5481,
-    "vozrast_s": 1.7,
+    "obnovleniy": 6200,
+    "vozrast_s": 3.6,
     "why_not": null,
     "kotirovki": {
       "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "USDC"
@@ -1412,11 +1411,11 @@ DropInPaths=
   "bloom_keepalive": {
     "enabled": true,
     "period_s": 20.0,
-    "ok": 1378,
+    "ok": 1559,
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-10-10T09:38:46Z",
+    "last_utc": "2026-10-10T10:39:11Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -1446,7 +1445,7 @@ DropInPaths=
     "n": 200,
     "median": 0.5,
     "min": 0.2,
-    "max": 5.2
+    "max": 209.9
   },
   "trevogi": {
     "работают": true,
@@ -1458,23 +1457,24 @@ DropInPaths=
   },
   "trevoga_tishiny": {
     "звать": false,
-    "почему": "кандидатов полосы 0 за окно при пороге 3 -- это не тревога, а отсутствие кандидатов; по политике отсечено 20",
+    "почему": "кандидатов полосы 0 за окно при пороге 3 -- это не тревога, а отсутствие кандидатов; по политике отсечено 10",
     "кандидатов_за_окно": 0,
     "отправлено_за_окно": 0,
     "политика_за_окно": {
       "предел полосы: по группе cand1 полоса не торгует (lane_trades выключен)": 3,
-      "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)": 12,
-      "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)": 5
+      "предел полосы: по группе kandidaty полоса не торгует (lane_trades выключен)": 1,
+      "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)": 5,
+      "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)": 1
     }
   },
   "trevogi_zhurnal": []
 }
-показан ЦЕЛИКОМ: 42235 знаков
-/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-10-10T09:39:50Z):
+показан ЦЕЛИКОМ: 42269 знаков
+/home/bot/bloom_executor_live_data/seller_heartbeat.json (изменён 2026-10-10T10:39:30Z):
 {
   "schema_version": 2,
-  "updated_utc": "2026-10-10T09:39:50Z",
-  "updated_ts": 1791625190.2872162,
+  "updated_utc": "2026-10-10T10:39:30Z",
+  "updated_ts": 1791628770.5452287,
   "mode": "live",
   "positions_in_cycle": 0,
   "last_cycle": [],
@@ -1561,11 +1561,11 @@ DropInPaths=
       "n": 5,
       "медиана": 0.0,
       "p90": 0.08,
-      "макс": 0.14
+      "макс": 0.13
     },
     "от_таймера_до_отправки_с": {
       "n": 5,
-      "медиана": 0.22,
+      "медиана": 0.21,
       "p90": 0.32,
       "макс": 0.39
     },
@@ -1606,8 +1606,8 @@ DropInPaths=
   }
 }
 показан ЦЕЛИКОМ: 3655 знаков
-/home/bot/bloom_executor_live_data/samoproverka_hosta.json (изменён 2026-10-10T09:10:01Z):
-{"время": "09:10Z", "строка": "самопроверка 09:10Z: журнал службы за час пуст -- у живой службы так не бывает, значит он не прочитан\nпроверено на хосте: службы, признаки жизни, сбои за час, UNSOLD за час, кредиты Helius, рубильники. Не с хоста (смотрит сессия): свежесть учёта и прогоны Actions.", "плохо": ["журнал службы за час пуст -- у живой службы так не бывает, значит он не прочитан"], "обновлено_utc": "09:10Z"}
+/home/bot/bloom_executor_live_data/samoproverka_hosta.json (изменён 2026-10-10T10:10:01Z):
+{"время": "10:10Z", "строка": "самопроверка 10:10Z: журнал службы за час пуст -- у живой службы так не бывает, значит он не прочитан\nпроверено на хосте: службы, признаки жизни, сбои за час, UNSOLD за час, кредиты Helius, рубильники. Не с хоста (смотрит сессия): свежесть учёта и прогоны Actions.", "плохо": ["журнал службы за час пуст -- у живой службы так не бывает, значит он не прочитан"], "обновлено_utc": "10:10Z"}
 
 показан ЦЕЛИКОМ: 690 знаков
 /home/bot/bloom_executor_live_data/own_sell_obkatany.json: нет или пуст
@@ -1619,10 +1619,10 @@ DropInPaths=
  }
 }
 показан ЦЕЛИКОМ: 250 знаков
-/home/bot/dbot_detect_probe/status.json (изменён 2026-10-10T09:39:28Z):
+/home/bot/dbot_detect_probe/status.json (изменён 2026-10-10T10:39:28Z):
 {
-  "updated_utc": "2026-10-10T09:39:28Z",
-  "uptime_s": 743854.8,
+  "updated_utc": "2026-10-10T10:39:28Z",
+  "uptime_s": 747454.9,
   "tx_method_работает": "logsSubscribe",
   "tx_method_история": [
     {
@@ -1687,9 +1687,9 @@ DropInPaths=
     }
   ],
   "источников": 8,
-  "событий_записано": 9419,
+  "событий_записано": 9451,
   "дублей_пропущено": 17,
-  "неудачных_пропущено": 1956,
+  "неудачных_пропущено": 1962,
   "переподключений_tx": 56,
   "причины_разрыва_tx": {
     "ConnectionClosedError: no close frame received or sent": 51,
@@ -1697,24 +1697,24 @@ DropInPaths=
   },
   "слепое_время_с": 60.5,
   "слепое_время_доля": 8e-05,
-  "переподключений_slot": 51,
-  "slot_уведомлений": 2831685,
-  "текущий_слот": 455208990,
-  "последнее_событие_utc": "2026-10-10T09:38:52Z",
+  "переподключений_slot": 52,
+  "slot_уведомлений": 2848218,
+  "текущий_слот": 455225528,
+  "последнее_событие_utc": "2026-10-10T10:38:55Z",
   "часы": {
-    "checked_at_utc": "2026-10-10T09:02:01Z",
-    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Sat 2026-10-10 11:02:01 CEST\nRTCTimeUSec=Sat 2026-10-10 11:02:01 CEST",
+    "checked_at_utc": "2026-10-10T10:02:01Z",
+    "timedatectl": "Timezone=Europe/Amsterdam\nLocalRTC=no\nCanNTP=yes\nNTP=yes\nNTPSynchronized=yes\nTimeUSec=Sat 2026-10-10 12:02:01 CEST\nRTCTimeUSec=Sat 2026-10-10 12:02:01 CEST",
     "chronyc": "нет на хосте",
     "ntpq": "нет на хосте",
     "ntp_synchronized": "yes"
   }
 }
 показан ЦЕЛИКОМ: 2340 знаков
-/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-10-10T09:39:44Z):
+/home/bot/grpc_feed_probe_data/heartbeat.json (изменён 2026-10-10T10:39:30Z):
 {
-  "utc": "2026-10-10T09:39:44Z",
+  "utc": "2026-10-10T10:39:30Z",
   "started_utc": "2026-10-02T00:08:32Z",
-  "uptime_s": 725471.9,
+  "uptime_s": 729057.8,
   "channels": 4,
   "channel_names": [
     "grpc",
@@ -1852,10 +1852,10 @@ DropInPaths=
   "summary": {
     "base": "helius_ws",
     "messages": {
-      "rabbit_ams": 13544,
-      "rabbit_fra": 13542,
-      "grpc2": 11481,
-      "grpc": 11481
+      "rabbit_ams": 13607,
+      "rabbit_fra": 13605,
+      "grpc2": 11532,
+      "grpc": 11532
     },
     "duplicates": {
       "rabbit_fra": 1,
@@ -1874,117 +1874,117 @@ DropInPaths=
     "by_group": {},
     "pairwise": {
       "grpc_vs_grpc2": {
-        "pairs": 47,
-        "first_share": 0.7872,
-        "median_ms": 1.62,
-        "p10_ms": -0.94,
-        "p90_ms": 5.38,
-        "p95_ms": 5.67,
-        "mean_ms": 2.0
+        "pairs": 52,
+        "first_share": 0.6923,
+        "median_ms": 0.98,
+        "p10_ms": -1.5,
+        "p90_ms": 5.41,
+        "p95_ms": 5.93,
+        "mean_ms": 1.74
       },
       "grpc_vs_rabbit_ams": {
-        "pairs": 47,
-        "first_share": 0.8511,
-        "median_ms": 1.77,
-        "p10_ms": -0.38,
-        "p90_ms": 3.04,
-        "p95_ms": 3.22,
-        "mean_ms": 1.3
+        "pairs": 52,
+        "first_share": 0.6731,
+        "median_ms": 1.38,
+        "p10_ms": -2.04,
+        "p90_ms": 2.96,
+        "p95_ms": 3.06,
+        "mean_ms": 0.8
       },
       "grpc_vs_rabbit_fra": {
-        "pairs": 47,
-        "first_share": 0.5106,
-        "median_ms": 0.22,
-        "p10_ms": -5.29,
-        "p90_ms": 4.27,
-        "p95_ms": 4.39,
-        "mean_ms": 1.03
+        "pairs": 52,
+        "first_share": 0.3269,
+        "median_ms": -1.1,
+        "p10_ms": -5.6,
+        "p90_ms": 2.72,
+        "p95_ms": 3.51,
+        "mean_ms": -1.17
       },
       "grpc2_vs_rabbit_ams": {
-        "pairs": 47,
-        "first_share": 0.383,
-        "median_ms": -0.85,
-        "p10_ms": -3.64,
-        "p90_ms": 2.32,
-        "p95_ms": 2.72,
-        "mean_ms": -0.7
+        "pairs": 52,
+        "first_share": 0.4423,
+        "median_ms": -0.52,
+        "p10_ms": -4.86,
+        "p90_ms": 2.97,
+        "p95_ms": 3.73,
+        "mean_ms": -0.94
       },
       "grpc2_vs_rabbit_fra": {
-        "pairs": 47,
-        "first_share": 0.0638,
-        "median_ms": -1.55,
-        "p10_ms": -5.26,
-        "p90_ms": -0.47,
-        "p95_ms": 0.11,
-        "mean_ms": -0.97
+        "pairs": 52,
+        "first_share": 0.0385,
+        "median_ms": -2.08,
+        "p10_ms": -6.41,
+        "p90_ms": -0.65,
+        "p95_ms": -0.45,
+        "mean_ms": -2.91
       },
       "rabbit_ams_vs_rabbit_fra": {
         "pairs": 64,
         "first_share": 0.2969,
-        "median_ms": -2.41,
-        "p10_ms": -5.42,
-        "p90_ms": 1.76,
-        "p95_ms": 2.27,
-        "mean_ms": -1.89
+        "median_ms": -2.68,
+        "p10_ms": -4.82,
+        "p90_ms": 1.15,
+        "p95_ms": 1.67,
+        "mean_ms": -1.95
       }
     },
     "pairs_total": 64
   }
 }
-показан ЦЕЛИКОМ: 5447 знаков
+показан ЦЕЛИКОМ: 5450 знаков
 --- размеры журналов ---
-/home/bot/bloom_executor_live_data/decisions.jsonl: 519483 строк
+/home/bot/bloom_executor_live_data/decisions.jsonl: 522024 строк
 /home/bot/bloom_executor_live_data/positions.jsonl: 312 строк
-/home/bot/dbot_detect_probe/events.jsonl: 26246 строк
+/home/bot/dbot_detect_probe/events.jsonl: 26276 строк
 
 --- решения детектора по кодам ---
-всего решений: 519486
+всего решений: 522027
 первое: "ts_utc": "2026-10-09T22:00:08Z"
-последнее: "ts_utc": "2026-10-10T09:39:53Z"
+последнее: "ts_utc": "2026-10-10T10:39:32Z"
 по кодам:
- 501769 NOT_A_BUY
+ 504180 NOT_A_BUY
   11704 STALE
-   1670 TARGET_AMOUNT_OUT_OF_RANGE
-    959 TOKEN_RECEIVED_NOT_BOUGHT
-    243 INSUFFICIENT_BALANCE
-    144 SKIP_TARGET_INCREASE_POSITION
-     27 THRESHOLD_EDGE
-      7 AMBIGUOUS_TX
+   1698 TARGET_AMOUNT_OUT_OF_RANGE
+   1031 TOKEN_RECEIVED_NOT_BOUGHT
+    249 INSUFFICIENT_BALANCE
+    147 SKIP_TARGET_INCREASE_POSITION
+     29 THRESHOLD_EDGE
+      8 AMBIGUOUS_TX
       4 WS_BREAK
 по задачам источника:
- 353301 cand1_03
- 154249 vol_4vw
-   3635 cand3
-   1464 konveyer
-   1297 cand2
-   1167 krug_001
-    329 cand1
-    213 BATCH-3
-    202 kandidaty
-    187 batch5
-    167 BATCH-5
-    165 sniper_src
-     75 lane_s0
-     48 cand2_03
+ 353305 cand1_03
+ 156281 vol_4vw
+   3925 cand3
+   1466 konveyer
+   1373 cand2
+   1187 krug_001
+    377 cand1
+    226 BATCH-3
+    210 batch5
+    205 kandidaty
+    186 BATCH-5
+    172 sniper_src
+     89 lane_s0
+     52 cand2_03
      10 leader
-забран bloom_detector.json (54371 байт)
+забран bloom_detector.json (54486 байт)
 забран bloom_seller.json (37795 байт)
 забран c2_own_send_dry.json (793 байт)
 
 --- расход Helius за сегодня по всем службам ---
-  bloom_detector: 464663 кредитов, бюджет 2000000, доля 0.2323
+  bloom_detector: 471913 кредитов, бюджет 2000000, доля 0.236
   bloom_seller: 29 кредитов, бюджет 60000, доля 0.0005
-  ledger: 6328 кредитов, бюджет 50000, доля 0.1266
-  ВСЕГО за 2026-10-10: 471020 кредитов
+  ledger: 6780 кредитов, бюджет 50000, доля 0.1356
+  ВСЕГО за 2026-10-10: 478722 кредитов
 
 --- работа хостовых таймеров ---
 имена таймеров из установщика: 'bloom-uchet-chas.timer' 'bloom-zhivuchest-chas.timer' 'bloom-vygruzka-sutki.timer' 'bloom-uborshchik-itog-sutki.timer' 'bloom-uborshchik-chas.timer'
 NEXT                          LEFT LAST                               PASSED UNIT                              ACTIVATES
-Sat 2026-10-10 11:53:00 CEST 12min Sat 2026-10-10 10:53:01 CEST    47min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
-Sat 2026-10-10 12:23:00 CEST 42min Sat 2026-10-10 11:23:01 CEST    17min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
-Sat 2026-10-10 12:38:00 CEST 57min Sat 2026-10-10 11:38:01 CEST 2min 14s ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
-Sat 2026-10-10 23:55:00 CEST   12h Fri 2026-10-09 23:55:01 CEST      11h ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
-Sun 2026-10-11 08:00:00 CEST   20h Sat 2026-10-10 08:00:01 CEST 3h 40min ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
+Sat 2026-10-10 12:53:00 CEST 13min Sat 2026-10-10 11:53:00 CEST    46min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
+Sat 2026-10-10 13:23:00 CEST 43min Sat 2026-10-10 12:23:01 CEST    16min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
+Sat 2026-10-10 13:38:00 CEST 58min Sat 2026-10-10 12:38:01 CEST 1min 53s ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
+Sat 2026-10-10 23:55:00 CEST   11h Fri 2026-10-09 23:55:01 CEST      12h ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
+Sun 2026-10-11 08:00:00 CEST   19h Sat 2026-10-10 08:00:01 CEST 4h 39min ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
 
 5 timers listed.
 bloom-uchet-chas.timer loaded active
@@ -1998,7 +1998,7 @@ bloom-uborshchik-chas.timer loaded active
 забран /home/bot/host_tajmery/uchet/data/ledger_status.json -> data/ledger_status_hosta.json (5089 байт)
 забран /home/bot/host_tajmery/uborshchik_sutki.json -> data/uborshchik_sutki_hosta.json (278 байт)
 /home/bot/bloom_executor_live_data/trevogi.jsonl: нет или пуст -- таймер ещё не отработал
-забран /home/bot/bloom_executor_live_data/zapusk_zhurnal.jsonl -> data/zapusk_zhurnal_hosta.jsonl (23362463 байт)
+забран /home/bot/bloom_executor_live_data/zapusk_zhurnal.jsonl -> data/zapusk_zhurnal_hosta.jsonl (24689904 байт)
 data/sdelki_polosy_2026-10-03.json уже в ветке (его написал прогон GitHub) -- копия хоста ляжет как data/sdelki_polosy_2026-10-03_s_hosta.json
 забрана выгрузка sdelki_polosy_2026-10-03.json -> data/sdelki_polosy_2026-10-03_s_hosta.json, сделок 240
 data/sdelki_polosy_2026-10-04.json уже в ветке (его написал прогон GitHub) -- копия хоста ляжет как data/sdelki_polosy_2026-10-04_s_hosta.json
@@ -2017,10 +2017,10 @@ data/sdelki_polosy_2026-10-10.json уже в ветке (его написал �
 забрана выгрузка sdelki_polosy_2026-10-10.json -> data/sdelki_polosy_2026-10-10_s_hosta.json, сделок 55
 
 --- возраст признаков жизни (порог 600 с) ---
-/home/bot/bloom_executor_live_data/detector_status.json: 19 с (свежий)
-/home/bot/bloom_executor_live_data/seller_heartbeat.json: 2 с (свежий)
-/home/bot/dbot_detect_probe/status.json: 54 с (свежий)
-/home/bot/grpc_feed_probe_data/heartbeat.json: 8 с (свежий)
+/home/bot/bloom_executor_live_data/detector_status.json: 36 с (свежий)
+/home/bot/bloom_executor_live_data/seller_heartbeat.json: 1 с (свежий)
+/home/bot/dbot_detect_probe/status.json: 33 с (свежий)
+/home/bot/grpc_feed_probe_data/heartbeat.json: 1 с (свежий)
 
 --- старт служб против mtime модулей ---
 самый свежий модуль служб: /home/bot/bloom_executor/c2_swap_build.py (2026-10-10T01:58:57Z)
@@ -2029,55 +2029,54 @@ bloom-detector: старт 2026-10-10T01:59:19Z, модули 2026-10-10T01:58:5
 bloom-seller: старт 2026-10-10T01:59:30Z, модули 2026-10-10T01:58:57Z, старт_позже_модулей (33 с)
 
 --- теневой журнал запусков: свод за час ---
-окно: с 2026-10-10T08:40:22Z
+окно: с 2026-10-10T09:40:02Z
 {
- "s": "2026-10-10T08:40:22Z",
+ "s": "2026-10-10T09:40:02Z",
  "do": null,
- "strok_vsego": 34968,
- "sozdanij": 1556,
- "s_pokupkoj_sozdatelya": 1075,
- "sol_sozdateley": 2432.680896049,
+ "strok_vsego": 36559,
+ "sozdanij": 1596,
+ "s_pokupkoj_sozdatelya": 1012,
+ "sol_sozdateley": 586.645970063,
  "otryv_slotov": {
   "min": 1,
-  "max": 5,
+  "max": 4,
   "mediana": 1,
   "bez_chisla": 0
  },
- "bajt": 42322368,
- "kreditov": 808,
+ "bajt": 42450283,
+ "kreditov": 810,
  "bez_bajt": 0,
- "pervaja_utc": "2026-10-10T08:40:26Z",
- "poslednjaja_utc": "2026-10-10T09:40:13Z",
+ "pervaja_utc": "2026-10-10T09:40:02Z",
+ "poslednjaja_utc": "2026-10-10T10:39:56Z",
  "razvidnosti": {
-  "create_v2": 1555,
-  "create": 1
+  "create_v2": 1596
  },
- "mb": 40.362
+ "mb": 40.484
 }
 --- он же за весь журнал ---
 {
  "s": null,
  "do": null,
- "strok_vsego": 34968,
- "sozdanij": 34968,
- "s_pokupkoj_sozdatelya": 23346,
- "sol_sozdateley": 27184.191493985,
+ "strok_vsego": 36559,
+ "sozdanij": 36559,
+ "s_pokupkoj_sozdatelya": 24353,
+ "sol_sozdateley": 27769.794912591,
  "otryv_slotov": {
   "min": 1,
   "max": 61,
   "mediana": 1,
   "bez_chisla": 0
  },
- "bajt": 934941725,
- "kreditov": 17834,
+ "bajt": 977231510,
+ "kreditov": 18640,
  "bez_bajt": 0,
  "pervaja_utc": "2026-10-09T16:59:23Z",
- "poslednjaja_utc": "2026-10-10T09:40:13Z",
+ "poslednjaja_utc": "2026-10-10T10:39:56Z",
  "razvidnosti": {
-  "create_v2": 34903,
+  "create_v2": 36494,
   "create": 65
  },
- "mb": 891.63
+ "mb": 931.961
 }
 
 --- врезка кривой v2/v3 на хосте ---
