@@ -4,17 +4,21 @@
   [
    "--s",
    "2026-10-10T03:00",
+   "--do",
+   "2026-10-10T04:00",
    "--chto",
    "--perepis",
    "--dengi",
    "--svezhih",
    "40",
+   "--predel-podpisey",
+   "700000",
    "--predel-razbora",
-   "1200",
+   "4000",
    "--metka",
    "_03Z"
   ]
  ],
- "helius_rps_na_paket": 5,
- "zachem": "p.1 (a) i (b): chto za programma DhpyNWkdxFh3DRPsBrwRwrK3TYC5t7Q4arnSvf3t84HY i kuda ushli SOL istochnika 4vw54BmA s 03:00Z 10.10. Poisk po publichnomu vebu pro etot adres nichego ne dayot, znachit otvet tolko po cepi. Progon chitaet samu programmu (vladelec-zagruzchik, ispolnyaemost, razmer, i u obnovlyaemogo zagruzchika schyot ProgramData -- avtoritet obnovleniya i slot zalivki), potom perepisyvaet podpisi istochnika s 03:00Z po minutam (chtoby videt, s kakogo momenta smenilsya temp), razbirayet 40 svezhih tranzakciy (diskriminator i dlina dannyh instrukcii, roli schetov, zhurnal programmy, raskhod vychisleniy) i po vyborke okna schitaet dvizhenie SOL -- komu ushlo i ot kogo prishlo. Esli podpisey okna bolshe predela razbora, v vyhode skazano, skolko ostalos neprochitannym. Tolko chtenie."
+ "helius_rps_na_paket": 4,
+ "zachem": "Povtor p.1 (a) i (b) s dvumya ispravleniyami. Pervyy progon: programma prochitana (obnovlyaemyy zagruzchik, programdata 88413 bayt, zalito v slote 454813567, avtoritet obnovleniya 2KP9miexioqgNbjPwysggcbi3sKqhH8JsPaDmFxRPURD), no VSE 1239 getTransaction upali RuntimeError -- prichina v maxSupportedTransactionVersion 0, pri kotorom uzel otvechaet -32015 na tranzakciyah versii 1 (u Code-1 dlya etogo est C.TX_VERSION = 1). Teper versiya beryotsya ottuda, a soobschenie uzla sohranyaetsya celikom. Vtoroe: perepis upiralas v predel 60000 podpisey i pokryvala tolko poslednie 48 minut -- temp istochnika 955 podpisey v minutu, iz nih 57802 iz 60000 s oshibkoy. Predel podnyat do 700000, i razbor tranzakciy ogranichen oknom --do: chitaetsya CHAS 03:00..04:00Z celikom, do nachala spama, gde perevody i dolzhny byt. Tolko chtenie."
 }

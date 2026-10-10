@@ -7,9 +7,9 @@
    "--chasov",
    "12",
    "--metka",
-   "_okno"
+   "_kalibr"
   ]
  ],
  "helius_rps_na_paket": 0,
- "zachem": "p.3: zhivye sdelki vol_4vw protiv modeli na TEH ZHE signalah. Vygruzka Code-1 za 2026-10-10T06:00Z dala 55 sdelok gruppy v okne 09.10 16:29:20Z .. 10.10 03:48:29Z, vse na krivoy (rezerv virtualnyy), bilet 0.3 u 52 i 0.01 u tryoh; itog po cepi sveren u 44: summa +0.5477 SOL, srednee +0.01245, mediana +0.01430, v plyuse 25 iz 44. Progon chitaet arhiv 09.10 16Z .. 10.10 03Z tolko po 55 mintam etih sdelok i schitaet krug modeli na ZHIVOM signale: vhod -- posledneye sostoyanie pula ne pozzhe nashego fakticheskogo slota vhoda (our_slot), vyhod -- ne pozzhe our_slot + hold_slots_fact, bilet -- yeyo size_sol. Dalshe model i cep sravnivayutsya po sdelkam, odna k odnoy. Chasov, kotoryh v arhive escho net (lag okolo 8.5 chasa), progon schitaet otdelno. Tolko chtenie arhiva."
+ "zachem": "Novyy p.1: perekalibrovat VHOD modeli po 55 zhivym sdelkam vol_4vw. Na tom zhe okne model uzhe sravnena s faktom i ZANIZHAET itog na 0.0082 SOL na sdelku (mediana 0.0063, nizhe fakta v 34 sluchayah iz 44). Teper schitaetsya prichina: po kazhdoy sdelke beryotsya fakticheskoe chislo poluchennyh tokenov (tokenov_polucheno_raw, 6 desyatichnyh) i fakticheskiy vhod v SOL po cepi, i protiv nih proveryayutsya PYAT praviL vybora sostoyaniya vhoda -- posledneye ne pozzhe nashego slota, posledneye ranshe nashego, posledneye ne pozzhe slota istochnika, pervoe ne ranshe nashego, pervoe pozzhe nashego. Po kazhdomu pravilu -- kvanty otnosheniya fakt/model i mediana kak gotovaya popravka. Otdelno -- vyruchka vyhoda protiv modeli na tom zhe sostoyanii, i fakticheskoe mesto v bloke iz zhivoy stroki (nash indeks mediana 516 pri 1238 tranzakciyah v bloke, indeks istochnika mediana 558, ranshe istochnika my v 30 sluchayah iz 54). Tolko chtenie arhiva."
 }
