@@ -60,6 +60,14 @@ def корень() -> Path:
     return Path(свой) if свой else КОРЕНЬ
 ОБРАЗЕЦ_ПО_УМОЛЧАНИЮ = "data/c2_pool_samples/pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA.json"
 ПОВТОРОВ_ПО_УМОЛЧАНИЮ = 31
+# ЧТО ЕЩЁ ДОЛЖНО ЛЕЖАТЬ РЯДОМ, КРОМЕ analysis/ И ОБРАЗЦА. Найдено прогоном
+# 10.10 23:25Z: на трёх машинах из четырёх сборка отказала
+# "FileNotFoundError", и строка была обрезана ровно до "data/solana_buyer_2".
+# Весь дефицит -- один файл 6 КБ с метками площадок, который c2_pool_programs
+# читает при импорте. Поэтому он проверяется ДО замера и называется по имени.
+НУЖНЫЕ_ФАЙЛЫ = (
+    "data/solana_buyer_200/prior/current/buyer_100/dex_labels.json",
+)
 СЕКУНД_ОКНА = 10.0
 # НОНС-ПАРА ДЛЯ ЗАМЕРА. Счёт настоящий (он же в самопроверках полосы), но здесь
 # в цепь ничего не уходит: сборка только строит байты.
@@ -377,6 +385,15 @@ def сборка(*, путь_образца: str = ОБРАЗЕЦ_ПО_УМОЛ�
     из_ = {"ok": False, "why_not": None, "fajl": путь_образца, "n": None,
             "polnaya_ms": None, "iz_zagotovki_ms": None, "size": None,
             "pool_program": None, "sborshchik": None, "setevyh_popytok": 0}
+    # ФАЙЛЫ ДАННЫХ -- ДО ИМПОРТА. Их нехватка видна без модулей, и назвать её
+    # надо именем файла, а не обрезанным ModuleNotFoundError.
+    нет_файлов = [ф for ф in НУЖНЫЕ_ФАЙЛЫ if not (корень() / ф).exists()]
+    if нет_файлов:
+        из_["why_not"] = ("рядом с кодом нет нужных файлов данных: "
+                           + ", ".join(нет_файлов)
+                           + f" (корень {корень()})")
+        из_["net_fajlov"] = нет_файлов
+        return из_
     корень_кода = str(корень() / "analysis")
     if корень_кода not in sys.path:
         sys.path.insert(0, корень_кода)
@@ -625,6 +642,24 @@ def самопроверка() -> int:
             for с in жив["processy"]), жив["processy"][:2])
 
     # СБОРКА: НЕТ МОДУЛЕЙ ИЛИ ОБРАЗЦА -> ПРИЧИНА, А НЕ ЧИСЛО.
+    # НЕХВАТКА ФАЙЛА ДАННЫХ НАЗЫВАЕТСЯ ПО ИМЕНИ, А НЕ ОБРЕЗАННЫМ
+    # FileNotFoundError: ровно на этом 10.10 потерялись три машины из четырёх.
+    _было_к = os.environ.get("SKOROST_KOREN")
+    try:
+        os.environ["SKOROST_KOREN"] = "/tmp"
+        _нет_д = сборка(повторов=1)
+        chk("нет файла меток площадок -- он назван по имени, и числа нет",
+            _нет_д["polnaya_ms"] is None
+            and "dex_labels.json" in (_нет_д.get("why_not") or ""),
+            _нет_д.get("why_not"))
+    finally:
+        if _было_к is None:
+            os.environ.pop("SKOROST_KOREN", None)
+        else:
+            os.environ["SKOROST_KOREN"] = _было_к
+    chk("нужные файлы данных перечислены списком, а не спрятаны в коде",
+        len(НУЖНЫЕ_ФАЙЛЫ) >= 1
+        and all(ф.startswith("data/") for ф in НУЖНЫЕ_ФАЙЛЫ), НУЖНЫЕ_ФАЙЛЫ)
     нет_обр = сборка(путь_образца="data/zzz_net_takogo_obrazca.json", повторов=1)
     chk("нет файла образцов -- причина словами, число не выдумывается",
         нет_обр["ok"] is False and нет_обр["polnaya_ms"] is None
