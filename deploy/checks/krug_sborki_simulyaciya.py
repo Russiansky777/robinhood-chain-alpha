@@ -1056,6 +1056,357 @@ def _blok_po_schetam(слот: int, *, таймаут: float = 90.0) -> dict:
             "blockTime": б.get("blockTime"), "blockHeight": б.get("blockHeight")}
 
 
+# СЧЕТА ЧАЕВЫХ, ПО КОТОРЫМ УЗНАЁТСЯ КАНАЛ ЧУЖОЙ ПОКУПКИ. Берутся ИЗ НАШЕГО
+# РЕЕСТРА (data/senders.json): tip_accounts каждого отправителя плюс раздел
+# tip_scheta_spravochnik, который для разбора ЧУЖИХ транзакций и сделан.
+# Ни одного адреса "по памяти": неизвестный счёт останется неизвестным, и это
+# будет видно числом.
+def _scheta_chaevyh() -> dict:
+    """{счёт: служба} -- для разбора чужих покупок. Пусто, если реестр не читается."""
+    из_: dict = {}
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "analysis"))
+        import bloom_senders as SS  # noqa: PLC0415
+
+        реестр = SS.реестр() or {}
+        for имя, з in реестр.items():
+            for с in (з.get("tip_accounts") or []):
+                из_.setdefault(str(с), имя)
+            # СНЯТЫЕ СЧЕТА ТОЖЕ УЗНАЮТСЯ: чужие клиенты со старыми списками
+            # по-прежнему платят на них, и назвать канал надо и в этом случае.
+            for с in (з.get("tip_accounts_ubrany") or []):
+                из_.setdefault(str(с), имя + " (снятый счёт)")
+        из_.update(SS.справочник_чаевых() or {})
+    except Exception:  # noqa: BLE001
+        return из_
+    return из_
+
+
+def _metki_programm() -> dict:
+    """{программа: имя площадки} из наших же файлов, без выдуманных имён."""
+    из_: dict = {}
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "analysis"))
+        import bloom_detector as BD  # noqa: PLC0415
+
+        for и in dir(BD):
+            v = getattr(BD, и, None)
+            if (isinstance(v, dict) and v
+                    and all(isinstance(k, str) and len(k) > 30 for k in v)):
+                из_.update({str(k): str(x) for k, x in v.items()})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        п = (Path(__file__).resolve().parents[2] / "data" / "solana_buyer_200"
+             / "prior" / "current" / "buyer_100" / "dex_labels.json")
+        if п.exists():
+            для = json.loads(п.read_text(encoding="utf-8"))
+            из_.update({str(k): str(v) for k, v in для.items()})
+    except Exception:  # noqa: BLE001
+        pass
+    return из_
+
+
+def _blok_s_dengami(слот: int, *, таймаут: float = 120.0) -> dict:
+    """Блок со СЧЕТАМИ И ДЕНЬГАМИ: подписи, счета с признаком подписанта,
+    тариф и балансы до/после -- в том числе токенные.
+
+    transactionDetails="accounts", А НЕ "full", И ЭТОГО ХВАТАЕТ. Полный блок
+    кривой весит единицы мегабайт на каждый слот; раскладка "accounts" отдаёт
+    счета (а программы -- это тоже счета, поэтому площадка узнаётся), meta с
+    балансами (отсюда размер покупки и чаевые) и токенные балансы (отсюда
+    минт). Инструкции не нужны: мы не пересобираем чужую сделку, а называем
+    плательщика, канал и размер.
+    """
+    о = зов("getBlock", [int(слот), {
+        "encoding": "jsonParsed",
+        "transactionDetails": "accounts",
+        "rewards": False,
+        "commitment": "confirmed",
+        "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX}], таймаут=таймаут)
+    if not о["ok"]:
+        return {"ok": False, "why_not": о.get("why_not")}
+    б = о.get("result") or {}
+    ряды = []
+    for т in (б.get("transactions") or []):
+        тр = т.get("transaction") or {}
+        мета = т.get("meta") or {}
+        счета = []
+        for с in (тр.get("accountKeys") or []):
+            if isinstance(с, dict):
+                счета.append({"pubkey": с.get("pubkey"),
+                               "signer": bool(с.get("signer"))})
+            else:
+                счета.append({"pubkey": str(с), "signer": False})
+        ряды.append({
+            "podpis": (тр.get("signatures") or [None])[0],
+            "scheta": счета,
+            "err": bool(мета.get("err")),
+            "fee": мета.get("fee"),
+            "pre": мета.get("preBalances") or [],
+            "post": мета.get("postBalances") or [],
+            "pre_tok": мета.get("preTokenBalances") or [],
+            "post_tok": мета.get("postTokenBalances") or []})
+    return {"ok": True, "vsego": len(ряды), "ryady": ряды,
+            "blockTime": б.get("blockTime"), "blockHeight": б.get("blockHeight")}
+
+
+def _tokenov_poluchil(ряд: dict, минт: str) -> int:
+    """Сколько единиц ЭТОГО минта прибыло в сделке. 0 -- не покупка минта."""
+    до = {}
+    for з in (ряд.get("pre_tok") or []):
+        if str(з.get("mint")) == минт:
+            try:
+                до[int(з.get("accountIndex"))] = int(
+                    (з.get("uiTokenAmount") or {}).get("amount") or 0)
+            except (TypeError, ValueError):
+                continue
+    итог = 0
+    for з in (ряд.get("post_tok") or []):
+        if str(з.get("mint")) != минт:
+            continue
+        try:
+            и = int(з.get("accountIndex"))
+            после = int((з.get("uiTokenAmount") or {}).get("amount") or 0)
+        except (TypeError, ValueError):
+            continue
+        d = после - до.get(и, 0)
+        if d > 0:
+            итог += d
+    return итог
+
+
+def _razbor_pokupki(ряд: dict, *, минт: str, чаевые_счета: dict,
+                     метки: dict) -> dict:
+    """Кто заплатил, чем купил, сколько и кому дал чаевых -- по одной сделке."""
+    счета = ряд.get("scheta") or []
+    имена = [с.get("pubkey") for с in счета]
+    пре, пост = ряд.get("pre") or [], ряд.get("post") or []
+    плательщик = имена[0] if имена else None
+    подписанты = [с["pubkey"] for с in счета if с.get("signer")]
+    # ЧАЕВЫЕ -- ПО ПРИБЫЛИ НА ИЗВЕСТНЫЙ СЧЁТ, а не по инструкции: инструкций у
+    # нас нет, а прибыль на счёт чаевых -- это и есть платёж каналу.
+    чаевые, каналы = 0, []
+    for и, имя in enumerate(имена):
+        служба = чаевые_счета.get(имя)
+        if not служба or и >= len(пре) or и >= len(пост):
+            continue
+        d = int(пост[и]) - int(пре[и])
+        if d > 0:
+            чаевые += d
+            каналы.append({"служба": служба, "счёт": имя, "лампорты": d})
+    # ПЛОЩАДКИ -- ЭТО СЧЕТА-ПРОГРАММЫ В СПИСКЕ. Неизвестные не выдумываются.
+    площадки = sorted({метки[и] for и in имена if и in метки})
+    расход = None
+    if пре and пост:
+        расход = int(пре[0]) - int(пост[0])
+    тариф = int(ряд.get("fee") or 0)
+    покупка = (расход - тариф - чаевые) if isinstance(расход, int) else None
+    return {"platelshchik": плательщик,
+             "podpisantov": len(подписанты),
+             "podpisanty": подписанты_короткие(подписанты),
+             "ploshchadki": площадки,
+             "chaevye_lamporty": чаевые, "kanaly": каналы,
+             "rashod_sol": (round(расход / 1e9, 9)
+                             if isinstance(расход, int) else None),
+             "fee_sol": round(тариф / 1e9, 9),
+             "chaevye_sol": round(чаевые / 1e9, 9),
+             "pokupka_sol": (round(покупка / 1e9, 9)
+                              if isinstance(покупка, int) else None),
+             "tokenov": _tokenov_poluchil(ряд, минт),
+             "err": bool(ряд.get("err"))}
+
+
+def подписанты_короткие(подписанты: list) -> list:
+    """Подписанты как есть, но не больше четырёх: дальше читать нечего."""
+    return [str(x) for x in подписанты[:4]]
+
+
+ГОЛОВЫ_ПО_УМОЛЧАНИЮ = 30
+
+
+def golova_ocheredi(*, vygruzka: str, pauza: float,
+                     skolko: int = ГОЛОВЫ_ПО_УМОЛЧАНИЮ,
+                     predel_sdelok: int = 0) -> dict:
+    """ПЕРВЫЕ N ПОКУПОК ТОГО ЖЕ МИНТА ПОСЛЕ ИСТОЧНИКА В ЕГО БЛОКЕ.
+
+    Вопрос владельца 10.10 (ночь, п.1): кто стоит в голове очереди -- тот же
+    сервис, которым ходит источник, или независимые боты. Ответ ищется по
+    цепи: берутся блоки сделок vol_4vw, в каждом находится транзакция
+    источника, и дальше по порядку блока собираются покупки ТОГО ЖЕ минта.
+
+    ЧТО СЧИТАЕТСЯ ПОКУПКОЙ. Транзакция, в которой единиц этого минта
+    ПРИБЫЛО (по токенным балансам до/после) и которая стоит ПОСЛЕ транзакции
+    источника в том же блоке. Наша собственная покупка из счёта головы
+    исключается: мы и есть тот, с кем сравниваем.
+
+    Только чтение: ни одной отправки, ни одной записи на хост.
+    """
+    из_ = {"vygruzka": vygruzka, "skolko": int(skolko), "sdelok": 0,
+            "prochitano": 0, "ne_prochitano": 0, "golov_vsego": 0,
+            "stroki": [], "why_not": None}
+    try:
+        данные = json.loads(Path(vygruzka).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as сбой:
+        из_["why_not"] = f"выгрузка не прочитана: {type(сбой).__name__}"
+        return из_
+    ряды = данные.get("ряды") or данные.get("rows") or данные.get("stroki") or []
+    чаевые_счета = _scheta_chaevyh()
+    метки = _metki_programm()
+    из_["chaevyh_schetov_izvestno"] = len(чаевые_счета)
+    из_["metok_programm"] = len(метки)
+    отобраны = [р for р in ряды
+                if (р.get("source_slot") or р.get("slot"))
+                and (р.get("source_sig") or р.get("podpis_istochnika"))
+                and р.get("mint")]
+    if predel_sdelok and predel_sdelok > 0:
+        отобраны = отобраны[-int(predel_sdelok):]
+    из_["sdelok"] = len(отобраны)
+    кэш: dict = {}
+    for р in отобраны:
+        слот = int(р.get("source_slot") or р.get("slot"))
+        подпись_ист = str(р.get("source_sig") or р.get("podpis_istochnika"))
+        минт = str(р.get("mint"))
+        наша = str(р.get("buy_sig") or р.get("landed_sig") or "")
+        строка = {"utc": р.get("utc"), "mint": минт, "source_sig": подпись_ист,
+                   "source_slot": слот, "golova": [], "why_not": None}
+        if слот not in кэш:
+            кэш[слот] = _blok_s_dengami(слот)
+            time.sleep(float(pauza))
+        б = кэш[слот]
+        if not б.get("ok"):
+            строка["why_not"] = f"блок не прочитан: {б.get('why_not')}"
+            из_["ne_prochitano"] += 1
+            из_["stroki"].append(строка)
+            continue
+        из_["prochitano"] += 1
+        ряды_б = б.get("ryady") or []
+        подписи = [x.get("podpis") for x in ряды_б]
+        if подпись_ист not in подписи:
+            строка["why_not"] = "подписи источника нет в этом блоке"
+            из_["stroki"].append(строка)
+            continue
+        и_ист = подписи.index(подпись_ист)
+        строка["ist_index"] = и_ист
+        строка["blok_vsego"] = len(ряды_б)
+        # ПЛАТЕЛЬЩИК САМОГО ИСТОЧНИКА -- С ЧЕМ И СРАВНИВАЕМ ГОЛОВУ.
+        ист = _razbor_pokupki(ряды_б[и_ист], минт=минт,
+                               чаевые_счета=чаевые_счета, метки=метки)
+        строка["ist"] = ист
+        строка["nash_index"] = (подписи.index(наша) if наша in подписи else None)
+        собрано = 0
+        for и in range(и_ист + 1, len(ряды_б)):
+            if собрано >= int(skolko):
+                break
+            р_б = ряды_б[и]
+            if р_б.get("podpis") == наша:
+                continue
+            if _tokenov_poluchil(р_б, минт) <= 0:
+                continue
+            раз = _razbor_pokupki(р_б, минт=минт, чаевые_счета=чаевые_счета,
+                                   метки=метки)
+            раз["index"] = и
+            раз["posle_istochnika"] = и - и_ист
+            раз["podpis"] = р_б.get("podpis")
+            строка["golova"].append(раз)
+            собрано += 1
+        из_["golov_vsego"] += собрано
+        из_["stroki"].append(строка)
+    из_["svod"] = svod_golovy(из_["stroki"], чаевые_счета=чаевые_счета)
+    return из_
+
+
+def svod_golovy(строки: list, *, чаевые_счета: dict | None = None) -> dict:
+    """Свод по голове очереди: чей платёж, чьи чаевые, кто держит объём."""
+    из_ = {"golov": 0, "s_platelshchikom_istochnika": 0,
+            "dolya_platelshchika_istochnika": None,
+            "s_chaevymi_jito": 0, "dolya_chaevyh_jito": None,
+            "s_chaevymi_otpravitelej": 0, "dolya_chaevyh_otpravitelej": None,
+            "obyom_sol": 0.0, "platelshchikov": 0,
+            "platelshchikov_do_poloviny_obyoma": None,
+            "po_platelshchikam": [], "ploshchadki": {},
+            "platelshchik_istochnika_po_sdelkam": {}}
+    по_плательщикам: dict = {}
+    площадки: dict = {}
+    for с in строки:
+        ист_пл = ((с.get("ist") or {}).get("platelshchik")) or None
+        if ист_пл:
+            из_["platelshchik_istochnika_po_sdelkam"][ист_пл] = (
+                из_["platelshchik_istochnika_po_sdelkam"].get(ист_пл, 0) + 1)
+        for г in (с.get("golova") or []):
+            из_["golov"] += 1
+            if ист_пл and г.get("platelshchik") == ист_пл:
+                из_["s_platelshchikom_istochnika"] += 1
+            каналы = [к.get("служба") or "" for к in (г.get("kanaly") or [])]
+            if any("jito" in к.lower() for к in каналы):
+                из_["s_chaevymi_jito"] += 1
+            if каналы:
+                из_["s_chaevymi_otpravitelej"] += 1
+            размер = г.get("pokupka_sol")
+            размер = float(размер) if isinstance(размер, (int, float)) else 0.0
+            из_["obyom_sol"] = round(из_["obyom_sol"] + размер, 9)
+            к = г.get("platelshchik") or "без плательщика"
+            з = по_плательщикам.setdefault(к, {"platelshchik": к, "pokupok": 0,
+                                                 "obyom_sol": 0.0,
+                                                 "sdelok": set(),
+                                                 "posle": [],
+                                                 "chaevye_sol": 0.0,
+                                                 "kanaly": set(),
+                                                 "ploshchadki": set()})
+            з["pokupok"] += 1
+            з["obyom_sol"] = round(з["obyom_sol"] + размер, 9)
+            з["sdelok"].add(с.get("source_sig"))
+            if isinstance(г.get("posle_istochnika"), int):
+                з["posle"].append(г["posle_istochnika"])
+            з["chaevye_sol"] = round(з["chaevye_sol"]
+                                      + float(г.get("chaevye_sol") or 0.0), 9)
+            for кан in каналы:
+                if кан:
+                    з["kanaly"].add(кан)
+            for пл in (г.get("ploshchadki") or []):
+                з["ploshchadki"].add(пл)
+                площадки[пл] = площадки.get(пл, 0) + 1
+    из_["ploshchadki"] = dict(sorted(площадки.items(), key=lambda x: -x[1]))
+    строк = из_["golov"] or 0
+    if строк:
+        из_["dolya_platelshchika_istochnika"] = round(
+            из_["s_platelshchikom_istochnika"] / строк, 4)
+        из_["dolya_chaevyh_jito"] = round(из_["s_chaevymi_jito"] / строк, 4)
+        из_["dolya_chaevyh_otpravitelej"] = round(
+            из_["s_chaevymi_otpravitelej"] / строк, 4)
+    таблица = []
+    for к, з in по_плательщикам.items():
+        таблица.append({"platelshchik": к, "pokupok": з["pokupok"],
+                         "obyom_sol": з["obyom_sol"],
+                         "sdelok": len(з["sdelok"]),
+                         "posle_istochnika_mediana": _mediana(з["posle"]),
+                         "chaevye_sol": з["chaevye_sol"],
+                         "kanaly": sorted(з["kanaly"]),
+                         "ploshchadki": sorted(з["ploshchadki"])})
+    таблица.sort(key=lambda з: (-з["obyom_sol"], -з["pokupok"]))
+    из_["po_platelshchikam"] = таблица
+    из_["platelshchikov"] = len(таблица)
+    # СКОЛЬКО ПЛАТЕЛЬЩИКОВ ДЕРЖАТ ПОЛОВИНУ ОБЪЁМА -- по убыванию объёма.
+    if из_["obyom_sol"] > 0:
+        набрано, сколько = 0.0, 0
+        for з in таблица:
+            набрано += з["obyom_sol"]
+            сколько += 1
+            if набрано >= из_["obyom_sol"] / 2:
+                break
+        из_["platelshchikov_do_poloviny_obyoma"] = сколько
+    # ТЕ ЖЕ ЛИ ПЛАТЕЛЬЩИКИ ИЗ СДЕЛКИ В СДЕЛКУ: сколько сделок накрывает каждый
+    # из первых пяти по объёму, и сколько всего сделок с головой.
+    сделок = len({с.get("source_sig") for с in строки
+                   if (с.get("golova") or [])})
+    из_["sdelok_s_golovoj"] = сделок
+    из_["pervye_pyat_po_sdelkam"] = [
+        {"platelshchik": з["platelshchik"], "sdelok": з["sdelok"],
+         "dolya_sdelok": (round(з["sdelok"] / сделок, 4) if сделок else None)}
+        for з in таблица[:5]]
+    return из_
+
+
 def mesta_v_bloke(*, vygruzka: str, pauza: float) -> dict:
     """Место сделки ИСТОЧНИКА и нашей в их блоках + соседи по минту.
 
@@ -1642,6 +1993,98 @@ def самопроверка() -> int:
     chk("подписи нет в блоке -- причина словами, а не пустой индекс молча",
         'подписи источника в блоке его слота' in _ист_мв
         and 'нашей подписи в блоке нашего слота нет' in _ист_мв)
+    # --- ГОЛОВА ОЧЕРЕДИ (п.1 владельца 10.10, ночь). Арифметика свода -- на
+    # готовых строках, без сети.
+    _г_стр = [
+        {"source_sig": "S1", "ist": {"platelshchik": "AgmL"},
+         "golova": [
+             {"platelshchik": "AgmL", "pokupka_sol": 1.0, "posle_istochnika": 1,
+              "kanaly": [{"служба": "jito"}], "chaevye_sol": 0.001,
+              "ploshchadki": ["Pump.fun"]},
+             {"platelshchik": "BOT1", "pokupka_sol": 0.5, "posle_istochnika": 5,
+              "kanaly": [], "chaevye_sol": 0.0,
+              "ploshchadki": ["Jupiter v6"]}]},
+        {"source_sig": "S2", "ist": {"platelshchik": "AgmL"},
+         "golova": [
+             {"platelshchik": "AgmL", "pokupka_sol": 2.0, "posle_istochnika": 2,
+              "kanaly": [{"служба": "Jito"}], "chaevye_sol": 0.002,
+              "ploshchadki": ["Pump.fun"]}]}]
+    _г = svod_golovy(_г_стр, чаевые_счета={})
+    chk("голова: доля покупок с плательщиком ИСТОЧНИКА считается по головам, "
+        "а не по сделкам",
+        _г["golov"] == 3 and _г["dolya_platelshchika_istochnika"] == 0.6667,
+        (_г["golov"], _г["dolya_platelshchika_istochnika"]))
+    chk("голова: чаевые Jito узнаются независимо от регистра имени службы",
+        _г["s_chaevymi_jito"] == 2 and _г["dolya_chaevyh_jito"] == 0.6667,
+        (_г["s_chaevymi_jito"], _г["dolya_chaevyh_jito"]))
+    chk("голова: объём -- сумма РАЗМЕРОВ ПОКУПОК, а не расходов",
+        abs(_г["obyom_sol"] - 3.5) < 1e-9, _г["obyom_sol"])
+    chk("голова: сколько плательщиков держат половину объёма -- по убыванию",
+        _г["platelshchikov_do_poloviny_obyoma"] == 1
+        and _г["platelshchikov"] == 2,
+        (_г["platelshchikov_do_poloviny_obyoma"], _г["platelshchikov"]))
+    chk("голова: таблица -- объём, покупки, СДЕЛКИ и медианный индекс после "
+        "источника",
+        _г["po_platelshchikam"][0]["platelshchik"] == "AgmL"
+        and _г["po_platelshchikam"][0]["sdelok"] == 2
+        and _г["po_platelshchikam"][0]["posle_istochnika_mediana"] == 1.5
+        and _г["po_platelshchikam"][1]["posle_istochnika_mediana"] == 5,
+        _г["po_platelshchikam"])
+    chk("голова: «те же ли плательщики» -- доля СДЕЛОК, накрытых каждым",
+        _г["sdelok_s_golovoj"] == 2
+        and _г["pervye_pyat_po_sdelkam"][0]["dolya_sdelok"] == 1.0
+        and _г["pervye_pyat_po_sdelkam"][1]["dolya_sdelok"] == 0.5,
+        _г["pervye_pyat_po_sdelkam"])
+    chk("голова: площадки считаются по головам и сортируются по частоте",
+        list(_г["ploshchadki"]) == ["Pump.fun", "Jupiter v6"], _г["ploshchadki"])
+    _г0 = svod_golovy([], чаевые_счета={})
+    chk("голова: пустой вход -- доли None, а не нули (делить не на что)",
+        _г0["golov"] == 0 and _г0["dolya_platelshchika_istochnika"] is None
+        and _г0["platelshchikov_do_poloviny_obyoma"] is None, _г0)
+    # ПОКУПКА МИНТА УЗНАЁТСЯ ПО ПРИБЫЛИ ТОКЕНА, а не по тексту инструкции.
+    _ряд_п = {"pre_tok": [{"accountIndex": 3, "mint": "M",
+                            "uiTokenAmount": {"amount": "100"}}],
+              "post_tok": [{"accountIndex": 3, "mint": "M",
+                             "uiTokenAmount": {"amount": "250"}}]}
+    chk("минт: прибыло 150 единиц -- это покупка",
+        _tokenov_poluchil(_ряд_п, "M") == 150, _tokenov_poluchil(_ряд_п, "M"))
+    chk("минт: у ДРУГОГО минта прибыли нет -- 0, а не чужое число",
+        _tokenov_poluchil(_ряд_п, "ДРУГОЙ") == 0)
+    chk("минт: ПРОДАЖА покупкой не считается (убыло, а не прибыло)",
+        _tokenov_poluchil(
+            {"pre_tok": [{"accountIndex": 3, "mint": "M",
+                           "uiTokenAmount": {"amount": "250"}}],
+             "post_tok": [{"accountIndex": 3, "mint": "M",
+                            "uiTokenAmount": {"amount": "100"}}]}, "M") == 0)
+    _раз = _razbor_pokupki(
+        {"scheta": [{"pubkey": "PAYER", "signer": True},
+                     {"pubkey": "TIPJITO", "signer": False},
+                     {"pubkey": "PROG", "signer": False}],
+         "pre": [1_000_000_000, 0, 0], "post": [800_000_000, 5_000_000, 0],
+         "fee": 5_000, "pre_tok": [], "post_tok": []},
+        минт="M", чаевые_счета={"TIPJITO": "jito"},
+        метки={"PROG": "Pump.fun"})
+    chk("разбор: плательщик -- ПЕРВЫЙ счёт, чаевые -- прибыль на известный "
+        "счёт, площадка -- по счёту-программе",
+        _раз["platelshchik"] == "PAYER"
+        and _раз["chaevye_lamporty"] == 5_000_000
+        and _раз["ploshchadki"] == ["Pump.fun"]
+        and _раз["podpisantov"] == 1, _раз)
+    chk("разбор: размер покупки = расход минус тариф минус чаевые",
+        abs(_раз["pokupka_sol"]
+            - (200_000_000 - 5_000 - 5_000_000) / 1e9) < 1e-12,
+        (_раз["rashod_sol"], _раз["fee_sol"], _раз["chaevye_sol"],
+         _раз["pokupka_sol"]))
+    chk("разбор: НЕИЗВЕСТНЫЙ счёт чаевыми не считается -- имён не выдумываем",
+        _razbor_pokupki(
+            {"scheta": [{"pubkey": "PAYER", "signer": True},
+                         {"pubkey": "ЧУЖОЙ", "signer": False}],
+             "pre": [1_000_000_000, 0], "post": [900_000_000, 5_000_000],
+             "fee": 5_000, "pre_tok": [], "post_tok": []},
+            минт="M", чаевые_счета={}, метки={})["chaevye_lamporty"] == 0)
+    chk("счета чаевых и метки площадок берутся ИЗ НАШИХ ФАЙЛОВ и их много",
+        len(_scheta_chaevyh()) >= 20 and len(_metki_programm()) >= 50,
+        (len(_scheta_chaevyh()), len(_metki_programm())))
     print(f"самопроверка круга сборки: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
@@ -1675,6 +2118,14 @@ def main() -> int:
     п.add_argument("--mesta-v-bloke", default="",
                     help="ТОЛЬКО ЧТЕНИЕ: путь к выгрузке сделок -- места в "
                          "блоках источника и наших по архивному узлу")
+    п.add_argument("--golova", default="",
+                    help="ТОЛЬКО ЧТЕНИЕ: путь к выгрузке сделок -- первые N "
+                         "покупок того же минта ПОСЛЕ источника в его блоке: "
+                         "плательщик, подписанты, площадка, чаевые, размер")
+    п.add_argument("--golov-skolko", type=int, default=30,
+                    help="сколько покупок головы брать на сделку (по умолчанию 30)")
+    п.add_argument("--golov-sdelok", type=int, default=0,
+                    help="взять только последние N сделок выгрузки (0 -- все)")
     п.add_argument("--chaevye-zhivy", default="",
                     help="ТОЛЬКО ЧТЕНИЕ: имя отправителя из реестра (или "
                          "адреса через запятую) -- идут ли на его счета чаевых "
@@ -1713,6 +2164,18 @@ def main() -> int:
         print(текст)
         if а.out:
             Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        return 0
+    if а.golova.strip():
+        из_ = golova_ocheredi(vygruzka=а.golova.strip(), pauza=а.pauza,
+                              skolko=int(а.golov_skolko),
+                              predel_sdelok=int(а.golov_sdelok))
+        из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        # НЕПРОЧИТАННЫЕ БЛОКИ -- НЕ СБОЙ ПРОГОНА: отчёт нужен и с частью, а
+        # судить по числам prochitano / ne_prochitano.
         return 0
     if а.chaevye_zhivy.strip():
         зн = а.chaevye_zhivy.strip()

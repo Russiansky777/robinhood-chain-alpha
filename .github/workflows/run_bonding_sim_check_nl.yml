@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение) | 'blocksubscribe' -- даёт ли наш план Helius подписку на блоки (только чтение)"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение) | 'blocksubscribe' -- даёт ли наш план Helius подписку на блоки (только чтение) | 'golova' -- первые N покупок того же минта ПОСЛЕ источника в его блоке: плательщик, площадка, чаевые, размер (только чтение)"
         required: false
         default: "bonding"
       sravnit:
@@ -53,6 +53,14 @@ on:
         description: "mayhem_krivoj: минты через запятую -- is_mayhem_mode и котировка по счёту кривой"
         required: false
         default: ""
+      golov_skolko:
+        description: "golova: сколько покупок головы брать на сделку (по умолчанию 30)"
+        required: false
+        default: "30"
+      golov_sdelok:
+        description: "golova: взять только последние N сделок выгрузки (0 -- все)"
+        required: false
+        default: "0"
       otpravitel:
         description: "chaevye_zhivy: имя отправителя из реестра -- его счета чаевых берутся ИЗ РЕЕСТРА, а не из рук"
         required: false
@@ -143,7 +151,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy|blocksubscribe)
+            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy|blocksubscribe|golova)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -361,6 +369,29 @@ jobs:
             --pauza "${{ inputs.pauza }}" \
             --out data/chaevye_zhivy.json | tail -80
 
+      - name: "golova: первые N покупок того же минта после источника (только чтение)"
+        if: ${{ inputs.zadacha == 'golova' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          VYGRUZKA: ${{ inputs.vygruzka }}
+          GOLOV: ${{ inputs.golov_skolko }}
+          GOLOV_SDELOK: ${{ inputs.golov_sdelok }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          [ -f "$VYGRUZKA" ] || { echo "СБОЙ: нет файла выгрузки $VYGRUZKA"; exit 1; }
+          case "${GOLOV:-30}" in ''|*[!0-9]*) echo "SBOY: golov_skolko ne celoe"; exit 1;; esac
+          case "${GOLOV_SDELOK:-0}" in ''|*[!0-9]*) echo "SBOY: golov_sdelok ne celoe"; exit 1;; esac
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --self-test | tail -2
+          export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py \
+            --golova "$VYGRUZKA" \
+            --golov-skolko "${GOLOV:-30}" \
+            --golov-sdelok "${GOLOV_SDELOK:-0}" \
+            --pauza "${{ inputs.pauza }}" \
+            --out data/golova_ocheredi.json | tail -40
+
       - name: "blocksubscribe: даёт ли наш план Helius подписку на блоки (только чтение)"
         if: ${{ inputs.zadacha == 'blocksubscribe' }}
         env:
@@ -502,7 +533,7 @@ jobs:
             cp /tmp/krug.json data/krug_sborki_simulyaciya.json 2>/dev/null || true
             git add data/krug_sborki_simulyaciya.json || true
           fi
-          for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json data/versii_razbora.json data/mayhem_krivoj.json data/mesta_v_bloke.json data/chaevye_zhivy.json data/blocksubscribe_proba.json; do
+          for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json data/versii_razbora.json data/mayhem_krivoj.json data/mesta_v_bloke.json data/chaevye_zhivy.json data/blocksubscribe_proba.json data/golova_ocheredi.json; do
             [ -f "$F" ] && git add "$F"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
