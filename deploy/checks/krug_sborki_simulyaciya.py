@@ -1517,7 +1517,9 @@ def cu_po_podpisi(подпись: str, *, таймаут: float = 30.0) -> dict:
     инстр = list(сооб.get("instructions") or [])
     б = budzhet_iz_instrukcij(инстр)
     из_.update(cu_predel=б["cu_predel"],
-                cu_cena_mikrolamport=б["cu_cena_mikrolamport"])
+                cu_cena_mikrolamport=б["cu_cena_mikrolamport"],
+                instrukcij_budzheta=б["instrukcij_budzheta"],
+                instrukcij_vsego=len(инстр))
     мета = т.get("meta") or {}
     из_["cu_potracheno"] = мета.get("computeUnitsConsumed")
     из_["fee_lamportov"] = мета.get("fee")
@@ -1676,10 +1678,15 @@ def cu_verhnim(ряды: list, *, podpisej: int = 4, pauza: float = 0.12) -> dic
     из_ = {"prochitano": 0, "s_cenoj": 0, "bez_budzheta": 0, "oshibok": 0}
     for р in (ряды or []):
         цены, из_комиссии, пределы, без_бюджета, сбои = [], [], [], 0, []
-        по_потраченному, расхождения = [], []
+        по_потраченному, расхождения, подробно = [], [], []
         for подпись in (р.get("podpisi") or [])[:max(1, int(podpisej))]:
             о = cu_po_podpisi(подпись)
             из_["prochitano"] += 1
+            подробно.append({к: о.get(к) for к in
+                              ("podpis", "cu_predel", "cu_cena_mikrolamport",
+                               "cu_potracheno", "fee_lamportov", "podpisantov",
+                               "prioritet_lamportov", "instrukcij_budzheta",
+                               "why_not")})
             if о.get("cu_cena_mikrolamport") is not None:
                 цены.append(int(о["cu_cena_mikrolamport"]))
             if о.get("cena_iz_komissii_mikrolamport") is not None:
@@ -1706,6 +1713,10 @@ def cu_verhnim(ряды: list, *, podpisej: int = 4, pauza: float = 0.12) -> dic
             "bez_instrukcii_budzheta": без_бюджета,
             "sboev": len([с for с in сбои if с]),
             "why_not": (сбои[0] if сбои else None)}
+        # ПОДРОБНО ПО ПЕРВЫМ ПОДПИСЯМ -- ЧТОБЫ МЕДИАНУ МОЖНО БЫЛО ПРОВЕРИТЬ.
+        # Без этого "33 из 48 транзакций без инструкции бюджета" остаётся
+        # утверждением, которое нечем перепроверить.
+        р["cu"]["podrobno"] = подробно[:3]
         из_["s_cenoj"] += 1 if цены else 0
         из_["bez_budzheta"] += без_бюджета
         из_["oshibok"] += len([с for с in сбои if с])
