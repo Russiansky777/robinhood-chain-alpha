@@ -366,6 +366,20 @@ def путь_urs(п: dict) -> dict:
                               if п.get("lane_pool_winner")
                               else ("точка одиночной отправки"
                                     if п.get("lane_send_point") else None)),
+        # ПЕРВЫЙ ПРИНЯВШИЙ -- ЭТО ДРУГОЕ СОБЫТИЕ, ЧЕМ "ДОВЁЗ" (вопрос
+        # владельца 10.10, п.2). Ответ сервиса значит только "принял"; села ли
+        # транзакция, решает цепь. С 10.10 пул уходит ПО ПЕРВОМУ принявшему, и
+        # без этого поля нельзя ответить, изменился ли он после правки.
+        "pool_accepted_first": п.get("lane_pool_accepted_first"),
+        # ПОДШАГ "ПОДПИСЬ" -- РОВНО ТО, ЧТО СРЕЗАЛА ПРАВКА 10.10 (42.9 -> 1.3
+        # мс по замеру). Берётся из того же журнала подшагов, что и до правки,
+        # иначе "до/после" сравнивалось бы по разным линейкам.
+        "podpis_ms": ((п.get("lane_podshagi_ms") or {}).get("подпись")
+                      if isinstance(п.get("lane_podshagi_ms"), dict) else None),
+        "podshagi_ms": (п.get("lane_podshagi_ms")
+                        if isinstance(п.get("lane_podshagi_ms"), dict) else None),
+        "variants_ms": п.get("lane_variants_ms"),
+        "sign_ms": п.get("lane_sign_ms"),
     }
 
 
