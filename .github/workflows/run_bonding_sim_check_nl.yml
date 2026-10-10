@@ -253,11 +253,22 @@ jobs:
         if: ${{ inputs.zadacha == 'versii_razbora' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          REF_STARYJ: ${{ inputs.ref_staryj }}
         run: |
           set -e
           set -o pipefail
           [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
           [ -n "${{ inputs.sravnit }}" ] || { echo "СБОЙ: нужны подписи во входе sravnit"; exit 1; }
+          # ИСТОРИЯ. checkout@v4 без fetch-depth приносит ОДИН коммит, и
+          # `git show <старый коммит>:файл` в такой копии невозможен -- прогон
+          # 38060569408 упал ровно этим: "invalid object name 'e222b934^'".
+          # Углубляем ЗДЕСЬ, а не в общем checkout: полная история нужна только
+          # этой задаче, остальным она лишняя трата.
+          git fetch --unshallow --quiet 2>/dev/null \
+            || git fetch --deepen=400 --quiet 2>/dev/null || true
+          git rev-parse --verify --quiet "$REF_STARYJ" >/dev/null \
+            || { echo "СБОЙ: коммита $REF_STARYJ нет даже после углубления"; exit 1; }
+          echo "старая версия: $REF_STARYJ -> $(git rev-parse "$REF_STARYJ")"
           # САМОПРОВЕРКА ДО УЗЛА: падает она -- сравнивать нечем.
           PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --self-test | tail -2
           export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
