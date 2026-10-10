@@ -232,7 +232,10 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
         print(json.dumps(тело["программа_по_цепи"], ensure_ascii=False, indent=1),
               flush=True)
 
+    счёт_ошибок: collections.Counter = collections.Counter()
     с_ts = int(time.mktime(time.strptime(а.s, "%Y-%m-%dT%H:%M"))) - time.timezone
+    до_ts = (int(time.mktime(time.strptime(а.do, "%Y-%m-%dT%H:%M"))) - time.timezone
+             if а.do else None)
     стр = []
     if а.perepis or а.dengi or а.chto:
         print(f"== подписи источника с {а.s}Z", flush=True)
@@ -249,7 +252,10 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
     if а.dengi and стр:
         # Все подписи окна, если их не больше предела разбора; иначе равномерная выборка,
         # и в выходе честно сказано, сколько осталось непрочитанным.
-        все = [x["signature"] for x in стр]
+        в_окне = [x for x in стр
+                  if до_ts is None or (x.get("blockTime") or 0) <= до_ts]
+        тело["подписей_в_окне_разбора"] = len(в_окне)
+        все = [x["signature"] for x in в_окне]
         if len(все) <= а.predel_razbora:
             план += все
             тело["разбор_окна"] = {"полный": True, "подписей": len(все)}
@@ -265,10 +271,17 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
     for i, п_ in enumerate(план, 1):
         темп.ждать()
         try:
-            о = rpc.call("getTransaction", [п_, {"encoding": "jsonParsed",
-                                                 "maxSupportedTransactionVersion": 0}])
+            о = rpc.call("getTransaction",
+                         [п_, {"encoding": "jsonParsed",
+                               "maxSupportedTransactionVersion": C.TX_VERSION}])
         except Exception as exc:  # noqa: BLE001
-            разобрано.append({"подпись": п_, "ошибка_запроса": type(exc).__name__})
+            # Сообщение узла сохраняем целиком: первый прогон упал 1 239 раз подряд,
+            # и по одному имени класса причину было не назвать. С
+            # maxSupportedTransactionVersion 0 узел отвечает -32015 на транзакциях
+            # версии 1 -- отсюда C.TX_VERSION, как у Code-1.
+            разобрано.append({"подпись": п_, "ошибка_запроса": type(exc).__name__,
+                              "сообщение": str(exc)[:300]})
+            счёт_ошибок[str(exc)[:120]] += 1
             continue
         if о:
             разобрано.append(разбор_транзакции(п_, о))
@@ -320,6 +333,7 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
     тело["sol_ушло_кому"] = {k: round(v, 6) for k, v in ушло.most_common(20)}
     тело["sol_пришло_от"] = {k: round(v, 6) for k, v in пришло.most_common(20)}
     тело["плат_sol_на_разобранных"] = round(платы, 6)
+    тело["ошибки_запросов"] = dict(счёт_ошибок.most_common(8))
     тело["транзакции"] = разобрано[:a_предел(а)]
     тело["запросов"] = dict(getattr(rpc, "calls_by_method", {}) or {})
 
@@ -343,6 +357,11 @@ def a_предел(а) -> int:
 def main() -> int:
     р = argparse.ArgumentParser()
     р.add_argument("--s", default="2026-10-10T03:00", help="начало окна, YYYY-MM-DDTHH:MM")
+    р.add_argument("--do", default="",
+                   help="конец окна разбора, YYYY-MM-DDTHH:MM. Перепись подписей идёт "
+                        "до --s, а в разбор транзакций попадают только подписи не позже "
+                        "--do: у источника 955 подписей в минуту, и без этой границы "
+                        "разбор съедает выборку на свежем спаме вместо нужного окна")
     р.add_argument("--chto", action="store_true", help="пункт а: программа и её инструкции")
     р.add_argument("--perepis", action="store_true", help="перепись подписей по минутам")
     р.add_argument("--dengi", action="store_true", help="пункт б: движение SOL")
