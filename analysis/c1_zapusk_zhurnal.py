@@ -34,6 +34,20 @@ if str(Path(__file__).resolve().parent) not in sys.path:
 СОЗДАНИЯ = ("create", "create_v2")
 # Покупка кривой в ТОЙ ЖЕ транзакции -- любая разновидность по именам IDL.
 ПОКУПКИ = ("buy_exact_quote_in_v3", "buy_v3", "buy_exact_quote_in_v2", "buy_v2")
+# ПОКУПКИ, КОТОРЫМИ ПОЛОСА УЖЕ ХОДИЛА НА ДЕНЬГАХ. Сигналом запуска годится
+# только такая разновидность: слово владельца 10.10 п.2 -- "покупка через уже
+# проверенный путь кривой v3". v2 остаётся отказом по имени, а не тихой
+# попыткой на непроверенном пути.
+ПОКУПКИ_ОБКАТАННЫЕ = ("buy_exact_quote_in_v3", "buy_v3")
+WSOL = "So11111111111111111111111111111111111111112"
+# Причины отказа сигнала запуска -- названные и перечислимые: по ним считается
+# воронка, а строка why_not читается человеком.
+ОТКАЗ_НЕТ_СОЗДАНИЯ = "net_sozdaniya"
+ОТКАЗ_НЕ_КУПИЛ = "sozdatel_ne_kupil"
+ОТКАЗ_MAYHEM = "mayhem"
+ОТКАЗ_КОТИРОВКА = "kotirovka_ne_sol"
+ОТКАЗ_РАЗНОВИДНОСТЬ = "razvidnost_ne_obkatana"
+ОТКАЗ_НЕТ_ПОЛЕЙ = "net_poley_sdelki"
 ИМЯ_ЖУРНАЛА = "zapusk_zhurnal.jsonl"
 # Длина слота, если замера нет. ЧИСЛО НЕ ПОДСТАВЛЯЕТСЯ МОЛЧА: когда замера нет,
 # отрыв в слотах отдаётся None с названной причиной, а не считается по
@@ -165,7 +179,9 @@ def razbor_sozdanija(tx: dict, *, slot_sozdanija=None) -> dict:
     из_ = {"ok": False, "why_not": None, "sozdanie": None, "mint": None,
            "sozdatel": None, "slot_sozdanija": slot_sozdanija,
            "kupil_v_sozdanii": False, "pokupka": None,
-           "sol_sozdatelya": None, "lamportov_sozdatelya": None}
+           "sol_sozdatelya": None, "lamportov_sozdatelya": None,
+           "is_mayhem_mode": None, "quote_mint": None, "quote_sol": None,
+           "base_token_program": None}
     PS = _сборщик()
     if PS is None:
         из_["why_not"] = "сборщик по IDL не доступен"
@@ -190,10 +206,22 @@ def razbor_sozdanija(tx: dict, *, slot_sozdanija=None) -> dict:
             по_именам = _po_imenam(PS, имя, и["accounts"])
             из_.update(ok=True, sozdanie=имя, mint=по_именам.get("mint"),
                        sozdatel=по_именам.get("user"))
+            # MAYHEM -- ИЗ АРГУМЕНТОВ САМОГО СОЗДАНИЯ, без единого вызова сети.
+            м = mayhem_iz_dannyh(сырые, имя)
+            из_["is_mayhem_mode"] = м["is_mayhem_mode"]
+            if м["why_not"]:
+                из_["mayhem_why_not"] = м["why_not"]
         elif имя in ПОКУПКИ:
             по_именам = _po_imenam(PS, имя, и["accounts"])
             покупки.append({"imya": имя, "mint": по_именам.get("base_mint"),
-                            "user": по_именам.get("user")})
+                            "user": по_именам.get("user"),
+                            # КОТИРОВКА И ПРОГРАММА БАЗЫ -- ИЗ СЧЕТОВ ПОКУПКИ
+                            # ПО ИМЕНАМ IDL. В самом создании котировки нет
+                            # вовсе (она живёт в счёте кривой), а в покупке
+                            # создателя она стоит местом -- и читается даром.
+                            "quote_mint": по_именам.get("quote_mint"),
+                            "base_token_program": по_именам.get(
+                                "base_token_program")})
     if not из_["ok"]:
         из_["why_not"] = "create/create_v2 в транзакции не найдена"
         return из_
@@ -204,11 +232,160 @@ def razbor_sozdanija(tx: dict, *, slot_sozdanija=None) -> dict:
     if своя:
         из_["kupil_v_sozdanii"] = True
         из_["pokupka"] = своя[0]["imya"]
+        из_["quote_mint"] = своя[0].get("quote_mint")
+        из_["quote_sol"] = (своя[0].get("quote_mint") == WSOL
+                            if своя[0].get("quote_mint") else None)
+        из_["base_token_program"] = своя[0].get("base_token_program")
         д = sol_sozdatelya(tx, из_["sozdatel"] or "")
         из_["sol_sozdatelya"] = д["sol"]
         из_["lamportov_sozdatelya"] = д["lamportov"]
         if д["why_not"]:
             из_["sol_why_not"] = д["why_not"]
+    return из_
+
+
+def _borsh_stroka(данные: bytes, сдвиг: int) -> tuple:
+    """Строка borsh: u32 длины и байты. Отдаёт (следующий сдвиг, длина)."""
+    if сдвиг + 4 > len(данные):
+        return (None, None)
+    длина = int.from_bytes(данные[сдвиг:сдвиг + 4], "little")
+    конец = сдвиг + 4 + длина
+    if длина > len(данные) or конец > len(данные):
+        return (None, None)
+    return (конец, длина)
+
+
+def dannye_sozdanija(razvidnost: str, *, name: str = "Имя", symbol: str = "ТКН",
+                     uri: str = "https://пример/метаданные.json",
+                     creator: bytes = b"\x07" * 32, mayhem: bool = False) -> bytes:
+    """Аргументы создания раскладкой borsh -- ДЛЯ САМОПРОВЕРКИ И СВЕРКИ.
+
+    Нужна отдельной функцией, а не внутри теста: разбор и сборка одних и тех же
+    байтов обязаны жить рядом, иначе проверка начнёт подтверждать сама себя на
+    байтах, каких в цепи не бывает. Строки берутся РАЗНОЙ длины нарочно: на
+    строках одной длины зашитое смещение прошло бы проверку.
+    """
+    из_ = b""
+    for т in (name, symbol, uri):
+        б = т.encode("utf-8")
+        из_ += len(б).to_bytes(4, "little") + б
+    из_ += bytes(creator)
+    if razvidnost == "create_v2":
+        из_ += bytes([1 if mayhem else 0])
+        из_ += bytes([0, 0, 0])          # три Option*, все None
+    return из_
+
+
+def mayhem_iz_dannyh(данные: bytes, razvidnost: str) -> dict:
+    """is_mayhem_mode из аргументов create_v2. Разбор ПОСЛЕДОВАТЕЛЬНЫЙ.
+
+    СМЕЩЕНИЕ НЕЛЬЗЯ ЗАШИТЬ ЧИСЛОМ. Аргументы create_v2 по IDL: name, symbol,
+    uri (три строки borsh -- u32 длины плюс байты), creator (32 байта), и уже
+    затем is_mayhem_mode (1 байт). Имя, тикер и ссылка у каждого токена своей
+    длины, поэтому байт признака у каждого создания стоит на СВОЁМ месте, и
+    любое зашитое число читало бы чужой байт -- то есть иногда выдавало бы
+    mayhem там, где его нет, и наоборот.
+
+    У create (v1) аргумента нет вовсе: name, symbol, uri, creator и всё. Это
+    НЕ "mayhem выключен", а "поля нет" -- и отдаётся None с причиной.
+    """
+    из_ = {"is_mayhem_mode": None, "why_not": None, "smeshchenie": None}
+    if razvidnost != "create_v2":
+        из_["why_not"] = (f"у {razvidnost} аргумента is_mayhem_mode нет вовсе "
+                          "-- поля нет, а не выключено")
+        return из_
+    сдвиг = 8                                   # дискриминатор Anchor
+    for какая in ("name", "symbol", "uri"):
+        сдвиг, _дл = _borsh_stroka(данные, сдвиг)
+        if сдвиг is None:
+            из_["why_not"] = f"аргументы обрываются на строке {какая}"
+            return из_
+    сдвиг += 32                                 # creator -- pubkey
+    if сдвиг >= len(данные):
+        из_["why_not"] = "аргументы обрываются до is_mayhem_mode"
+        return из_
+    байт = данные[сдвиг]
+    if байт not in (0, 1):
+        # BOOL В BORSH -- ЭТО 0 ИЛИ 1. Любое иное значение значит, что разбор
+        # уехал: молча считать его истиной нельзя.
+        из_["why_not"] = (f"на месте is_mayhem_mode байт {байт} -- это не bool, "
+                          "разбор аргументов уехал")
+        из_["smeshchenie"] = сдвиг
+        return из_
+    из_.update(is_mayhem_mode=bool(байт), smeshchenie=сдвиг)
+    return из_
+
+
+def signal_zapuska(tx: dict, *, podpis: str | None = None,
+                   slot: int | None = None) -> dict:
+    """Годится ли это создание в СИГНАЛ ПОКУПКИ. Все отказы -- ДО подписи.
+
+    Условия владельца (10.10, п.2), в этом порядке, и каждое названо своим
+    кодом отказа:
+      1. в транзакции есть create или create_v2;
+      2. СОЗДАТЕЛЬ КУПИЛ в этой же транзакции -- иначе покупать не за кем;
+      3. не mayhem-режим;
+      4. котировка кривой -- SOL (WSOL): полоса платит солами, и на кривой с
+         чужой котировкой программа ответила бы 6004 уже после оплаты чаевых
+         (замер 09.10 на отказанных сигналах vol_4vw);
+      5. разновидность покупки -- из обкатанных v3: покупка идёт уже
+         проверенным путём, а не новым.
+
+    Эта функция НЕ покупает и НЕ подписывает: она только отвечает да/нет и
+    отдаёт поля, которых ждёт денежный путь. Торговлю включает отдельная
+    дверь, и только по слову владельца.
+    """
+    из_ = {"ok": False, "why_not": None, "otkaz_vid": None,
+           "signature": podpis, "slot_sozdanija": slot,
+           "istochnik": None, "mint": None, "sozdanie": None,
+           "pokupka": None, "is_mayhem_mode": None, "quote_mint": None,
+           "base_token_program": None, "sol_sozdatelya": None,
+           "lamportov_sozdatelya": None}
+    р = razbor_sozdanija(tx, slot_sozdanija=slot)
+    for поле in ("sozdanie", "mint", "is_mayhem_mode", "quote_mint",
+                  "base_token_program", "sol_sozdatelya",
+                  "lamportov_sozdatelya", "pokupka"):
+        из_[поле] = р.get(поле)
+    из_["istochnik"] = р.get("sozdatel")
+    из_["slot_sozdanija"] = р.get("slot_sozdanija")
+    if not р.get("ok"):
+        из_.update(why_not=р.get("why_not"), otkaz_vid=ОТКАЗ_НЕТ_СОЗДАНИЯ)
+        return из_
+    if not р.get("kupil_v_sozdanii"):
+        из_.update(why_not="создатель в транзакции создания не покупал",
+                   otkaz_vid=ОТКАЗ_НЕ_КУПИЛ)
+        return из_
+    if р.get("is_mayhem_mode") is True:
+        из_.update(why_not="mayhem-режим -- по слову владельца пропускаем",
+                   otkaz_vid=ОТКАЗ_MAYHEM)
+        return из_
+    if р.get("is_mayhem_mode") is None:
+        # НЕ ЗНАЕМ -- ЗНАЧИТ НЕ ИДЁМ. Пропускать mayhem велено явно, и
+        # "признак не прочитался" это не "mayhem выключен".
+        из_.update(why_not=(f"mayhem не прочитан: "
+                            f"{р.get('mayhem_why_not') or 'причина не названа'}"
+                            " -- не знаем, значит не идём"),
+                   otkaz_vid=ОТКАЗ_MAYHEM)
+        return из_
+    if not р.get("quote_mint"):
+        из_.update(why_not="котировки кривой в покупке создателя нет",
+                   otkaz_vid=ОТКАЗ_НЕТ_ПОЛЕЙ)
+        return из_
+    if р.get("quote_mint") != WSOL:
+        из_.update(why_not=(f"котировка кривой {str(р['quote_mint'])[:12]} не "
+                            "SOL -- полоса платит солами, купить нечем"),
+                   otkaz_vid=ОТКАЗ_КОТИРОВКА)
+        return из_
+    if р.get("pokupka") not in ПОКУПКИ_ОБКАТАННЫЕ:
+        из_.update(why_not=(f"разновидность покупки {р.get('pokupka')} не из "
+                            f"обкатанных {list(ПОКУПКИ_ОБКАТАННЫЕ)}"),
+                   otkaz_vid=ОТКАЗ_РАЗНОВИДНОСТЬ)
+        return из_
+    if not (из_["istochnik"] and из_["mint"] and из_["base_token_program"]):
+        из_.update(why_not="в сделке нет создателя, минта или программы базы",
+                   otkaz_vid=ОТКАЗ_НЕТ_ПОЛЕЙ)
+        return из_
+    из_["ok"] = True
     return из_
 
 
@@ -365,7 +542,7 @@ def zapis_iz_uvedomlenija(res: dict, *, t_polucheno=None, slot_seti=None,
 
 # ------------------------------------------------------------- самопроверка
 
-ЖДЁМ_ПРОВЕРОК = 20
+ЖДЁМ_ПРОВЕРОК = 36
 
 
 def self_test() -> int:  # noqa: C901, PLR0915
@@ -406,7 +583,8 @@ def self_test() -> int:  # noqa: C901, PLR0915
             False)
 
     def _тx(*, создание="create", минт="M" * 44, создатель="U" * 44,
-            покупка=None, покупка_минт=None, покупка_user=None,
+            покупка=None, покупка_минт=None, покупка_user=None, mayhem=False,
+            котировка=None,
             до=(2_000_000_000, 0), после=(1_000_000_000, 0), fee=5000):
         """Транзакция в виде ответа узла. Счета -- по именам IDL."""
         инстр = []
@@ -414,15 +592,21 @@ def self_test() -> int:  # noqa: C901, PLR0915
         счета = []
         for имя in имена:
             счета.append({"mint": минт, "user": создатель}.get(имя, imya_zapolnitel(имя)))
+        # ДАННЫЕ СОЗДАНИЯ -- НАСТОЯЩЕЙ РАСКЛАДКОЙ borsh, а не нулями: иначе
+        # разбор is_mayhem_mode проверялся бы на том, чего в цепи не бывает.
         инстр.append({"programId": ПРОГ_КРИВОЙ,
-                      "data": PS.b58e(ix[создание]["disc"] + b"\x00" * 8),
+                      "data": PS.b58e(ix[создание]["disc"]
+                                      + dannye_sozdanija(создание,
+                                                         mayhem=mayhem)),
                       "accounts": счета})
         if покупка:
             имена_п = [а["name"] for а in ix[покупка]["accounts"]]
             счета_п = []
             for имя in имена_п:
                 счета_п.append({"base_mint": покупка_минт or минт,
-                                "user": покупка_user or создатель}.get(
+                                "user": покупка_user or создатель,
+                                "quote_mint": котировка or WSOL,
+                                "base_token_program": PS.ПРОГ_ТОКЕНА_2022}.get(
                                     имя, imya_zapolnitel(имя)))
             инстр.append({"programId": ПРОГ_КРИВОЙ,
                           "data": PS.b58e(ix[покупка]["disc"] + b"\x00" * 17),
@@ -489,6 +673,94 @@ def self_test() -> int:  # noqa: C901, PLR0915
     chk("слота сети нет -- отрыв считается НИЖНЕЙ границей, и это сказано",
         о3["otryv_slotov"] == 1 and "НИЖНЕЙ" in (о3["why_not"] or ""), о3)
 
+    # --- MAYHEM ИЗ АРГУМЕНТОВ (слово владельца 10.10, п.2)
+    _д2 = dannye_sozdanija("create_v2", mayhem=False)
+    _д2м = dannye_sozdanija("create_v2", mayhem=True)
+    chk("is_mayhem_mode читается из аргументов create_v2: выключен и включен",
+        mayhem_iz_dannyh(b"\x00" * 8 + _д2, "create_v2")["is_mayhem_mode"] is False
+        and mayhem_iz_dannyh(b"\x00" * 8 + _д2м, "create_v2"
+                              )["is_mayhem_mode"] is True)
+    chk("смещение признака СЧИТАЕТСЯ по строкам, а не зашито: имя длиннее -- "
+        "и байт признака уезжает ровно на разницу",
+        mayhem_iz_dannyh(b"\x00" * 8 + dannye_sozdanija(
+            "create_v2", name="Имя подлиннее", mayhem=True), "create_v2"
+        )["smeshchenie"]
+        - mayhem_iz_dannyh(b"\x00" * 8 + _д2м, "create_v2")["smeshchenie"]
+        == len("Имя подлиннее".encode()) - len("Имя".encode()))
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: у create (v1) аргумента нет вовсе -- None и "
+        "причина, а не «mayhem выключен»",
+        mayhem_iz_dannyh(b"\x00" * 8 + dannye_sozdanija("create"), "create")
+        ["is_mayhem_mode"] is None)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: обрезанные аргументы -- отказ по имени, а не "
+        "чужой байт за признак",
+        mayhem_iz_dannyh(b"\x00" * 12, "create_v2")["why_not"] is not None)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: на месте признака не 0 и не 1 -- разбор уехал, и "
+        "это сказано, а не принято за истину",
+        mayhem_iz_dannyh(b"\x00" * 8 + dannye_sozdanija("create")
+                          + bytes([7]), "create_v2")["is_mayhem_mode"] is None)
+    # --- СИГНАЛ ЗАПУСКА: каждое условие владельца -- своим отказом
+    _сг = signal_zapuska(_тx(создание="create_v2",
+                             покупка="buy_exact_quote_in_v3"),
+                         podpis="ПОДПИСЬ", slot=777)
+    chk("годный сигнал: создатель купил v3, не mayhem, котировка SOL -- "
+        "источником идёт СОЗДАТЕЛЬ, и поля денежного пути на месте",
+        _сг["ok"] and _сг["istochnik"] == "U" * 44 and _сг["mint"] == "M" * 44
+        and _сг["slot_sozdanija"] == 777
+        and _сг["base_token_program"] == PS.ПРОГ_ТОКЕНА_2022, _сг)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: создатель не покупал -- отказ sozdatel_ne_kupil",
+        signal_zapuska(_тx(создание="create_v2"))["otkaz_vid"]
+        == ОТКАЗ_НЕ_КУПИЛ)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: mayhem-режим -- отказ mayhem",
+        signal_zapuska(_тx(создание="create_v2", mayhem=True,
+                            покупка="buy_exact_quote_in_v3"))["otkaz_vid"]
+        == ОТКАЗ_MAYHEM)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: create (v1) -- признака mayhem нет, и сигнал НЕ "
+        "идёт: не знаем значит не идём",
+        signal_zapuska(_тx(создание="create",
+                            покупка="buy_exact_quote_in_v3"))["otkaz_vid"]
+        == ОТКАЗ_MAYHEM)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: котировка кривой не SOL -- отказ "
+        "kotirovka_ne_sol, с минтом котировки в причине",
+        signal_zapuska(_тx(создание="create_v2",
+                            покупка="buy_exact_quote_in_v3",
+                            котировка="CARDSccUMFKohQ5h1Kw6bjnMuaDfKtyzNHBP9R9N1C2x"
+                            ))["otkaz_vid"] == ОТКАЗ_КОТИРОВКА)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: покупка v2 -- разновидность не обкатана, сигнал "
+        "не идёт непроверенным путём",
+        signal_zapuska(_тx(создание="create_v2",
+                            покупка="buy_exact_quote_in_v2"))["otkaz_vid"]
+        == ОТКАЗ_РАЗНОВИДНОСТЬ)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: покупка чужого минта в транзакции создания за "
+        "покупку создателя не считается и сигналом не становится",
+        signal_zapuska(_тx(создание="create_v2",
+                            покупка="buy_exact_quote_in_v3",
+                            покупка_минт="N" * 44))["otkaz_vid"]
+        == ОТКАЗ_НЕ_КУПИЛ)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: в транзакции нет создания -- отказ net_sozdaniya",
+        signal_zapuska({"transaction": {"message": {"accountKeys": [],
+                                                     "instructions": []}}}
+                        )["otkaz_vid"] == ОТКАЗ_НЕТ_СОЗДАНИЯ)
+    chk("ни один отказ сигнала не оставляет ok=True",
+        all(not signal_zapuska(т)["ok"] for т in (
+            _тx(создание="create_v2"),
+            _тx(создание="create_v2", mayhem=True,
+                покупка="buy_exact_quote_in_v3"),
+            _тx(создание="create", покупка="buy_exact_quote_in_v3"),
+            _тx(создание="create_v2", покупка="buy_exact_quote_in_v2"))))
+    # РАБОЧАЯ ЧАСТЬ ФАЙЛА -- БЕЗ ТЕЛА САМОПРОВЕРКИ. Искать запретные слова во
+    # всём файле нельзя: они есть в самой этой проверке, и она краснела бы
+    # всегда. Ровно на таком же расколе по чужому имени функции держалась тихая
+    # зелень в выгрузке сделок (правка 10.10).
+    _рабочая = Path(__file__).read_text(encoding="utf-8").split(
+        "def self_test")[0]
+    chk("раскол исходника отделил самопроверку от рабочего кода",
+        "chk(" not in _рабочая and "def signal_zapuska" in _рабочая)
+    chk("в рабочей части модуля нет ни отправки, ни подписи -- сигнал только "
+        "отвечает да/нет",
+        not any(с in _рабочая for с in ("sendTransaction", "Keypair",
+                                         "sign_message", "partial_sign")),
+        [с for с in ("sendTransaction", "Keypair", "sign_message",
+                      "partial_sign") if с in _рабочая])
     стр = [json.dumps({"ts_utc": "2026-10-09T18:00:00Z", "sozdanie": "create",
                        "kupil_v_sozdanii": True, "sol_sozdatelya": 0.5,
                        "otryv_slotov": 2}),
