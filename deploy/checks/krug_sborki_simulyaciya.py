@@ -1451,12 +1451,15 @@ def budzhet_iz_instrukcij(инструкции: list) -> dict:
     """
     из_ = {"cu_predel": None, "cu_cena_mikrolamport": None,
             "instrukcij_budzheta": 0, "why_not": None, "iz_parsed": 0,
-            "iz_base58": 0}
+            "iz_base58": 0, "tipy": []}
     for и in (инструкции or []):
         if (и or {}).get("programId") != ПРОГРАММА_БЮДЖЕТА:
             continue
         из_["instrukcij_budzheta"] += 1
         разобрано = ((и or {}).get("parsed") or {})
+        из_["tipy"].append(str(разобрано.get("type")
+                                or ((и or {}).get("data") or "")[:8]
+                                or "без type и без data"))
         тип = (разобрано.get("type") or "")
         сведения = (разобрано.get("info") or {})
         if тип == "setComputeUnitPrice" and сведения.get("microLamports") is not None:
@@ -1499,6 +1502,7 @@ def cu_po_podpisi(подпись: str, *, таймаут: float = 30.0) -> dict:
             "cu_predel": None, "cu_cena_mikrolamport": None,
             "cu_potracheno": None, "fee_lamportov": None,
             "podpisantov": None, "prioritet_lamportov": None,
+            "tipy_budzheta": None, "programmy": None, "instrukcij_vsego": None,
             "cena_iz_komissii_mikrolamport": None,
             "cena_po_potrachennomu_mikrolamport": None,
             "why_predel_net": None, "rashozhdenie_putej_pct": None}
@@ -1519,6 +1523,9 @@ def cu_po_podpisi(подпись: str, *, таймаут: float = 30.0) -> dict:
     из_.update(cu_predel=б["cu_predel"],
                 cu_cena_mikrolamport=б["cu_cena_mikrolamport"],
                 instrukcij_budzheta=б["instrukcij_budzheta"],
+                tipy_budzheta=б["tipy"],
+                programmy=[str((и or {}).get("programId") or "?")[:10]
+                            for и in инстр],
                 instrukcij_vsego=len(инстр))
     мета = т.get("meta") or {}
     из_["cu_potracheno"] = мета.get("computeUnitsConsumed")
@@ -1686,7 +1693,8 @@ def cu_verhnim(ряды: list, *, podpisej: int = 4, pauza: float = 0.12) -> dic
                               ("podpis", "cu_predel", "cu_cena_mikrolamport",
                                "cu_potracheno", "fee_lamportov", "podpisantov",
                                "prioritet_lamportov", "instrukcij_budzheta",
-                               "why_not")})
+                               "tipy_budzheta", "instrukcij_vsego",
+                               "programmy", "why_not")})
             if о.get("cu_cena_mikrolamport") is not None:
                 цены.append(int(о["cu_cena_mikrolamport"]))
             if о.get("cena_iz_komissii_mikrolamport") is not None:
@@ -2396,6 +2404,15 @@ def самопроверка() -> int:
         {"programId": ПРОГРАММА_БЮДЖЕТА, "program": "computeBudget",
          "parsed": {"type": "setComputeUnitPrice",
                      "info": {"microLamports": 63636}}}])
+    chk("типы инструкций бюджета названы списком -- иначе 'одна инструкция "
+        "бюджета' не проверить",
+        _рз0["tipy"] == ["setComputeUnitLimit", "setComputeUnitPrice"]
+        if (_рз0 := budzhet_iz_instrukcij([
+            {"programId": ПРОГРАММА_БЮДЖЕТА,
+             "parsed": {"type": "setComputeUnitLimit", "info": {"units": 1}}},
+            {"programId": ПРОГРАММА_БЮДЖЕТА,
+             "parsed": {"type": "setComputeUnitPrice",
+                         "info": {"microLamports": 2}}}])) else False)
     chk("jsonParsed: цена и предел CU читаются из parsed, где data нет вовсе",
         _рз["cu_cena_mikrolamport"] == 63636 and _рз["cu_predel"] == 110000
         and _рз["iz_parsed"] == 2 and _рз["iz_base58"] == 0, _рз)
