@@ -13305,7 +13305,7 @@ def self_test() -> int:
         # 0.003102 SOL на сделку.
         chk("пятеро чаевых укладываются в потолок 0.005 SOL на сделку "
             f"({пч5.get('total_sol')} SOL)",
-            пч5["ok"] and пч5["total_lamports"] == 3_102_000
+            пч5["ok"] and пч5["total_lamports"] == 3_101_000
             and пч5["total_lamports"] < int(round(
                 ПОТОЛОК_ЧАЕВЫХ_ПУЛА_SOL * ЛАМПОРТОВ_В_SOL)), пч5)
         # ШЕСТЕРО -- ЭТО ТО, ЧТО УХОДИТ ЖИВЬЁМ, И ИМЕННО ЕГО НИКТО НЕ ПИНИЛ.
@@ -13325,7 +13325,7 @@ def self_test() -> int:
         chk(f"ШЕСТЕРО чаевых -- то, что уходит живьём: {пч6.get('total_sol')} "
             f"SOL из {ПОТОЛОК_ЧАЕВЫХ_ПУЛА_SOL}, запас "
             f"{_потолок_л - (пч6.get('total_lamports') or 0)} лампортов",
-            пч6["ok"] and пч6["total_lamports"] == 4_102_000
+            пч6["ok"] and пч6["total_lamports"] == 4_101_000
             and пч6["total_lamports"] < _потолок_л
             and dict((с["sender"], с["tip_lamports"])
                      for с in пч6["senders"])["zeroslot"] == 1_000_000, пч6)

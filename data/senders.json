@@ -95,7 +95,7 @@
    "key_env": "BLOCKRAZOR_AUTH_TOKEN",
    "key_in": "header:apikey",
    "key_in_note": "ПОДТВЕРЖДЕНО 25.09 двумя источниками: в документации curl-пример прямо пишет --header 'apikey: $auth_token' (data/docs/senders/blockrazor_curl_example.md), и живая проба с секретом BLOCKRAZOR_AUTH_TOKEN прошла именно этим заголовком: сервер ответил про тело пробы ('illegal transaction'), а на всех остальных схемах и без ключа -- 403 'Authentication information is missing. Please provide a valid auth token'. Платный план не требуется: в документации сказано, что отправка транзакций не привязана к подписке, предел 3 запроса в секунду",
-   "min_tip_lamports": 101000,
+   "min_tip_lamports": 100000,
    "tip_accounts": [
     "FjmZZrFvhnqqb9ThCuMVnENaM3JGVuGWNyCAxRJcFpg9",
     "6No2i3aawzHsjtThw81iq1EXPJN6rh8eSJCLaYZfKDTG",
@@ -104,7 +104,7 @@
    ],
    "tip_accounts_note": "в документации их 14; полный список -- в data/sender_pool_candidates.json",
    "docs": "data/docs/senders/blockrazor_solana_priority_fee_and_tip.md",
-   "min_tip_pochemu": "101 000, А НЕ 100 000, И ЭТО ИЗМЕРЕНО, А НЕ ОКРУГЛЕНО. BlockRazor принимал ровно 100 000 лампортов одиннадцать отправок подряд (09.10 22:30:01Z -- 10.10 03:48:32Z, http 200 на каждой), а с 10.10 13:49:37Z отказывает на том же числе двадцать четыре раза подряд: http 500, \"Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\". То есть сервис сравнивает СТРОГО больше, а в документации стоит \"не меньше\" -- наше число, равное названному минимуму, под эту проверку не проходит. Поставлено 101 000 (+1000 лампортов = +0.000001 SOL), и платится это только когда вариант BlockRazor садится."
+   "min_tip_pochemu": "100 000 -- ИЗМЕРЕННОЕ, А НЕ ВЗЯТОЕ ИЗ ДОКУМЕНТАЦИИ: ровно это число BlockRazor принимал одиннадцать отправок подряд в ночь 09->10.10 (http 200 на каждой). С 10.10 13:49:37Z он отказывает на нём же -- http 500, \"Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\". ЧИСЛО В ОШИБКЕ НЕ ЖИВОЙ ПОРОГ: пробы самопереводом 10.10 18:40-18:48Z дали отказ с ТЕМ ЖЕ текстом и ТЕМ ЖЕ числом при чаевых 101 000, 200 000 и 1 000 000 лампортов, то есть и при десятикратном минимуме. Значит дело не в сумме, и поднимать её бессмысленно. Остались два подозреваемых: адрес чаевых (у нас в списке 4, в документации их 14) и требование ставить инструкцию чаевых ПЕРВОЙ (tip_first у нас не задан). Пробы бесплатны: отказанная отправка не платит ни комиссии, ни чаевых."
   },
   "nozomi": {
    "name": "Nozomi (Temporal)",
