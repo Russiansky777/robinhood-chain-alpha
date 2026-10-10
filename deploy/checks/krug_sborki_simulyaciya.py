@@ -43,6 +43,16 @@ import c3_pump_sborka as СБ  # noqa: E402
 
 КОШЕЛЁК_ПОЛОСЫ = "4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x"
 ПОКУПКА = "buy_exact_quote_in_v3"
+# РАЗНОВИДНОСТИ ПОКУПКИ, КОТОРЫЕ ИЩЕМ В СДЕЛКЕ ИСТОЧНИКА. Собираем мы всегда
+# ПОКУПКОЙ (buy_exact_quote_in_v3): полоса платит фиксированный билет, то есть
+# «точный вход». А вот источник (у запусков -- создатель токена) мог купить
+# любой из двух v3: оба 17-счётные и имена счетов у них совпадают до единого,
+# поэтому минт, программа базы и buyback снимаются с любого. Прогон
+# 38014321870 это показал числом: девять подписей из двенадцати ушли в отказ
+# "buy_exact_quote_in_v3 в транзакции не найдена" только потому, что создатель
+# взял buy_v3, -- проверять было нечего, хотя ворота сигнала такой запуск
+# пропускают.
+ПОКУПКИ_ИСТОЧНИКА = ("buy_exact_quote_in_v3", "buy_v3")
 ПРОДАЖА = "sell_v3"
 WHY_НЕТ_УЗЛА = "узел задаётся только окружением BLOOM_TREKKER_RPC"
 # ПОТОЛОК ВЕРСИИ ТРАНЗАКЦИИ -- КАК У СЛУЖБЫ, А НЕ НОЛЬ. Здесь стоял 0, и
@@ -599,9 +609,9 @@ def _kriwaja_iz_tx(t: dict) -> dict:
     журнала решений). Второй раз писать то же значило бы разойтись.
     """
     из_ = {"ok": False, "why_not": None}
-    идл = СБ.zagruzit_idl()["pump"]["ix"][ПОКУПКА]
-    диск = идл["disc"]
-    имена = [а["name"] for а in идл["accounts"]]
+    _идл = СБ.zagruzit_idl()["pump"]["ix"]
+    по_диску = {_идл[в]["disc"]: [а["name"] for а in _идл[в]["accounts"]]
+                for в in ПОКУПКИ_ИСТОЧНИКА}
     соо = ((t or {}).get("transaction") or {}).get("message") or {}
     ключи = [k.get("pubkey") if isinstance(k, dict) else k
              for k in (соо.get("accountKeys") or [])]
@@ -616,7 +626,8 @@ def _kriwaja_iz_tx(t: dict) -> dict:
             сырые = СБ.b58d(данные)
         except Exception:  # noqa: BLE001
             continue
-        if сырые[:8] != диск:
+        имена = по_диску.get(сырые[:8])
+        if имена is None:
             continue
         счета = [ключи[с] if isinstance(с, int) and с < len(ключи) else с
                  for с in (и.get("accounts") or [])]
@@ -626,8 +637,12 @@ def _kriwaja_iz_tx(t: dict) -> dict:
         return {"ok": True, "why_not": None, "mint": по_именам["base_mint"],
                 "base_token_program": по_именам.get("base_token_program"),
                 "buyback": по_именам.get("buyback_fee_recipient"),
-                "bazovyj_vault": по_именам.get("associated_base_bonding_curve")}
-    из_["why_not"] = f"{ПОКУПКА} в транзакции не найдена"
+                "bazovyj_vault": по_именам.get("associated_base_bonding_curve"),
+                "pokupka_istochnika": next(
+                    (в for в in ПОКУПКИ_ИСТОЧНИКА
+                     if _идл[в]["disc"] == сырые[:8]), None)}
+    из_["why_not"] = (f"покупки кривой {list(ПОКУПКИ_ИСТОЧНИКА)} в транзакции "
+                      "не найдено")
     return из_
 
 
@@ -913,7 +928,16 @@ def самопроверка() -> int:
             "отказывает по имени, а не возвращает пустой минт",
             _kriwaja_iz_tx({"transaction": {"message": {
                 "accountKeys": [], "instructions": []}}}).get("why_not")
-            == f"{ПОКУПКА} в транзакции не найдена")
+            == (f"покупки кривой {list(ПОКУПКИ_ИСТОЧНИКА)} в транзакции "
+                 "не найдено"))
+        chk("ищутся ОБА v3: имена счетов у них совпадают, поэтому минт "
+            "снимается с любого",
+            ПОКУПКИ_ИСТОЧНИКА == ("buy_exact_quote_in_v3", "buy_v3")
+            and [а["name"] for а in
+                 СБ.zagruzit_idl()["pump"]["ix"]["buy_v3"]["accounts"]]
+            == [а["name"] for а in
+                СБ.zagruzit_idl()["pump"]["ix"]["buy_exact_quote_in_v3"]
+                ["accounts"]])
         chk("склейка покупки и продажи даёт транзакцию без второго предела CU",
             sum(1 for и in (_назад + _bez_budzheta(_назад))
                 if и["programma"].startswith("ComputeBudget")) == 1)
