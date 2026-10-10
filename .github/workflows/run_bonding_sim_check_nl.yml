@@ -39,9 +39,12 @@ on:
         required: false
         default: ""
       ref_staryj:
-        description: "versii_razbora: коммит СТАРОЙ версии c2_swap_build (по умолчанию ночная, до правок под запуски)"
+        description: "versii_razbora: ПОЛНЫЙ sha (40 знаков) коммита СТАРОЙ версии c2_swap_build -- копия бегунка глубиной 1, sha^ и имена ветвей в ней не разворачиваются"
         required: false
-        default: "e222b934^"
+        # НОЧНАЯ ВЕРСИЯ РАЗБОРА: родитель e222b934, то есть та, на которой
+        # vol_4vw торговал 09.10 16:29Z -- 10.10 01:59Z. Полным sha, а не
+        # "e222b934^": в копии глубиной 1 такой ref не разворачивается.
+        default: "540a998b15b252b4efe1eb4636218cd782f60867"
       chitat:
         description: "chem_sobrana: подписи НАШИХ транзакций через запятую -- чем они собраны (только чтение, без симуляции)"
         required: false
@@ -259,16 +262,21 @@ jobs:
           set -o pipefail
           [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
           [ -n "${{ inputs.sravnit }}" ] || { echo "СБОЙ: нужны подписи во входе sravnit"; exit 1; }
-          # ИСТОРИЯ. checkout@v4 без fetch-depth приносит ОДИН коммит, и
+          # ИСТОРИЯ: ПРИВОЗИМ РОВНО ОДИН КОММИТ, И ВОТ ПОЧЕМУ ИМЕННО ТАК.
+          # checkout@v4 без fetch-depth приносит ОДИН (верхний) коммит, и
           # `git show <старый коммит>:файл` в такой копии невозможен -- прогон
           # 38060569408 упал ровно этим: "invalid object name 'e222b934^'".
-          # Углубляем ЗДЕСЬ, а не в общем checkout: полная история нужна только
-          # этой задаче, остальным она лишняя трата.
-          git fetch --unshallow --quiet 2>/dev/null \
-            || git fetch --deepen=400 --quiet 2>/dev/null || true
-          git rev-parse --verify --quiet "$REF_STARYJ" >/dev/null \
-            || { echo "СБОЙ: коммита $REF_STARYJ нет даже после углубления"; exit 1; }
-          echo "старая версия: $REF_STARYJ -> $(git rev-parse "$REF_STARYJ")"
+          # Первая попытка лечить это --unshallow не доехала за 10 минут
+          # (прогон 38060904774 снят): в истории этой ветки лежат суточные
+          # выгрузки и журналы, полная история тянется десятками минут.
+          # Поэтому ref_staryj -- ПОЛНЫЙ sha, и он привозится по одному,
+          # глубиной 1: GitHub отдаёт коммит по sha.
+          git fetch --depth=1 --quiet origin "$REF_STARYJ" 2>/dev/null || true
+          git rev-parse --verify --quiet "$REF_STARYJ^{commit}" >/dev/null \
+            || { echo "СБОЙ: коммита $REF_STARYJ в копии нет. Нужен ПОЛНЫЙ sha (40 знаков), ref вида sha^ или имя ветки не привезти глубиной 1."; exit 1; }
+          git cat-file -e "$REF_STARYJ:analysis/c2_swap_build.py" \
+            || { echo "СБОЙ: в коммите $REF_STARYJ нет analysis/c2_swap_build.py"; exit 1; }
+          echo "старая версия: $REF_STARYJ"
           # САМОПРОВЕРКА ДО УЗЛА: падает она -- сравнивать нечем.
           PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --self-test | tail -2
           export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
