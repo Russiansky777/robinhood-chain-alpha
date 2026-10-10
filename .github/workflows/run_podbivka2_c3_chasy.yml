@@ -1,0 +1,110 @@
+name: "Podbivka-2: chasy arhiva dlya Code-3 (artefakt, ne v vetku)"
+
+# ZACHEM. Zakaz Code-3 (docs/c3_lp_zakaz_chasov.md v claude/stroiteli): ryady LP
+# na 24 chasa. S ego mashiny replay.pumpapi.io zakryt (403 na CONNECT), poetomu
+# chasy chitaet moya chitalka na oblachnom begunke. Dva prohoda ego pravilom:
+#   1) otbor -- okno 160 slotov, bez nashih sobytiy: otkuda berutsya pereezdy;
+#   2) ryady -- --minty po vybranym mintam: polnaya lenta sobytiy kazhdogo.
+# Mezhdu prohodami -- vyborka: polovina verh po sobytiyam okna, polovina sluchayno.
+#
+# Vyhod -- ARTEFAKT zadaniya, v vetku nichego ne pishetsya: PODB_BEZ_PUSHA
+# otklyuchaet push v podbivka_run, shaga "Final commit" zdes net.
+#
+# Zapuskaetsya TOLKO vruchnuyu i TOLKO kogda tyazhelyy progon arhiva uzhe
+# zakonchen: eto odno zadanie, a ne shest, i mesta arhiva ono ne zanimaet.
+on:
+  workflow_dispatch:
+    inputs:
+      s:
+        description: "pervyy chas, YYYY-MM-DDTHH (UTC)"
+        default: "2026-10-08T00"
+      chasov:
+        description: "skolko chasov podryad"
+        default: "48"
+      mintov:
+        description: "skolko mintov vo vtorom prohode"
+        default: "250"
+
+concurrency:
+  group: podbivka2-c3
+  cancel-in-progress: false
+
+jobs:
+  chasy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/podbivka
+
+      - name: "Python venv"
+        run: |
+          set -e
+          python3 -m venv "$RUNNER_TEMP/pod_venv"
+          "$RUNNER_TEMP/pod_venv/bin/pip" install -q requests solders zstandard
+          echo "PY=$RUNNER_TEMP/pod_venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: "Kesh chasov na diske, esli mesta hvataet"
+        run: |
+          set -e
+          # 48 chasov ~ 21.7 GB (452 MB mediana po arhiv_glubina_proba.json).
+          # S keshem chasy kachayutsya ODIN raz na dva prohoda; bez nego -- dvazhdy.
+          NUZHNO=$(( ${{ github.event.inputs.chasov }} * 500 ))   # MB s zapasom
+          for D in /mnt /home/runner/work; do
+            SVOB=$(df -Pm "$D" 2>/dev/null | awk 'NR==2{print $4}')
+            [ -n "$SVOB" ] || continue
+            echo "$D: svobodno ${SVOB} MB, nuzhno ${NUZHNO} MB"
+            if [ "$SVOB" -gt "$NUZHNO" ]; then
+              sudo mkdir -p "$D/pumpapi_kesh" && sudo chown "$(id -u):$(id -g)" "$D/pumpapi_kesh"
+              echo "PODB_ARHIV_KESH=$D/pumpapi_kesh" >> "$GITHUB_ENV"
+              echo "kesh: $D/pumpapi_kesh"
+              exit 0
+            fi
+          done
+          echo "mesta pod kesh net -- oba prohoda chitayut potokom (kachaem dvazhdy)"
+
+      - name: "Prohod 1: otbor pereezdov"
+        env:
+          PODB_BEZ_PUSHA: "1"
+        run: |
+          set -e
+          $PY analysis/podbivka_arhiv_den.py \
+            --s "${{ github.event.inputs.s }}" \
+            --chasov "${{ github.event.inputs.chasov }}" \
+            --okno 160 --bez-sobytij \
+            --metka "c3_lp_otbor_${{ github.event.inputs.s }}_${{ github.event.inputs.chasov }}ch"
+
+      - name: "Vyborka mintov"
+        run: |
+          set -e
+          $PY analysis/podbivka_c3_vybor_mintov.py \
+            --vhod "data/podbivka/arhiv_den/c3_lp_otbor_${{ github.event.inputs.s }}_${{ github.event.inputs.chasov }}ch.json.gz" \
+            --vyhod "$RUNNER_TEMP/minty.txt" \
+            --vyhod-json "data/podbivka/arhiv_den/c3_lp_vybor_mintov.json" \
+            --mintov "${{ github.event.inputs.mintov }}"
+
+      - name: "Prohod 2: ryady po vybrannym mintam"
+        env:
+          PODB_BEZ_PUSHA: "1"
+        run: |
+          set -e
+          $PY analysis/podbivka_arhiv_den.py \
+            --s "${{ github.event.inputs.s }}" \
+            --chasov "${{ github.event.inputs.chasov }}" \
+            --minty "$(cat "$RUNNER_TEMP/minty.txt")" \
+            --metka "c3_lp_rjady_${{ github.event.inputs.s }}_${{ github.event.inputs.chasov }}ch"
+
+      - name: "Artefakt dlya Code-3"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "c3-lp-chasy-${{ github.event.inputs.s }}-${{ github.event.inputs.chasov }}ch"
+          path: |
+            data/podbivka/arhiv_den/c3_lp_otbor_*.json.gz
+            data/podbivka/arhiv_den/c3_lp_rjady_*.json.gz
+            data/podbivka/arhiv_den/c3_lp_vybor_mintov.json
+          retention-days: 14
+          if-no-files-found: error

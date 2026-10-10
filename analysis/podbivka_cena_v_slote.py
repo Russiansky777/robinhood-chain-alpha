@@ -121,11 +121,16 @@ def главное(а) -> int:
                             if y and x + net > 0 else None)
         лаг = ((с.get("our_slot") or 0) - (с.get("source_slot") or 0)
                if с.get("our_slot") and с.get("source_slot") else None)
+        ои, ии = с.get("our_block_index"), с.get("source_block_index")
+        между = (ои - ии - 1 if лаг == 0 and isinstance(ои, int)
+                 and isinstance(ии, int) and ои > ии else None)
         ряды.append({
             "utc": с.get("utc"), "минт": с.get("mint"), "лаг": лаг,
             "доля_блока_факт": с.get("our_block_share"),
-            "индекс_в_блоке": с.get("our_block_index"),
-            "индекс_источника": с.get("source_block_index"),
+            "индекс_в_блоке": ои,
+            "индекс_источника": ии,
+            "транзакций_между": между,
+            "транзакций_в_блоке": с.get("our_block_total"),
             "q_замеренное": round(q, 4),
             "наплыв_слота_пп": round((xд / x0 - 1.0) * 100, 2) if x0 else None,
             "цена_факт": ц_факт, "цена_S0": ц_s0, "цена_S0_дно": ц_дно,
@@ -140,8 +145,12 @@ def главное(а) -> int:
     for имя, сп in sorted(по_лагу.items()):
         qs = [r["q_замеренное"] for r in сп]
         нап = [r["наплыв_слота_пп"] for r in сп if r["наплыв_слота_пп"] is not None]
+        меж = [r["транзакций_между"] for r in сп
+               if r.get("транзакций_между") is not None]
         свод[имя] = {
             "n": len(сп),
+            "транзакций_между_медиана": statistics.median(меж) if меж else None,
+            "транзакций_между_n": len(меж),
             "q_медиана": round(statistics.median(qs), 3),
             "q_p10": round(sorted(qs)[int(0.1 * len(qs))], 3),
             "q_p90": round(sorted(qs)[min(len(qs) - 1, int(0.9 * len(qs)))], 3),
@@ -154,7 +163,25 @@ def главное(а) -> int:
                 for кв in ("0.0", "0.5", "0.7", "0.784", "1.0")
                 if any(r["факт_к_модели_по_q"].get(кв) for r in сп)},
         }
+    прошлое = {}
+    if а.sravnit:
+        пр = Path(а.sravnit)
+        if пр.exists():
+            прошлое = (json.loads(пр.read_text(encoding="utf-8"))
+                       .get("по_лагу") or {})
+        else:
+            счёт["прошлого_файла_нет"] += 1
+    сдвиг = {}
+    for имя, с_ in свод.items():
+        б = прошлое.get(имя) or {}
+        if б.get("q_медиана") is not None:
+            сдвиг[имя] = {"было": б["q_медиана"], "стало": с_["q_медиана"],
+                          "n_было": б.get("n"), "n_стало": с_["n"],
+                          "сдвинулось_на": round(с_["q_медиана"] - б["q_медиана"], 3),
+                          "между_было": б.get("транзакций_между_медиана"),
+                          "между_стало": с_.get("транзакций_между_медиана")}
     тело = {"что": "где внутри слота источника мы садимся: факт против модели",
+            "сдвиг_против_прошлого": сдвиг,
             "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "вход": str(а.vhod), "группа": а.gruppa or "все",
             "счёт": dict(счёт), "по_лагу": свод, "сделки": ряды}
@@ -162,6 +189,19 @@ def главное(а) -> int:
     вых.write_text(json.dumps(тело, ensure_ascii=False, indent=1), encoding="utf-8")
     import podbivka_run as R  # noqa: PLC0415
     R.записано(вых)
+    л0 = свод.get("лаг 0") or {}
+    с0 = сдвиг.get("лаг 0")
+    if с0 and abs(с0["сдвинулось_на"]) >= а.porog_sdviga:
+        print(f"q СДВИНУЛОСЬ с {с0['было']} до {с0['стало']} "
+              f"(лаг 0, n было {с0['n_было']}, стало {с0['n_стало']}; "
+              f"транзакций между источником и нами: было {с0['между_было']}, "
+              f"стало {с0['между_стало']})", flush=True)
+    elif с0:
+        print(f"q НЕ сдвинулось: было {с0['было']}, стало {с0['стало']} "
+              f"(лаг 0, n было {с0['n_было']}, стало {с0['n_стало']})", flush=True)
+    elif л0:
+        print(f"q при лаге 0: {л0.get('q_медиана')} (n {л0.get('n')}), "
+              "сравнивать не с чем -- прошлый прогон не передан", flush=True)
     print(f"счёт: {dict(счёт)}", flush=True)
     for имя, с_ in свод.items():
         print(f"{имя}: n {с_['n']}, q медиана {с_['q_медиана']} "
@@ -177,6 +217,10 @@ def main() -> int:
                    help="живая выгрузка сделок Code-1")
     р.add_argument("--gruppa", default="", help="только эта группа (например vol_4vw)")
     р.add_argument("--desyatichnyh", type=int, default=ДЕСЯТИЧНЫХ)
+    р.add_argument("--sravnit", default="",
+                   help="прошлый cena_v_slote*.json: насколько сдвинулось q")
+    р.add_argument("--porog-sdviga", type=float, default=0.05,
+                   help="сдвиг q меньше этого считается «не сдвинулось»")
     р.add_argument("--metka", default="")
     return главное(р.parse_args())
 
