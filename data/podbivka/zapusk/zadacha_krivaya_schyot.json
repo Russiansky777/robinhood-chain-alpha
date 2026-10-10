@@ -1,0 +1,13 @@
+{
+ "skript": "podbivka_krivaya_schyot.py",
+ "zapuski": [
+  [
+   "--iz",
+   "data/podbivka/krivaya_rashod_p1.json",
+   "--metka",
+   "p1"
+  ]
+ ],
+ "helius_rps_na_paket": 3,
+ "zachem": "p.2 vladelca: gipoteza Mayhem na 'nulevoy porode'. V IDL pump.fun (data/idl/pump.json u Code-1) u schyota BondingCurve est pole is_mayhem_mode, a ryadom is_cashback_coin, is_holder_reward, depth, creator_fee_bps i quote_mint. Progon chitaet schyot krivoy (PDA 'bonding-curve' + mint) u VSEH mintov dvuh grupp sverki krivoy: 107 rashodyaschihsya (tarif 0+0 b.p. v sobytii, otnoshenie 0.85) i 21 kontrolnogo (95+30 b.p., otnoshenie 1.00) -- i raskladyvaet po etim polyam. Esli rashodyaschiesya eto Mayhem, flag budet u nih i ne budet u kontrolnyh. getMultipleAccounts pachkami po 100, vsego 2 zaprosa. Tolko chtenie."
+}
