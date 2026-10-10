@@ -1,92 +1,511 @@
 {
  "podpisej": 12,
- "proshlo": 0,
- "krasnyh": 3,
- "krivaya_zakonchilas": 0,
+ "proshlo": 3,
+ "krasnyh": 8,
+ "krivaya_zakonchilas": 1,
  "kotirovka_ne_wsol": 0,
- "ne_razobrano": 9,
+ "ne_razobrano": 0,
  "sdelki": [
   {
    "mint": "5qkCaVkaVs1X9UmKw7DeWPbaweSWj37g1nobdb6Tpump",
-   "ok": false,
-   "why_not": "шаблон не снялся: разновидность инструкции кривой не известна: d6904cec5f8b31b4",
+   "ok": true,
+   "why_not": null,
    "put": "denezhnyj",
-   "ostatok_posle_pokupki": null,
+   "ostatok_posle_pokupki": 353134691328,
+   "po_idl": "buy_exact_quote_in_v3",
+   "exact_out": false,
+   "buyback": "A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW",
+   "ata": "8mKHyqLtpkdEUKt1dVw6qau5hbhEdrwP2fSEcFkwhhV4",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "5qkCaVkaVs1X9UmKw7DeWPbaweSWj37g1nobdb6Tpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 93714,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "8mKHyqLtpkdEUKt1dVw6qau5hbhEdrwP2fSEcFkwhhV4",
+   "zakryt_schyot_wsol": null,
+   "krug_err": null,
+   "krug_units": 151335,
+   "instrukcij_kruga": 8,
    "podpis": "62KUXmT9qkWqDxEyP4pzkEyRxJt8gg5eFJFGEAcymGBGv5Lv12VMjsXJnUgsTfnixZDTjJqTRp2giEy26sQdWfsp"
   },
   {
-   "podpis": "2BbKkihR1oJqyt7pXtpXtWSPP1NXVE7MaG6uwF9L2TiTzfVHcHbqDyzG8BGg658QiSd9AyUw1eKR5NBPoCPaBfRY",
+   "mint": "8T7QWoS8SRrPuW6JEgutzgSDPFpitEGu2Z4zDsMpump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+   "ata": "6N1qMZts4czKxYnKUC8sMtUiz4JjivBhhrKW6EMQ8FPq",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "8T7QWoS8SRrPuW6JEgutzgSDPFpitEGu2Z4zDsMpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 104030,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "6N1qMZts4czKxYnKUC8sMtUiz4JjivBhhrKW6EMQ8FPq",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 156477,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 71500 of 567470 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 52447 of 495970 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "2BbKkihR1oJqyt7pXtpXtWSPP1NXVE7MaG6uwF9L2TiTzfVHcHbqDyzG8BGg658QiSd9AyUw1eKR5NBPoCPaBfRY"
   },
   {
    "mint": "4cHqRdnEgfGq68HokiPAHjWPBPhot6vifgKHXT7Zpump",
-   "ok": false,
-   "why_not": "шаблон не снялся: разновидность инструкции кривой не известна: d6904cec5f8b31b4",
+   "ok": true,
+   "why_not": null,
    "put": "denezhnyj",
-   "ostatok_posle_pokupki": null,
+   "ostatok_posle_pokupki": 352075273656,
+   "po_idl": "buy_exact_quote_in_v3",
+   "exact_out": false,
+   "buyback": "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+   "ata": "Kz2ayN9EscsY9yKCejb1buFtpCwztVNsvh5LSgmVSUq",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "4cHqRdnEgfGq68HokiPAHjWPBPhot6vifgKHXT7Zpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 101163,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "Kz2ayN9EscsY9yKCejb1buFtpCwztVNsvh5LSgmVSUq",
+   "zakryt_schyot_wsol": null,
+   "krug_err": null,
+   "krug_units": 161730,
+   "instrukcij_kruga": 8,
    "podpis": "5wGyg8Psnp9P723ZveBdJeCW78JbfcSVS5No65jYvGGfCN4tMwVvZmkp7j2rzXmbL8thfeVzPuBHNvKBmjmYATzV"
   },
   {
-   "podpis": "2s8gT3BxdEMPQj3BMpGos9tJZuPjx1CyxtXxQhFEehZQVSAyx4BZQyXaFJiQYqMu3cWZ1XSxH5Fx447cKAXZVMuA",
+   "mint": "9BbMGt4ZVurLSFNEtCEEgVhiWt2wJzVLB7t8xiQ8pump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD",
+   "ata": "7HZfm7jTBtaWKo7qQxo5iowA6c7xdU1RJwbwAD1f1Qxe",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "9BbMGt4ZVurLSFNEtCEEgVhiWt2wJzVLB7t8xiQ8pump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 93582,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "7HZfm7jTBtaWKo7qQxo5iowA6c7xdU1RJwbwAD1f1Qxe",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 137081,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 62552 of 568970 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 43499 of 506418 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "2s8gT3BxdEMPQj3BMpGos9tJZuPjx1CyxtXxQhFEehZQVSAyx4BZQyXaFJiQYqMu3cWZ1XSxH5Fx447cKAXZVMuA"
   },
   {
-   "podpis": "4UTc4X3y3BzRGu45tDGY4ERdBkyYbFjVDUBn1QmtRRGxsCRNk6tTwiXdTY2YbGSJHHczXh7gkFjmxDSWpXCE3ooX",
+   "mint": "4NijsnfVP7mQC4a5hpNx2sCCQN5XiQJ68JPqLY7Gpump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7",
+   "ata": "8JxWycLu5RvJ1hVUpzconVcu87pX8cReuECU2XUo6VzY",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "4NijsnfVP7mQC4a5hpNx2sCCQN5XiQJ68JPqLY7Gpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 102449,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "8JxWycLu5RvJ1hVUpzconVcu87pX8cReuECU2XUo6VzY",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 145817,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 62419 of 559970 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 43368 of 497551 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "4UTc4X3y3BzRGu45tDGY4ERdBkyYbFjVDUBn1QmtRRGxsCRNk6tTwiXdTY2YbGSJHHczXh7gkFjmxDSWpXCE3ooX"
   },
   {
-   "podpis": "5ouoJL3noxS8Fgaeq4FnaFjH2BEDzx38RnPmh3Fqxv625XUYRrf5pgZ4bijzwYr8EJSgKhsVaesH6C6Hyv4CHhTz",
+   "mint": "8pBQ9xBinjbZy7HTCSSMyPQDV3zVBguxzFDSdEYTpump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL",
+   "ata": "5L4nRpabDDLkLNn8CWTuw6NiV9GKoZpaMg2krErFf5km",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "8pBQ9xBinjbZy7HTCSSMyPQDV3zVBguxzFDSdEYTpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 102478,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "5L4nRpabDDLkLNn8CWTuw6NiV9GKoZpaMg2krErFf5km",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 153373,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 69948 of 567470 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 50895 of 497522 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "5ouoJL3noxS8Fgaeq4FnaFjH2BEDzx38RnPmh3Fqxv625XUYRrf5pgZ4bijzwYr8EJSgKhsVaesH6C6Hyv4CHhTz"
   },
   {
-   "podpis": "3SahYpXA2kgAAQtbFjyyGWejY7KVUULt2DUbprGb4mN7aEdZdSDkdPYR3t5KWNmt5xQZzbaAUSFAsvV6a5u6KtpH",
+   "mint": "B6Yy7fHYz1hnyohABSr5XvUWzqqmBcDMzqQEiLN3pump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+   "ata": "8vuB2tYp81HDxpbKudE6m34rAhBWzfk4nSYrW8kZ5CMo",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "B6Yy7fHYz1hnyohABSr5XvUWzqqmBcDMzqQEiLN3pump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 95028,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "8vuB2tYp81HDxpbKudE6m34rAhBWzfk4nSYrW8kZ5CMo",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 138475,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 62498 of 567470 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 43447 of 504972 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "3SahYpXA2kgAAQtbFjyyGWejY7KVUULt2DUbprGb4mN7aEdZdSDkdPYR3t5KWNmt5xQZzbaAUSFAsvV6a5u6KtpH"
   },
   {
-   "podpis": "bnfADW4aJH3SCjcHFsUK8xKUuDBHA2uooibAXpjxKWARGXyLsy3SaeLtY6A1cKudeNVhJ9qZt99ckmdxJMAHF8c",
+   "mint": "9ZsCeHMg3LMoHjohQgfSJkpFGxFeeBB6tQrT4Gxgpump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "кривая закончилась, повторить сигнал суткам позже нечем: BondingCurveComplete -- кривая добрана и переехала в пул",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": null,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+   "ata": "8XA1WAqhXa7X4MTg9w4oDdnTsSn3JY3mCaDdyqgRiL3c",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "9ZsCeHMg3LMoHjohQgfSJkpFGxFeeBB6tQrT4Gxgpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": {
+    "InstructionError": [
+     5,
+     {
+      "Custom": 6005
+     }
+    ]
+   },
+   "pokupka_units": 80221,
+   "logi": [
+    "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: BuyV3",
+    "Program 11111111111111111111111111111111 invoke [2]",
+    "Program 11111111111111111111111111111111 success",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:148. Error Code: BondingCurveComplete. Error Number: 6005. Error Message: The bonding curve has completed and liquidity migrated to raydium..",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 41691 of 561470 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1775"
+   ],
+   "klass_otkaza": "krivaya_zakonchilas",
+   "kod_otkaza": "6005",
+   "otkaz_slovami": "BondingCurveComplete -- кривая добрана и переехала в пул",
+   "krivaya": {
+    "schyot": "7BAyC8mKEG5PQHzx2ZNTrjW6jePeq8JY3vX3avBMAaTt",
+    "est": true,
+    "complete": true,
+    "why_not": null,
+    "dlina": 166,
+    "quote_mint": "11111111111111111111111111111111",
+    "quote_wsol": false,
+    "creator": "JDCjR3US6cmSpKQ8H7vejMPM2qUp8Y1HwjATSetdb6ji",
+    "is_mayhem_mode": false
+   },
+   "raskladka_prinyata": true,
+   "podpis": "bnfADW4aJH3SCjcHFsUK8xKUuDBHA2uooibAXpjxKWARGXyLsy3SaeLtY6A1cKudeNVhJ9qZt99ckmdxJMAHF8c"
   },
   {
-   "podpis": "3jkroR611EP8pCVFG91CnxYRR5CcoJozogEYAkz5Uuhx6ne4iDJoLZKq6Ff1iFpNG4Uo9uTFtEyyCpseeVCBZQ4X",
+   "mint": "3H5PLq9mz1JsWoL6GkyQWHFPtKnuM6W43UEvMVBopump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7",
+   "ata": "6j9jvc3XKGQy5pSi9FEyTY6qsbYgTqTSohWBHH4dWGEp",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "3H5PLq9mz1JsWoL6GkyQWHFPtKnuM6W43UEvMVBopump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 102449,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "6j9jvc3XKGQy5pSi9FEyTY6qsbYgTqTSohWBHH4dWGEp",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 153317,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 69919 of 567470 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 50868 of 497551 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "3jkroR611EP8pCVFG91CnxYRR5CcoJozogEYAkz5Uuhx6ne4iDJoLZKq6Ff1iFpNG4Uo9uTFtEyyCpseeVCBZQ4X"
   },
   {
    "mint": "8E7EyQh8TbguZAHiznKPUQC9P5Qb4nVbfzNpJ3sNpump",
-   "ok": false,
-   "why_not": "шаблон не снялся: разновидность инструкции кривой не известна: d6904cec5f8b31b4",
+   "ok": true,
+   "why_not": null,
    "put": "denezhnyj",
-   "ostatok_posle_pokupki": null,
+   "ostatok_posle_pokupki": 320018913124,
+   "po_idl": "buy_exact_quote_in_v3",
+   "exact_out": false,
+   "buyback": "3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR",
+   "ata": "HwuRVrWB8Lum4m83d2Wj49DEAfmnp5xyiepAwZWq8VP2",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "8E7EyQh8TbguZAHiznKPUQC9P5Qb4nVbfzNpJ3sNpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 105612,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "HwuRVrWB8Lum4m83d2Wj49DEAfmnp5xyiepAwZWq8VP2",
+   "zakryt_schyot_wsol": null,
+   "krug_err": null,
+   "krug_units": 172129,
+   "instrukcij_kruga": 8,
    "podpis": "2vYWoveVJvj92U5YXP2RqKqWJ8GsTvXcxFkyDAQAzTXV9uwsKouSo9TBmHSxCsftURqu4YMwnRFtJQgis7PRWUXk"
   },
   {
-   "podpis": "5CeTQjVVzxpcc3jXcg9cLyvG3Q83McUQeYXz2o5d2HXsZnVe6NLAAWUgeYNS5p9wo83rHugFmwKthgUhPmBuJQf8",
+   "mint": "8mwBFWUZvNSquGaZonCyJfj6vhPBPsDSYNJq4SWzpump",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW",
+   "ata": "88ku4DpXwZ6V1BTCUZtqw6BM4FggtkUkP6ncYgfp2m7R",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "8mwBFWUZvNSquGaZonCyJfj6vhPBPsDSYNJq4SWzpump",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 96609,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "88ku4DpXwZ6V1BTCUZtqw6BM4FggtkUkP6ncYgfp2m7R",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 143135,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 65579 of 568970 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 46526 of 503391 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "5CeTQjVVzxpcc3jXcg9cLyvG3Q83McUQeYXz2o5d2HXsZnVe6NLAAWUgeYNS5p9wo83rHugFmwKthgUhPmBuJQf8"
   },
   {
-   "podpis": "2qxdVc5tjJ7oYnaRppQuEUg3ynoaxyWZ1rmqcGR6tsd6TVyuYXnE6tkwc2zAjmAgWeBXYf3tNPsjpDjKVDbAGhZ8",
+   "mint": "53m1ock18gtGmFN6952SGxY2HXZTQHG1MW85dPLz58dB",
    "ok": false,
-   "why_not": "buy_exact_quote_in_v3 в транзакции не найдена"
+   "why_not": "круг денежного пути не прошёл симуляцию",
+   "put": "denezhnyj",
+   "ostatok_posle_pokupki": 1,
+   "po_idl": "buy_v3",
+   "exact_out": true,
+   "buyback": "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD",
+   "ata": "88szAcXVz78DtWmJZv3ZnVKeFi3v1trdGUD2tAmLd3WA",
+   "razmer_pokupki": 807,
+   "instrukcij_pokupki": 6,
+   "base_mint_puti": "53m1ock18gtGmFN6952SGxY2HXZTQHG1MW85dPLz58dB",
+   "quote_mint_puti": "So11111111111111111111111111111111111111112",
+   "pokupka_err": null,
+   "pokupka_units": 91923,
+   "sposob_prodazhi": "krivaya",
+   "imya_prodazhi": "sell_v3",
+   "programma_bazy": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+   "zakryt_schyot_tokena": "88szAcXVz78DtWmJZv3ZnVKeFi3v1trdGUD2tAmLd3WA",
+   "zakryt_schyot_wsol": null,
+   "krug_err": {
+    "InstructionError": [
+     6,
+     {
+      "Custom": 6003
+     }
+    ]
+   },
+   "krug_units": 133765,
+   "instrukcij_kruga": 8,
+   "logi": [
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 60893 of 568970 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+    "Program log: Instruction: SellV3",
+    "Program log: AnchorError thrown in programs/pump/src/trade_v3.rs:976. Error Code: TooLittleSolReceived. Error Number: 6003. Error Message: slippage: Too little SOL received to sell the given amount of tokens..",
+    "Program log: Left: 0",
+    "Program log: Right: 1",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 41842 of 508077 compute units",
+    "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P failed: custom program error: 0x1773"
+   ],
+   "podpis": "2qxdVc5tjJ7oYnaRppQuEUg3ynoaxyWZ1rmqcGR6tsd6TVyuYXnE6tkwc2zAjmAgWeBXYf3tNPsjpDjKVDbAGhZ8"
   }
  ],
- "why_not": "3 отказанных сигналов из 12 красные на денежном пути",
+ "why_not": "8 отказанных сигналов из 12 красные на денежном пути",
  "uzel": "https://mainnet.helius-rpc.com/?api-key=…",
  "sbor_istochnika": {
   "istochnik": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9",
-  "prosmotreno": 16,
-  "v_okne": 16,
+  "prosmotreno": 58,
+  "v_okne": 58,
   "ne_prochitano": 0,
   "pusto": 0,
-  "bez_v3": 16,
+  "bez_v3": 58,
   "pervyj_otkaz_chteniya": null,
-  "why_not": "покупок buy_exact_quote_in_v3 у источника за окно нет (прочитано 16, без v3 16)",
+  "why_not": "покупок buy_exact_quote_in_v3 у источника за окно нет (прочитано 58, без v3 58)",
   "podpisej_najdeno": 0
  }
 }
