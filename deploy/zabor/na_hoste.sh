@@ -99,6 +99,17 @@ chgrp bot "$RABOTA/c2_zabor_s0_opyt.py" && chmod 640 "$RABOTA/c2_zabor_s0_opyt.p
 if [ -s "$RABOTA/c2_zabor_gonka.py" ]; then
   chgrp bot "$RABOTA/c2_zabor_gonka.py" && chmod 640 "$RABOTA/c2_zabor_gonka.py"
 fi
+# REESTR OTPRAVITELEJ IZ VETKI -- TOZHE GRUPPE bot, i eto ne meloch.
+# Dostavka idyot ot root pod umask 077, to est fajl 600 root:root, a probu
+# zapuskaet bot: progon 21:47Z otkazal "u otpravitelya blockrazor v reestre net
+# schetov chaevyh" rovno potomu, chto bot ne smog prochitat fajl, i reestr
+# vyshel pustym. Sekretov v nyom net -- tolko adresa i minimumy chaevyh.
+if [ -s "$RABOTA/senders.json" ]; then
+  chgrp bot "$RABOTA/senders.json" && chmod 640 "$RABOTA/senders.json"
+  echo "reestr proby: $(stat -c %a:%U:%G "$RABOTA/senders.json"), otpravitelej $(python3 -c "import json;print(len((json.load(open('$RABOTA/senders.json')).get('senders') or {})))" 2>/dev/null || echo '?')"
+else
+  echo "reestr proby ne dostavlen -- budet vzyat tot, chto ryadom s kodom"
+fi
 echo "dostup dlja bot: katalog $(stat -c %a:%U:%G "$RABOTA"), skript $(stat -c %a:%U:%G "$RABOTA/c2_zabor_s0_opyt.py")"
 
 # ОКРУЖЕНИЕ СЛУЖБЫ -- ТОЛЬКО ЧИТАЕМ. Узел, отправители и их ключи берутся оттуда
