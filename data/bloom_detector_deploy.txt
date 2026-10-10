@@ -1,4 +1,4 @@
-progon 217, 2026-10-10T13:09:17Z
+progon 218, 2026-10-10T15:06:09Z
   "slippage_pct": 35.0,
   "priority_fee": 0.001,
   "processor_tip": 0.001,
@@ -43,12 +43,12 @@ progon 217, 2026-10-10T13:09:17Z
       "api_error_last_ts": 1790381356.4951322
     },
     "day_pnl": {
-      "realized_sol": 0.200678592,
-      "spent_sol": 0.03532792,
+      "realized_sol": -0.358237668,
+      "spent_sol": 0.08515196,
       "buys": 0,
-      "sells": 8,
+      "sells": 19,
       "tz_unavailable": false,
-      "updated_utc": "2026-10-10T03:48:40Z"
+      "updated_utc": "2026-10-10T15:00:03Z"
     },
     "bloom_request_budget": {
       "limit_week": 10000,
@@ -78,7 +78,7 @@ progon 217, 2026-10-10T13:09:17Z
     "checked": 40,
     "window_h": 24.0,
     "boundary_from": "окно",
-    "boundary_utc": "2026-10-09T13:10:09Z",
+    "boundary_utc": "2026-10-09T15:07:03Z",
     "recent": [],
     "recent_count": 0,
     "older_count": 29,
@@ -96,12 +96,12 @@ progon 217, 2026-10-10T13:09:17Z
   "journal": {
     "decisions": {
       "v1": 0,
-      "v2": 530530,
+      "v2": 608305,
       "unreadable": 0
     },
     "positions": {
       "v1": 0,
-      "v2": 312,
+      "v2": 726,
       "unreadable": 0
     },
     "mixed": false
@@ -120,22 +120,22 @@ progon 217, 2026-10-10T13:09:17Z
 режим: live, вердикт: сверка чистая: настоящие покупки включать можно
 кошелёк 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N: баланс 0.0 SOL -- Bloom выключен -- баланс исполнителя не проверяется (слово владельца 02.10: площадка выключена с 27.09, кошелёк скомпрометирован 01.10 и не пополняется)
 чужая активность: известно=True, свежих за 24.0 ч 0, прежних 29 (самая свежая 2026-10-01T19:11:08Z)
-граница чужой активности: окно (2026-10-09T13:10:09Z)
+граница чужой активности: окно (2026-10-09T15:07:03Z)
 позиции: dry-run 0, настоящих открытых 0
   примечание: у кошелька есть прежняя история: 29 сделок старше окна, самая свежая из них 2026-10-01T19:11:08Z. Старт не блокирует, но кошелёк не с чистого листа, и приписывать себе весь его результат нельзя
   примечание: список подписей уперся в лимит 40: видно не всю историю кошелька, только последние сделки
   примечание: Bloom выключен -- баланс исполнителя не проверяется (слово владельца 02.10: площадка выключена с 27.09, кошелёк скомпрометирован 01.10 и не пополняется); на цепи сейчас 0.0 SOL
 обязательные имена на месте: BLOOM_SOURCE_GROUPS
-признак жизни: 20 с назад; группы ['money', 'speed_only']; открытых 0, зависших 0
+признак жизни: 1 с назад; группы ['money', 'speed_only']; открытых 0, зависших 0
 второе мнение: модуль загружен
 МОЖНО: открытых 0, зависших 0, признак свежий, продажи разрешены, модуль второго мнения загружен
-bloom-detector: start 2026-10-10T13:10:15Z, moduli 2026-10-10T13:09:48Z, start_pozzhe_modulej (27 s)
-bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_pozzhe_modulej (38 s)
+bloom-detector: start 2026-10-10T15:07:13Z, moduli 2026-10-10T15:06:44Z, start_pozzhe_modulej (29 s)
+bloom-seller: start 2026-10-10T15:07:24Z, moduli 2026-10-10T15:06:44Z, start_pozzhe_modulej (40 s)
 {
   "schema_version": 2,
-  "updated_utc": "2026-10-10T13:10:16Z",
-  "updated_ts": 1791637816.2482898,
-  "alive_since_utc": "2026-10-10T13:10:15Z",
+  "updated_utc": "2026-10-10T15:07:14Z",
+  "updated_ts": 1791644834.3075793,
+  "alive_since_utc": "2026-10-10T15:07:13Z",
   "mode": "live",
   "sources": 634,
   "source_groups": {
@@ -191,6 +191,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "pump_amm",
           "cpmm",
@@ -230,6 +232,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -274,6 +278,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -318,6 +324,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": null,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": null,
         "lane_route": null,
         "lane_route_tax_bps": null,
@@ -350,6 +358,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": null,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": null,
         "lane_route": null,
         "lane_route_tax_bps": null,
@@ -382,6 +392,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "pump_amm",
           "cpmm",
@@ -424,6 +436,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": null,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": null,
         "lane_route": null,
         "lane_route_tax_bps": null,
@@ -456,6 +470,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": 150,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -500,6 +516,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": 150,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -544,6 +562,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": 100,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -588,6 +608,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": 150,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -632,6 +654,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": 150,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -676,6 +700,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": 150,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": null,
         "lane_route": null,
         "lane_route_tax_bps": null,
@@ -708,6 +734,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 1,
         "per_day": 3,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -752,6 +780,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": null,
         "lane_route": null,
         "lane_route_tax_bps": null,
@@ -784,6 +814,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "lane_open_max": 3,
         "per_day": null,
         "per_hour": null,
+        "stop_after_closed": null,
+        "stop_after_hours": null,
         "lane_pools": [
           "amm_v4",
           "bonding",
@@ -820,7 +852,7 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
   "sender_connections": {
     "by_sender": {
       "astralane": {
-        "age_s": 0.2,
+        "age_s": 0.1,
         "last_use_s": null,
         "last_ping_s": 0.1,
         "pings_ok": 1,
@@ -875,7 +907,7 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
       }
     },
     "warm_period_s": 25.0,
-    "last_warm_s": 0.2,
+    "last_warm_s": 0.1,
     "last_warm": {
       "ok": 6,
       "failed": 0
@@ -888,9 +920,9 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
   "unsubscribed_addresses": 576,
   "credits": {
     "за_сеанс": 7,
-    "за_час": 18515,
-    "за_прошлый_час": 7301,
-    "за_сутки": 518337,
+    "за_час": 4547,
+    "за_прошлый_час": 40608,
+    "за_сутки": 582650,
     "бюджет_за_сутки": 2000000,
     "why_not": null
   },
@@ -920,10 +952,10 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
   },
   "lane_cu_limit": 140000,
   "summary_minute": 2,
-  "summary_last_hour": "2026-10-10T12:00Z",
+  "summary_last_hour": "2026-10-10T14:00Z",
   "summary_write_error": null,
   "rate_source": "geckoterminal",
-  "rate_usd_sol": 109.85399286676278,
+  "rate_usd_sol": 110.27119822983893,
   "rate_fresh": true,
   "rate_stale_used": 0,
   "rate_failures": [],
@@ -959,25 +991,25 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
     "otkljuchen_pochemu": "",
     "pokupok_net": true
   },
-  "net_slot": 455267148,
+  "net_slot": 455299177,
   "slot_notifications": 1,
   "ws_baity_po_vidam": {},
   "dlina_slota": {},
   "dlina_slota_v_rabote": {
-    "длина_слота_с": 0.21301,
+    "длина_слота_с": 0.22762,
     "источник": "замер",
-    "возраст_замера_с": 251.7,
+    "возраст_замера_с": 96.9,
     "константа_в_коде_с": 0.4
   },
-  "net_slot_age_s": 0.01,
+  "net_slot_age_s": 0.02,
   "balance_sol": 0.0,
-  "balance_age_s": 0.15,
+  "balance_age_s": 0.14,
   "rpc_calls": 7,
   "rpc_by_method": {
     "getMultipleAccounts": 2,
+    "getSlot": 1,
     "getBalance": 2,
     "getLatestBlockhash": 1,
-    "getSlot": 1,
     "getAccountInfo": 1
   },
   "session_credits": 7,
@@ -1040,8 +1072,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
     "module_why_not": "",
     "passed_in_row_by_pool": {},
     "hour": {
-      "since_ts": 1791637815.7277985,
-      "since_utc": "2026-10-10T13:10:15Z",
+      "since_ts": 1791644833.7613335,
+      "since_utc": "2026-10-10T15:07:13Z",
       "signals": 0,
       "built": 0,
       "sim_failed": 0,
@@ -1050,7 +1082,7 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
     },
     "restarts": 0,
     "last_restart_utc": "",
-    "credits_day": 698,
+    "credits_day": 846,
     "credits_write_why_not": ""
   },
   "route_tax_filter": {
@@ -1083,16 +1115,16 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
       "ok": true,
       "why_not": null
     },
-    "balance_sol": 5.169209326,
+    "balance_sol": 4.607278068,
     "balance_day_threshold": {
       "ok": true,
       "kill": false,
-      "why": "просадка от 00:00 -0.197664 SOL при рубильнике 2.0",
+      "why": "просадка от 00:00 0.364268 SOL при рубильнике 2.0",
       "threshold_sol": 2.0,
       "day": "20261010",
       "open_sol": 4.971545731,
-      "balance_sol": 5.169209326,
-      "drop_sol": -0.197663595,
+      "balance_sol": 4.607278068,
+      "drop_sol": 0.364267663,
       "withdrawals_sol": 0.0,
       "deposits_sol": 0.0,
       "net_owner_sol": 0.0,
@@ -1101,18 +1133,18 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
     },
     "lane_daily_stop": {
       "threshold_sol": null,
-      "pnl_all_groups_sol": 0.197663592,
+      "pnl_all_groups_sol": -0.364267668,
       "stopped": false,
       "why_not": null
     },
     "lane_chain_day": {
       "годен": true,
       "почему_нет": null,
-      "итог_sol": 0.197663595,
+      "итог_sol": -0.364267663,
       "день": "20261010",
       "начало_суток_ts": 1791583200.0,
       "как_считаются_сутки": "Europe/Madrid",
-      "баланс_sol": 5.169209326,
+      "баланс_sol": 4.607278068,
       "возраст_баланса_с": 0.0,
       "предел_возраста_с": 300.0,
       "открытие_sol": 4.971545731,
@@ -1125,7 +1157,7 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
       "открытых": 0,
       "открытых_по_входу_sol": 0.0,
       "открытых_без_числа": 0,
-      "итог_с_открытыми_sol": 0.197663595
+      "итог_с_открытыми_sol": -0.364267663
     },
     "balance_age_s": 0.1,
     "sim_shadow": {
@@ -1172,32 +1204,34 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
       "day": "20261010",
       "day_start_ts": 1791583200.0,
       "day_how": "Europe/Madrid",
-      "pnl_all_groups_sol": 0.197663592,
-      "pnl_chain_sol": 0.209774312,
-      "pnl_chain_all_groups_sol": 0.209774312,
-      "pnl_chain_n": 8,
-      "pnl_chain_fields_n": 3,
+      "pnl_all_groups_sol": -0.364267668,
+      "pnl_chain_sol": -0.335504708,
+      "pnl_chain_all_groups_sol": -0.335504708,
+      "pnl_chain_n": 19,
+      "pnl_chain_fields_n": 6,
       "pnl_chain_open_n": 0,
       "pnl_chain_why_not": [
         "итог по цепи в записи не посчитан",
         "итог по цепи в записи не посчитан",
         "итог по цепи в записи не посчитан"
       ],
-      "pnl_vs_chain_sol": -0.01211072,
-      "today_all_groups": 11,
-      "today": 11,
-      "hour": 0,
+      "pnl_vs_chain_sol": -0.02876296,
+      "today_all_groups": 25,
+      "today": 25,
+      "hour": 10,
       "failed_in_row": 0,
-      "pnl_sol": 0.197663592,
-      "pnl_trade_sol": 0.236006512,
-      "spend_sol": 0.03834292,
+      "pnl_sol": -0.364267668,
+      "pnl_trade_sol": -0.273085708,
+      "spend_sol": 0.09118196,
       "uncountable_today": 0,
       "no_result_today": 0,
       "uncountable_why": [],
-      "total": 55,
+      "total": 69,
+      "closed": 55,
+      "first_ts": 1791563360.5389612,
       "group": "деньги (все группы кроме скорости)",
-      "day_turnover_sol": 3.319055,
-      "day_spend_sol": 0.03834292
+      "day_turnover_sol": 7.544125,
+      "day_spend_sol": 0.09118196
     },
     "lane_state_by_group": {
       "money": {
@@ -1206,32 +1240,34 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "day": "20261010",
         "day_start_ts": 1791583200.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": 0.197663592,
-        "pnl_chain_sol": 0.209774312,
-        "pnl_chain_all_groups_sol": 0.209774312,
-        "pnl_chain_n": 8,
-        "pnl_chain_fields_n": 3,
+        "pnl_all_groups_sol": -0.364267668,
+        "pnl_chain_sol": -0.335504708,
+        "pnl_chain_all_groups_sol": -0.335504708,
+        "pnl_chain_n": 19,
+        "pnl_chain_fields_n": 6,
         "pnl_chain_open_n": 0,
         "pnl_chain_why_not": [
           "итог по цепи в записи не посчитан",
           "итог по цепи в записи не посчитан",
           "итог по цепи в записи не посчитан"
         ],
-        "pnl_vs_chain_sol": -0.01211072,
-        "today_all_groups": 11,
-        "today": 11,
-        "hour": 0,
+        "pnl_vs_chain_sol": -0.02876296,
+        "today_all_groups": 25,
+        "today": 25,
+        "hour": 10,
         "failed_in_row": 0,
-        "pnl_sol": 0.197663592,
-        "pnl_trade_sol": 0.236006512,
-        "spend_sol": 0.03834292,
+        "pnl_sol": -0.364267668,
+        "pnl_trade_sol": -0.273085708,
+        "spend_sol": 0.09118196,
         "uncountable_today": 0,
         "no_result_today": 0,
         "uncountable_why": [],
-        "total": 55,
+        "total": 69,
+        "closed": 55,
+        "first_ts": 1791563360.5389612,
         "group": "деньги (все группы кроме скорости)",
-        "day_turnover_sol": 3.319055,
-        "day_spend_sol": 0.03834292
+        "day_turnover_sol": 7.544125,
+        "day_spend_sol": 0.09118196
       },
       "speed_only": {
         "open": 0,
@@ -1239,15 +1275,15 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "day": "20261010",
         "day_start_ts": 1791583200.0,
         "day_how": "Europe/Madrid",
-        "pnl_all_groups_sol": 0.197663592,
+        "pnl_all_groups_sol": -0.364267668,
         "pnl_chain_sol": 0.0,
-        "pnl_chain_all_groups_sol": 0.209774312,
+        "pnl_chain_all_groups_sol": -0.335504708,
         "pnl_chain_n": 0,
         "pnl_chain_fields_n": 0,
         "pnl_chain_open_n": 0,
         "pnl_chain_why_not": [],
         "pnl_vs_chain_sol": 0.0,
-        "today_all_groups": 11,
+        "today_all_groups": 25,
         "today": 0,
         "hour": 0,
         "failed_in_row": 0,
@@ -1258,6 +1294,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
         "no_result_today": 0,
         "uncountable_why": [],
         "total": 0,
+        "closed": 0,
+        "first_ts": null,
         "group": "speed_only",
         "day_turnover_sol": 0,
         "day_spend_sol": 0.0
@@ -1285,11 +1323,11 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
       "enabled": true,
       "tip_cap_sol": 0.005,
       "winners": {
-        "astralane": 30,
-        "helius": 10,
+        "astralane": 35,
+        "helius": 16,
         "blockrazor": 11,
-        "nozomi": 3,
-        "jito": 1
+        "nozomi": 5,
+        "jito": 2
       }
     },
     "pool_nonce": {
@@ -1302,7 +1340,7 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
       "shift_signature": null,
       "warm": {
         "есть": true,
-        "возраст_с": 0.13,
+        "возраст_с": 0.11,
         "почему": "",
         "обновлений": 1,
         "взят_тёплым": 0,
@@ -1332,8 +1370,8 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
     "top_up_why_not": "",
     "bytes": 0,
     "credits": 0,
-    "credits_day": 33600,
-    "credits_before_start": 33600,
+    "credits_day": 42600,
+    "credits_before_start": 42600,
     "credits_write_why_not": "",
     "credit_budget": 0,
     "credit_cap": "нет потолка",
@@ -1379,7 +1417,7 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
     "failed": 0,
     "skipped_while_buying": 0,
     "last_code": 200,
-    "last_utc": "2026-10-10T13:10:15Z",
+    "last_utc": "2026-10-10T15:07:14Z",
     "last_error": ""
   },
   "executor_attached": true,
@@ -1423,9 +1461,9 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
   },
   "trevogi_zhurnal": []
 }--- решений в журнале ---
-530674
+608493
 --- позиций в журнале (должно быть 0: покупать нечем) ---
-312
+726
   [ok  ] работ ровно пять: учёт, живучесть, суточная выгрузка, уборщик и строка уборщика за сутки
   [ok  ] имена юнитов не совпадают между собой
   [ok  ] имена юнитов только ASCII: systemd кириллицы в имени не любит
@@ -1606,6 +1644,11 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
   [ok  ] поле ряда zapusk_sol_sozdatelya (сколько вложил создатель) есть в рабочем коде выгрузки
   [ok  ] поле ряда zapusk_sozdanie (разновидность создания) есть в рабочем коде выгрузки
   [ok  ] поле ряда our_slot (слот нашей покупки) есть в рабочем коде выгрузки
+  [ok  ] ДОКАЗАННЫЙ КРАСНЫЙ: pool_program в записи позиции НЕ ПИШЕТСЯ (0 из 55 рядов 10.10), поэтому колонка дозаполняется полем program -- тем же, чем заполнен строитель
+  [ok  ] имя площадки собирается из ТЕХ ЖЕ имён, что у полосы, а не пишется здесь второй раз, и колонка действительно подставлена в ряд
+  [ok  ] кривая pump.fun названа словом полосы (bonding), пустая программа и чужая -- названный отказ, а не пустое поле молча
+  [ok  ] площадок столько же, сколько типов у полосы (10 из 10), и причина пустоты не нужна (None)
+  [ok  ] имена площадок читаются разбором исходника, а не импортом полосы и сборки (иначе на бегунке без solders поле пустое с ложной причиной)
   [ok  ] our_slot больше НЕ берётся только из полей, которых в записи нет (own_tx_seen_slot и our_slot -- 0 из 66 рядов 09.10)
   [ok  ] токенов получено берётся из lane_bought_raw -- поля, которое полоса действительно пишет (62 из 66 рядов 09.10)
   [ok  ] доли путей продажи и покрытие идут в сводку
@@ -1619,7 +1662,7 @@ bloom-seller: start 2026-10-10T13:10:26Z, moduli 2026-10-10T13:09:48Z, start_poz
   [ok  ] подпись берётся и из отправленного варианта, когда севшей нет
   [ok  ] поля отказа есть в ряду выгрузки, а не только в функции
   [ok  ] числа отказов идут в сводку
-самопроверка выгрузки сделок полосы: 60/60 пройдено
+самопроверка выгрузки сделок полосы: 65/65 пройдено
 пояс хоста +0200, таймеры в UTC: OnCalendar считается по строке, а не по хосту
 изменено файлов: ни одного (всё уже стояло)
 daemon-reload не нужен: ни один файл не изменился
@@ -1628,23 +1671,23 @@ bloom-zhivuchest-chas.timer: is-enabled=enabled
 bloom-vygruzka-sutki.timer: is-enabled=enabled
 bloom-uborshchik-itog-sutki.timer: is-enabled=enabled
 bloom-uborshchik-chas.timer: is-enabled=enabled
-NEXT                             LEFT LAST                              PASSED UNIT                              ACTIVATES
-Sat 2026-10-10 15:14:00 CEST 2min 54s Sat 2026-10-10 14:44:01 CEST   27min ago bloom-stroka-balansov.timer       bloom-stroka-balansov.service
-Sat 2026-10-10 15:23:00 CEST    11min Sat 2026-10-10 14:23:01 CEST   48min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
-Sat 2026-10-10 15:38:00 CEST    26min Sat 2026-10-10 14:38:01 CEST   33min ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
-Sat 2026-10-10 15:53:00 CEST    41min Sat 2026-10-10 14:53:01 CEST   18min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
-Sat 2026-10-10 16:10:00 CEST    58min Sat 2026-10-10 15:10:00 CEST 1min 5s ago bloom-samoproverka-chas.timer     bloom-samoproverka-chas.service
-Sat 2026-10-10 23:55:00 CEST       8h Fri 2026-10-09 23:55:01 CEST     15h ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
-Sun 2026-10-11 08:00:00 CEST      16h Sat 2026-10-10 08:00:01 CEST      7h ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
+NEXT                             LEFT LAST                            PASSED UNIT                              ACTIVATES
+Sat 2026-10-10 17:10:00 CEST 1min 54s Sat 2026-10-10 16:10:01 CEST 58min ago bloom-samoproverka-chas.timer     bloom-samoproverka-chas.service
+Sat 2026-10-10 17:14:00 CEST     5min Sat 2026-10-10 16:44:01 CEST 24min ago bloom-stroka-balansov.timer       bloom-stroka-balansov.service
+Sat 2026-10-10 17:23:00 CEST    14min Sat 2026-10-10 16:23:01 CEST 45min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
+Sat 2026-10-10 17:38:00 CEST    29min Sat 2026-10-10 16:38:01 CEST 30min ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
+Sat 2026-10-10 17:53:00 CEST    44min Sat 2026-10-10 16:53:01 CEST 15min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
+Sat 2026-10-10 23:55:00 CEST       6h Fri 2026-10-09 23:55:01 CEST   17h ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
+Sun 2026-10-11 08:00:00 CEST      14h Sat 2026-10-10 08:00:01 CEST    9h ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
 
 7 timers listed.
 Pass --all to see loaded but inactive timers, too.
 NEXT                          LEFT LAST                            PASSED UNIT                              ACTIVATES
-Sat 2026-10-10 15:23:00 CEST 11min Sat 2026-10-10 14:23:01 CEST 48min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
-Sat 2026-10-10 15:38:00 CEST 26min Sat 2026-10-10 14:38:01 CEST 33min ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
-Sat 2026-10-10 15:53:00 CEST 41min Sat 2026-10-10 14:53:01 CEST 18min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
-Sat 2026-10-10 23:55:00 CEST    8h Fri 2026-10-09 23:55:01 CEST   15h ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
-Sun 2026-10-11 08:00:00 CEST   16h Sat 2026-10-10 08:00:01 CEST    7h ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
+Sat 2026-10-10 17:23:00 CEST 14min Sat 2026-10-10 16:23:01 CEST 45min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
+Sat 2026-10-10 17:38:00 CEST 29min Sat 2026-10-10 16:38:01 CEST 30min ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
+Sat 2026-10-10 17:53:00 CEST 44min Sat 2026-10-10 16:53:01 CEST 15min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
+Sat 2026-10-10 23:55:00 CEST    6h Fri 2026-10-09 23:55:01 CEST   17h ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
+Sun 2026-10-11 08:00:00 CEST   14h Sat 2026-10-10 08:00:01 CEST    9h ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
 
 5 timers listed.
 Pass --all to see loaded but inactive timers, too.
