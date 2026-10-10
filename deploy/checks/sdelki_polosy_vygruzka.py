@@ -247,12 +247,34 @@ def put_prodazhi(п: dict) -> dict:
     пул или двухшаговая) -- склеивать их в одно слово значит терять замер.
     """
     вид = (п.get("sell_address_kind") or "").strip() or None
+    # ВИДЫ ПОПЫТОК СТРОКОЙ ПИШЕТ ТОЛЬКО ПУТЬ BLOOM-API (bloom_seller:2530), а
+    # Jupiter, своя нога в пул и двухшаговая его не трогают вовсе. У сделок
+    # полосы он поэтому ПУСТ ПО ПОСТРОЕНИЮ, и читать пустоту как "попытка была
+    # одна" нельзя -- отсюда отдельное имя поля, а не "попыток".
     виды = [в for в in (п.get("sell_address_kinds") or "").split(",") if в]
     путь = ПУТЬ_ПРОДАЖИ_ПО_ВИДУ.get(вид or "")
     из_ = {"put_prodazhi": путь,
             "put_prodazhi_vid": вид,
             "put_prodazhi_vidy_popytok": (",".join(виды) or None),
             "put_prodazhi_why_not": None}
+    # СВЕРКА ВИДА С ПОДПИСЬЮ ЕГО ЖЕ ПУТИ. Вид адреса пишется ТОЛЬКО когда
+    # вернулась подпись (bloom_seller:4112, 4865, 3612), поэтому попытка,
+    # отказавшая до сети, оставляет в поле ПРЕЖНИЙ путь -- и поле способно
+    # назвать путь, которым эта продажа не шла. Если подпись пути не совпала с
+    # отчитанной подписью продажи, путь НЕ утверждается: называются оба числа.
+    своя = {"jupiter": п.get("jup_signature"),
+             "свой_в_пул": п.get("own_pool_sell_signature"),
+             "two_step": п.get("two_step_sell_signature")}.get(вид or "")
+    отчитана = (п.get("last_sell_reported")
+                or (п.get("last_sell_signatures") or [None])[-1])
+    if путь and своя and отчитана and своя != отчитана:
+        из_["put_prodazhi"] = None
+        из_["put_prodazhi_rashozhdenie"] = {"podpis_puti": своя,
+                                             "podpis_prodazhi": отчитана}
+        из_["put_prodazhi_why_not"] = (
+            f"вид адреса {вид!r} назван подписью {str(своя)[:12]}, а продажа "
+            f"отчитана подписью {str(отчитана)[:12]} -- путь не утверждаем")
+        return из_
     if вид and путь is None:
         # НОВЫЙ ВИД АДРЕСА -- НЕ «Jupiter ПО УМОЛЧАНИЮ». Молчаливое отнесение
         # незнакомого вида к одной из сторон испортило бы долю на следующей же
@@ -262,6 +284,49 @@ def put_prodazhi(п: dict) -> dict:
             "к «нашему» и к «Jupiter» он не отнесён")
     elif not вид:
         из_["put_prodazhi_why_not"] = WHY_НЕТ_ПУТИ_ПРОДАЖИ
+    return из_
+
+
+def nativ_i_wsol(п: dict) -> dict:
+    """Ликвидный итог и дельта завёрнутого -- из слагаемых итога по цепи.
+
+    ЗАЧЕМ ОТДЕЛЬНО. Поля closed_sol_net_native и closed_wsol_delta выгрузка
+    читала из записи позиции, а служба их не пишет: на живой выгрузке за 09.10
+    оба -- 0 из 66 рядов. Пустое поле в выгрузке читается как "числа нет", и
+    это тихая пустота: число есть, оно просто лежит в другом месте.
+
+    itog_po_cepi_nativ_sol -- ЛИКВИДНАЯ сумма двух ног (части
+    итог_ликвидный_sol): ровно то, что видел бы счёт по нативному балансу
+    кошелька, без ренты токеновых счетов.
+    """
+    из_ = {"itog_po_cepi_nativ_sol": п.get("closed_sol_net_native"),
+            "wsol_delta_sol": п.get("closed_wsol_delta"),
+            "nativ_i_wsol_otkuda": ("запись" if (
+                п.get("closed_sol_net_native") is not None
+                or п.get("closed_wsol_delta") is not None) else None)}
+    ч = п.get("lane_chain_pnl_parts")
+    if not isinstance(ч, dict) or not ч:
+        if из_["nativ_i_wsol_otkuda"] is None:
+            из_["nativ_i_wsol_why_not"] = (
+                п.get("lane_chain_pnl_why_not")
+                or "слагаемых итога по цепи в записи нет")
+        return из_
+    if из_["itog_po_cepi_nativ_sol"] is None:
+        зн = ч.get("итог_ликвидный_sol")
+        if isinstance(зн, (int, float)):
+            из_["itog_po_cepi_nativ_sol"] = round(float(зн), 9)
+            из_["nativ_i_wsol_otkuda"] = "слагаемые итога по цепи"
+    if из_["wsol_delta_sol"] is None:
+        сумма, нашлось = 0.0, False
+        for роль in ("покупка", "продажа"):
+            нога = ч.get(роль)
+            зн = нога.get("завёрнутое_sol") if isinstance(нога, dict) else None
+            if isinstance(зн, (int, float)):
+                сумма += float(зн)
+                нашлось = True
+        if нашлось:
+            из_["wsol_delta_sol"] = round(сумма, 9)
+            из_["nativ_i_wsol_otkuda"] = "слагаемые итога по цепи"
     return из_
 
 
@@ -795,8 +860,14 @@ def main() -> int:
             # ИТОГ ПО ЦЕПИ БЕЗ РАСПАКОВКИ WSOL и прежнее нативное число рядом:
             # по ним видно, какие сделки сменили итог после правки учёта 01.10.
             "itog_po_cepi_sol": п.get("closed_sol_net"),
-            "itog_po_cepi_nativ_sol": п.get("closed_sol_net_native"),
-            "wsol_delta_sol": п.get("closed_wsol_delta"),
+            # ДВА ЧИСЛА БРАЛИСЬ ИЗ ПОЛЕЙ, КОТОРЫХ В ЗАПИСИ НЕТ ВОВСЕ. Замер по
+            # живой выгрузке за 09.10: closed_sol_net_native и
+            # closed_wsol_delta -- 0 из 66 рядов, то есть оба поля выгрузки
+            # выходили ВСЕГДА пустыми, и Code-2 читал это как "числа нет".
+            # Настоящие числа лежат в слагаемых итога по цепи: ликвидная сумма
+            # и дельта завёрнутого. Прежние имена записи остаются первыми --
+            # если служба однажды начнёт их писать, возьмётся запись.
+            **nativ_i_wsol(п),
             "freeze_authority": None,
             "freeze_authority_otozvan": None,
             "state": п.get("state"),
@@ -1386,6 +1457,32 @@ def самопроверка() -> int:
         _одна["vhod_sol_po_cepi"] == 0.01
         and _одна["vyhod_sol_po_cepi"] is None
         and "продажа" in (_одна["vhod_vyhod_why_not"] or ""), _одна)
+    _рсх = put_prodazhi({"sell_address_kind": "jupiter", "jup_signature": "A",
+                          "last_sell_reported": "B"})
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: вид адреса назван подписью одного пути, а продажа "
+        "отчитана другой -- путь НЕ утверждается, оба числа названы",
+        _рсх["put_prodazhi"] is None
+        and _рсх["put_prodazhi_rashozhdenie"] == {"podpis_puti": "A",
+                                                  "podpis_prodazhi": "B"}, _рсх)
+    chk("подписи совпали -- путь утверждается",
+        put_prodazhi({"sell_address_kind": "jupiter", "jup_signature": "A",
+                       "last_sell_reported": "A"})["put_prodazhi"] == "Jupiter")
+    # --- ЛИКВИДНЫЙ ИТОГ И ЗАВЁРНУТОЕ: поля брались из полей, которых в записи нет
+    _нв = nativ_i_wsol({"lane_chain_pnl_parts": {
+        "покупка": {"завёрнутое_sol": 0.0}, "продажа": {"завёрнутое_sol": 0.0},
+        "итог_ликвидный_sol": 0.009404716}})
+    chk("ликвидный итог берётся из слагаемых по цепи, а не из поля, которого "
+        "в записи нет (замер 09.10: 0 из 66 рядов)",
+        _нв["itog_po_cepi_nativ_sol"] == 0.009404716
+        and _нв["wsol_delta_sol"] == 0.0
+        and _нв["nativ_i_wsol_otkuda"] == "слагаемые итога по цепи", _нв)
+    chk("запись сильнее слагаемых: если служба однажды напишет поле, берётся оно",
+        nativ_i_wsol({"closed_sol_net_native": 1.5,
+                       "lane_chain_pnl_parts": {"итог_ликвидный_sol": 9.9}}
+                      )["itog_po_cepi_nativ_sol"] == 1.5)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: ни поля, ни слагаемых -- причина словами, а не ноль",
+        nativ_i_wsol({})["nativ_i_wsol_why_not"] is not None
+        and nativ_i_wsol({})["itog_po_cepi_nativ_sol"] is None)
     chk("путь продажи и вход/выход -- поля РЯДА выгрузки, а не только функций",
         "**put_prodazhi(п)" in рабочая_в
         and "**vhod_vyhod_po_cepi(п)" in рабочая_в, None)
