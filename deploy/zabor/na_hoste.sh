@@ -214,6 +214,7 @@ sudo -u bot -E env PYTHONPATH="$CODE_DIR:$RABOTA" BLOOM_CODE_DIR="$CODE_DIR" \
   --chaevye-rotaciya "${CHAEVYE_ROTACIYA:-0}" \
   --reestr "$RABOTA/senders.json" \
   --put-v2 "${PUT_V2:-0}" \
+  --dazhe-vyklyuchennym "${DAZHE_VYKL:-0}" \
   --out "$RABOTA/out.json"
 KOD=$?
 set -e

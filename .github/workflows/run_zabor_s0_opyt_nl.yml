@@ -56,6 +56,10 @@ on:
         description: "ПРОБА: чаевые в лампортах вместо минимума из реестра (0 -- из реестра). Потолок пробы сторожит сам модуль"
         required: false
         default: "0"
+      dazhe_vyklyuchennym:
+        description: "ПРОБА: 1 -- послать ДАЖЕ выключенному в реестре отправителю (идёт по копии реестра, боевой файл не трогается)"
+        required: false
+        default: "0"
       put_v2:
         description: "ПРОБА: 1 -- послать тот же байт путём /v2/sendBinaryTransaction (сырые байты, ключ в auth=)"
         required: false
@@ -186,6 +190,7 @@ jobs:
           CHAEVYE_VPERYOD: ${{ inputs.chaevye_vperyod }}
           CHAEVYE_ROTACIYA: ${{ inputs.chaevye_rotaciya }}
           PUT_V2: ${{ inputs.put_v2 }}
+          DAZHE_VYKL: ${{ inputs.dazhe_vyklyuchennym }}
         run: |
           set -e
           set -o pipefail
@@ -203,15 +208,19 @@ jobs:
             0|1) ;;
             *) echo "SBOY: put_v2 -- tolko 0 ili 1: $PUT_V2"; exit 1;;
           esac
+          case "${DAZHE_VYKL:-0}" in
+            0|1) ;;
+            *) echo "SBOY: dazhe_vyklyuchennym -- tolko 0 ili 1: $DAZHE_VYKL"; exit 1;;
+          esac
           case "${CHAEVYE:-0}" in
             ''|*[!0-9]*) echo "SBOY: chaevye ne celoe chislo: $CHAEVYE"; exit 1;;
           esac
           ssh -n $SSH_OPTS root@$TARGET_HOST 'rm -rf /tmp/zabor_s0_opyt; install -d -m 700 /tmp/zabor_s0_opyt'
           # Параметры отдельным файлом: тогда в команде ssh нечего подставлять.
-          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\nOTPRAVITELI=%s\nCHAEVYE=%s\nCHAEVYE_VPERYOD=%s\nCHAEVYE_ROTACIYA=%s\nPUT_V2=%s\n' \
+          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\nOTPRAVITELI=%s\nCHAEVYE=%s\nCHAEVYE_VPERYOD=%s\nCHAEVYE_ROTACIYA=%s\nPUT_V2=%s\nDAZHE_VYKL=%s\n' \
             "$OTPRAVITEL" "$RAUNDOV" "$REZHIM" "$OTPRAVITELI" "${CHAEVYE:-0}" \
             "${CHAEVYE_VPERYOD:-0}" "${CHAEVYE_ROTACIYA:-0}" "${PUT_V2:-0}" \
-            > /tmp/zabor_params
+            "${DAZHE_VYKL:-0}" > /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/params' < /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/c2_zabor_s0_opyt.py' < analysis/c2_zabor_s0_opyt.py
           # МОДУЛЬ ГОНКИ ЕДЕТ ВСЕГДА, а не только в режиме gonka: лишний файл
