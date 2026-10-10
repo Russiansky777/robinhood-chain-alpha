@@ -1,125 +1,219 @@
 #!/usr/bin/env python3
-"""Подбивка: забор S+0 в деньгах -- 45 сделок полосы 28.09 06Z → 29.09 06Z по цепи (Правило 11).
+"""Забор S+0: вход только в блок источника, цена -- конец его слота (S0_дно).
 
-Вход: data/podbivka/mesto/vhod_2026-09-29.json (data/sdelki_polosy_2026-09-29.json ветки Code-1, только чтение).
-Итог сделки = изменение нативного баланса нашего кошелька и всех его токеновых счетов (владелец -- кошелёк;
-WSOL, ATA минта) по всем транзакциям сделки -- комиссии, чаевые, рента входят (как в Правиле 11 Code-1).
-Транзакции сделки: buy_sig, sell_sig, last_sell_signatures из записи Code-1 и ВСЕ транзакции кошелька в окне,
-где у кошелька меняется баланс этого минта (продажи ищутся по подписям кошелька, не по истории пула; так
-находятся и ручные продажи владельца). Транзакции, где у кошелька меняются балансы нескольких минтов
-(пакетное закрытие пустых счетов), не входят: у кошелька и его счетов вместе рента в них сходится в ноль.
-Только чтение, Helius. Выход: data/podbivka/zabor_s0_2026-09-29.json.
+Зачем. Место внутри блока итог не решает, решает СЛОТ: по живым сделкам лаг 0 даёт
++0.0238 SOL (n 14, в плюсе 57 %), лаг 1 -0.0082 (n 34), лаг 3 -0.0208 (n 7, в плюсе 0 %).
+Значит стоит считать стратегию, которая входит ТОЛЬКО когда попала в блок источника, а
+остальные сигналы бросает без комиссии.
+
+Честная цена. Садясь в слот источника, мы оказываемся у конца слота: доля блока при лаге 0
+-- p10 0.316, медиана 0.784, p90 0.982. Поэтому цена входа -- S0_дно (состояние после
+последнего события слота источника), а не S0 (сразу за его сделкой). По факту наш налив
+садится даже на 0.9--2.2 % лучше конца слота, так что S0_дно -- оценка осторожная.
+
+Доля попадания. По живым сделкам vol_4vw лаг 0 у 14 из 67 -- 20.9 %. Зависимости от
+загрузки блока не видно: 19 % при 1200--1600 транзакций в блоке, 25 % при 800--1200, 50 %
+при 1600+ (n 2). Поэтому доля берётся плоской, флагом --dolya, и это сказано как
+допущение, а не измеренный закон. Владелец называет для групп 582 из 1 645 (35.4 %) --
+воспроизвести по выгрузке нельзя: в ней за то окно our_slot и source_slot не заполнены ни
+у одной из 1 711 сделок, поэтому второе значение считается отдельным прогоном.
+
+Как учтена доля. Сигналы НЕ умножаются на долю -- они прореживаются: берётся случайная (по
+семени) доля сигналов, остальные выброшены. Иначе знаки суточных исходов и число сделок
+остались бы прежними, а именно они и решают в стандарте: при доле 20.9 % число сделок на
+окне падает впятеро, и порог «n >= 100 на окне» становится настоящим ограничением.
+
+Билет: 0.3 и, вторым столбцом, предельный по глубине пула (не больше 2 % резерва на
+входе). Поправки круга -- три, рядом. Стандарт -- тот же, что в podbivka_istochniki_novyj.
+
+Только чтение кэша сигналов. Выход: data/podbivka/zabor_s0.json.
 """
 from __future__ import annotations
 
-import calendar
+import argparse
+import collections
 import json
+import random
+import statistics
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import c2_common as C  # noqa: E402
-import podbivka_sim as S  # noqa: E402
+import podbivka_bilet as B           # noqa: E402
+import podbivka_istochniki_novyj as И  # noqa: E402
+import podbivka_paket_obshee as O    # noqa: E402
+import podbivka_zapuski_svod as Z    # noqa: E402
 
-КОРЕНЬ = Path(__file__).resolve().parent.parent
-ВХОД = КОРЕНЬ / "data" / "podbivka" / "mesto" / "vhod_2026-09-29.json"
-ВЫХОД = КОРЕНЬ / "data" / "podbivka" / "zabor_s0_2026-09-29.json"
-ОКНО = ("2026-09-28T05:30:00Z", "2026-09-29T09:00:00Z")
+П = O.П
+МЕСТО = "S0_дно"
+УДЕРЖАНИЯ = И.УДЕРЖАНИЯ
+ДОЛЯ_РЕЗЕРВА = И.ДОЛЯ_РЕЗЕРВА
+БИЛЕТ = И.БИЛЕТ
+К_G_РЯДОМ = И.К_G_РЯДОМ
+СЕМЯ = 20261010
 
 
-def ts(s: str) -> float:
-    return calendar.timegm(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ"))
+def билет_по_глубине(р: dict) -> float | None:
+    """Предельный билет: не больше ДОЛЯ_РЕЗЕРВА от резерва пула на входе."""
+    вх = (р.get("вход") or {}).get(МЕСТО)
+    if not вх:
+        return None
+    рез = float(вх[0]) / float(р.get("масштаб") or 1.0)
+    б = ДОЛЯ_РЕЗЕРВА * рез
+    return round(min(б, 3.0), 4) if б > 0.01 else None
 
 
-def наши_дельты(tx: dict, кош: str) -> tuple[int, dict]:
-    """Δ лампортов кошелька + всех его токеновых счетов; {минт: Δ сырых токенов кошелька}."""
-    keys = C.account_keys(tx)
-    meta = tx.get("meta") or {}
-    pre, post = meta.get("preBalances") or [], meta.get("postBalances") or []
-    ряды = C.token_rows(tx)
-    свои = {i for i, r in ряды.items() if r.get("owner") == кош and isinstance(i, int)}
-    if кош in keys:
-        свои.add(keys.index(кош))
-    лам = sum(int(post[i]) - int(pre[i]) for i in свои if i < len(pre) and i < len(post))
-    минты: dict = {}
-    for r in ряды.values():
-        if r.get("owner") == кош and r.get("mint") != C.WSOL:
-            минты[r["mint"]] = минты.get(r["mint"], 0) + (int(r["post"]) - int(r["pre"]))
-    return лам, минты
+def проход(а, изд: float) -> dict:
+    рнд = random.Random(СЕМЯ)
+    ряды: dict = collections.defaultdict(list)
+    счёт: collections.Counter = collections.Counter()
+    for р in O.сигналы():
+        счёт["сигналов"] += 1
+        if р.get("quoteMint") != O.WSOL or not р.get("первая"):
+            continue
+        if (р.get("sol") or 0) < И.ПОРОГ_ИСТОЧНИКА:
+            continue
+        ист = р.get("ист")
+        if not (ист and (р.get("вход") or {}).get(МЕСТО)):
+            continue
+        счёт["годных_сигналов"] += 1
+        # прореживание: попали в блок источника только в доле --dolya случаев
+        if рнд.random() > а.dolya:
+            счёт["мимо_блока_источника"] += 1
+            continue
+        счёт["вошли"] += 1
+        с = O.как_сигнал(р)
+        бг = билет_по_глубине(р)
+        for H in УДЕРЖАНИЯ:
+            for имя_б, б in (("0.3", БИЛЕТ), ("глубина", бг)):
+                if not б:
+                    continue
+                итоги = {}
+                вид = None
+                for кг in К_G_РЯДОМ:
+                    и_, в_ = И.круг(с, б, МЕСТО, H, изд, 1.0, кг)
+                    вид = в_
+                    if и_ is not None:
+                        итоги[str(кг)] = и_
+                if not итоги:
+                    счёт[f"круг_нет|{вид}"] += 1
+                    continue
+                ряды[(ист, H, имя_б)].append(
+                    {"сутки": O.сутки(р), "итоги": итоги,
+                     "итог": next(iter(итоги.values())),
+                     "билет": б, "резерв": р.get("резерв_sol"), "вид": вид})
+    return {"ряды": dict(ряды), "счёт": dict(счёт)}
+
+
+def главное(а) -> int:  # noqa: PLR0915
+    кал = (json.loads((П / "kalibrovka.json").read_text(encoding="utf-8"))
+           .get("калибровка") or {})
+    изд = float(кал.get("издержки_медиана_sol") or 0.002)
+    print(f"доля попадания {а.dolya}, место {МЕСТО}, издержки {изд}", flush=True)
+    п = проход(а, изд)
+    дни = sorted({x["сутки"] for ряды in п["ряды"].values() for x in ряды})
+    if not дни:
+        print("сигналов не осталось", flush=True)
+        return 2
+    окна = И.окна_скольжения(дни, И.ПОДБОР_СУТОК, И.ПРОВЕРКА_СУТОК, И.СДВИГ_СУТОК)
+    print(f"суток {len(дни)}: {дни[0]} .. {дни[-1]}; окон {len(окна)}; "
+          f"счёт {п['счёт']}", flush=True)
+    рнд = random.Random(СЕМЯ)
+    по_кг = {}
+    for кг in К_G_РЯДОМ:
+        таб = {}
+        for (ист, H, имя_б), ряды in п["ряды"].items():
+            окон = []
+            for _, пров_д in окна:
+                пр = [x for x in ряды if x["сутки"] in пров_д]
+                if not пр:
+                    окон.append({"n": 0, "прошло": False})
+                    continue
+                с_ = И.свод(пр, пров_д, str(кг))
+                пол = И.половины(пр, пров_д, str(кг))
+                да, почему = И.окно_прошло(с_, пол)
+                окон.append({"n": с_["n"], "sol_в_сутки": с_["sol_в_сутки"],
+                             "прошло": да, "почему_нет": почему})
+            всего = И.свод(ряды, дни, str(кг))
+            p, p_пер = И.p_по_знакам(всего.get("суммы_по_суткам") or {}, рнд)
+            годных = [o for o in окон if o["n"]]
+            таб[f"{ист}|{H}|{имя_б}"] = {
+                "источник": ист, "удержание": H, "билет": имя_б,
+                "всё_окно": всего, "окна": окон, "окон_годных": len(годных),
+                "окон_в_плюсе": sum(1 for o in окон if o["прошло"]),
+                "прошло": bool(годных and len(годных) >= И.ОКОН_МИН
+                               and all(o["прошло"] for o in годных)),
+                "p": p, "p_перестановками": p_пер}
+        по_кг[str(кг)] = таб
+    осн = по_кг[str(а.k_g_osnovnaya)]
+    N = len({v["источник"] for v in осн.values()})
+    порог = 0.05 / max(1, N)
+    for таб in по_кг.values():
+        for v in таб.values():
+            v["прошло_с_поправкой"] = bool(v["прошло"] and v["p"] is not None
+                                           and v["p"] < порог)
+    тело = {"что": "забор S+0: вход только в блок источника, цена S0_дно",
+            "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "допущения": {"место_входа": МЕСТО, "доля_попадания": а.dolya,
+                          "доля_откуда": "живые сделки vol_4vw: лаг 0 у 14 из 67 = 20.9 %; "
+                                         "зависимости от загрузки блока не видно",
+                          "мимо_блока": "сигнал выброшен без комиссии",
+                          "издержки_sol": изд, "к_g_рядом": [str(x) for x in К_G_РЯДОМ],
+                          "билеты": ["0.3", "предельный по глубине 2 % резерва"],
+                          "N": N, "порог_p": порог},
+            "окно": {"сутки": дни, "окон": len(окна)},
+            "счёт": п["счёт"],
+            "прошли": {кг: sorted(k for k, v in таб.items() if v["прошло_с_поправкой"])
+                       for кг, таб in по_кг.items()},
+            "таблица": [
+                {"источник": v["источник"], "удержание": v["удержание"],
+                 "билет": v["билет"], "n": (v["всё_окно"] or {}).get("n"),
+                 "сделок_в_сутки": (v["всё_окно"] or {}).get("сделок_в_сутки"),
+                 "sol_в_сутки": {кг: ((по_кг[кг].get(k) or {}).get("всё_окно") or {})
+                                 .get("sol_в_сутки") for кг in по_кг},
+                 "без_верх_5": (v["всё_окно"] or {}).get("без_верх_5_sol"),
+                 "окон_в_плюсе": v["окон_в_плюсе"], "окон_годных": v["окон_годных"],
+                 "p": v["p"], "глубина_ок": (v["всё_окно"] or {}).get("глубина_ок"),
+                 "суток_в_плюсе": (v["всё_окно"] or {}).get("суток_в_плюсе"),
+                 "суток": (v["всё_окно"] or {}).get("суток"),
+                 "прошло": {кг: (по_кг[кг].get(k) or {}).get("прошло_с_поправкой")
+                            for кг in по_кг}}
+                for k, v in sorted(осн.items(),
+                                   key=lambda kv: -((kv[1]["всё_окно"] or {})
+                                                    .get("sol_в_сутки") or -1e9))[:120]]}
+    ф = П / f"zabor_s0{а.metka}.json"
+    ф.write_text(json.dumps(тело, ensure_ascii=False, indent=1), encoding="utf-8")
+    try:
+        import podbivka_run as R  # noqa: PLC0415
+        R.записано(ф)
+    except Exception:  # noqa: BLE001, S110
+        pass
+    print(json.dumps({k: v for k, v in тело.items()
+                      if k not in ("таблица", "окно")}, ensure_ascii=False,
+                     indent=1)[:1800], flush=True)
+    print(f"\n{'источник':14}{'H':>4}{'билет':>9}{'n':>6}{'сд/сут':>8}"
+          f"{'0.989':>10}{'1.000':>9}{'1.013':>9}{'без в5':>10}{'окон+':>7}{'p':>10}",
+          flush=True)
+    for r in тело["таблица"][:18]:
+        s = r["sol_в_сутки"]
+        print(f"{r['источник'][:12]:14}{r['удержание']:>4}{r['билет']:>9}{r['n']:>6}"
+              f"{r['сделок_в_сутки']:>8}{(s.get('0.989') or 0):>+10.4f}"
+              f"{(s.get('1.0') or 0):>+9.4f}{(s.get('1.013') or 0):>+9.4f}"
+              f"{(r['без_верх_5'] or 0):>+10.4f}"
+              f"{r['окон_в_плюсе']}/{r['окон_годных']:<4}"
+              f"{(r['p'] if r['p'] is not None else 1):>10.2e}", flush=True)
+    return 0
 
 
 def main() -> int:
-    import podbivka_run as R  # noqa: PLC0415
-    д = json.loads(ВХОД.read_text(encoding="utf-8"))
-    ряды = д["ряды"]
-    кош = next((р.get("wallet") or (р.get("zapis") or {}).get("wallet") for р in ряды
-                if р.get("wallet") or (р.get("zapis") or {}).get("wallet")), None)
-    уз = S.Узел()
-    t0, t1 = ts(ОКНО[0]), ts(ОКНО[1])
-    подп, до = [], None
-    with уз.на("helius"):
-        while True:
-            стр = уз.подписи(кош, до=до, limit=1000)
-            if not стр:
-                break
-            подп += [з for з in стр if t0 <= (з.get("blockTime") or 0) <= t1]
-            if (стр[-1].get("blockTime") or 0) < t0 or len(стр) < 1000:
-                break
-            до = стр[-1]["signature"]
-        явные = set()
-        for р in ряды:
-            з = р.get("zapis") or {}
-            явные |= {x for x in [р.get("buy_sig"), р.get("sell_sig"), р.get("landed_sig"), *(з.get("last_sell_signatures") or [])] if x}
-        все = sorted({з["signature"] for з in подп} | явные)
-        txs = {}
-        for и in range(0, len(все), 100):
-            txs.update(уз.пакет(все[и:и + 100]))
-    по_минту: dict = {}
-    разбор = {}
-    for s, т in txs.items():
-        if not т:
-            continue
-        лам, минты = наши_дельты(т, кош)
-        изм = {m: v for m, v in минты.items() if v != 0}
-        разбор[s] = {"slot": т.get("slot"), "blockTime": т.get("blockTime"), "лампорты": лам, "минты": изм,
-                     "ошибка": (т.get("meta") or {}).get("err") is not None}
-        if len(изм) == 1:
-            по_минту.setdefault(next(iter(изм)), []).append(s)
-    # один минт может торговаться несколько раз: транзакция -- сделке с последним слотом источника ≤ её слота
-    сделки_минта: dict = {}
-    for р in ряды:
-        сделки_минта.setdefault(р["mint"], []).append(р.get("source_slot") or 0)
-    for v in сделки_минта.values():
-        v.sort()
-
-    def своя(р, s):
-        сл = разбор[s]["slot"] or 0
-        сс = сделки_минта[р["mint"]]
-        i = max((k for k, x in enumerate(сс) if x <= сл), default=None)
-        return i is not None and сс[i] == (р.get("source_slot") or 0)
-    рез = []
-    for р in ряды:
-        з = р.get("zapis") or {}
-        m = р["mint"]
-        свои = {s for s in по_минту.get(m, []) if своя(р, s)}
-        свои |= {x for x in [р.get("buy_sig"), р.get("landed_sig"), р.get("sell_sig"), *(з.get("last_sell_signatures") or [])]
-                 if x and x in разбор and len(разбор[x]["минты"]) <= 1}
-        # покупка и её окно: транзакции минта от нашей покупки (не раньше слота источника)
-        свои = {s for s in свои if (разбор[s]["slot"] or 0) >= (р.get("source_slot") or 0)}
-        пр = [s for s in свои if (разбор[s]["минты"].get(m) or 0) < 0]
-        рез.append({"cid": р.get("cid"), "группа": р.get("group"), "mint": m, "source_slot": р.get("source_slot"),
-                    "landed_slot": р.get("landed_slot"), "chain_ok": р.get("chain_ok"),
-                    "итог_code1": р.get("итог_sol"), "транзакций": len(свои),
-                    "итог_цепь_sol": sum(разбор[s]["лампорты"] for s in свои) / 1e9,
-                    "продажи": sorted((разбор[s]["blockTime"], s) for s in пр),
-                    "подписи": sorted(свои)})
-    ВЫХОД.write_text(json.dumps({"кошелёк": кош, "окно": ОКНО, "подписей_кошелька": len(подп), "сделки": рез,
-                                 "разбор": разбор, "расход": уз.расход()}, ensure_ascii=False, default=str), encoding="utf-8")
-    R.записано(ВЫХОД)
-    R.пуш("Podbivka-2: zabor S+0 v dengah po cepi 28.09 [automated]", [str(ВЫХОД)])
-    return 0
+    р = argparse.ArgumentParser()
+    р.add_argument("--dolya", type=float, default=0.209,
+                   help="доля сигналов, в которых мы попали в блок источника")
+    р.add_argument("--k-g-osnovnaya", type=float, default=1.0)
+    р.add_argument("--metka", default="")
+    return главное(р.parse_args())
 
 
 if __name__ == "__main__":
