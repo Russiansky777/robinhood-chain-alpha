@@ -1,0 +1,19 @@
+{
+ "skript": "podbivka_arhiv_glubina.py",
+ "zapuski": [
+  [
+   "--ot",
+   "2026-09-21",
+   "--nazad",
+   "1,2,3,5,7,10,14,21,30,45,60,90,120,180,270,365",
+   "--chas",
+   "06",
+   "--zamer",
+   "2026/09/20",
+   "--metka",
+   "_proba"
+  ]
+ ],
+ "helius_rps_na_paket": 0,
+ "zachem": "p.1 novogo standarta vyborki: skolko sutok istorii mozhno podnyat nazad ot 21.09 i chego eto stoit. U menya vsego 18 sutok (21.09..08.10), i na skolzyaschuyu proverku 'podbor 7 -> proverka 4, sdvig 4' eto dayot vsego dva okna -- vyborka malaya. Progon sprashivaet u replay.pumpapi.io po odnomu chasu na kazhduyu datu nazad (1,2,3,5,7,10,14,21,30,45,60,90,120,180,270,365 sutok) zaprosom s Range na pervyy kilobayt, chtoby ne kachat chas celikom, i beryot kod otveta, Content-Length i Last-Modified. Otdelno chestnyy zamer: odin chas (2026/09/20/06) chitaetsya CELIKOM s zamerom sekund i bayt, i iz nego schitaetsya ocenka gigabayt i vremeni na 30 i 60 sutok. Gigabayty eto prokachat, a ne hranit: prohod potochnyy, na diske ostayutsya tolko sutochnye fayly signalov (u 18 sobrannyh sutok eto 4.0 GB na 203 fayla). Tolko chtenie."
+}
