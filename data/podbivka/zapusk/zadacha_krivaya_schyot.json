@@ -6,8 +6,14 @@
    "data/podbivka/krivaya_rashod_p1.json",
    "--metka",
    "p1"
+  ],
+  [
+   "--celi",
+   "data/podbivka/krivaya_mayhem_celi.json",
+   "--metka",
+   "rezerv"
   ]
  ],
  "helius_rps_na_paket": 3,
- "zachem": "p.2 vladelca: gipoteza Mayhem na 'nulevoy porode'. V IDL pump.fun (data/idl/pump.json u Code-1) u schyota BondingCurve est pole is_mayhem_mode, a ryadom is_cashback_coin, is_holder_reward, depth, creator_fee_bps i quote_mint. Progon chitaet schyot krivoy (PDA 'bonding-curve' + mint) u VSEH mintov dvuh grupp sverki krivoy: 107 rashodyaschihsya (tarif 0+0 b.p. v sobytii, otnoshenie 0.85) i 21 kontrolnogo (95+30 b.p., otnoshenie 1.00) -- i raskladyvaet po etim polyam. Esli rashodyaschiesya eto Mayhem, flag budet u nih i ne budet u kontrolnyh. getMultipleAccounts pachkami po 100, vsego 2 zaprosa. Tolko chtenie."
+ "zachem": "p.2: dva progona na odnom i tom zhe skripte s ispravlennym razborom schyota. (a) Povtor po 107 rashodyaschimsya i 20 kontrolnym mintam: pervyy progon otbrosil 25 schetov dlinoy 141 bayt ('ne BondingCurve'), teper razbor dlinoosoznannyy -- na cepi schyot byvaet 141 / 151 / 166 bayt. (b) Novoe: proverka arhivnogo priznaka Mayhem. Na strokah sozdaniya pump.fun za sutki 07.10 nachalnyy virtualnyy rezerv kvoty bimodalen -- 30.0 SOL u normalnoy krivoy (22.2 %), okolo 4.22 u otdelnoy porody (2.7 %) i okolo 115 u escho odnoy (1.0 %); 68.9 % strok sozdaniya idut uzhe POSLE pokupki sozdatelya (x > 30), chto sovpadaet s 69.6 % zhivogo zhurnala. Po 60 mintov iz kazhdoy korziny chitayutsya schyota: esli korzina 4.22 eto Mayhem, flag budet u neyo i ne budet u korziny 30.0 -- i togda Mayhem opoznayotsya po arhivu bez RPC na kazhdyy zapusk. Tolko chtenie, getMultipleAccounts pachkami po 100."
 }
