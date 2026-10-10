@@ -378,6 +378,14 @@ def путь_urs(п: dict) -> dict:
                       if isinstance(п.get("lane_podshagi_ms"), dict) else None),
         "podshagi_ms": (п.get("lane_podshagi_ms")
                         if isinstance(п.get("lane_podshagi_ms"), dict) else None),
+        # ПРОЦЕССОРНОЕ ВРЕМЯ РЯДОМ СО СТЕННЫМ: где стенное много больше, там
+        # поток ждал, а не считал, и это видно только парой чисел.
+        "podshagi_cpu_ms": (п.get("lane_podshagi_cpu_ms")
+                            if isinstance(п.get("lane_podshagi_cpu_ms"), dict)
+                            else None),
+        "variants_cpu_ms": п.get("lane_variants_cpu_ms"),
+        "variants_zhdali_ms": п.get("lane_variants_zhdali_ms"),
+        "potokov_v_processe": п.get("lane_potokov_v_processe"),
         "variants_ms": п.get("lane_variants_ms"),
         "sign_ms": п.get("lane_sign_ms"),
     }
@@ -1926,6 +1934,28 @@ def самопроверка() -> int:
         "**путь_urs(п)" in рабочая_в
         and '"pered_nami": п.get("slot_peers_before_us")' in рабочая_в
         and '"nacenka_k_istochniku_pct"' in рабочая_в, None)
+    # ПРОЦЕССОРНОЕ ВРЕМЯ УЕЗЖАЕТ С ВЫГРУЗКОЙ. Без этого разбор "33 мс на шесть
+    # вариантов" снова пошёл бы догадками: стенное время есть, а признака
+    # "поток ждал" нет.
+    _цп = путь_urs({"lane_podshagi_ms": {"сборка": 5.9, "подпись": 33.0,
+                                          "всего": 48.5},
+                     "lane_podshagi_cpu_ms": {"сборка": 0.8, "подпись": 1.9,
+                                               "всего": 4.1},
+                     "lane_variants_cpu_ms": 1.74,
+                     "lane_variants_zhdali_ms": 31.27,
+                     "lane_potokov_v_processe": 7})
+    chk("выгрузка несёт подшаги процессорным временем и ожидание вариантов",
+        _цп["podshagi_cpu_ms"] == {"сборка": 0.8, "подпись": 1.9, "всего": 4.1}
+        and _цп["variants_cpu_ms"] == 1.74
+        and _цп["variants_zhdali_ms"] == 31.27
+        and _цп["potokov_v_processe"] == 7, _цп)
+    chk("нет процессорных подшагов в записи -- None, а не пустой словарь: "
+        "«не знаем» и «ноль» разные",
+        путь_urs({})["podshagi_cpu_ms"] is None
+        and путь_urs({})["variants_cpu_ms"] is None)
+    chk("процессорные подшаги подставлены в РЯД выгрузки, а не только в функцию",
+        '"podshagi_cpu_ms"' in рабочая_в and '"variants_zhdali_ms"' in рабочая_в)
+
     # --- ПУЛ ПО ОТПРАВИТЕЛЯМ (вопрос владельца 10.10, вечер, п.4) ---
     # ТРИ СОБЫТИЯ РАЗЛИЧАЮТСЯ: послали / принял / довёз. Проверяется на
     # числах с известным ответом, а не сверкой данных с собой.
