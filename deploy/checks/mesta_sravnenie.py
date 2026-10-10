@@ -79,6 +79,19 @@ def _лаг(ряд: dict):
     return None
 
 
+def _между(ряд: dict):
+    """Транзакций МЕЖДУ источником и нами в ОДНОМ блоке. Иначе None."""
+    if _лаг(ряд) != 0:
+        return None
+    и, с = ряд.get("our_block_index"), ряд.get("source_block_index")
+    if not isinstance(и, int) or not isinstance(с, int):
+        return None
+    # ЗНАК СОХРАНЯЕТСЯ: отрицательное значит, что мы ВПЕРЕДИ источника в его же
+    # блоке -- так было ночью 09->10.10 по медиане (наш 516 против 527). Брать
+    # модуль значило бы потерять ровно то, что мерим.
+    return и - с - 1
+
+
 def строка_сделки(ряд: dict) -> dict:
     """Одна сделка: лаг, место, доля, подшаг подписи, кто принял и кто довёз."""
     пш = ряд.get("podshagi_ms") if isinstance(ряд.get("podshagi_ms"), dict) else {}
@@ -90,6 +103,12 @@ def строка_сделки(ряд: dict) -> dict:
         "block_vsego": ряд.get("our_block_total"),
         "dolya": _доля(ряд),
         "ist_index": ряд.get("source_block_index"),
+        # СКОЛЬКО ТРАНЗАКЦИЙ МЕЖДУ НАМИ -- ТОЛЬКО ПРИ ЛАГЕ 0, и это не
+        # придирка: при лаге 1 и больше мы в ДРУГОМ блоке, и "между" значило бы
+        # остаток блока источника плюс начало нашего -- другое число, которое
+        # нельзя класть в тот же столбец. Поэтому при лаге != 0 здесь None, и в
+        # своде оно считается отдельной корзиной.
+        "mezhdu_nami": _между(ряд),
         # ПОДПИСЬ -- ТОТ САМЫЙ ПОДШАГ, который срезала правка 10.10 (42.9 ->
         # 1.3 мс). Берётся из журнала подшагов, а не считается заново.
         "podpis_ms": (ряд.get("podpis_ms")
@@ -148,6 +167,22 @@ def свод(строки: list, рубежи: dict) -> dict:
                          else ("сдвинуло ВПЕРЁД (доля меньше -- лучше)"
                                if разница < 0 else
                                "сдвинуло НАЗАД (доля больше -- хуже)"))}
+    # МЕЖДУ НАМИ -- СВОЙ СВОД, по тем сделкам, где лаг 0 (в других блоках
+    # "между" не определено).
+    _между_л0 = [с["mezhdu_nami"] for с in строки if с["lag"] == 0]
+    из_["mezhdu_nami"] = {
+        "sdelok_lag0": len([с for с in строки if с["lag"] == 0]),
+        "schitano": len([x for x in _между_л0 if isinstance(x, int)]),
+        "mediana": _мед(_между_л0),
+        "vperedi_istochnika": len([x for x in _между_л0
+                                    if isinstance(x, int) and x < 0]),
+        "pozzhe_istochnika": len([x for x in _между_л0
+                                   if isinstance(x, int) and x >= 0])}
+    из_["dolya_lag0"] = (round(len([с for с in строки if с["lag"] == 0])
+                                / len(строки), 4) if строки else None)
+    из_["index_mediany"] = {"ist": _мед([с["ist_index"] for с in строки]),
+                             "nash": _мед([с["nash_index"] for с in строки]),
+                             "block": _мед([с["block_vsego"] for с in строки])}
     из_["podpis"] = {"mediana_ms": _мед([с["podpis_ms"] for с in строки]),
                       "maks_ms": max([с["podpis_ms"] for с in строки
                                        if isinstance(с["podpis_ms"], (int, float))]
@@ -282,6 +317,48 @@ def самопроверка() -> int:
         пусто["sdvinulo"]["den"]["raznica"] is None
         and "нет" in пусто["sdvinulo"]["den"]["slovami"],
         пусто["sdvinulo"]["den"])
+    # МЕЖДУ НАМИ: знак сохраняется, и при лаге != 0 это None, а не ноль.
+    chk("между нами при лаге 0 -- наш индекс минус индекс источника минус 1",
+        _между({"s_plus": 0, "our_block_index": 20,
+                 "source_block_index": 10}) == 9)
+    chk("мы ВПЕРЕДИ источника -- число ОТРИЦАТЕЛЬНОЕ, а не по модулю "
+        "(ночью 09->10.10 так и было: наш 516 против 527)",
+        _между({"s_plus": 0, "our_block_index": 10,
+                 "source_block_index": 20}) == -11)
+    chk("при лаге 1 между нами НЕ считается: это другой блок",
+        _между({"s_plus": 1, "our_block_index": 20,
+                 "source_block_index": 10}) is None)
+    chk("нет индексов -- None, а не ноль",
+        _между({"s_plus": 0, "our_block_index": 20}) is None)
+    _мн = свод([
+        {"utc": "2026-10-10T22:00:00Z", "noch": True, "lag": 0, "dolya": 0.2,
+         "nash_index": 10, "block_vsego": 100, "ist_index": 20,
+         "mezhdu_nami": -11, "podpis_ms": 1.0, "vsego_ms": 50,
+         "reshili_ms": 5, "prinyal_pervym": "jito", "dovyoz": "jito",
+         "itog_sol": 0.0},
+        {"utc": "2026-10-10T22:01:00Z", "noch": True, "lag": 0, "dolya": 0.6,
+         "nash_index": 60, "block_vsego": 100, "ist_index": 20,
+         "mezhdu_nami": 39, "podpis_ms": 1.0, "vsego_ms": 50,
+         "reshili_ms": 5, "prinyal_pervym": "jito", "dovyoz": "jito",
+         "itog_sol": 0.0},
+        {"utc": "2026-10-10T22:02:00Z", "noch": True, "lag": 2, "dolya": 0.3,
+         "nash_index": 30, "block_vsego": 100, "ist_index": 20,
+         "mezhdu_nami": None, "podpis_ms": 1.0, "vsego_ms": 50,
+         "reshili_ms": 5, "prinyal_pervym": "jito", "dovyoz": "jito",
+         "itog_sol": 0.0}], РУБЕЖИ_ПО_УМОЛЧАНИЮ)
+    chk("свод «между нами» считает только лаг 0 и делит впереди/позже",
+        _мн["mezhdu_nami"]["sdelok_lag0"] == 2
+        and _мн["mezhdu_nami"]["schitano"] == 2
+        and _мн["mezhdu_nami"]["mediana"] == 14.0
+        and _мн["mezhdu_nami"]["vperedi_istochnika"] == 1
+        and _мн["mezhdu_nami"]["pozzhe_istochnika"] == 1,
+        _мн["mezhdu_nami"])
+    chk("доля лага 0 -- это доля ОТ ВСЕХ сделок, а не от корзины",
+        _мн["dolya_lag0"] == round(2 / 3, 4), _мн["dolya_lag0"])
+    chk("медианы индексов -- источника, нашего и размера блока",
+        _мн["index_mediany"]["ist"] == 20
+        and _мн["index_mediany"]["nash"] == 30
+        and _мн["index_mediany"]["block"] == 100, _мн["index_mediany"])
     chk("корзины лага считаются отдельно, и 3+ своя",
         с_["po_lagu"]["0"]["sdelok"] == 2 and с_["po_lagu"]["1"]["sdelok"] == 1
         and с_["po_lagu"]["3+"]["sdelok"] == 0, с_["po_lagu"])
