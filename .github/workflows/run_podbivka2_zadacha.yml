@@ -62,7 +62,9 @@ jobs:
         run: |
           set -e
           python3 -m venv "$RUNNER_TEMP/pod_venv"
-          "$RUNNER_TEMP/pod_venv/bin/pip" install -q requests solders
+          # zstandard -- chasy arhiva PumpApi szhaty .zst; bez nego lyuboy
+          # arhivnyy progon padaet na import (progon 10.10 01:14Z).
+          "$RUNNER_TEMP/pod_venv/bin/pip" install -q requests solders zstandard
           echo "PY=$RUNNER_TEMP/pod_venv/bin/python" >> "$GITHUB_ENV"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
