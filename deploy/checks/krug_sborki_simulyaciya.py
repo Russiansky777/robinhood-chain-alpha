@@ -1628,7 +1628,8 @@ def platelshchiki_golovy(данные: dict, *, verhnih: int = 10,
                 "platelshchik": пл, "pokupok": 0, "obyom_sol": 0.0,
                 "chaevyh_pokupok": 0, "chaevye_sol": 0.0, "kanaly": {},
                 "pozicii": [], "sdelki": set(), "sdelki_ranee_poroga": set(),
-                "ploshchadki": {}, "fee_sol": [], "podpisi": []})
+                "ploshchadki": {}, "fee_sol": [], "podpisi": [],
+                "prioritet_lamportov": []})
             з["pokupok"] += 1
             з["obyom_sol"] += float(г.get("pokupka_sol") or 0.0)
             if float(г.get("chaevye_sol") or 0.0) > 0:
@@ -1648,6 +1649,15 @@ def platelshchiki_golovy(данные: dict, *, verhnih: int = 10,
                 з["sdelki"].add(подпись_сделки)
             if г.get("fee_sol") is not None:
                 з["fee_sol"].append(float(г["fee_sol"]))
+                # ПРИОРИТЕТ, ФАКТИЧЕСКИ УПЛАЧЕННЫЙ -- по ВСЕМ его покупкам, а
+                # не по трём прочитанным подписям, и без всякой цены CU:
+                # комиссия минус базовая (5000 лампортов на подпись). Это
+                # единственное число про приоритет, которое в этой выборке
+                # известно наверняка.
+                _подп = int(г.get("podpisantov") or 1)
+                з["prioritet_lamportov"].append(
+                    int(round(float(г["fee_sol"]) * 1_000_000_000))
+                    - БАЗОВАЯ_КОМИССИЯ_ЛАМПОРТОВ * max(1, _подп))
             if г.get("podpis"):
                 з["podpisi"].append(г["podpis"])
     весь_объём = sum(з["obyom_sol"] for з in по_пл.values()) or 0.0
@@ -1680,6 +1690,12 @@ def platelshchiki_golovy(данные: dict, *, verhnih: int = 10,
             "ploshchadki": dict(sorted(з["ploshchadki"].items(),
                                         key=lambda п: -п[1])),
             "fee_sol_median": _mediana(з["fee_sol"]),
+            "prioritet_lamportov_median": _mediana(з["prioritet_lamportov"]),
+            "prioritet_lamportov_max": (max(з["prioritet_lamportov"])
+                                         if з["prioritet_lamportov"] else None),
+            "prioritet_sol_median": (round(_mediana(з["prioritet_lamportov"])
+                                            / 1e9, 9)
+                                      if з["prioritet_lamportov"] else None),
             "podpisi": з["podpisi"][:8],
             "cu": None})
     ряды.sort(key=lambda р: -(р["obyom_sol"] or 0.0))
@@ -2470,6 +2486,16 @@ def самопроверка() -> int:
         and _по["A"]["dolya_sdelok_ranee_poroga"] == 0.5, _по["A"])
     chk("кто ни в одной сделке не встал раньше 100-й -- ноль, а не None",
         _по["B"]["sdelok_ranee_poroga"] == 0, _по["B"])
+    # ПРИОРИТЕТ СЧИТАЕТСЯ ПО ВСЕМ ПОКУПКАМ И БЕЗ ЦЕНЫ CU: комиссия минус
+    # базовая. У A комиссии 0.001 и 0.001 SOL при одном подписанте ->
+    # 1 000 000 - 5 000 = 995 000 лампортов.
+    chk("приоритет в лампортах -- комиссия минус базовая, по всем покупкам",
+        _по["A"]["prioritet_lamportov_median"] == 995000
+        and _по["B"]["prioritet_lamportov_median"] == 0, 
+        (_по["A"]["prioritet_lamportov_median"],
+         _по["B"]["prioritet_lamportov_median"]))
+    chk("приоритет в SOL рядом -- тем же числом",
+        _по["A"]["prioritet_sol_median"] == 0.000995, _по["A"]["prioritet_sol_median"])
     chk("медианный индекс после источника -- по всем его покупкам",
         _по["A"]["index_posle_istochnika_median"] == 152.5, _по["A"])
     chk("доля в блоке источника -- 1.00 И причина названа рядом, а не молча",
