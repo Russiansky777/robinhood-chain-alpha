@@ -864,6 +864,146 @@ def _procentil(числа: list, доля: int):
     return round(р[и], 4)
 
 
+# РАЗМЕРЫ ПРОСТЫХ ТИПОВ BORSH -- ТОЛЬКО ТЕ, ЧТО ЕСТЬ В СЧЁТЕ КРИВОЙ. Чего в
+# таблице нет, обрывает счёт смещений с названной причиной: молча пропустить
+# неизвестное поле значило бы сдвинуть все следующие и прочитать mayhem не там.
+РАЗМЕРЫ_BORSH = {"u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4,
+                  "u64": 8, "i64": 8, "u128": 16, "i128": 16,
+                  "bool": 1, "pubkey": 32}
+
+
+def smeshchenija_krivoj() -> dict:
+    """{имя поля: (смещение, тип)} в счёте BondingCurve -- ИЗ IDL, не руками.
+
+    ЗАЧЕМ ИЗ IDL. is_mayhem_mode лежит в счёте кривой девятым полем, и его
+    смещение зависит от ВСЕХ предыдущих. Числом в коде оно жило бы до первой
+    правки программы pump.fun, а ошибка смещения на один байт читается как
+    "mayhem там, где его нет", то есть как настоящий ответ. Поэтому смещения
+    складываются по тому же IDL, которым собирается покупка, и первое же
+    неизвестное поле обрывает счёт причиной.
+
+    Восемь байт дискриминатора учтены: данные счёта начинаются с него.
+    """
+    из_ = {"polya": {}, "why_not": None, "razmer": None}
+    типы = (СБ.zagruzit_idl()["pump"].get("types")
+            or {}) if hasattr(СБ, "zagruzit_idl") else {}
+    поля = None
+    if isinstance(типы, dict):
+        т = типы.get("BondingCurve") or {}
+        поля = (т.get("type") or {}).get("fields") or т.get("fields")
+    if not поля:
+        # IDL в сборщике разложен иначе -- читаем файл IDL напрямую тем же
+        # путём, которым его берёт сборщик.
+        путь = Path(__file__).resolve().parents[2] / "data" / "idl" / "pump.json"
+        if not путь.exists():
+            из_["why_not"] = f"IDL кривой не найден: {путь}"
+            return из_
+        with open(путь, encoding="utf-8") as ф:
+            сыро = json.load(ф)
+        for т in (сыро.get("types") or []):
+            if т.get("name") == "BondingCurve":
+                поля = (т.get("type") or {}).get("fields") or []
+                break
+    if not поля:
+        из_["why_not"] = "в IDL нет типа BondingCurve с полями"
+        return из_
+    сдвиг = 8  # дискриминатор счёта
+    for ф_ in поля:
+        имя = ф_.get("name")
+        тип = ф_.get("type")
+        if not isinstance(тип, str) or тип not in РАЗМЕРЫ_BORSH:
+            из_["why_not"] = (f"поле {имя}: тип {тип!r} не из простых -- счёт "
+                               f"смещений обрываю здесь, чтобы не прочитать "
+                               f"следующие поля не там")
+            break
+        из_["polya"][имя] = (сдвиг, тип)
+        сдвиг += РАЗМЕРЫ_BORSH[тип]
+    из_["razmer"] = сдвиг
+    return из_
+
+
+def mayhem_mintov(*, minty: list, pauza: float) -> dict:
+    """is_mayhem_mode и котировка по счёту кривой каждого минта.
+
+    Вопрос владельца 10.10 (вечер, доп. к п.2д): "Mayhem ли минты дневных
+    покупок источника против ночных". Флаг лежит в СЧЁТЕ КРИВОЙ (PDA
+    bonding-curve + минт) и ставится при создании, поэтому чтение сейчас даёт
+    то же значение, что было на покупке.
+
+    ТОЛЬКО ЧТЕНИЕ: getAccountInfo на счёт кривой, ни одной отправки.
+    """
+    из_ = {"mintov": 0, "prochitano": 0, "ne_prochitano": 0,
+            "mayhem_da": 0, "mayhem_net": 0, "kotirovka_ne_sol": 0,
+            "stroki": [], "why_not": None}
+    см = smeshchenija_krivoj()
+    if см.get("why_not") and "is_mayhem_mode" not in см["polya"]:
+        из_["why_not"] = f"смещения по IDL не сложились: {см['why_not']}"
+        return из_
+    из_["smeshchenija_why_not"] = см.get("why_not")
+    поле_м = см["polya"].get("is_mayhem_mode")
+    поле_к = см["polya"].get("quote_mint")
+    поле_с = см["polya"].get("complete")
+    if not поле_м:
+        из_["why_not"] = "в IDL нет поля is_mayhem_mode"
+        return из_
+    из_["smeshchenie_mayhem"] = поле_м[0]
+    for м in minty:
+        м = str(м).strip()
+        if not м:
+            continue
+        из_["mintov"] += 1
+        ряд = {"mint": м}
+        try:
+            кривая, _ = СБ.pda([b"bonding-curve", СБ.b58d(м)], СБ.ПРОГ_КРИВОЙ)
+        except Exception as сбой:  # noqa: BLE001
+            ряд["why_not"] = f"PDA кривой не выведен: {type(сбой).__name__}"
+            из_["ne_prochitano"] += 1
+            из_["stroki"].append(ряд)
+            continue
+        ряд["krivaya"] = str(кривая)
+        о = зов("getAccountInfo", [str(кривая), {"encoding": "base64"}])
+        знач = ((о.get("result") or {}) or {}).get("value") if о.get("ok") else None
+        if not знач:
+            ряд["why_not"] = (f"счёт кривой не прочитан: "
+                               f"{о.get('why_not') or 'счёта нет'}")
+            из_["ne_prochitano"] += 1
+            из_["stroki"].append(ряд)
+            if pauza:
+                time.sleep(pauza)
+            continue
+        сырые = base64.b64decode((знач.get("data") or ["", ""])[0])
+        ряд["bajt_schyota"] = len(сырые)
+        сдв, _т = поле_м
+        if len(сырые) <= сдв:
+            ряд["why_not"] = (f"счёт короче смещения is_mayhem_mode "
+                               f"({len(сырые)} <= {сдв})")
+            из_["ne_prochitano"] += 1
+            из_["stroki"].append(ряд)
+            continue
+        байт = сырые[сдв]
+        # БАЙТ НЕ 0 И НЕ 1 -- НЕ "mayhem выключен", А НЕИЗВЕСТНОЕ. Выдавать
+        # мусор за False значило бы ответить владельцу числом, которого нет.
+        ряд["is_mayhem_mode"] = (bool(байт) if байт in (0, 1) else None)
+        if байт not in (0, 1):
+            ряд["why_not"] = (f"на месте is_mayhem_mode байт {байт} -- это не "
+                               "bool, смещение или раскладка не те")
+        if поле_к and len(сырые) >= поле_к[0] + 32:
+            ряд["quote_mint"] = СБ.b58e(сырые[поле_к[0]:поле_к[0] + 32])
+        if поле_с and len(сырые) > поле_с[0]:
+            ряд["complete"] = bool(сырые[поле_с[0]])
+        if ряд.get("is_mayhem_mode") is True:
+            из_["mayhem_da"] += 1
+        elif ряд.get("is_mayhem_mode") is False:
+            из_["mayhem_net"] += 1
+        if ряд.get("quote_mint") and ряд["quote_mint"] != WSOL:
+            из_["kotirovka_ne_sol"] += 1
+        из_["prochitano"] += 1
+        из_["stroki"].append(ряд)
+        if pauza:
+            time.sleep(pauza)
+    return из_
+
+
 def k_why(к: dict) -> str:
     """Причина, по которой в сделке не нашлось кривой. Короткой строкой."""
     return str((к or {}).get("why_not") or "хранилища базы в сделке нет")[:140]
@@ -1196,6 +1336,36 @@ def самопроверка() -> int:
         and "ПОВТОРОВ_ЗАМЕРА" in _ист_ср
         and 'ряд["ms_novaya"] - ряд["ms_staraya"]' in _ист_ср
         and '"raznica_ms_mediana"' in _ист_ср)
+    # --- MAYHEM ПО СЧЁТУ КРИВОЙ (доп. к п.2д, владелец 10.10 вечером) ---
+    # СМЕЩЕНИЯ СЛОЖЕНЫ ПО IDL, И ЭТО ПРОВЕРЯЕТСЯ ЧИСЛАМИ. Ошибка на один байт
+    # читается как "mayhem там, где его нет", то есть как настоящий ответ, --
+    # поэтому проверяются и само смещение, и порядок соседей, и полный размер
+    # счёта. Числа взяты из живого IDL кривой (19 полей), а не из головы.
+    _см = smeshchenija_krivoj()
+    chk(f"смещения счёта кривой из IDL: is_mayhem_mode {_см['polya'].get('is_mayhem_mode')}, "
+        f"quote_mint {_см['polya'].get('quote_mint')}, размер {_см['razmer']}",
+        _см.get("why_not") is None
+        and _см["polya"].get("complete") == (48, "bool")
+        and _см["polya"].get("creator") == (49, "pubkey")
+        and _см["polya"].get("is_mayhem_mode") == (81, "bool")
+        and _см["polya"].get("is_cashback_coin") == (82, "bool")
+        and _см["polya"].get("quote_mint") == (83, "pubkey")
+        and _см["razmer"] == 166
+        and len(_см["polya"]) == 19, _см.get("why_not"))
+    # НЕИЗВЕСТНЫЙ ТИП ОБРЫВАЕТ СЧЁТ, А НЕ ПРОПУСКАЕТСЯ: пропуск сдвинул бы
+    # все следующие поля и прочитал бы mayhem не там.
+    _был_размер = dict(РАЗМЕРЫ_BORSH)
+    try:
+        РАЗМЕРЫ_BORSH.pop("pubkey", None)
+        _обрыв = smeshchenija_krivoj()
+        chk("неизвестный тип поля обрывает счёт смещений с названной причиной, "
+            "а не пропускается молча",
+            _обрыв.get("why_not") is not None
+            and "creator" in str(_обрыв["why_not"])
+            and "is_mayhem_mode" not in _обрыв["polya"])
+    finally:
+        РАЗМЕРЫ_BORSH.clear()
+        РАЗМЕРЫ_BORSH.update(_был_размер)
     print(f"самопроверка круга сборки: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
@@ -1226,6 +1396,9 @@ def main() -> int:
                          "(нынешней и из --ref-staryj) и назвать расхождения")
     п.add_argument("--ref-staryj", default="e222b934^",
                     help="коммит старой версии c2_swap_build для сравнения")
+    п.add_argument("--mayhem", default="",
+                    help="ТОЛЬКО ЧТЕНИЕ: минты через запятую -- is_mayhem_mode "
+                         "и котировка по СЧЁТУ КРИВОЙ (смещения из IDL)")
     п.add_argument("--out", default="")
     а = п.parse_args()
     if а.self_test:
@@ -1246,6 +1419,19 @@ def main() -> int:
             Path(а.out).write_text(текст + "\n", encoding="utf-8")
         # РАСХОЖДЕНИЕ -- НЕ СБОЙ ПРОГОНА: его и искали. Код 0, чтобы отчёт
         # коммитился, а судить по числам.
+        return 0
+    if а.mayhem.strip():
+        из_ = mayhem_mintov(
+            minty=[x for x in а.mayhem.replace(";", ",").split(",")
+                    if x.strip()],
+            pauza=а.pauza)
+        из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        # НЕПРОЧИТАННЫЕ -- НЕ СБОЙ ПРОГОНА: отчёт нужен и с частью счетов,
+        # а судить по числам prochitano / ne_prochitano.
         return 0
     if а.chitat.strip():
         из_ = chem_kupleno(
