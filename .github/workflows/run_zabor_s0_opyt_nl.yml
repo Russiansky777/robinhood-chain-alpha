@@ -37,7 +37,7 @@ on:
         required: true
         type: choice
         default: helius
-        options: [helius, astralane, triton]
+        options: [helius, astralane, blockrazor, jito, nozomi, zeroslot, triton]
       raundov:
         description: "раундов (по ОДНОЙ отправке в каждом; сдвиг -1/0/+1 по кругу)"
         required: false
@@ -52,6 +52,10 @@ on:
         description: "gonka: отправители через запятую (triton как ОТПРАВИТЕЛЬ у нас не настроен -- у него нет точки входа отправки)"
         required: false
         default: "helius,astralane"
+      chaevye:
+        description: "ПРОБА: чаевые в лампортах вместо минимума из реестра (0 -- из реестра). Потолок пробы сторожит сам модуль"
+        required: false
+        default: "0"
       podtverzhdenie:
         description: "для rezhim=opyt и rezhim=gonka впишите otpravlyat -- иначе отправок не будет"
         required: false
@@ -116,14 +120,14 @@ jobs:
         run: |
           set -e
           case "$OTPRAVITEL" in
-            helius|astralane|triton) ;;
+            helius|astralane|blockrazor|jito|nozomi|zeroslot|triton) ;;
             *) echo "SBOY: otpravitel: $OTPRAVITEL"; exit 1;;
           esac
           if [ "$REZHIM" = gonka ]; then
             [ -n "$OTPRAVITELI" ] || { echo "SBOY: gonka bez spiska otpravitelej"; exit 1; }
             for O in $(echo "$OTPRAVITELI" | tr ',' ' '); do
               case "$O" in
-                helius|astralane|triton) ;;
+                helius|astralane|blockrazor|jito|nozomi|zeroslot|triton) ;;
                 *) echo "SBOY: neizvestnyj otpravitel v spiske: $O"; exit 1;;
               esac
             done
@@ -166,13 +170,19 @@ jobs:
           OTPRAVITELI: ${{ inputs.otpraviteli }}
           RAUNDOV: ${{ inputs.raundov }}
           REZHIM: ${{ inputs.rezhim }}
+          CHAEVYE: ${{ inputs.chaevye }}
         run: |
           set -e
           set -o pipefail
+          # ЧАЕВЫЕ ПРОБЫ -- ТОЛЬКО ЦЕЛОЕ ЧИСЛО. Это значение идёт в деньги, и
+          # мусор в нём должен быть отказом здесь, а не на хосте.
+          case "${CHAEVYE:-0}" in
+            ''|*[!0-9]*) echo "SBOY: chaevye ne celoe chislo: $CHAEVYE"; exit 1;;
+          esac
           ssh -n $SSH_OPTS root@$TARGET_HOST 'rm -rf /tmp/zabor_s0_opyt; install -d -m 700 /tmp/zabor_s0_opyt'
           # Параметры отдельным файлом: тогда в команде ssh нечего подставлять.
-          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\nOTPRAVITELI=%s\n' \
-            "$OTPRAVITEL" "$RAUNDOV" "$REZHIM" "$OTPRAVITELI" > /tmp/zabor_params
+          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\nOTPRAVITELI=%s\nCHAEVYE=%s\n' \
+            "$OTPRAVITEL" "$RAUNDOV" "$REZHIM" "$OTPRAVITELI" "${CHAEVYE:-0}" > /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/params' < /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/c2_zabor_s0_opyt.py' < analysis/c2_zabor_s0_opyt.py
           # МОДУЛЬ ГОНКИ ЕДЕТ ВСЕГДА, а не только в режиме gonka: лишний файл

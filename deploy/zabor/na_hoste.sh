@@ -37,7 +37,7 @@ fi
 : "${REZHIM:?SBOY: REZHIM ne zadan}"
 
 case "$OTPRAVITEL" in
-  helius|astralane|triton) ;;
+  helius|astralane|blockrazor|jito|nozomi|zeroslot|triton) ;;
   *) echo "SBOY: neizvestnyj otpravitel: $OTPRAVITEL"; exit 1;;
 esac
 case "$REZHIM" in
@@ -51,7 +51,7 @@ if [ "$REZHIM" = gonka ]; then
   : "${OTPRAVITELI:?SBOY: OTPRAVITELI ne zadany}"
   for O in $(echo "$OTPRAVITELI" | tr ',' ' '); do
     case "$O" in
-      helius|astralane|triton) ;;
+      helius|astralane|blockrazor|jito|nozomi|zeroslot|triton) ;;
       *) echo "SBOY: neizvestnyj otpravitel v spiske: $O"; exit 1;;
     esac
   done
@@ -180,6 +180,7 @@ sudo -u bot -E env PYTHONPATH="$CODE_DIR:$RABOTA" BLOOM_CODE_DIR="$CODE_DIR" \
   --otpravitel "$OTPRAVITEL" \
   --otpraviteli "${OTPRAVITELI:-helius,astralane}" \
   --raundov "$RAUNDOV" \
+  --chaevye-lamporty "${CHAEVYE:-0}" \
   --out "$RABOTA/out.json"
 KOD=$?
 set -e
