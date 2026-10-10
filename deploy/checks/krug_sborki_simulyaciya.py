@@ -512,12 +512,38 @@ def krug_denezhnogo_puti(*, tx_istochnika: dict, mint: str, token_program: str,
         return из_
     ата = SB.ata(koshelek, mint, token_program)
     из_["ata"] = ата
+    # МИНИМУМ ВЫХОДА -- ТЕМ ЖЕ СЧЁТОМ, ЧТО В ПОЛОСЕ (min_out_from_reserves,
+    # bloom_own_send:3193), А НЕ ЕДИНИЦЕЙ.
+    #
+    # ЗДЕСЬ СТОЯЛА ЕДИНИЦА, И ПРОГОН 38014760631 ПОКАЗАЛ, ЧЕМ ЭТО ПЛАТИТСЯ.
+    # У «точного входа» (buy_exact_quote_in_v3) единица безвредна: это лишь
+    # нижний порог, трата задана отдельно. А у «точного ВЫХОДА» (buy_v3)
+    # первым аргументом идёт КОЛИЧЕСТВО ТОКЕНА -- и единица означала «купить
+    # один сырой юнит»: восемь подписей из двенадцати давали остаток РОВНО 1 и
+    # красный круг. Это был отказ ПРОВЕРКИ, а не пути, и по имени поля этого
+    # не видно: ostatok_posle_pokupki=1 выглядит как купленный токен.
+    мо = SB.min_out_from_reserves(ш, tx_istochnika, int(bilet_lamportov), 0.4)
+    из_.update(min_out_ok=bool(мо.get("ok")),
+               min_out=мо.get("min_out") if мо.get("ok") else None,
+               expected_out=мо.get("expected_out") if мо.get("ok") else None,
+               min_out_why_not=None if мо.get("ok") else мо.get("why_not"))
+    if мо.get("ok") and int(мо.get("min_out") or 0) > 0:
+        _min_out = int(мо["min_out"])
+    elif ш.get("exact_out"):
+        # ТОЧНЫЙ ВЫХОД БЕЗ СЧЁТА -- ОТКАЗ, А НЕ ЕДИНИЦА: количество токена
+        # выдумывать нечем, а единица проверила бы покупку одного юнита.
+        из_["why_not"] = (f"точный выход, а минимум по резервам не посчитан: "
+                          f"{мо.get('why_not')}")
+        return из_
+    else:
+        _min_out = 1
+    из_["min_out_v_sborke"] = _min_out
     try:
         # close_wsol=False: продажа в том же круге пишет на счёт WSOL, а
         # закрытие покупки его бы уже снесло. В работе круг -- две транзакции,
         # и там закрытие покупки на своём месте.
         пок = SB.build_buy(ш, tx_istochnika, user=koshelek, payer=koshelek,
-                           amount_in=int(bilet_lamportov), min_out=1,
+                           amount_in=int(bilet_lamportov), min_out=_min_out,
                            cu_units=int(cu), wrap_sol=True, close_wsol=False)
     except Exception as сбой:  # noqa: BLE001
         из_["why_not"] = f"build_buy: {type(сбой).__name__}: {str(сбой)[:160]}"
@@ -682,6 +708,7 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
             bazovyj_vault=к["bazovyj_vault"], koshelek=koshelek,
             bilet_lamportov=bilet_lamportov, cu=cu, pauza=pauza)
         р["podpis"] = п
+        р["pokupka_istochnika"] = к.get("pokupka_istochnika")
         из_["sdelki"].append(р)
         из_["proshlo"] += 1 if р["ok"] else 0
         if not р["ok"]:
