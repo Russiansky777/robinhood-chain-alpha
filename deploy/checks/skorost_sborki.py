@@ -547,15 +547,141 @@ def таблица(своды: dict) -> dict:
     return из_
 
 
+# ------------------------------------------------- СОСЕДНИЕ ПОТОКИ И ОЖИДАНИЕ
+
+# СКОЛЬКО ЖГУЩИХ ПОТОКОВ ПРОБОВАТЬ. Ноль -- опора, дальше по одному: именно
+# между одним и двумя в CPython появляется ожидание, и это надо видеть, а не
+# предполагать.
+СОСЕДЕЙ_ПО_УМОЛЧАНИЮ = (0, 1, 2, 4)
+ПОВТОРОВ_СОСЕДЕЙ = 15
+
+
+def _жечь_потоками(сколько: int):
+    """Запустить `сколько` жгущих процессор потоков. Возвращает «погасить»."""
+    стоп = __import__("threading").Event()
+    потоки = []
+    def _жечь():
+        while not стоп.is_set():
+            sum(range(5000))
+    for _ in range(max(0, int(сколько))):
+        п = __import__("threading").Thread(target=_жечь, daemon=True)
+        п.start()
+        потоки.append(п)
+    def погасить():
+        стоп.set()
+        for п in потоки:
+            п.join(timeout=3.0)
+        return sum(1 for п in потоки if п.is_alive())
+    return погасить, потоки
+
+
+def sosedi_i_ozhidanie(*, путь_образца: str = ОБРАЗЕЦ_ПО_УМОЛЧАНИЮ,
+                        повторов: int = ПОВТОРОВ_СОСЕДЕЙ,
+                        потоков=СОСЕДЕЙ_ПО_УМОЛЧАНИЮ) -> dict:
+    """ПОЧЕМУ ШЕСТЬ ВАРИАНТОВ МОГУТ СТОИТЬ 33 МС, ХОТЯ СЧЁТА ТАМ НА 0.5 МС.
+
+    Замер железа 10.10 показал: торговый хост делает шесть вариантов из
+    заготовки за 0.51 мс, а живой журнал держит 29-40 мс. Разница -- не счёт.
+    Здесь проверяется ОДНО объяснение, и проверяется поведением: шесть
+    вариантов строятся, пока в ТОМ ЖЕ ПРОЦЕССЕ жгут процессор другие потоки
+    Python. Рядом снимаются стенное время и процессорное время потока; их
+    разница и есть ожидание передачи GIL.
+
+    Ничего не отправляет и ничего не меняет: та же сборка из заготовки, что в
+    остальных замерах, без сети.
+    """
+    из_ = {"ok": False, "why_not": None, "gil_interval_s": sys.getswitchinterval(),
+            "yader": os.cpu_count(), "povtorov": повторов, "ryady": []}
+    корень_кода = str(корень() / "analysis")
+    if корень_кода not in sys.path:
+        sys.path.insert(0, корень_кода)
+    нет_файлов = [ф for ф in НУЖНЫЕ_ФАЙЛЫ if not (корень() / ф).exists()]
+    if нет_файлов:
+        из_["why_not"] = "нет нужных файлов данных: " + ", ".join(нет_файлов)
+        return из_
+    try:
+        import bloom_exec_state as ST  # noqa: PLC0415
+        import bloom_own_send as OS  # noqa: PLC0415
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = (f"модули полосы не загрузились: "
+                           f"{type(сбой).__name__}: {str(сбой)[:160]}")
+        return из_
+    обр_ = _образец(путь_образца)
+    if not обр_["ok"]:
+        из_["why_not"] = обр_["why_not"]
+        return из_
+    наш = ST.EXECUTOR_WALLET
+    нонс = (НОНС_ЗАМЕРА, наш)
+    чаевые = [ЧАЕВЫЕ_ЗАМЕРА]
+
+    def _без_сети(метод, *_а, **_к):
+        raise RuntimeError(f"замер без сети: запрошен {метод}")
+
+    база, сам = None, None
+    for обр in обр_["pachka"]:
+        сам = обр.get("tx") or обр
+        б = OS.собрать(tx_источника=сам, источник=обр.get("source") or "",
+                        минт=обр.get("mint") or "", наш_кошелёк=наш,
+                        лампорты=10_000_000, семя="ZAMER_SOSEDEJ",
+                        rpc_call=_без_сети)
+        if б.get("ok") and (б.get("_zagotovka") or None):
+            база = б
+            break
+    if база is None:
+        из_["why_not"] = "ни один образец не дал базу с заготовкой без сети"
+        return из_
+
+    def шесть():
+        # ШЕСТЬ -- СТОЛЬКО ЖЕ, СКОЛЬКО ОТПРАВИТЕЛЕЙ В ПУЛЕ: сравнивать надо с
+        # живым числом из журнала, а не с одним вариантом.
+        for _ in range(6):
+            OS.вариант_из_zagotovki(база, сам, чаевые_списком=чаевые,
+                                     чаевые_вперёд=False, нонс=нонс)
+
+    шесть()  # прогрев
+    for сколько in потоков:
+        погасить, потоки_ = _жечь_потоками(сколько)
+        try:
+            if сколько:
+                time.sleep(0.3)  # дать потокам реально встать на ядра
+            стенное, процессорное = [], []
+            for _ in range(max(1, int(повторов))):
+                т, ц = time.perf_counter(), time.thread_time()
+                шесть()
+                стенное.append((time.perf_counter() - т) * 1000.0)
+                процессорное.append((time.thread_time() - ц) * 1000.0)
+        finally:
+            живых = погасить()
+        ст, цп = _мс(стенное), _мс(процессорное)
+        из_["ryady"].append({
+            "zhgushchih_potokov": сколько,
+            "potokov_zapushcheno": len(потоки_),
+            "potokov_ostalos_zhivyh": живых,
+            "stennoe_ms": ст, "processornoe_ms": цп,
+            "zhdali_ms": (round(ст["med"] - цп["med"], 2)
+                           if (ст["med"] is not None and цп["med"] is not None)
+                           else None)})
+    опора = (из_["ryady"][0]["stennoe_ms"]["med"] if из_["ryady"] else None)
+    for р in из_["ryady"]:
+        р["raz_k_opore"] = (round(р["stennoe_ms"]["med"] / опора, 2)
+                             if (опора and р["stennoe_ms"]["med"]) else None)
+    из_["ok"] = bool(из_["ryady"])
+    return из_
+
+
 def свод(*, секунд: float = СЕКУНД_ОКНА, повторов: int = ПОВТОРОВ_ПО_УМОЛЧАНИЮ,
           путь_образца: str = ОБРАЗЕЦ_ПО_УМОЛЧАНИЮ,
-          делать_сборку: bool = True) -> dict:
+          делать_сборку: bool = True, делать_соседей: bool = False) -> dict:
     из_ = {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "mashina": platform.node(), "zhelezo": железо(секунд),
             "etalon": эталон()}
     из_["sborka"] = (сборка(путь_образца=путь_образца, повторов=повторов)
                       if делать_сборку
                       else {"ok": False, "why_not": "сборка не запрашивалась"})
+    из_["sosedi"] = (sosedi_i_ozhidanie(путь_образца=путь_образца)
+                      if делать_соседей
+                      else {"ok": False,
+                             "why_not": "соседние потоки не запрашивались"})
     return из_
 
 
@@ -735,6 +861,56 @@ def самопроверка() -> int:
     chk("порог разбега назван числом и объяснён в коде",
         РАЗБЕГ_ОТНОШЕНИЙ == 0.35)
 
+    # СОСЕДНИЕ ПОТОКИ И ОЖИДАНИЕ. Проверяется СТРОЕНИЕ замера, а не конкретное
+    # отношение: на одном ядре или на занятой машине любое пороговое число
+    # красило бы проверку от загрузки, а не от ошибки. Числа идут в отчёт.
+    _сос = sosedi_i_ozhidanie(повторов=3, потоков=(0, 2))
+    if _сос.get("ok"):
+        chk("соседи: по ряду на каждое число потоков, и потоки реально "
+            "запущены и погашены",
+            [р["zhgushchih_potokov"] for р in _сос["ryady"]] == [0, 2]
+            and _сос["ryady"][1]["potokov_zapushcheno"] == 2
+            and all(р["potokov_ostalos_zhivyh"] == 0 for р in _сос["ryady"]),
+            [(р["zhgushchih_potokov"], р["potokov_zapushcheno"],
+              р["potokov_ostalos_zhivyh"]) for р in _сос["ryady"]])
+        chk("соседи: у каждого ряда есть и стенное, и процессорное время",
+            all(р["stennoe_ms"]["med"] and р["processornoe_ms"]["med"]
+                for р in _сос["ryady"]),
+            [(р["stennoe_ms"]["med"], р["processornoe_ms"]["med"])
+             for р in _сос["ryady"]])
+        chk("соседи: процессорное время не больше стенного -- иначе часы врут",
+            all(р["processornoe_ms"]["med"] <= р["stennoe_ms"]["med"] + 0.5
+                for р in _сос["ryady"]),
+            [(р["stennoe_ms"]["med"], р["processornoe_ms"]["med"])
+             for р in _сос["ryady"]])
+        chk("соседи: ожидание считается как разность, а не выдумывается",
+            all(abs(р["zhdali_ms"] - (р["stennoe_ms"]["med"]
+                                       - р["processornoe_ms"]["med"])) < 0.011
+                for р in _сос["ryady"]),
+            [(р["zhdali_ms"], р["stennoe_ms"]["med"],
+              р["processornoe_ms"]["med"]) for р in _сос["ryady"]])
+        chk("соседи: шаг GIL и число ядер названы -- без них отношение "
+            "ничего не значит",
+            _сос["gil_interval_s"] > 0 and (_сос["yader"] or 0) >= 1,
+            (_сос["gil_interval_s"], _сос["yader"]))
+    else:
+        chk("соседи: нет модулей или образца -- причина словами, а не число",
+            _сос.get("why_not") is not None, _сос.get("why_not"))
+    _было_с = os.environ.get("SKOROST_KOREN")
+    try:
+        os.environ["SKOROST_KOREN"] = "/tmp"
+        chk("соседи с чужим корнем -- причина с именем файла, а не число",
+            "dex_labels.json" in (sosedi_i_ozhidanie(повторов=1,
+                                                      потоков=(0,))
+                                   .get("why_not") or ""))
+    finally:
+        if _было_с is None:
+            os.environ.pop("SKOROST_KOREN", None)
+        else:
+            os.environ["SKOROST_KOREN"] = _было_с
+    chk("свод по умолчанию соседей НЕ мерит -- они занимают все ядра",
+        свод(секунд=0.2, повторов=1)["sosedi"]["ok"] is False)
+
     # СВОД СОБИРАЕТСЯ ЦЕЛИКОМ И ПЕРЕЖИВАЕТ json.dumps -- его увозят в отчёт.
     с = свод(секунд=0.2, повторов=3)
     chk("свод: машина, железо, эталон и сборка -- все четыре раздела",
@@ -762,6 +938,10 @@ def main() -> int:
     п.add_argument("--povtorov", type=int, default=ПОВТОРОВ_ПО_УМОЛЧАНИЮ)
     п.add_argument("--obrazec", default=ОБРАЗЕЦ_ПО_УМОЛЧАНИЮ)
     п.add_argument("--bez-sborki", action="store_true")
+    п.add_argument("--sosedi", action="store_true",
+                    help="замерить ожидание при жгущих соседних потоках "
+                         "(занимает все ядра на несколько секунд -- на "
+                         "торговом хосте включать осознанно)")
     п.add_argument("--koren", default="",
                     help="корень дерева с analysis/ и data/ (пусто -- рядом с модулем)")
     п.add_argument("--out", default="")
@@ -790,7 +970,7 @@ def main() -> int:
             Path(а.out).write_text(текст + "\n", encoding="utf-8")
         return 0
     из_ = свод(секунд=а.sekund, повторов=а.povtorov, путь_образца=а.obrazec,
-                делать_сборку=not а.bez_sborki)
+                делать_сборку=not а.bez_sborki, делать_соседей=а.sosedi)
     текст = json.dumps(из_, ensure_ascii=False, indent=1)
     print(текст)
     if а.out:
