@@ -56,6 +56,10 @@ on:
         description: "ПРОБА: чаевые в лампортах вместо минимума из реестра (0 -- из реестра). Потолок пробы сторожит сам модуль"
         required: false
         default: "0"
+      put_v2:
+        description: "ПРОБА: 1 -- послать тот же байт путём /v2/sendBinaryTransaction (сырые байты, ключ в auth=)"
+        required: false
+        default: "0"
       chaevye_rotaciya:
         description: "ПРОБА: 1 -- менять счёт чаевых КАЖДЫЙ раунд по кругу (ротация по всем счетам реестра)"
         required: false
@@ -181,6 +185,7 @@ jobs:
           CHAEVYE: ${{ inputs.chaevye }}
           CHAEVYE_VPERYOD: ${{ inputs.chaevye_vperyod }}
           CHAEVYE_ROTACIYA: ${{ inputs.chaevye_rotaciya }}
+          PUT_V2: ${{ inputs.put_v2 }}
         run: |
           set -e
           set -o pipefail
@@ -194,14 +199,19 @@ jobs:
             0|1) ;;
             *) echo "SBOY: chaevye_rotaciya -- tolko 0 ili 1: $CHAEVYE_ROTACIYA"; exit 1;;
           esac
+          case "${PUT_V2:-0}" in
+            0|1) ;;
+            *) echo "SBOY: put_v2 -- tolko 0 ili 1: $PUT_V2"; exit 1;;
+          esac
           case "${CHAEVYE:-0}" in
             ''|*[!0-9]*) echo "SBOY: chaevye ne celoe chislo: $CHAEVYE"; exit 1;;
           esac
           ssh -n $SSH_OPTS root@$TARGET_HOST 'rm -rf /tmp/zabor_s0_opyt; install -d -m 700 /tmp/zabor_s0_opyt'
           # Параметры отдельным файлом: тогда в команде ssh нечего подставлять.
-          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\nOTPRAVITELI=%s\nCHAEVYE=%s\nCHAEVYE_VPERYOD=%s\nCHAEVYE_ROTACIYA=%s\n' \
+          printf 'OTPRAVITEL=%s\nRAUNDOV=%s\nREZHIM=%s\nOTPRAVITELI=%s\nCHAEVYE=%s\nCHAEVYE_VPERYOD=%s\nCHAEVYE_ROTACIYA=%s\nPUT_V2=%s\n' \
             "$OTPRAVITEL" "$RAUNDOV" "$REZHIM" "$OTPRAVITELI" "${CHAEVYE:-0}" \
-            "${CHAEVYE_VPERYOD:-0}" "${CHAEVYE_ROTACIYA:-0}" > /tmp/zabor_params
+            "${CHAEVYE_VPERYOD:-0}" "${CHAEVYE_ROTACIYA:-0}" "${PUT_V2:-0}" \
+            > /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/params' < /tmp/zabor_params
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/c2_zabor_s0_opyt.py' < analysis/c2_zabor_s0_opyt.py
           # МОДУЛЬ ГОНКИ ЕДЕТ ВСЕГДА, а не только в режиме gonka: лишний файл
@@ -218,6 +228,21 @@ jobs:
           ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/senders.json' < data/senders.json
           ssh -n $SSH_OPTS root@$TARGET_HOST 'ls -la /tmp/zabor_s0_opyt'
           rm -f /tmp/zabor_params
+
+      - name: "Токен BlockRazor на хост файлом 600 (только для пробы пути v2)"
+        if: ${{ inputs.put_v2 == '1' }}
+        env:
+          BLOCKRAZOR_AUTH_TOKEN: ${{ secrets.BLOCKRAZOR_AUTH_TOKEN }}
+        run: |
+          set -e
+          [ -n "$BLOCKRAZOR_AUTH_TOKEN" ] || { echo "SBOY: sekret BLOCKRAZOR_AUTH_TOKEN ne zadan"; exit 1; }
+          # printf -- встроенная bash: значение не попадает ни в ps, ни в argv.
+          umask 077
+          printf '%s' "$BLOCKRAZOR_AUTH_TOKEN" > /tmp/zabor_br_token
+          ssh $SSH_OPTS root@$TARGET_HOST 'umask 077; cat > /tmp/zabor_s0_opyt/br_token' < /tmp/zabor_br_token
+          ssh -n $SSH_OPTS root@$TARGET_HOST 'chmod 600 /tmp/zabor_s0_opyt/br_token; chown root:bot /tmp/zabor_s0_opyt/br_token; chmod 640 /tmp/zabor_s0_opyt/br_token'
+          shred -u /tmp/zabor_br_token 2>/dev/null || rm -f /tmp/zabor_br_token
+          echo "token dostavlen fajlom; v argv i v log ne popadal"
 
       - name: "Секрет LIVE_TESTS на хост файлом 600 (не в argv, не в лог)"
         if: ${{ inputs.rezhim == 'opyt' || inputs.rezhim == 'gonka' }}

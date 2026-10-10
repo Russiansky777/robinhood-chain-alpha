@@ -549,6 +549,85 @@ def подписать_вариант(tx_base64: str, вариант: dict, *,
     return из_
 
 
+_РЕЕСТР_ПРОБЫ_ПУТЬ: str | None = None
+
+
+def реестр_для_пробы() -> dict:
+    """Реестр, которым пользуется ПРОБА. Путь задаётся входом --reestr."""
+    try:
+        import bloom_senders as SS  # noqa: PLC0415
+
+        return SS.реестр(_РЕЕСТР_ПРОБЫ_ПУТЬ)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def отправить_v2_binary(tx_base64: str, *, токен: str,
+                         адрес: str = "", таймаут: float = 5.0) -> dict:
+    """ПРОБА: тот же байт -- путём `/v2/sendBinaryTransaction` BlockRazor.
+
+    ОТКУДА ПУТЬ И ФОРМА. Из его же документации
+    (transaction-submission/transaction-sending/solana/send-transaction/
+    send-in-binary.md, копия у нас в data/docs/senders/): `POST
+    /v2/sendBinaryTransaction`, тело -- СЫРЫЕ БАЙТЫ транзакции (не base64), а
+    ключ стоит не в заголовке `apikey`, а в строке запроса `?auth=<token>`.
+    То есть от нашего боевого пути он отличается тремя вещами сразу, и
+    проверять его надо отдельно от реестра -- потому он здесь, в пробе, а не
+    в bloom_senders.
+
+    Ключ в отчёт не попадает: наружу уходит адрес без строки запроса.
+    """
+    import base64 as _b64  # noqa: PLC0415
+    import urllib.error  # noqa: PLC0415
+    import urllib.request  # noqa: PLC0415
+
+    из_ = {"ok": False, "why_not": None, "http": None, "sender": "blockrazor_v2",
+            "путь": "/v2/sendBinaryTransaction"}
+    база = (адрес or "http://amsterdam.solana.blockrazor.xyz:443").rstrip("/")
+    из_["url"] = f"{база}/v2/sendBinaryTransaction"
+    if not токен:
+        из_["why_not"] = "нет токена BLOCKRAZOR_AUTH_TOKEN -- отправлять нечем"
+        return из_
+    try:
+        сырое = _b64.b64decode(tx_base64)
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = f"тело не разобралось из base64: {type(сбой).__name__}"
+        return из_
+    из_["байт"] = len(сырое)
+    зап = urllib.request.Request(
+        f"{из_['url']}?auth={токен}", data=сырое,
+        headers={"Content-Type": "application/octet-stream"}, method="POST")
+    т0 = time.perf_counter()
+    try:
+        with urllib.request.urlopen(зап, timeout=таймаут) as отв:
+            из_["http"] = отв.getcode()
+            текст = отв.read().decode("utf-8", "replace")[:300]
+    except urllib.error.HTTPError as сбой:
+        из_["http"] = сбой.code
+        текст = сбой.read().decode("utf-8", "replace")[:300]
+    except Exception as сбой:  # noqa: BLE001
+        из_["send_ms"] = round((time.perf_counter() - т0) * 1000, 2)
+        из_["why_not"] = f"сеть: {type(сбой).__name__}: {str(сбой)[:160]}"
+        # ТОКЕН МОГ ПОПАСТЬ В ТЕКСТ ОШИБКИ вместе с адресом -- вычищаем.
+        из_["why_not"] = из_["why_not"].replace(токен, "…")[:200]
+        return из_
+    из_["send_ms"] = round((time.perf_counter() - т0) * 1000, 2)
+    из_["ответ"] = текст.replace(токен, "…")
+    # ПОДПИСЬ ИЗ ОТВЕТА -- ПО ЕГО ЖЕ ФОРМЕ: он отдаёт её полем signature.
+    try:
+        разбор = json.loads(текст)
+    except ValueError:
+        разбор = {}
+    подпись = (разбор.get("signature") or разбор.get("result")
+               if isinstance(разбор, dict) else None)
+    if int(из_["http"] or 0) == 200 and подпись:
+        из_.update(ok=True, sent=True, signature=подпись)
+    else:
+        из_["why_not"] = (из_["why_not"]
+                           or f"отказ http {из_['http']}: {из_['ответ'][:200]}")
+    return из_
+
+
 def отправить_одновременно(строки: list, *, имя_отправителя: str,
                             отправить=None, таймаут: float = 5.0) -> list:
     """Три отправки ОДНОВРЕМЕННО: потоки и один барьер на старте.
@@ -1349,6 +1428,43 @@ def self_test(кольцо_файл: str | None = None) -> int:  # noqa: C901
                                 минимум=_мин_tf, счёт_индекс=4)),
         чаевые_отправителя("многосчётный", реестр=_реестр_сч,
                             минимум=_мин_tf, счёт_индекс=4))
+    # --- ПУТЬ v2 (БИНАРНЫЙ) -- ПРОВЕРЯЕТСЯ БЕЗ СЕТИ. Три отличия от боевого
+    # пути сразу: путь /v2/sendBinaryTransaction, тело СЫРЫМИ байтами, ключ в
+    # строке запроса auth=. Ошибиться в любом -- получить отказ и счесть его
+    # ответом сервиса про чаевые.
+    _в2_без = отправить_v2_binary("AAAA", токен="")
+    chk("v2: без токена отправки нет, и это сказано словами",
+        _в2_без["ok"] is False and "токена" in (_в2_без["why_not"] or ""),
+        _в2_без)
+    _в2_путь = отправить_v2_binary("не base64!!!", токен="ТОКЕН")
+    chk("v2: путь собран по документации -- /v2/sendBinaryTransaction",
+        _в2_путь["url"].endswith("/v2/sendBinaryTransaction"), _в2_путь["url"])
+    chk("v2: битое тело -- отказ до сети, а не отправка мусора",
+        _в2_путь["ok"] is False
+        and "base64" in (_в2_путь["why_not"] or ""), _в2_путь["why_not"])
+    chk("v2: токен в отчёт не попадает",
+        "ТОКЕН" not in json.dumps(_в2_путь, ensure_ascii=False), _в2_путь)
+    _в2_отп = []
+
+    def _в2_зов(url, данные, заг, таймаут):  # noqa: ARG001
+        _в2_отп.append({"url": url, "байт": len(данные or b""),
+                         "заг": dict(заг or {})})
+        return 200, "{}"
+
+    # Тело уходит СЫРЫМИ байтами: длина тела обязана совпасть с длиной
+    # декодированного base64, а не с длиной самой строки base64.
+    import base64 as _b64_т  # noqa: PLC0415
+
+    _тело_т = _b64_т.b64encode(b"\x01\x02\x03\x04\x05").decode()
+    _в2_пр = отправить_v2_binary(_тело_т, токен="ТОКЕН2",
+                                  адрес="http://ничего.invalid:443")
+    chk("v2: тело считается в СЫРЫХ байтах, а не в знаках base64",
+        _в2_пр.get("байт") == 5, (_в2_пр.get("байт"), len(_тело_т)))
+    chk("v2: недоступный адрес -- причина «сеть», а не выдуманный отказ "
+        "сервиса, и токена в ней нет",
+        _в2_пр["ok"] is False
+        and (_в2_пр["why_not"] or "").startswith("сеть: ")
+        and "ТОКЕН2" not in (_в2_пр["why_not"] or ""), _в2_пр["why_not"])
     # ЖИВОЙ РЕЕСТР: СНЯТЫХ СЧЕТОВ СРЕДИ РАБОЧИХ БЫТЬ НЕ ДОЛЖНО.
     try:
         import bloom_senders as _SS_сч  # noqa: PLC0415
@@ -1702,6 +1818,11 @@ def _разборщик() -> argparse.ArgumentParser:
                    help="ПРОБА: взять эти чаевые вместо минимума из реестра "
                         "(0 -- из реестра). Нужно, чтобы искать настоящий "
                         "минимум сервиса, не правя реестр полосы")
+    р.add_argument("--put-v2", type=int, default=0,
+                   help="ПРОБА: 1 -- послать тот же байт путём "
+                        "/v2/sendBinaryTransaction BlockRazor (сырые байты, "
+                        "ключ в строке запроса auth=). Это ДРУГОЙ путь, чем "
+                        "боевой, и он проверяется отдельно от реестра")
     р.add_argument("--reestr", default="",
                    help="путь к реестру отправителей для ПРОБЫ (пусто -- тот, "
                         "что рядом с развёрнутым кодом). Нужен, чтобы проба "
@@ -1841,6 +1962,7 @@ def main() -> int:  # noqa: C901
     # без них отказывает (-32602, минимум 200 000 лампортов), и без них опыт
     # 30.09 16:26Z не отправил ни одной из двенадцати попыток.
     _реестр_путь = (а.reestr or "").strip() or None
+    globals()["_РЕЕСТР_ПРОБЫ_ПУТЬ"] = _реестр_путь
     ч = чаевые_отправителя(а.otpravitel, счёт_индекс=int(а.chaevye_schyot or 0),
                             путь_реестра=_реестр_путь)
     if _реестр_путь:
@@ -1940,9 +2062,23 @@ def main() -> int:  # noqa: C901
                 о.setdefault("чаевые_по_раундам", []).append(
                     {"раунд": н + 1, "счёт_индекс": ч_р["счёт_индекс"],
                      "адрес": ч_р["адрес"], "лампорты": int(ч["лампорты"])})
+        # ПУТЬ v2 -- СВОЙ ОТПРАВИТЕЛЬ, и он подставляется ТОЛЬКО входом пробы.
+        # Боевой реестр при этом не меняется ни на байт: это проба другого
+        # пути, а не правка денежного пути.
+        _отпр_раунда = None
+        if int(а.put_v2 or 0) > 0:
+            _ток = (os.environ.get("BLOCKRAZOR_AUTH_TOKEN") or "").strip()
+            _адр = ((реестр_для_пробы() or {}).get(а.otpravitel) or {}).get("url")
+            _база = (str(_адр or "").split("/sendTransaction")[0]
+                     or "http://amsterdam.solana.blockrazor.xyz:443")
+
+            def _отпр_раунда(имя, tx_base64):  # noqa: ARG001
+                return отправить_v2_binary(tx_base64, токен=_ток, адрес=_база)
+
+            о["put_v2"] = {"база": _база, "токен_задан": bool(_ток)}
         р = раунд(зов, кольцо=кольцо, имя_отправителя=а.otpravitel,
                    сдвиг=сдвиг, ждать_с=а.zhdat, чаевые=пара_раунда,
-                   чаевые_вперёд=чаевые_вперёд)
+                   чаевые_вперёд=чаевые_вперёд, отправить=_отпр_раунда)
         о.setdefault("раунды", []).append({к_: v for к_, v in р.items()
                                             if к_ != "строки"})
         if not р.get("ok"):

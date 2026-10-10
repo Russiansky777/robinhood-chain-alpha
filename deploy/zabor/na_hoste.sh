@@ -137,6 +137,24 @@ else
   echo "rezhim kolco: sekret ne nuzhen i ne chitaetsya"
 fi
 
+# TOKEN BLOCKRAZOR -- TOLKO DLYA PROBY PUTI v2, i tozhe iz fajla, a ne iz argv.
+# Boevoj put ego beryot iz okruzheniya sluzhby; probe v2 on nuzhen potomu, chto
+# tam klyuch stoit v STROKE ZAPROSA (?auth=), a ne v zagolovke apikey.
+BR_TOKEN_FAJL=$RABOTA/br_token
+if [ "${PUT_V2:-0}" = "1" ]; then
+  if [ ! -s "$BR_TOKEN_FAJL" ]; then
+    echo "SBOY: proba v2 prosit token, a fajla net: $BR_TOKEN_FAJL"
+    exit 1
+  fi
+  BLOCKRAZOR_AUTH_TOKEN=$(cat "$BR_TOKEN_FAJL")
+  export BLOCKRAZOR_AUTH_TOKEN
+  if [ -z "$BLOCKRAZOR_AUTH_TOKEN" ]; then
+    echo "SBOY: token BlockRazor pustoj"
+    exit 1
+  fi
+  echo "token BlockRazor: prinyat iz fajla, dlina $(printf %s "$BLOCKRAZOR_AUTH_TOKEN" | wc -c) znakov"
+fi
+
 # РАБОЧИЙ КАТАЛОГ -- КАТАЛОГ КОДА СЛУЖБЫ, А НЕ ДОМАШНИЙ КАТАЛОГ root.
 # ЗАЧЕМ. Реестр отправителей bloom_senders ищет "data/senders.json" ОТНОСИТЕЛЬНО
 # рабочего каталога. Команда приезжает по ssh от root, то есть рабочий каталог --
@@ -184,6 +202,7 @@ sudo -u bot -E env PYTHONPATH="$CODE_DIR:$RABOTA" BLOOM_CODE_DIR="$CODE_DIR" \
   --chaevye-vperyod "${CHAEVYE_VPERYOD:-0}" \
   --chaevye-rotaciya "${CHAEVYE_ROTACIYA:-0}" \
   --reestr "$RABOTA/senders.json" \
+  --put-v2 "${PUT_V2:-0}" \
   --out "$RABOTA/out.json"
 KOD=$?
 set -e
@@ -192,7 +211,11 @@ set -e
 if [ -f "$KLJUCH" ]; then
   shred -u "$KLJUCH" 2>/dev/null || rm -f "$KLJUCH"
 fi
+if [ -f "$BR_TOKEN_FAJL" ]; then
+  shred -u "$BR_TOKEN_FAJL" 2>/dev/null || rm -f "$BR_TOKEN_FAJL"
+fi
 unset BLOOM_LIVE_TESTS_KEY
+unset BLOCKRAZOR_AUTH_TOKEN
 
 echo "kod vozvrata opyta: $KOD"
 exit "$KOD"
