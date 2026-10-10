@@ -1,51 +1,16 @@
 {
- "pochemu": "KALIBROVOCHNYJ POTOK, slovo vladelca 10.10. Odna pravka fajla grupp: sozdat gruppu kalib_6qud i perenesti v neyo adres 6qudAN2kV8mt... iz cand1_03 (cand1_03 ostayotsya na pauze: lane_trades u neyo false, i v ney ostayotsya vtoroy adres DYAn4XpA, to est gruppa ne pusteet).",
- "chto_vazhno": [
-  "BILET 0.01, A NE 0.1, I ETO NARochNO. Uderzhanie 108 slotov dlya etogo puti novoe, poetomu po Pravilu 8 pervaya sdelka idyot polnym krugom biletom 0.01 (pokupka, prodazha po tajmeru, zakrytie schyota, itog po cepi). Posle neyo bilet stavitsya 0.1 vtoroy pravkoy -- vladelec razreshil eto bez novogo slova. Tak zhe zavodilas vol_4vw (sm. eyo note).",
-  "STOP KALIBROVKI: stop_after_closed 100 i stop_after_hours 30 -- chto ranshe. Chasy schitayutsya OT PERVOY SDELKI gruppy, a ne ot etoy pravki: poka istochnik molchit, okno goret ne dolzhno. Pervaya sdelka 0.01 vhodit v sotnyu, to est budet 1 krug po 0.01 i do 99 po 0.1.",
-  "PROCHEE KAK U vol_4vw: porog vhoda 2.0, dopusk 0.4, do 3 otkrytyh, max_slots_from_source 3, skip_flippers, allow_taxed_route, tot zhe spisok odinnadcati tipov pulov. Sutochnogo stopa gruppy net (Pravilo 16)."
- ],
+ "pochemu": "Слово владельца 10.10, вечер, п.1: «vol_4vw -- билет 0.3 -> 0.01 одной правкой групп, остальное не трогать. Цель -- замер места в блоке днём и ночью, не прибыль. Вернуть 0.3 -- только по слову владельца».",
+ "chto_vazhno": "ДВЕ ПРАВКИ, А НЕ ОДНА, И ЭТО НЕ РАСШИРЕНИЕ ЗАДАНИЯ. Размер группы лежит в файле под ДВУМЯ именами: lane_size (имя финального плана) и lane_sol (прежнее). Загрузчик службы (analysis/bloom_source_groups.py:429-457) при РАСХОЖДЕНИИ этих чисел ставит группе lane_trades=False и поднимает тревогу -- то есть правка одного поля ОСТАНОВИЛА БЫ vol_4vw совсем. Ровно это стоило впустую потраченной правки 29.09 (lane_size 0.3 против поставленного lane_sol 0.1: приоритет у lane_size, размер НЕ изменился). Поэтому оба имени ставятся в 0.01 ОДНИМ прогоном, то есть одной правкой файла. Больше у vol_4vw не меняется ничего: hold_slots 36, min_target_sol 2.0, slippage 0.4, lane_open_max 3, lane_pools, адрес -- как есть.",
  "pravki": [
   {
-   "sozdat": "kalib_6qud",
-   "politika": {
-    "lane_sol": 0.01,
-    "lane_size": 0.01,
-    "lane_trades": true,
-    "bloom_trades": false,
-    "bloom_sol": null,
-    "fanout": false,
-    "subscribe": true,
-    "hold_slots": 108,
-    "min_target_sol": 2.0,
-    "slippage": 0.4,
-    "lane_open_max": 3,
-    "max_slots_from_source": 3,
-    "skip_flippers": true,
-    "allow_taxed_route": true,
-    "min_pool_sol_reserve": null,
-    "stop_after_closed": 100,
-    "stop_after_hours": 30,
-    "lane_pools": [
-     "amm_v4",
-     "bonding",
-     "clmm",
-     "cpmm",
-     "damm2",
-     "dbc",
-     "dlmm",
-     "launchlab",
-     "pump_amm",
-     "two_step",
-     "whirlpool"
-    ],
-    "note": "Kalibrovochnyj potok 6qudAN2k (slovo vladelca 10.10). Uderzhanie 108 slotov ot s0, porog vhoda 2.0 SOL-ekv., dopusk po cene 0.40, do 3 otkrytyh. Bilet 0.01 TOLKO na pervuyu sdelku polnym krugom (Pravilo 8: uderzhanie 108 dlya etogo puti novoe), posle neyo 0.1 bez novogo slova. Gruppa ostanavlivaetsya sama posle 100 zakrytyh sdelok ili cherez 30 chasov ot pervoy sdelki -- chto ranshe (stop_after_closed, stop_after_hours; o stope uhodit odna stroka v TG). Adres perenesyon iz cand1_03, kotoraya ostayotsya na pauze. Vygruzki dlya Code-2 -- po 50 i po 100 sdelkam."
-   }
+   "gruppa": "vol_4vw",
+   "pole": "lane_size",
+   "znachenie": "0.01"
   },
   {
-   "perenesti": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
-   "v": "kalib_6qud",
-   "pometka": "kalibrovochnyj potok 10.10: uderzhanie 108, bilet 0.01 pervaya sdelka, dalee 0.1; perenesyon iz cand1_03"
+   "gruppa": "vol_4vw",
+   "pole": "lane_sol",
+   "znachenie": "0.01"
   }
  ]
 }
