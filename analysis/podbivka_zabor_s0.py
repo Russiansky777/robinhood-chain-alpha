@@ -41,10 +41,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import podbivka_bilet as B           # noqa: E402
 import podbivka_istochniki_novyj as И  # noqa: E402
 import podbivka_paket_obshee as O    # noqa: E402
-import podbivka_zapuski_svod as Z    # noqa: E402
 
 П = O.П
 МЕСТО = "S0_дно"      # по умолчанию; меняется флагом --mesto
@@ -66,7 +64,66 @@ def билет_по_глубине(р: dict, место: str = MESTO_ЗАГЛУ�
     return round(min(б, 3.0), 4) if б > 0.01 else None
 
 
-def проход(а, изд: float, место: str | None = None, доля: float | None = None) -> dict:
+def середина_слота(вх: dict) -> list | None:
+    """Состояние середины слота источника: половина наплыва слота уже прошла.
+
+    Идём по инварианту x*y: x = (x0 + x_дно)/2, y = x0*y0/x. Это ровно половина наплыва
+    слота источника по SOL, а не среднее двух цен.
+    """
+    s0, sд = вх.get("S0"), вх.get("S0_дно")
+    if not (s0 and sд):
+        return None
+    try:
+        x0, y0, xд = float(s0[0]), float(s0[1]), float(sд[0])
+    except (TypeError, ValueError, IndexError):
+        return None
+    x = (x0 + xд) / 2.0
+    if x <= 0 or y0 <= 0 or x0 <= 0:
+        return None
+    return [x, x0 * y0 / x, *list(s0[2:])]
+
+
+def доли_по_источникам(база: float, низ: float = 0.05, верх: float = 0.6) -> dict:
+    """Доля попадания отдельно по каждому источнику -- МОДЕЛЬ, не измерение.
+
+    Архив не знает нашего места внутри блока источника. Он знает НАПЛЫВ в слоте
+    источника: насколько цена ушла от S0 (сразу за его сделкой) к S0_дно (конец его
+    слота). Чем больше наплыв, тем больше желающих стояло в том же слоте и тем меньше
+    шанс попасть. Доля источника берётся обратно пропорционально его медианному наплыву
+    и нормируется так, чтобы средняя по вселенной осталась равна `база`. По живым сделкам
+    зависимости попадания от загрузки блока не видно, поэтому это чувствительность к
+    допущению «доля плоская», а не измеренный закон.
+    """
+    наплыв: dict = collections.defaultdict(list)
+    for р in O.сигналы():
+        if р.get("quoteMint") != O.WSOL or not р.get("первая"):
+            continue
+        if (р.get("sol") or 0) < И.ПОРОГ_ИСТОЧНИКА:
+            continue
+        ист = р.get("ист")
+        вх = р.get("вход") or {}
+        s0, sд = вх.get("S0"), вх.get("S0_дно")
+        if not (ист and s0 and sд):
+            continue
+        try:
+            ц0 = float(s0[0]) / float(s0[1])
+            цд = float(sд[0]) / float(sд[1])
+        except (TypeError, ValueError, ZeroDivisionError, IndexError):
+            continue
+        if ц0 <= 0 or цд <= 0:
+            continue
+        наплыв[ист].append(max(0.0, цд / ц0 - 1.0))
+    мед = {и: statistics.median(v) for и, v in наплыв.items() if v}
+    if not мед:
+        return {}
+    общ = statistics.median(мед.values()) or 1e-9
+    вес = {и: 1.0 / (1.0 + m / общ) for и, m in мед.items()}
+    ср = statistics.fmean(вес.values()) or 1.0
+    return {и: min(верх, max(низ, база * w / ср)) for и, w in вес.items()}
+
+
+def проход(а, изд: float, место: str | None = None, доля: float | None = None,
+           доли_ист: dict | None = None, мелкие: bool = False) -> dict:
     место = место or а.mesto
     доля = а.dolya if доля is None else доля
     рнд = random.Random(СЕМЯ)
@@ -79,18 +136,27 @@ def проход(а, изд: float, место: str | None = None, доля: flo
         if (р.get("sol") or 0) < И.ПОРОГ_ИСТОЧНИКА:
             continue
         ист = р.get("ист")
-        if not (ист and (р.get("вход") or {}).get(место)):
+        вх = р.get("вход") or {}
+        if место == "S0_сер" and not вх.get("S0_сер"):
+            сер = середина_слота(вх)
+            if сер:
+                вх["S0_сер"] = сер
+                р["вход"] = вх
+        if not (ист and вх.get(место)):
             continue
         счёт["годных_сигналов"] += 1
         # прореживание: попали в блок источника только в доле --dolya случаев
-        if рнд.random() > доля:
+        # (доли_ист -- отдельная доля на каждый источник, чувствительность)
+        if рнд.random() > (доли_ист.get(ист, доля) if доли_ист else доля):
             счёт["мимо_блока_источника"] += 1
             continue
         счёт["вошли"] += 1
         с = O.как_сигнал(р)
         бг = билет_по_глубине(р, место)
+        билеты = ((("0.01", 0.01), ("0.1", 0.1)) if мелкие else ()) + \
+                 (("0.3", БИЛЕТ), ("глубина", бг))
         for H in УДЕРЖАНИЯ:
-            for имя_б, б in (("0.3", БИЛЕТ), ("глубина", бг)):
+            for имя_б, б in билеты:
                 if not б:
                     continue
                 итоги = {}
@@ -215,7 +281,8 @@ def main() -> int:
     р.add_argument("--dolya", type=float, default=0.209,
                    help="доля сигналов, в которых мы попали в блок источника")
     р.add_argument("--k-g-osnovnaya", type=float, default=1.0)
-    р.add_argument("--mesto", default="S0_дно", choices=("S0_дно", "S1", "S2"))
+    р.add_argument("--mesto", default="S0_дно",
+                   choices=("S0_дно", "S0_сер", "S1", "S2"))
     р.add_argument("--metka", default="")
     return главное(р.parse_args())
 
