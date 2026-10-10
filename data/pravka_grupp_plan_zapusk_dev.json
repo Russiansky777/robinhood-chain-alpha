@@ -1,0 +1,42 @@
+{
+ "pochemu": "GRUPPA zapusk_dev -- PODGOTOVLENA, NE PRIMENENA. Slovo vladelca 10.10, p.2: 'podgotovit kod i gruppu, vklyuchat tolko po slovu vladelca (ono budet otdelno)'. Etot fajl -- plan pravki, a ne pravka: chtoby ego primenit, nado yavno dispatchnut run_vps_pravka_grupp_nl.yml s plan=yes i FAJLOM etogo plana. Sam fajl nichego ne menyaet.",
+ "chego_ne_hvataet_do_vklyucheniya": [
+  "1. Primenit etot plan (gruppa poyavitsya s lane_trades=false -- ona SOZDANA, no NE torguet).",
+  "2. Postavit gruppe lane_trades=true otdelnoy pravkoy -- eto vtoraya dver.",
+  "3. Zavesti v env BLOOM_ZAPUSK_TORGUET=1 -- tretya dver, i ona trebuet pravki okruzheniya (deploj idyot s keep_env=yes, sam on eyo ne zavedyot).",
+  "Vse tri nuzhny vmeste: lyubaya zakrytaya -- uvedomlenie sozdaniya uhodit tolko v tenevoj zhurnal, pokupok net."
+ ],
+ "adresa_u_gruppy_odin_i_eto_narochno": "PDA mint_authority programmy krivoy TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM. On nuzhen RADI PODPISKI: detektor podpisyvaetsya na adresa grupp, i bez nego potok sozdaniy ne prihodit vovse. ISTOCHNIKOM SIGNALA on ne stanovitsya nikogda -- istochnikom idyot SOZDATEL tokena, a gruppu emu dayot pravilo chlenstva bloom_own_send.gruppa_zapuska_po_tranzakcii.",
+ "pravki": [
+  {
+   "sozdat": "zapusk_dev",
+   "politika": {
+    "lane_size": 0.01,
+    "lane_sol": 0.01,
+    "lane_trades": false,
+    "bloom_trades": false,
+    "bloom_sol": null,
+    "fanout": false,
+    "subscribe": true,
+    "min_target_sol": 0.001,
+    "max_slots_from_source": 3,
+    "skip_flippers": true,
+    "allow_taxed_route": true,
+    "slippage": 0.4,
+    "min_pool_sol_reserve": null,
+    "lane_open_max": 3,
+    "per_hour": 10,
+    "hold_slots": 160,
+    "lane_pools": [
+     "bonding"
+    ],
+    "note": "Gruppa zapuskov pump.fun (slovo vladelca 10.10, p.2). Signal -- SOZDANIE tokena, esli sozdatel kupil v tranzakcii sozdaniya; propuskayutsya is_mayhem_mode i kotirovka ne SOL (otkaz do podpisi, c1_zapusk_zhurnal.signal_zapuska). Pokupka -- uzhe proverennym putyom krivoy v3 (buy_exact_quote_in_v3), poetomu lane_pools tolko bonding: nikakogo drugogo tipa pula u sozdaniya byt ne mozhet. Bilet 0.01, otkrytyh ne bolshe 3, pokupok ne bolshe 10 v chas (per_hour -- skolzyashchee okno). Prodazha po tajmeru 160 slotov; hold_slots schitaetsya OT SLOTA ISTOCHNIKA, a istochnik zdes -- sama tranzakciya sozdaniya, to est 160 slotov ot sozdaniya (~34.8 s pri izmerennoy dline slota 0.2177 s), i nasha posadka sjedaet iz nih okolo odnogo. Pravilo 4 ne menyaetsya: prodayot storozh tem putyom, kotoryj deshevle po cene. lane_trades=false NAROCHNO -- gruppa sozdana, no ne torguet; vklyuchenie otdelnoy pravkoy po slovu vladelca. min_target_sol 0.001 -- EDINSTVENNOE chislo, kotorogo vladelec ne nazval: porog sravnivaetsya s tratoy SOZDATELYA, a uslovie vladelca -- 'esli sozdatel kupil', bez summy. Zamer zhurnala za chas 09.10: 1720 pokupok sozdateley, mediana 0.2587 SOL, ot 0.0057 do 65.01 -- pri obshchem poroge 2.0 otseklos by okolo chetyrnadcati pyatnadcatyh signalov. Nuzhen drugoy porog -- odno slovo."
+   }
+  },
+  {
+   "perenesti": "TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM",
+   "v": "zapusk_dev",
+   "pometka": "PDA mint-authority programmy krivoj: radi podpiski na sozdaniya. Istochnikom signala ne stanovitsya -- istochnik eto sozdatel, gruppa emu dayotsya pravilom."
+  }
+ ]
+}
