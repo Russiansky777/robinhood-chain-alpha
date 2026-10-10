@@ -81,6 +81,19 @@ jobs:
       - name: "Проверки ДО хоста: синтаксис скриптов и самопроверки"
         run: |
           set -e
+          # ЧУЖОЙ ОТЧЁТ УБИРАЕТСЯ ЗДЕСЬ, В ПЕРВОМ ЖЕ ШАГЕ, И ВОТ ПОЧЕМУ ЭТОГО
+          # НЕ ХВАТИЛО В ШАГЕ ОПЫТА. То же `rm -f` стоит ниже, внутри шага
+          # "Опыт на хосте", и прошлый раз (30.09 15:55Z) этого хватило. Но
+          # если прогон падает ДО этого шага -- например на разборе входа, --
+          # шаг опыта ПРОПУСКАЕТСЯ, файл прошлого прогона остаётся, а шаг
+          # "Страница и отчёт" стоит с if: always() и копирует его в отчёт.
+          # ЖИВОЙ СЛУЧАЙ 10.10 15:30Z: прогон kolco отказал на числе раундов
+          # (30 при пределе 20), опыт не шёл ВОВСЕ -- и в data/ уехал сырой
+          # вывод прогона 30.09, затёрший исправленный свод (победитель по
+          # ПАРНОМУ сравнению astralane 21:4 сменился обратно на helius "по
+          # медианам", вместе с предупреждением о расхождении). Отчёт, который
+          # никто не измерял, хуже отсутствия: его читают как итог.
+          rm -f /tmp/zabor_out.json
           for f in deploy/zabor/na_hoste.sh deploy/zabor/zabrat.sh deploy/zabor/ubrat.sh; do
             bash -n "$f"
             echo "bash -n ok: $f"
@@ -258,10 +271,22 @@ jobs:
 
       - name: "Страница и отчёт"
         if: always()
+        env:
+          REZHIM: ${{ inputs.rezhim }}
         run: |
           set -e
           if ! python3 -c "import json,sys; json.load(open('/tmp/zabor_out.json'))" 2>/dev/null; then
             echo "otchyota net ili on ne json -- stranicu ne pishem"
+            exit 0
+          fi
+          # КОЛЬЦО -- СВОЙ ФАЙЛ, А НЕ ФАЙЛ ОПЫТА. Кольцо НИЧЕГО не отправляет:
+          # это проверка оснастки и остатка, а не замер. Прежде оно писало в
+          # тот же data/zabor_s0_opyt.json и затирало результаты настоящих
+          # прогонов -- то есть замер, стоивший денег, пропадал от бесплатной
+          # проверки.
+          if [ "$REZHIM" = kolco ]; then
+            cp /tmp/zabor_out.json data/zabor_s0_kolco.json
+            echo "rezhim kolco: otchyot v data/zabor_s0_kolco.json, fajl opyta ne tronut"
             exit 0
           fi
           cp /tmp/zabor_out.json "$OUT_JSON"
@@ -278,6 +303,7 @@ jobs:
           # чужие изменения состояния, оказавшиеся в дереве в этот момент.
           git add docs/zabor_s0_opyt_*.md 2>/dev/null || true
           [ -f "$OUT_JSON" ] && git add "$OUT_JSON"
+          [ -f data/zabor_s0_kolco.json ] && git add data/zabor_s0_kolco.json
           git diff --cached --quiet && { echo "nechego kommitit"; exit 0; }
           git commit -m "Opyt zabora S+0: tablica progona [automated]"
           for i in 1 2 3 4 5; do

@@ -358,6 +358,10 @@ def _bez_budzheta(instrukcii: list) -> list:
 СМЕЩЕНИЕ_QUOTE_MINT = 83
 ДЛИНА_СЧЁТА_КРИВОЙ = 166
 WSOL = "So11111111111111111111111111111111111111112"
+# НУЛЕВОЙ PUBKEY. В счёте кривой им помечена ПУСТОТА поля: у кривой с нативной
+# котировкой отдельного минта котировки нет. Считать его "чужой котировкой"
+# значило бы ответить ровно наоборот (см. mayhem_mintov).
+ПУСТОЙ_PUBKEY = "11111111111111111111111111111111"
 
 
 def klass_otkaza(logi: list) -> dict:
@@ -934,6 +938,7 @@ def mayhem_mintov(*, minty: list, pauza: float) -> dict:
     """
     из_ = {"mintov": 0, "prochitano": 0, "ne_prochitano": 0,
             "mayhem_da": 0, "mayhem_net": 0, "kotirovka_ne_sol": 0,
+            "kotirovka_nativnyj_sol": 0, "kotirovka_wsol": 0,
             "stroki": [], "why_not": None}
     см = smeshchenija_krivoj()
     if см.get("why_not") and "is_mayhem_mode" not in см["polya"]:
@@ -995,8 +1000,22 @@ def mayhem_mintov(*, minty: list, pauza: float) -> dict:
             из_["mayhem_da"] += 1
         elif ряд.get("is_mayhem_mode") is False:
             из_["mayhem_net"] += 1
-        if ряд.get("quote_mint") and ряд["quote_mint"] != WSOL:
+        # НУЛЕВОЙ PUBKEY -- ЭТО НАТИВНЫЙ SOL, А НЕ "ЧУЖАЯ КОТИРОВКА".
+        # ЖИВОЙ СЛУЧАЙ 10.10: у всех 67 кривых quote_mint =
+        # 11111111111111111111111111111111, то есть поле ПУСТОЕ -- у кривой с
+        # нативной котировкой минта котировки нет вовсе. Прежний счёт
+        # ("не равно WSOL -- значит не SOL") дал бы владельцу "котировка не SOL
+        # у 67 из 67", то есть ровно обратное правде.
+        _кот = ряд.get("quote_mint")
+        ряд["kotirovka"] = ("нативный SOL" if _кот in (ПУСТОЙ_PUBKEY, None)
+                             else ("WSOL" if _кот == WSOL else _кот))
+        if _кот and _кот not in (WSOL, ПУСТОЙ_PUBKEY):
             из_["kotirovka_ne_sol"] += 1
+        elif _кот == ПУСТОЙ_PUBKEY:
+            из_["kotirovka_nativnyj_sol"] = (
+                int(из_.get("kotirovka_nativnyj_sol") or 0) + 1)
+        elif _кот == WSOL:
+            из_["kotirovka_wsol"] = int(из_.get("kotirovka_wsol") or 0) + 1
         из_["prochitano"] += 1
         из_["stroki"].append(ряд)
         if pauza:
@@ -1366,6 +1385,16 @@ def самопроверка() -> int:
     finally:
         РАЗМЕРЫ_BORSH.clear()
         РАЗМЕРЫ_BORSH.update(_был_размер)
+    # НУЛЕВОЙ PUBKEY В КОТИРОВКЕ -- НАТИВНЫЙ SOL. Числа проверяются на том
+    # самом случае, который меня и поймал 10.10: у всех живых кривых 4vw
+    # quote_mint пуст, и прежний счёт сказал бы "котировка не SOL у 67 из 67".
+    _ист_м = inspect.getsource(mayhem_mintov)
+    chk("пустой pubkey котировки не считается чужой котировкой, и у него своё "
+        "имя в ряду",
+        'ПУСТОЙ_PUBKEY' in _ист_м
+        and '_кот not in (WSOL, ПУСТОЙ_PUBKEY)' in _ист_м
+        and 'ряд["kotirovka"]' in _ист_м
+        and ПУСТОЙ_PUBKEY == "11111111111111111111111111111111")
     print(f"самопроверка круга сборки: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
