@@ -672,6 +672,124 @@ def _kriwaja_iz_tx(t: dict) -> dict:
     return из_
 
 
+def _modul_iz_kommita(ref: str, otnositelno: str, imya: str):
+    """Модуль ИЗ КОММИТА, рядом с нынешним. Для сравнения двух версий разбора.
+
+    Берётся git show, кладётся во временный каталог и грузится под другим
+    именем -- так в одном прогоне живут обе версии и сравниваются на ОДНИХ
+    транзакциях. Иначе "решения совпадают" пришлось бы принимать на слово.
+    """
+    import importlib.util  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+    import tempfile  # noqa: PLC0415
+
+    вых = subprocess.run(["git", "show", f"{ref}:{otnositelno}"],
+                          capture_output=True, text=True, check=False)
+    if вых.returncode != 0 or not вых.stdout.strip():
+        raise RuntimeError(f"git show {ref}:{otnositelno} не дал текста: "
+                            f"{(вых.stderr or '')[:160]}")
+    кат = Path(tempfile.mkdtemp())
+    фл = кат / f"{imya}.py"
+    фл.write_text(вых.stdout, encoding="utf-8")
+    спец = importlib.util.spec_from_file_location(imya, фл)
+    мод = importlib.util.module_from_spec(спец)
+    sys.modules[imya] = мод
+    спец.loader.exec_module(мод)
+    return мод
+
+
+def _snimok_shablona(ш: dict) -> dict:
+    """Что именно сравниваем у шаблона покупки. None -- отказ."""
+    if not isinstance(ш, dict):
+        return {"ok": False, "why_not": "шаблона нет"}
+    return {"ok": bool(ш.get("ok")),
+             "why_not": (str(ш.get("why_not"))[:140]
+                          if ш.get("why_not") else None),
+             "ix": ш.get("ix"), "po_idl": ш.get("po_idl"),
+             "exact_out": ш.get("exact_out"),
+             "schetov": len(ш.get("accounts") or []),
+             "dannye_8": (ш.get("data") or b"")[:8].hex()
+                         if isinstance(ш.get("data"), (bytes, bytearray)) else None,
+             "arg0": ш.get("arg0"), "arg1": ш.get("arg1")}
+
+
+def sravnit_versii_razbora(*, podpisi: list, ref_staryj: str,
+                            pauza: float) -> dict:
+    """ОДНИ транзакции -- ДВЕ версии разбора сделки источника.
+
+    Слово владельца 10.10 (вечер): перед откатом прогнать сегодняшние сигналы
+    обеими версиями и сказать, сколько решений расходится, построчно.
+    Сравнивается то, что решает судьбу сделки: прошёл ли шаблон, какая
+    разновидность инструкции, сколько счетов, первые восемь байт данных и
+    аргументы -- то есть ЧЕМ собралась бы наша покупка.
+    """
+    из_ = {"podpisej": 0, "sovpalo": 0, "razoshlos": 0, "ne_prochitano": 0,
+            "ref_staryj": ref_staryj, "sdelki": [], "why_not": None}
+    try:
+        стар = _modul_iz_kommita(ref_staryj, "analysis/c2_swap_build.py",
+                                  "c2_swap_build_staryj")
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = f"старая версия не загружена: {сбой}"
+        return из_
+    import c2_swap_build as нов  # noqa: PLC0415
+
+    for п in podpisi:
+        п = str(п).strip()
+        if not п:
+            continue
+        из_["podpisej"] += 1
+        т = зов("getTransaction", [п, {
+            "encoding": "jsonParsed",
+            "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX,
+            "commitment": "confirmed"}])
+        if not т["ok"] or not т.get("result"):
+            из_["ne_prochitano"] += 1
+            из_["sdelki"].append({"podpis": п, "sovpalo": None,
+                                   "why_not": f"не прочитана: {т.get('why_not')}"})
+            continue
+        tx = т["result"]
+        к = _kriwaja_iz_tx(tx)
+        хранилище = к.get("bazovyj_vault")
+        ряд = {"podpis": п, "mint": к.get("mint"),
+                "pokupka_istochnika": к.get("pokupka_istochnika"),
+                "hranilishche": хранилище}
+        if not хранилище:
+            # НЕТ ХРАНИЛИЩА -- СРАВНИВАТЬ НЕЧЕГО, и это тоже надо сказать.
+            ряд.update(sovpalo=None, why_not=k_why(к))
+            из_["ne_prochitano"] += 1
+            из_["sdelki"].append(ряд)
+            continue
+        снимки = {}
+        for имя, мод in (("staraya", стар), ("novaya", нов)):
+            try:
+                снимки[имя] = _snimok_shablona(
+                    мод.extract_template(tx, мод.BONDING, хранилище))
+            except Exception as сбой:  # noqa: BLE001
+                снимки[имя] = {"ok": False,
+                                "why_not": f"{type(сбой).__name__}: "
+                                           f"{str(сбой)[:120]}"}
+        ряд["staraya"] = снимки["staraya"]
+        ряд["novaya"] = снимки["novaya"]
+        отличия = [к_ for к_ in sorted(set(снимки["staraya"])
+                                        | set(снимки["novaya"]))
+                    if снимки["staraya"].get(к_) != снимки["novaya"].get(к_)]
+        ряд["otlichiya"] = отличия
+        ряд["sovpalo"] = not отличия
+        из_["sovpalo" if not отличия else "razoshlos"] += 1
+        из_["sdelki"].append(ряд)
+        if pauza:
+            time.sleep(pauza)
+    if из_["razoshlos"]:
+        из_["why_not"] = (f"решения разошлись на {из_['razoshlos']} подписях "
+                           f"из {из_['podpisej']}")
+    return из_
+
+
+def k_why(к: dict) -> str:
+    """Причина, по которой в сделке не нашлось кривой. Короткой строкой."""
+    return str((к or {}).get("why_not") or "хранилища базы в сделке нет")[:140]
+
+
 def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
                                 bilet_lamportov: int, cu: int,
                                 pauza: float) -> dict:
@@ -996,6 +1114,11 @@ def main() -> int:
     п.add_argument("--chitat", default="",
                     help="ТОЛЬКО ЧТЕНИЕ: подписи наших транзакций -- чем они "
                          "собраны (имя разновидности по IDL), без симуляции")
+    п.add_argument("--sravnit-versii", default="",
+                    help="подписи сигналов: прогнать разбор ДВУМЯ версиями "
+                         "(нынешней и из --ref-staryj) и назвать расхождения")
+    п.add_argument("--ref-staryj", default="e222b934^",
+                    help="коммит старой версии c2_swap_build для сравнения")
     п.add_argument("--out", default="")
     а = п.parse_args()
     if а.self_test:
@@ -1004,6 +1127,19 @@ def main() -> int:
     # --live значит "найди минты сам", а здесь минты названы снаружи. Проверка
     # на --live стояла выше этой ветки и съела весь прогон 37957981526: код 2
     # "нужен --live", ноль вызовов узла, а прогон при этом зелёный.
+    if а.sravnit_versii.strip():
+        из_ = sravnit_versii_razbora(
+            podpisi=[x for x in а.sravnit_versii.replace(";", ",").split(",")
+                      if x.strip()],
+            ref_staryj=а.ref_staryj, pauza=а.pauza)
+        из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        # РАСХОЖДЕНИЕ -- НЕ СБОЙ ПРОГОНА: его и искали. Код 0, чтобы отчёт
+        # коммитился, а судить по числам.
+        return 0
     if а.chitat.strip():
         из_ = chem_kupleno(
             [x for x in а.chitat.replace(";", ",").split(",") if x.strip()],
