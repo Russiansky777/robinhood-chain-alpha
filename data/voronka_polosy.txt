@@ -1,29 +1,99 @@
-=== Полоса: воронка по журналу решений, 2026-10-10T15:16:45Z ===
-окно: с '2026-10-10T15:07:00Z' до 'конца журнала'
+=== Полоса: воронка по журналу решений, 2026-10-10T15:54:42Z ===
+окно: с '2026-10-10T15:27:00Z' до 'конца журнала'
 {
  "строк_всего": 400000,
- "попыток_полосы": 250,
- "в_окне": 1,
- "с": "2026-10-10T15:07:00Z",
+ "попыток_полосы": 259,
+ "в_окне": 9,
+ "с": "2026-10-10T15:27:00Z",
  "до": null,
  "группа": null,
  "по_этапам": {
-  "gate": 1
+  "gate": 8,
+  "usdc_signaly_build": 1
  },
  "по_группам": {
+  "cand2": {
+   "gate": 3
+  },
+  "cand2_03": {
+   "gate": 1
+  },
+  "krug_001": {
+   "gate": 2
+  },
+  "lane_s0": {
+   "gate": 1
+  },
   "sniper_src": {
    "gate": 1
+  },
+  "vol_4vw": {
+   "usdc_signaly_build": 1
   }
  },
  "причины": {
   "gate": [
    {
+    "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
+    "раз": 3
+   },
+   {
+    "почему": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
+    "раз": 2
+   },
+   {
+    "почему": "предел полосы: по группе cand2_03 полоса не торгует (lane_trades выключен)",
+    "раз": 1
+   },
+   {
+    "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
+    "раз": 1
+   },
+   {
     "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
+    "раз": 1
+   }
+  ],
+  "usdc_signaly_build": [
+   {
+    "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
     "раз": 1
    }
   ]
  },
  "причины_по_группам": {
+  "cand2": {
+   "gate": [
+    {
+     "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
+     "раз": 3
+    }
+   ]
+  },
+  "cand2_03": {
+   "gate": [
+    {
+     "почему": "предел полосы: по группе cand2_03 полоса не торгует (lane_trades выключен)",
+     "раз": 1
+    }
+   ]
+  },
+  "krug_001": {
+   "gate": [
+    {
+     "почему": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
+     "раз": 2
+    }
+   ]
+  },
+  "lane_s0": {
+   "gate": [
+    {
+     "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
+     "раз": 1
+    }
+   ]
+  },
   "sniper_src": {
    "gate": [
     {
@@ -31,45 +101,203 @@
      "раз": 1
     }
    ]
+  },
+  "vol_4vw": {
+   "usdc_signaly_build": [
+    {
+     "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
+     "раз": 1
+    }
+   ]
   }
  },
  "примеры": {
+  "cand2/gate": [
+   {
+    "ts_utc": "2026-10-10T15:40:10Z",
+    "group": "cand2",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
+    "mint": "EqHuTkiG8xQJsqzXmwnWhyQz24Qfi8ceztGaLP8Jpump",
+    "source_sig": "65PzU2gTP5KViBXU1Eh2A1w82VpZYsAxiLCoo9iLhpT5Yk9RHyhfnCJVuapbSX6c6f4LRN1L3V4XJ7Y8jgCxciyH",
+    "size_sol": 0.1,
+    "source": "3JJzmDLp33hFG8KeNghcYM9Hyr8pJuWeTr3Rr8suP1tQ"
+   },
+   {
+    "ts_utc": "2026-10-10T15:50:25Z",
+    "group": "cand2",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
+    "mint": "BDYQgba7FVBpqaMyMcLW1ENP81VEYwGfCs6TsC5Fpump",
+    "source_sig": "hsRZUDzDDSjZ9WqQ4DnexrRgTTNDHMRQU74bx2vY96eMWeUBC1rjkejDKRoAeaV748zF8ok48SnC8upcCn7oQXQ",
+    "size_sol": 0.1,
+    "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr"
+   },
+   {
+    "ts_utc": "2026-10-10T15:51:40Z",
+    "group": "cand2",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
+    "mint": "2SPZttq6YTkum582bqtBZ9bCJagTc5sA8TeFkYvbbxNm",
+    "source_sig": "SpPJ8rTLZvesKg3wccTeuwmchk1JwpKGmP7LPL1emZAHUpJVhsntf2qfLTodEmnCTzEhXJRWVczE1n1cDucCML5",
+    "size_sol": 0.1,
+    "source": "AFmiexHwMBFjKY7N9spbYjeKCr2nmj6k7zmAaamcjkVy"
+   }
+  ],
+  "cand2_03/gate": [
+   {
+    "ts_utc": "2026-10-10T15:36:48Z",
+    "group": "cand2_03",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе cand2_03 полоса не торгует (lane_trades выключен)",
+    "mint": "7VUdoT8SeRiZRtyQuCS4qhMWJEmDghyPNudE1zArE1D2",
+    "source_sig": "3Q5whWBSFBJp8uo6xkKbqrnLZN5GANdSDt346JjQvkiPHVeNggvRZcAvRQn74FsMCgAVjnDpnNJwQQu8ixwHiqka",
+    "size_sol": 0.3,
+    "source": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE"
+   }
+  ],
+  "krug_001/gate": [
+   {
+    "ts_utc": "2026-10-10T15:28:25Z",
+    "group": "krug_001",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
+    "mint": "FxB1qj7V9D4Qa3Qoe6BQ4DjyU5nWu9DEj3J1oAkPpump",
+    "source_sig": "4nHL2RDvPeVCzHay5QQEoCtKSzQag6BtdbyZo2n6aMJGbxRMtfUbewG9WtnELW8mBQAfaYPunWDZ7ArbrQ5gfBGM",
+    "size_sol": 0.01,
+    "source": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij"
+   },
+   {
+    "ts_utc": "2026-10-10T15:50:25Z",
+    "group": "krug_001",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
+    "mint": "BDYQgba7FVBpqaMyMcLW1ENP81VEYwGfCs6TsC5Fpump",
+    "source_sig": "ez8PvpvSW25g5pZpcatX38f9mpm3cLPSCqL4zC5pfBpMWLm41aw5RUrSYVG6jnZKW6boGtb689tg2yqWxLTdMJ6",
+    "size_sol": 0.01,
+    "source": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij"
+   }
+  ],
+  "lane_s0/gate": [
+   {
+    "ts_utc": "2026-10-10T15:43:48Z",
+    "group": "lane_s0",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
+    "mint": "Gyk9Z93Ri2JUjqES9HTpc7pxCJTLD7vhBhEjBhyApump",
+    "source_sig": "44Fur6cNwSdxCVZM4uPNmWSrpLC5Z8TdGcmDYgchacimDBJgkGsLvqXFxMpWxrHRPZ9ktR51mYHbW6mw1vsx5Lfq",
+    "size_sol": 0.5,
+    "source": "3Um4qsYQKYULYSJwRChReZtgsXu3kiGm6HNTvZpy9dYy"
+   }
+  ],
   "sniper_src/gate": [
    {
-    "ts_utc": "2026-10-10T15:07:19Z",
+    "ts_utc": "2026-10-10T15:44:04Z",
     "group": "sniper_src",
     "stage": "gate",
     "ok": false,
     "sent": false,
     "why_not": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-    "mint": "6ir6ih6y9t9JWBLQSP5PRLVDzBxBRqQkMMnxkkT6pump",
-    "source_sig": "51p97hDtouKEPP588ZvUurXZU6qjB7GDbpnPvNbVg8t4fsucefRvmkY1ei2V4wwo7HjmnwxVNVKjeCtZQVgHHTgg",
+    "mint": "2SPZttq6YTkum582bqtBZ9bCJagTc5sA8TeFkYvbbxNm",
+    "source_sig": "27jPRdMMqwDK1SWYCSXBBn71TUB1YeXcoZTaJJJ2D8ckJYw6j35UDgBiuaxEA8Q7QFwuLsRdKB8124bQd1p73ZeN",
     "size_sol": 0.3,
     "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC"
    }
+  ],
+  "vol_4vw/usdc_signaly_build": [
+   {
+    "ts_utc": "2026-10-10T15:37:37Z",
+    "group": "vol_4vw",
+    "stage": "usdc_signaly_build",
+    "ok": false,
+    "sent": false,
+    "why_not": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
+    "mint": "HwRuXudDiMLsxtimorRAXV5oGqyh3yfNmiEP7pNypump",
+    "source_sig": "3q4irbuTMjaQdUa9Dq8j2gbhTjiojr5ufXLVhbfrakEqgNr3PtHWtCK7kMJJWUPJwKuvtmJyBfy8kCP5S26eEeW7",
+    "size_sol": 0.01,
+    "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9",
+    "lane_route_offered": true,
+    "direct_why_not": "котировка пула не SOL -- полоса только одношаговая",
+    "lane_usdc_signaly_godilos": false,
+    "lane_usdc_signaly_why_not": "разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
+    "lane_usdc_signaly": {
+     "label": "Кривая pump.fun v2",
+     "kotirovshchik": "krivaya_v2",
+     "leg1_min_out": null,
+     "leg2_amount_in": null,
+     "min_out": null,
+     "expected_out": null,
+     "min_out_from": null,
+     "razvernut": false,
+     "size": null
+    },
+    "lane_usdc_signaly_alt": {
+     "ok": true,
+     "адрес": "B1LxDr9ib1ezCSebbxnF73hCSAsVsy23U5fEwrqkfzXY",
+     "адресов": 47,
+     "why_not": null
+    },
+    "lane_usdc_noga_godilos": false,
+    "lane_usdc_noga_why_not": "тип пула не в таблице USDC-ноги: 6EF8rrec",
+    "lane_usdc_noga_potolok_sol": 0.01,
+    "lane_usdc_noga_posadok": 0,
+    "lane_usdc_noga_potolok_snjat": false
+   }
   ]
  },
- "первая_utc": "2026-10-10T15:07:19Z",
- "последняя_utc": "2026-10-10T15:07:19Z",
+ "первая_utc": "2026-10-10T15:28:25Z",
+ "последняя_utc": "2026-10-10T15:51:40Z",
  "отправлено": 0,
  "подписи": [],
  "подписи_отказов": {
+  "cand2/gate": [
+   "65PzU2gTP5KViBXU1Eh2A1w82VpZYsAxiLCoo9iLhpT5Yk9RHyhfnCJVuapbSX6c6f4LRN1L3V4XJ7Y8jgCxciyH",
+   "hsRZUDzDDSjZ9WqQ4DnexrRgTTNDHMRQU74bx2vY96eMWeUBC1rjkejDKRoAeaV748zF8ok48SnC8upcCn7oQXQ",
+   "SpPJ8rTLZvesKg3wccTeuwmchk1JwpKGmP7LPL1emZAHUpJVhsntf2qfLTodEmnCTzEhXJRWVczE1n1cDucCML5"
+  ],
+  "cand2_03/gate": [
+   "3Q5whWBSFBJp8uo6xkKbqrnLZN5GANdSDt346JjQvkiPHVeNggvRZcAvRQn74FsMCgAVjnDpnNJwQQu8ixwHiqka"
+  ],
+  "krug_001/gate": [
+   "4nHL2RDvPeVCzHay5QQEoCtKSzQag6BtdbyZo2n6aMJGbxRMtfUbewG9WtnELW8mBQAfaYPunWDZ7ArbrQ5gfBGM",
+   "ez8PvpvSW25g5pZpcatX38f9mpm3cLPSCqL4zC5pfBpMWLm41aw5RUrSYVG6jnZKW6boGtb689tg2yqWxLTdMJ6"
+  ],
+  "lane_s0/gate": [
+   "44Fur6cNwSdxCVZM4uPNmWSrpLC5Z8TdGcmDYgchacimDBJgkGsLvqXFxMpWxrHRPZ9ktR51mYHbW6mw1vsx5Lfq"
+  ],
   "sniper_src/gate": [
-   "51p97hDtouKEPP588ZvUurXZU6qjB7GDbpnPvNbVg8t4fsucefRvmkY1ei2V4wwo7HjmnwxVNVKjeCtZQVgHHTgg"
+   "27jPRdMMqwDK1SWYCSXBBn71TUB1YeXcoZTaJJJ2D8ckJYw6j35UDgBiuaxEA8Q7QFwuLsRdKB8124bQd1p73ZeN"
+  ],
+  "vol_4vw/usdc_signaly_build": [
+   "3q4irbuTMjaQdUa9Dq8j2gbhTjiojr5ufXLVhbfrakEqgNr3PtHWtCK7kMJJWUPJwKuvtmJyBfy8kCP5S26eEeW7"
   ]
  }
 }
 --- ves zhurnal bez okna ---
 {
  "строк_всего": 400000,
- "попыток_полосы": 250,
- "в_окне": 250,
+ "попыток_полосы": 259,
+ "в_окне": 259,
  "с": null,
  "до": null,
  "группа": null,
  "по_этапам": {
-  "gate": 217,
-  "usdc_signaly_build": 8,
+  "gate": 225,
+  "usdc_signaly_build": 9,
   "build": 5,
   "sent": 20
  },
@@ -84,7 +312,10 @@
    "gate": 26
   },
   "cand2": {
-   "gate": 80
+   "gate": 83
+  },
+  "cand2_03": {
+   "gate": 1
   },
   "cand3": {
    "gate": 38
@@ -96,19 +327,19 @@
    "gate": 2
   },
   "krug_001": {
-   "gate": 8
+   "gate": 10
   },
   "lane_s0": {
-   "gate": 15
+   "gate": 16
   },
   "off": {
    "gate": 1
   },
   "sniper_src": {
-   "gate": 10
+   "gate": 11
   },
   "vol_4vw": {
-   "usdc_signaly_build": 8,
+   "usdc_signaly_build": 9,
    "build": 5,
    "sent": 20
   }
@@ -127,7 +358,7 @@
   "gate": [
    {
     "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-    "раз": 80
+    "раз": 83
    },
    {
     "почему": "предел полосы: по группе cand3 полоса не торгует (lane_trades выключен)",
@@ -143,13 +374,13 @@
    },
    {
     "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-    "раз": 15
+    "раз": 16
    }
   ],
   "usdc_signaly_build": [
    {
     "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
-    "раз": 7
+    "раз": 8
    },
    {
     "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула ApZuxdpz/Ar2e8UVJ",
@@ -186,7 +417,15 @@
    "gate": [
     {
      "почему": "предел полосы: по группе cand2 полоса не торгует (lane_trades выключен)",
-     "раз": 80
+     "раз": 83
+    }
+   ]
+  },
+  "cand2_03": {
+   "gate": [
+    {
+     "почему": "предел полосы: по группе cand2_03 полоса не торгует (lane_trades выключен)",
+     "раз": 1
     }
    ]
   },
@@ -218,7 +457,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе krug_001 полоса не торгует (lane_trades выключен)",
-     "раз": 8
+     "раз": 10
     }
    ]
   },
@@ -226,7 +465,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе lane_s0 полоса не торгует (lane_trades выключен)",
-     "раз": 15
+     "раз": 16
     }
    ]
   },
@@ -242,7 +481,7 @@
    "gate": [
     {
      "почему": "предел полосы: по группе sniper_src полоса не торгует (lane_trades выключен)",
-     "раз": 10
+     "раз": 11
     }
    ]
   },
@@ -260,7 +499,7 @@
    "usdc_signaly_build": [
     {
      "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
-     "раз": 7
+     "раз": 8
     },
     {
      "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула ApZuxdpz/Ar2e8UVJ",
@@ -408,6 +647,20 @@
     "source_sig": "5VbQ2UpyqhBikVfNe9SBfacEXpstGLD4NzgWQ6T9SG1eoCCxuAH15gAnvfYa1J3CuiZaz9v4GGucEPgLuatcc4yZ",
     "size_sol": 0.1,
     "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr"
+   }
+  ],
+  "cand2_03/gate": [
+   {
+    "ts_utc": "2026-10-10T15:36:48Z",
+    "group": "cand2_03",
+    "stage": "gate",
+    "ok": false,
+    "sent": false,
+    "why_not": "предел полосы: по группе cand2_03 полоса не торгует (lane_trades выключен)",
+    "mint": "7VUdoT8SeRiZRtyQuCS4qhMWJEmDghyPNudE1zArE1D2",
+    "source_sig": "3Q5whWBSFBJp8uo6xkKbqrnLZN5GANdSDt346JjQvkiPHVeNggvRZcAvRQn74FsMCgAVjnDpnNJwQQu8ixwHiqka",
+    "size_sol": 0.3,
+    "source": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE"
    }
   ],
   "cand3/gate": [
@@ -834,7 +1087,7 @@
   ]
  },
  "первая_utc": "2026-10-10T00:00:59Z",
- "последняя_utc": "2026-10-10T15:07:19Z",
+ "последняя_utc": "2026-10-10T15:51:40Z",
  "отправлено": 20,
  "подписи": [
   {
@@ -1076,7 +1329,13 @@
    "4NEnGJJ2xdpaxPn5aMJX9FzRKiSCJBMLBgKnemWL3pSnmZoDQXfXso9uY448qMvptwFsaZbXnqtZ91zCg3oip1wd",
    "43wnqvkDCFfFr6dfQyzV3ShY2wGRk3M4AQcguipdT2ftsuuiTaaKsc8mZ212Fasjv1MdRMyJjgWUSJkvxc4TWnZt",
    "4oNBfmPnRZKHGATbS3e5mLqnC3DFYeyXB5G5UGotRD6KSCPWf44ubdduEDfE9kLghSAgEY31o7PTWumQz2njQE5z",
-   "5NYTR46oFbmYDoZcahfqLU67pLn57UcKVBuxwUQRNhkSzBnMpTTjLDodR6tjULmvhQ1xy4hUjoU8rJguaVaLPWhi"
+   "5NYTR46oFbmYDoZcahfqLU67pLn57UcKVBuxwUQRNhkSzBnMpTTjLDodR6tjULmvhQ1xy4hUjoU8rJguaVaLPWhi",
+   "65PzU2gTP5KViBXU1Eh2A1w82VpZYsAxiLCoo9iLhpT5Yk9RHyhfnCJVuapbSX6c6f4LRN1L3V4XJ7Y8jgCxciyH",
+   "hsRZUDzDDSjZ9WqQ4DnexrRgTTNDHMRQU74bx2vY96eMWeUBC1rjkejDKRoAeaV748zF8ok48SnC8upcCn7oQXQ",
+   "SpPJ8rTLZvesKg3wccTeuwmchk1JwpKGmP7LPL1emZAHUpJVhsntf2qfLTodEmnCTzEhXJRWVczE1n1cDucCML5"
+  ],
+  "cand2_03/gate": [
+   "3Q5whWBSFBJp8uo6xkKbqrnLZN5GANdSDt346JjQvkiPHVeNggvRZcAvRQn74FsMCgAVjnDpnNJwQQu8ixwHiqka"
   ],
   "cand3/gate": [
    "4QxDzq8tpvDggrNTMYDS5xH96AX9SZ2V3ScbjtzLB63kf9zq2XzFB1T7HNMuoSYWZ33yijvMy6Ki9Jw2FpbTV3jw",
@@ -1144,7 +1403,9 @@
    "2QDVfmoMYkd1p6aKt3TqfHMANbhq5iituRLKCxBQDJBWdsmtvS8HW5dch9gPmmHFUW3x8uZdXi641NQnH35Ht8mY",
    "5hpfmkXLmEXNUhVLQ7pnKrnWbhCrN8HFUiLYQ2h2bz951q2va2jRUv9u9Xstet1bRmg8vcBRXXyh6cL9UmkDd7Bi",
    "47oiu8RxgcnC3nF9nrjtYN2uKt6Y6TQp31HxyXZN1mSCFAyYiRYFuJEvZwQDwX3jcU7mHVa7jBfSCi4yvpfXxR6M",
-   "4H9wEkC7hoJvY26Gjgfmc3btfKm4XTG6QA7Sprnpn4Ji6WbicuH7o8jsfdzk33HzmbUbLZNH3amtRt8fvWsGDuT6"
+   "4H9wEkC7hoJvY26Gjgfmc3btfKm4XTG6QA7Sprnpn4Ji6WbicuH7o8jsfdzk33HzmbUbLZNH3amtRt8fvWsGDuT6",
+   "4nHL2RDvPeVCzHay5QQEoCtKSzQag6BtdbyZo2n6aMJGbxRMtfUbewG9WtnELW8mBQAfaYPunWDZ7ArbrQ5gfBGM",
+   "ez8PvpvSW25g5pZpcatX38f9mpm3cLPSCqL4zC5pfBpMWLm41aw5RUrSYVG6jnZKW6boGtb689tg2yqWxLTdMJ6"
   ],
   "lane_s0/gate": [
    "2ViSfTDEtBPUgojGbgxc4otq1TJEufTL2nQ48GdXBD5JtZUwb2GTuziyQWbeCav79G63G41Wepn3EiE9Xzru69p",
@@ -1161,7 +1422,8 @@
    "cyyYp7AUg8w4toLvdFoL9rfVvimzxNqsKfYyXmLfJHFmiE2dp53iW4oPj4bkGrkTjVnDSXVisqfcfGc8YcK5hGX",
    "3NmghVktoA27J7MTgBW7S2Nq3nva2yJYwKM6mwkTWru8jJufKQjTpYPjXLXiqVJQbKP4C4KTuvbJDVoH4JgRRaP7",
    "2V29MjgejRZCBJpQdV7L1eTwC1KigBtevR7Ti93qa99fu9GrG63kQQTKjwKrSGsD5HAQeuTdFtpMqHeb5QrvMLj1",
-   "2TDymsmwzua4nU1GgoJ9NyFARSpQCQwYY643EJcMNaUoNy2HLun3QsEpZyd6hcpWTvaQJWk1TSC24g6mvuW1LSDp"
+   "2TDymsmwzua4nU1GgoJ9NyFARSpQCQwYY643EJcMNaUoNy2HLun3QsEpZyd6hcpWTvaQJWk1TSC24g6mvuW1LSDp",
+   "44Fur6cNwSdxCVZM4uPNmWSrpLC5Z8TdGcmDYgchacimDBJgkGsLvqXFxMpWxrHRPZ9ktR51mYHbW6mw1vsx5Lfq"
   ],
   "off/gate": [
    "5iksUv4en7fCDYMJx7bDfn7brveAwjzfFTjSPty2ffUzd5ubjvu4sk7C67cLbJAXAQq9rkznPH32xkAcDA5qYvkw"
@@ -1176,7 +1438,8 @@
    "9Lu2BpAk5cbLkgQijviraY3p3WQoDWFaKiQACUX55jkEop9bmmAy3WnUaAM47CEq5VsdGnSjZDzZ64dKZmCTr52",
    "3b44UjB59M5w8xKNsoQc7wQEaXdqae9XUnjnSfoWbkcRwGwMFU7NUVajmK3ZEFL4uX9Zg1tjaSEiNS83rtXUrUDh",
    "PHn8YDYooPQbs2PgioH4EYdoGMqkCxEXBHkWCAMGf1eRo4kGEwoL2uQA4Qvpep5boBBx331PEy1iGvt8MBtC82o",
-   "51p97hDtouKEPP588ZvUurXZU6qjB7GDbpnPvNbVg8t4fsucefRvmkY1ei2V4wwo7HjmnwxVNVKjeCtZQVgHHTgg"
+   "51p97hDtouKEPP588ZvUurXZU6qjB7GDbpnPvNbVg8t4fsucefRvmkY1ei2V4wwo7HjmnwxVNVKjeCtZQVgHHTgg",
+   "27jPRdMMqwDK1SWYCSXBBn71TUB1YeXcoZTaJJJ2D8ckJYw6j35UDgBiuaxEA8Q7QFwuLsRdKB8124bQd1p73ZeN"
   ],
   "vol_4vw/build": [
    "3ym8qWM3yd5kaiqU6ktEWproL8iqQFiGLKomN1MMuugdmahB2wiU348qErevRRhNTfo8xbzz84HLk33MuemitqcQ",
@@ -1193,26 +1456,27 @@
    "5s2u5dNTjDGMyaU7BzeRXweQRHnwKE56s2ApGBo7kvdpGmJpN6bXeHqbxK3h2PwUnoxWGoU74oVw7tsU2jwwSMPm",
    "4RKMVtMrv1awxaMZPjKwPPQR5WJtvXeuuTWT6kinS29RhusEE7jnKSdZMqvnBKLHDxCjrsMXgLRYC4GGACqrPHcQ",
    "2GeEqkjkvTTGhnWqxAsRdZ1uV3kQ31kktfETb2JFCzHbq6DWVo7pHoeEBJqqBY8op74nUwfPdpCFYShYsxGX5LSB",
-   "ung2Gkkcud4qzM54AA1z916mAhMCRaDoKDNzQH3hrU8MyAHrpTzSN7PMdJ1KR7vjwwDS6YaUbBJtdYF9L8K874b"
+   "ung2Gkkcud4qzM54AA1z916mAhMCRaDoKDNzQH3hrU8MyAHrpTzSN7PMdJ1KR7vjwwDS6YaUbBJtdYF9L8K874b",
+   "3q4irbuTMjaQdUa9Dq8j2gbhTjiojr5ufXLVhbfrakEqgNr3PtHWtCK7kMJJWUPJwKuvtmJyBfy8kCP5S26eEeW7"
   ]
  }
 }
 --- gruppa vol_4vw po vsemu zhurnalu ---
 {
  "строк_всего": 400000,
- "попыток_полосы": 250,
- "в_окне": 33,
+ "попыток_полосы": 259,
+ "в_окне": 34,
  "с": null,
  "до": null,
  "группа": "vol_4vw",
  "по_этапам": {
-  "usdc_signaly_build": 8,
+  "usdc_signaly_build": 9,
   "build": 5,
   "sent": 20
  },
  "по_группам": {
   "vol_4vw": {
-   "usdc_signaly_build": 8,
+   "usdc_signaly_build": 9,
    "build": 5,
    "sent": 20
   }
@@ -1231,7 +1495,7 @@
   "usdc_signaly_build": [
    {
     "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
-    "раз": 7
+    "раз": 8
    },
    {
     "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула ApZuxdpz/Ar2e8UVJ",
@@ -1254,7 +1518,7 @@
    "usdc_signaly_build": [
     {
      "почему": "USDC-нога: разновидность инструкции кривой не buy_exact_quote_in_v2 (c2ab1c46684d5b2f) -- USDC-нога берёт только её",
-     "раз": 7
+     "раз": 8
     },
     {
      "почему": "USDC-нога: котировка пула не EPjFWdd5: стороны пула ApZuxdpz/Ar2e8UVJ",
@@ -1458,7 +1722,7 @@
   ]
  },
  "первая_utc": "2026-10-10T00:17:49Z",
- "последняя_utc": "2026-10-10T15:04:43Z",
+ "последняя_utc": "2026-10-10T15:37:37Z",
  "отправлено": 20,
  "подписи": [
   {
@@ -1578,7 +1842,8 @@
    "5s2u5dNTjDGMyaU7BzeRXweQRHnwKE56s2ApGBo7kvdpGmJpN6bXeHqbxK3h2PwUnoxWGoU74oVw7tsU2jwwSMPm",
    "4RKMVtMrv1awxaMZPjKwPPQR5WJtvXeuuTWT6kinS29RhusEE7jnKSdZMqvnBKLHDxCjrsMXgLRYC4GGACqrPHcQ",
    "2GeEqkjkvTTGhnWqxAsRdZ1uV3kQ31kktfETb2JFCzHbq6DWVo7pHoeEBJqqBY8op74nUwfPdpCFYShYsxGX5LSB",
-   "ung2Gkkcud4qzM54AA1z916mAhMCRaDoKDNzQH3hrU8MyAHrpTzSN7PMdJ1KR7vjwwDS6YaUbBJtdYF9L8K874b"
+   "ung2Gkkcud4qzM54AA1z916mAhMCRaDoKDNzQH3hrU8MyAHrpTzSN7PMdJ1KR7vjwwDS6YaUbBJtdYF9L8K874b",
+   "3q4irbuTMjaQdUa9Dq8j2gbhTjiojr5ufXLVhbfrakEqgNr3PtHWtCK7kMJJWUPJwKuvtmJyBfy8kCP5S26eEeW7"
   ]
  }
 }
