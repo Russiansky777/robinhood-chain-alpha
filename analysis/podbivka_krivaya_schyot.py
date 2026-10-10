@@ -73,45 +73,60 @@ def адрес_кривой(минт: str) -> str:
 
 
 def разобрать(сырое: bytes) -> dict | None:
-    """Счёт BondingCurve по раскладке IDL. None, если дискриминатор не тот."""
-    if len(сырое) < 142 or сырое[:8] != ДИСКР:
+    """Счёт BondingCurve по раскладке IDL. None, если дискриминатор не тот.
+
+    На цепи счёт встречается трёх длин -- 141, 151 и 166 байт: Anchor выделяет место
+    при создании, и монеты разных версий программы несут разный хвост. Поля читаются
+    длиноосознанно: то, что за концом счёта, остаётся None, а не читается мусором.
+    Первые 81 байт (виртуальные и реальные резервы, выпуск, complete, создатель)
+    одинаковы у всех версий -- на них и держится ответ про is_mayhem_mode (смещение 81,
+    первый байт после создателя). Проверка раскладки: у нормальной кривой выходит ровно
+    канонический старт 1 073 000 000 000 000 / 30 000 000 000 и вирт − реал = 30 SOL.
+    """
+    if len(сырое) < 82 or сырое[:8] != ДИСКР:
         return None
     from solders.pubkey import Pubkey  # noqa: PLC0415
-    о = 8
-    вирт_ток, вирт_кв, реал_ток, реал_кв, всего = struct.unpack_from("<5Q", сырое, о)
-    о += 40
-    завершена = сырое[о]; о += 1
-    создатель = str(Pubkey.from_bytes(сырое[о:о + 32])); о += 32
-    mayhem = сырое[о]; о += 1
-    кэшбэк = сырое[о]; о += 1
-    квотный = str(Pubkey.from_bytes(сырое[о:о + 32])); о += 32
-    тариф_создателя_бп, = struct.unpack_from("<Q", сырое, о); о += 8
-    правка_тарифа = сырое[о]; о += 1
-    награда = сырое[о]; о += 1
-    тариф_создателя, = struct.unpack_from("<Q", сырое, о); о += 8
-    тарифы_протокола, = struct.unpack_from("<Q", сырое, о); о += 8
-    глубина = сырое[о]; о += 1
-    нач_вирт_кв = струк(сырое, о); о += 8
-    базы_после = струк(сырое, о); о += 8
-    квоты_после = струк(сырое, о); о += 8
+    n = len(сырое)
+
+    def u64(о: int):
+        return struct.unpack_from("<Q", сырое, о)[0] if n >= о + 8 else None
+
+    def u8(о: int):
+        return сырое[о] if n > о else None
+
+    def ключ(о: int):
+        return str(Pubkey.from_bytes(сырое[о:о + 32])) if n >= о + 32 else None
+
+    вирт_ток, вирт_кв, реал_ток, реал_кв, всего = struct.unpack_from("<5Q", сырое, 8)
+    завершена = сырое[48]
+    создатель = ключ(49)
+    mayhem = u8(81)
+    кэшбэк = u8(82)
+    квотный = ключ(83)
+    тариф_создателя_бп = u64(115)
+    правка_тарифа = u8(123)
+    награда = u8(124)
+    тариф_создателя = u64(125)
+    тарифы_протокола = u64(133)
+    глубина = u8(141)
+    нач_вирт_кв = u64(142)
+    базы_после = u64(150)
+    квоты_после = u64(158)
     return {"вирт_токен": вирт_ток, "вирт_квота": вирт_кв,
             "реал_токен": реал_ток, "реал_квота": реал_кв, "всего": всего,
             "завершена": bool(завершена), "создатель": создатель,
-            "is_mayhem_mode": bool(mayhem), "is_cashback_coin": bool(кэшбэк),
+            "вирт_минус_реал_квота": вирт_кв - реал_кв,
+            "is_mayhem_mode": None if mayhem is None else bool(mayhem),
+            "is_cashback_coin": None if кэшбэк is None else bool(кэшбэк),
             "quote_mint": квотный, "квота_sol": квотный == WSOL,
             "creator_fee_bps": тариф_создателя_бп,
-            "can_edit_creator_fee": bool(правка_тарифа),
-            "is_holder_reward": bool(награда),
+            "can_edit_creator_fee": (None if правка_тарифа is None
+                                     else bool(правка_тарифа)),
+            "is_holder_reward": None if награда is None else bool(награда),
             "creator_fee": тариф_создателя, "protocol_fees": тарифы_протокола,
             "depth": глубина, "initial_virtual_quote_reserves": нач_вирт_кв,
             "post_complete_base_out": базы_после, "post_complete_quote_in": квоты_после,
             "байт": len(сырое)}
-
-
-def струк(b: bytes, о: int) -> int | None:
-    if len(b) < о + 8:
-        return None
-    return struct.unpack_from("<Q", b, о)[0]
 
 
 def прочесть(rpc, темп: Темп, минты: list) -> dict:
@@ -148,7 +163,7 @@ def свод(карта: dict) -> dict:
     for п in поля:
         т[п] = sum(1 for v in карта.values() if v.get(п))
     for п in ("depth", "creator_fee_bps", "quote_mint",
-              "initial_virtual_quote_reserves", "байт"):
+              "initial_virtual_quote_reserves", "вирт_минус_реал_квота", "байт"):
         c = collections.Counter(v.get(п) for v in карта.values() if п in v)
         т[f"{п}_раскладка"] = {str(k): n for k, n in c.most_common(8)}
     ост = [v["всего"] for v in карта.values() if v.get("всего")]
@@ -163,6 +178,9 @@ def main() -> int:  # noqa: PLR0915
     р_ = argparse.ArgumentParser()
     р_.add_argument("--iz", default=str(П / "krivaya_rashod_p1.json"),
                     help="файл сверки сделок кривой с цепью")
+    р_.add_argument("--celi", default="",
+                    help="вместо --iz: файл с «группы»: {имя: [минты]} -- проверка "
+                         "гипотезы по начальному виртуальному резерву кривой")
     р_.add_argument("--metka", default="")
     а = р_.parse_args()
     ключ = (os.environ.get("HELIUS_API_KEY2") or os.environ.get("HELIUS_API_KEY")
@@ -170,17 +188,26 @@ def main() -> int:  # noqa: PLR0915
     if not ключ:
         print("нет ключа Helius -- проход только облачный", flush=True)
         return 1
-    д = json.loads(Path(а.iz).read_text(encoding="utf-8"))
-    группы = {}
-    for имя, ключ_г in (("не_сошлись", "не_сошлись"), ("контроль", "сошлись_контроль")):
-        ряды = (д.get(ключ_г) or {}).get("ряды") or []
-        группы[имя] = sorted({р["минт"] for р in ряды if р.get("минт")})
+    if а.celi:
+        д = json.loads(Path(а.celi).read_text(encoding="utf-8"))
+        группы = {имя: sorted(set(v)) for имя, v in (д.get("группы") or {}).items()}
+    else:
+        д = json.loads(Path(а.iz).read_text(encoding="utf-8"))
+        группы = {}
+        for имя, ключ_г in (("не_сошлись", "не_сошлись"),
+                            ("контроль", "сошлись_контроль")):
+            ряды = (д.get(ключ_г) or {}).get("ряды") or []
+            группы[имя] = sorted({р["минт"] for р in ряды if р.get("минт")})
     if not any(группы.values()):
         print(f"в {а.iz} нет минтов -- сверять нечего", flush=True)
         return 2
-    пересечение = set(группы["не_сошлись"]) & set(группы["контроль"])
-    print(f"минтов: расходящихся {len(группы['не_сошлись'])}, "
-          f"контрольных {len(группы['контроль'])}, в обеих {len(пересечение)}", flush=True)
+    пересечение: set = set()
+    имена = list(группы)
+    for i, а1 in enumerate(имена):
+        for а2 in имена[i + 1:]:
+            пересечение |= set(группы[а1]) & set(группы[а2])
+    print("минтов: " + ", ".join(f"{и} {len(группы[и])}" for и in имена)
+          + f", в двух группах сразу {len(пересечение)}", flush=True)
 
     rpc = C.C2Rpc(service="c2_krivaya_schyot", key=ключ)
     темп = Темп(RPS)
@@ -191,10 +218,11 @@ def main() -> int:  # noqa: PLR0915
 
     # сделки на минт -- чтобы связать флаг счёта с отношением модель/факт
     отн: dict = collections.defaultdict(list)
-    for ключ_г in ("не_сошлись", "сошлись_контроль"):
-        for р in (д.get(ключ_г) or {}).get("ряды") or []:
-            if р.get("минт") and р.get("отношение") is not None:
-                отн[р["минт"]].append(р["отношение"])
+    if not а.celi:
+        for ключ_г in ("не_сошлись", "сошлись_контроль"):
+            for р in (д.get(ключ_г) or {}).get("ряды") or []:
+                if р.get("минт") and р.get("отношение") is not None:
+                    отн[р["минт"]].append(р["отношение"])
     по_флагу: dict = collections.defaultdict(list)
     for имя, карта in карты.items():
         for м, v in карта.items():
@@ -208,7 +236,7 @@ def main() -> int:  # noqa: PLR0915
 
     тело = {"что": "счёт кривой pump.fun по цепи: чем «нулевая порода» отличается",
             "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "источник": а.iz, "параметры": vars(а),
+            "источник": а.celi or а.iz, "параметры": vars(а),
             "минтов_в_обеих_группах": sorted(пересечение),
             "свод": {имя: свод(карта) for имя, карта in карты.items()},
             "отношение_по_флагу": отн_свод,
