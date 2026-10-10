@@ -759,7 +759,18 @@ def main() -> int:
             "source": п.get("source"),
             "source_sig": п.get("source_sig"),
             "source_slot": п.get("source_slot"),
-            "our_slot": п.get("own_tx_seen_slot") or п.get("our_slot"),
+            # our_slot БРАЛСЯ ИЗ ПОЛЕЙ, КОТОРЫХ НЕТ. own_tx_seen_slot и
+            # our_slot в записи не пишет никто: замер по выгрузке 09.10 -- 0 из
+            # 66 рядов у обоих, то есть поле выходило ВСЕГДА пустым. Слот
+            # посадки покупки лежит в lane_landed_slot (он же landed_slot
+            # ниже), и его сюда и ставим -- иначе "слот нашей покупки" в файле
+            # для Code-2 пуст, а по имени поля этого не видно.
+            "our_slot": (п.get("own_tx_seen_slot") or п.get("our_slot")
+                         or п.get("lane_landed_slot")),
+            # ТОКЕНОВ ПОЛУЧЕНО -- СЫРЫМ ЧИСЛОМ. Его пишет полоса при посадке
+            # покупки (lane_bought_raw) и читает сторож, а в выгрузке его не
+            # было вовсе: валовой итог без издержек по файлу было не посчитать.
+            "tokenov_polucheno_raw": п.get("lane_bought_raw"),
             "our_signatures": наши_подписи(п),
             "our_block_index": п.get("block_index"),
             "source_block_index": п.get("source_block_index"),
@@ -914,6 +925,15 @@ def main() -> int:
             "landed_slot": п.get("lane_landed_slot"),
             "token_name": п.get("token_name"),
             "source_name": п.get("source_name"),
+            # ЗАПУСКИ (группа zapusk_dev, слово владельца 10.10 п.2). У сигнала
+            # запуска source_sig и source_slot -- ЭТО ПОДПИСЬ И СЛОТ СОЗДАНИЯ:
+            # сигналом служит сама транзакция создания. Отдельно нужны лишь то,
+            # чего в прочих сигналах не бывает: сколько вложил создатель и
+            # какой разновидностью токен создан. Пусто у всех прочих групп.
+            "zapusk_sol_sozdatelya": п.get("zapusk_sol_sozdatelya"),
+            "zapusk_lamportov_sozdatelya": п.get("zapusk_lamportov_sozdatelya"),
+            "zapusk_sozdanie": п.get("zapusk_sozdanie"),
+            "zapusk_mint_authority": п.get("zapusk_mint_authority"),
             # ВСЕ ПОЛЯ ЗАПИСИ -- по явному запросу. Без этого вторая сессия
             # видит только отобранное, и каждое новое поле требует правки
             # выгрузки.
@@ -1543,6 +1563,19 @@ def самопроверка() -> int:
     chk("нет канонического итога -- латинский ключ пуст с названной причиной, "
         "а не с выручкой под именем итога",
         '"itog_po_cepi_sol_why_not"' in рабочая_в, None)
+    # --- ЧИСЛА ДЛЯ ВАЛОВОГО ИТОГА (слово владельца 10.10, п.2)
+    for _поле, _зачем in (("tokenov_polucheno_raw", "токенов получено"),
+                           ("zapusk_sol_sozdatelya", "сколько вложил создатель"),
+                           ("zapusk_sozdanie", "разновидность создания"),
+                           ("our_slot", "слот нашей покупки")):
+        chk(f"поле ряда {_поле} ({_зачем}) есть в рабочем коде выгрузки",
+            f'"{_поле}"' in рабочая_в, _поле)
+    chk("our_slot больше НЕ берётся только из полей, которых в записи нет "
+        "(own_tx_seen_slot и our_slot -- 0 из 66 рядов 09.10)",
+        'п.get("lane_landed_slot")' in рабочая_в, None)
+    chk("токенов получено берётся из lane_bought_raw -- поля, которое полоса "
+        "действительно пишет (62 из 66 рядов 09.10)",
+        'п.get("lane_bought_raw")' in рабочая_в, None)
     chk("доли путей продажи и покрытие идут в сводку",
         '"put_prodazhi_po_sutkam"' in рабочая_в
         and '"strok_s_vhodom_po_cepi"' in рабочая_в, None)
