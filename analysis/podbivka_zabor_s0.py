@@ -47,7 +47,8 @@ import podbivka_paket_obshee as O    # noqa: E402
 import podbivka_zapuski_svod as Z    # noqa: E402
 
 П = O.П
-МЕСТО = "S0_дно"
+МЕСТО = "S0_дно"      # по умолчанию; меняется флагом --mesto
+MESTO_ЗАГЛУШКА = "S0_дно"
 УДЕРЖАНИЯ = И.УДЕРЖАНИЯ
 ДОЛЯ_РЕЗЕРВА = И.ДОЛЯ_РЕЗЕРВА
 БИЛЕТ = И.БИЛЕТ
@@ -55,9 +56,9 @@ import podbivka_zapuski_svod as Z    # noqa: E402
 СЕМЯ = 20261010
 
 
-def билет_по_глубине(р: dict) -> float | None:
+def билет_по_глубине(р: dict, место: str = MESTO_ЗАГЛУШКА) -> float | None:
     """Предельный билет: не больше ДОЛЯ_РЕЗЕРВА от резерва пула на входе."""
-    вх = (р.get("вход") or {}).get(МЕСТО)
+    вх = (р.get("вход") or {}).get(место)
     if not вх:
         return None
     рез = float(вх[0]) / float(р.get("масштаб") or 1.0)
@@ -65,7 +66,9 @@ def билет_по_глубине(р: dict) -> float | None:
     return round(min(б, 3.0), 4) if б > 0.01 else None
 
 
-def проход(а, изд: float) -> dict:
+def проход(а, изд: float, место: str | None = None, доля: float | None = None) -> dict:
+    место = место or а.mesto
+    доля = а.dolya if доля is None else доля
     рнд = random.Random(СЕМЯ)
     ряды: dict = collections.defaultdict(list)
     счёт: collections.Counter = collections.Counter()
@@ -76,16 +79,16 @@ def проход(а, изд: float) -> dict:
         if (р.get("sol") or 0) < И.ПОРОГ_ИСТОЧНИКА:
             continue
         ист = р.get("ист")
-        if not (ист and (р.get("вход") or {}).get(МЕСТО)):
+        if not (ист and (р.get("вход") or {}).get(место)):
             continue
         счёт["годных_сигналов"] += 1
         # прореживание: попали в блок источника только в доле --dolya случаев
-        if рнд.random() > а.dolya:
+        if рнд.random() > доля:
             счёт["мимо_блока_источника"] += 1
             continue
         счёт["вошли"] += 1
         с = O.как_сигнал(р)
-        бг = билет_по_глубине(р)
+        бг = билет_по_глубине(р, место)
         for H in УДЕРЖАНИЯ:
             for имя_б, б in (("0.3", БИЛЕТ), ("глубина", бг)):
                 if not б:
@@ -93,7 +96,7 @@ def проход(а, изд: float) -> dict:
                 итоги = {}
                 вид = None
                 for кг in К_G_РЯДОМ:
-                    и_, в_ = И.круг(с, б, МЕСТО, H, изд, 1.0, кг)
+                    и_, в_ = И.круг(с, б, место, H, изд, 1.0, кг)
                     вид = в_
                     if и_ is not None:
                         итоги[str(кг)] = и_
@@ -156,7 +159,7 @@ def главное(а) -> int:  # noqa: PLR0915
                                            and v["p"] < порог)
     тело = {"что": "забор S+0: вход только в блок источника, цена S0_дно",
             "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "допущения": {"место_входа": МЕСТО, "доля_попадания": а.dolya,
+            "допущения": {"место_входа": а.mesto, "доля_попадания": а.dolya,
                           "доля_откуда": "живые сделки vol_4vw: лаг 0 у 14 из 67 = 20.9 %; "
                                          "зависимости от загрузки блока не видно",
                           "мимо_блока": "сигнал выброшен без комиссии",
@@ -212,6 +215,7 @@ def main() -> int:
     р.add_argument("--dolya", type=float, default=0.209,
                    help="доля сигналов, в которых мы попали в блок источника")
     р.add_argument("--k-g-osnovnaya", type=float, default=1.0)
+    р.add_argument("--mesto", default="S0_дно", choices=("S0_дно", "S1", "S2"))
     р.add_argument("--metka", default="")
     return главное(р.parse_args())
 
