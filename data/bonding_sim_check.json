@@ -1,19 +1,44 @@
 {
- "utc": "2026-10-10T22:32:06Z",
+ "utc": "2026-10-10T23:27:18Z",
  "кошелёк": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
  "трата_sol": 0.01,
  "сигналов": 10,
- "вызовов_rpc": 17,
- "секунд": 2.0,
+ "вызовов_rpc": 14,
+ "секунд": 1.7,
  "по_вердикту": {
-  "other_error": 7,
-  "шаблон: разновидность инструкции кривой не известна: 1c92de7726c469d5": 1,
-  "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)": 1,
-  "узел не отдал сделку источника": 1
+  "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2": 5,
+  "other_error": 4,
+  "шаблон: счетов 28, ожидалось 27": 1
  },
  "по_инструкции": {
+  "5df6823ce7e940b2": {
+   "сигналов": 5,
+   "счетов": [
+    26
+   ],
+   "байт": [
+    24
+   ],
+   "программ_токена": [
+    2
+   ],
+   "котировка_не_sol": 5
+  },
+  "38fc74089edfcd5f": {
+   "сигналов": 2,
+   "счетов": [
+    18
+   ],
+   "байт": [
+    24
+   ],
+   "программ_токена": [
+    1
+   ],
+   "котировка_не_sol": 0
+  },
   "e1f7501ed5b38488": {
-   "сигналов": 6,
+   "сигналов": 2,
    "счетов": [
     17
    ],
@@ -25,36 +50,10 @@
    ],
    "котировка_не_sol": 2
   },
-  "1c92de7726c469d5": {
-   "сигналов": 1,
-   "счетов": [
-    17
-   ],
-   "байт": [
-    24
-   ],
-   "программ_токена": [
-    2
-   ],
-   "котировка_не_sol": 1
-  },
-  "07051dc4f5176550": {
-   "сигналов": 1,
-   "счетов": [
-    17
-   ],
-   "байт": [
-    24
-   ],
-   "программ_токена": [
-    2
-   ],
-   "котировка_не_sol": 1
-  },
   "c2ab1c46684d5b2f": {
    "сигналов": 1,
    "счетов": [
-    27
+    28
    ],
    "байт": [
     24
@@ -63,34 +62,275 @@
     2
    ],
    "котировка_не_sol": 1
-  },
-  "нет данных": {
-   "сигналов": 1,
-   "счетов": [],
-   "байт": [],
-   "программ_токена": [],
-   "котировка_не_sol": 0
   }
  },
  "прошло_бы": 0,
  "ряды": [
   {
-   "signature": "5bcAFwcugUGAHv4RgpJpWjNBWy7SxCKgaw3bt36pRhzoEJwYnvUgSNE6rCfSSSpuq7PjnJGWmM8LkmfHA52Wt2TK",
+   "signature": "5ksQ7h178BsKmY5LkcvYRk39W4P1wFC3gJpndcEdZGEu59m8c5HPnZv4uv4b4CnWUU5Kbqqnbr2XmtXL5gz8jMu9",
+   "mint": "F2Rphiuv162LgSvCX3HRHXAiQ8AQ55yRGQWyZFyCpaid",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:21:58Z",
+   "ix_disc": "38fc74089edfcd5f",
+   "ix_accounts": 18,
+   "ix_data_len": 24,
+   "ix_args": [
+    925729851,
+    16235807032811
+   ],
+   "ix_token_programs": 1,
+   "ix_other_mint": null,
+   "ok": true,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "native_sol",
+   "supported": true,
+   "route": "one_hop",
+   "min_out": 112666435156,
+   "expected_out": 173332977164,
+   "min_out_method": "pumpfun_curve_after_source",
+   "sol_to_curve": 9876542,
+   "max_sol_cost": 10000000,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "build_ms": 0.917,
+   "sim_ms": 20.7,
+   "why_not": null
+  },
+  {
+   "signature": "4edndZamuwGha8fx17yhaZu9LfTReBUXwyr55SqVZieqrne2Mx9p5QLzAfDP4p5G2E6qCpcQaj8XHJ82Wasx2m23",
+   "mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:19:56Z",
+   "ix_disc": "5df6823ce7e940b2",
+   "ix_accounts": 26,
+   "ix_data_len": 24,
+   "ix_args": [
+    4329419343995,
+    214628364
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "6BWARyhSJH99mgtui2kejCdtXZgEtVB1524vss1epump",
+   "ok": false,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "6BWARyhSJH99mgtui2kejCdtXZgEtVB1524vss1epump",
+   "supported": false,
+   "route": "one_hop",
+   "min_out": null,
+   "expected_out": null,
+   "min_out_method": null,
+   "sol_to_curve": null,
+   "max_sol_cost": null,
+   "sim_verdict": null,
+   "sim_err": null,
+   "sim_units": null,
+   "build_ms": null,
+   "sim_ms": null,
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2"
+  },
+  {
+   "signature": "2riZRsk9NCdhjXUhdamhWK8bNL8E3ZJtBGBQWXuU67BdN4Aa6wooVKwMftnH8Qynzh9VdgbADLRo3GgctDb8VqpK",
+   "mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:19:45Z",
+   "ix_disc": "5df6823ce7e940b2",
+   "ix_accounts": 26,
+   "ix_data_len": 24,
+   "ix_args": [
+    541177417999,
+    28214588
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "6BWARyhSJH99mgtui2kejCdtXZgEtVB1524vss1epump",
+   "ok": false,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "6BWARyhSJH99mgtui2kejCdtXZgEtVB1524vss1epump",
+   "supported": false,
+   "route": "one_hop",
+   "min_out": null,
+   "expected_out": null,
+   "min_out_method": null,
+   "sol_to_curve": null,
+   "max_sol_cost": null,
+   "sim_verdict": null,
+   "sim_err": null,
+   "sim_units": null,
+   "build_ms": null,
+   "sim_ms": null,
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2"
+  },
+  {
+   "signature": "2RHz3d4aPPiY8pNwiyk6zSb2F2UMLVN3wFP6M9eKMV46NuPHfNJCjFmFc4TF8wUnnoW61SXVJ6r5MncDuBRQxAri",
+   "mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:19:45Z",
+   "ix_disc": "5df6823ce7e940b2",
+   "ix_accounts": 26,
+   "ix_data_len": 24,
+   "ix_args": [
+    541177417999,
+    27141372
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "6BWARyhSJH99mgtui2kejCdtXZgEtVB1524vss1epump",
+   "ok": false,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "6BWARyhSJH99mgtui2kejCdtXZgEtVB1524vss1epump",
+   "supported": false,
+   "route": "one_hop",
+   "min_out": null,
+   "expected_out": null,
+   "min_out_method": null,
+   "sol_to_curve": null,
+   "max_sol_cost": null,
+   "sim_verdict": null,
+   "sim_err": null,
+   "sim_units": null,
+   "build_ms": null,
+   "sim_ms": null,
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2"
+  },
+  {
+   "signature": "5H3NXqGVHPNRHVKmXHToaeY1voa5skEQuE3mc1ZaMDhMqgakj2qc6qMJtFFAQ7Cp2SGwdmYBoLUFtk9wyXFxyKPT",
+   "mint": "3Ads5VkoTtWbYL3U2u2motvJ2uVsnstnGYFGCNxLpump",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:19:14Z",
+   "ix_disc": "38fc74089edfcd5f",
+   "ix_accounts": 18,
+   "ix_data_len": 24,
+   "ix_args": [
+    1103363747,
+    16541065257615
+   ],
+   "ix_token_programs": 1,
+   "ix_other_mint": null,
+   "ok": true,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "native_sol",
+   "supported": true,
+   "route": "one_hop",
+   "min_out": 96095228440,
+   "expected_out": 147838812985,
+   "min_out_method": "pumpfun_curve_after_source",
+   "sol_to_curve": 9876542,
+   "max_sol_cost": 10000000,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "build_ms": 0.534,
+   "sim_ms": 64.8,
+   "why_not": null
+  },
+  {
+   "signature": "3AsdzGD4zj9cNxa9a3snYiz4bBxAnxw71juVFAQxrsGc6fbAzkoTJFjKBry9gqJPYLVLrkzgmAze29ncGYTuV2ff",
+   "mint": "6BWARyhSJH99mgtui2kejCdtXZgEtVB1524vss1epump",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:18:50Z",
+   "ix_disc": "c2ab1c46684d5b2f",
+   "ix_accounts": 28,
+   "ix_data_len": 24,
+   "ix_args": [
+    321766691,
+    5357656438548
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+   "ok": false,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "CARDSccUMFKoPRZxt5vt3ksUbxEFEcnZ3H2pd3dKxYjp",
+   "supported": false,
+   "route": "one_hop",
+   "min_out": null,
+   "expected_out": null,
+   "min_out_method": null,
+   "sol_to_curve": null,
+   "max_sol_cost": null,
+   "sim_verdict": null,
+   "sim_err": null,
+   "sim_units": null,
+   "build_ms": null,
+   "sim_ms": null,
+   "why_not": "шаблон: счетов 28, ожидалось 27"
+  },
+  {
+   "signature": "syJATHtBmzQBPq9cGDPz3cW4fFveVXFpwE2GyvMjEvcbDFq1UL1tLM5BCVpSoxBiFryXDLrhSoEnZjW2oZ1uWpm",
+   "mint": "8NmKmyZSq7TV7XWt9612SKL3ezD7soTCquXdLxoUa8w7",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:17:14Z",
+   "ix_disc": "e1f7501ed5b38488",
+   "ix_accounts": 17,
+   "ix_data_len": 25,
+   "ix_args": [
+    1823753063,
+    9405094214799
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "So11111111111111111111111111111111111111112",
+   "ok": true,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "native_sol",
+   "supported": true,
+   "route": "one_hop",
+   "min_out": 33083234707,
+   "expected_out": 50897284166,
+   "min_out_method": "pumpfun_curve_after_source",
+   "sol_to_curve": 9876542,
+   "max_sol_cost": 10000000,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "build_ms": 4.838,
+   "sim_ms": 58.2,
+   "why_not": null
+  },
+  {
+   "signature": "36US3dXNK388MicWucbBwWzLPgQKeJymhPN2tegyXoWBiJ1L8kF3D1BvRZMaix6AUMLFKB1bE16Djvz4hR3ZtimJ",
+   "mint": "3Ads5VkoTtWbYL3U2u2motvJ2uVsnstnGYFGCNxLpump",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:16:46Z",
+   "ix_disc": "e1f7501ed5b38488",
+   "ix_accounts": 17,
+   "ix_data_len": 25,
+   "ix_args": [
+    980675258,
+    20307173211832
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "So11111111111111111111111111111111111111112",
+   "ok": true,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "native_sol",
+   "supported": true,
+   "route": "one_hop",
+   "min_out": 132588123643,
+   "expected_out": 203981728683,
+   "min_out_method": "pumpfun_curve_after_source",
+   "sol_to_curve": 9876542,
+   "max_sol_cost": 10000000,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "build_ms": 5.58,
+   "sim_ms": 56.5,
+   "why_not": null
+  },
+  {
+   "signature": "4h6EagD5pvquigwJLydjmGfMjtRWjSbJtHKsGyHyTiGzTyA86o9HQeERLrgZ5QkAhwbTN9GvJy1oAufYJahN6zha",
    "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
    "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
-   "ts_utc": "2026-10-10T22:29:58Z",
-   "ix_disc": "1c92de7726c469d5",
-   "ix_accounts": 17,
+   "ts_utc": "2026-10-10T23:15:28Z",
+   "ix_disc": "5df6823ce7e940b2",
+   "ix_accounts": 26,
    "ix_data_len": 24,
    "ix_args": [
-    16081698889652,
-    15411640793
+    8939381261706,
+    12041637641
    ],
    "ix_token_programs": 2,
-   "ix_other_mint": "RxZJUqNxXaDDEKxMe8WC85KyWMw5WwWx38oZiQepump",
+   "ix_other_mint": "GXFoeKjmTNnDwQKWE9jHgA2dbqQ4xHNgtG2x5pTtMHpZ",
    "ok": false,
    "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "RxZJUqNxXaDDEKxMe8WC85KyWMw5WwWx38oZiQepump",
+   "quote_mint": "GXFoeKjmTNnDwQKWE9jHgA2dbqQ4xHNgtG2x5pTtMHpZ",
    "supported": false,
    "route": "one_hop",
    "min_out": null,
@@ -103,87 +343,25 @@
    "sim_units": null,
    "build_ms": null,
    "sim_ms": null,
-   "why_not": "шаблон: разновидность инструкции кривой не известна: 1c92de7726c469d5"
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2"
   },
   {
-   "signature": "3twqKi3wg96Y2U17daNAN9Q7UKtSboHV3mSobGi92ata4qRBPewNGVScH3PkmcCLn22SUSXie5aeMRQxs2tjB4Ur",
-   "mint": "HF5V8JjanxiCe8utKXypqvVKDzsKEA2bLihQxLydpump",
+   "signature": "YkgC4HvFyszLxti9KtSbv261E3kyEkbK235qfk8g5tTHRkhRBgrAaSR3nUWkiVEryse1cnxsiCMQp6LTsne8XbQ",
+   "mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
    "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
-   "ts_utc": "2026-10-10T22:29:56Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    961251246,
-    3693391091343
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": "So11111111111111111111111111111111111111112",
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 24961106387,
-   "expected_out": 38401702134,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 4.123,
-   "sim_ms": 110.1,
-   "why_not": null
-  },
-  {
-   "signature": "4tDSeVDhakV5ZCwPYTjAupqo9i2nuJXdjRLYZjV6JJzj9e5c8Fvzzen8NfCBC4wSuGTNfHGxBqMgf1eoJhgm2NdY",
-   "mint": "HF5V8JjanxiCe8utKXypqvVKDzsKEA2bLihQxLydpump",
-   "source": "7zyowp3jJHuVTm5VBkht21EgZHmbFTZR3edTAeqcy8Da",
-   "ts_utc": "2026-10-10T22:29:55Z",
-   "ix_disc": "07051dc4f5176550",
-   "ix_accounts": 17,
+   "ts_utc": "2026-10-10T23:15:12Z",
+   "ix_disc": "5df6823ce7e940b2",
+   "ix_accounts": 26,
    "ix_data_len": 24,
    "ix_args": [
-    16693397782563,
-    3610338685
+    993264584633,
+    1449615727
    ],
    "ix_token_programs": 2,
-   "ix_other_mint": "So11111111111111111111111111111111111111112",
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 28786270178,
-   "expected_out": 44286569505,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 3.558,
-   "sim_ms": 89.1,
-   "why_not": null
-  },
-  {
-   "signature": "2QNKywEgv6zRn7vsr4ykLCz7onzVRiyb4JwwHFX932cuF42SwVeiba7kekzhs2g7qycSTG514YzjRA6Puy7SFzGP",
-   "mint": "RxZJUqNxXaDDEKxMe8WC85KyWMw5WwWx38oZiQepump",
-   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
-   "ts_utc": "2026-10-10T22:29:27Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    27435114932,
-    15920881900830
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "ix_other_mint": "GXFoeKjmTNnDwQKWE9jHgA2dbqQ4xHNgtG2x5pTtMHpZ",
    "ok": false,
    "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+   "quote_mint": "GXFoeKjmTNnDwQKWE9jHgA2dbqQ4xHNgtG2x5pTtMHpZ",
    "supported": false,
    "route": "one_hop",
    "min_out": null,
@@ -196,169 +374,7 @@
    "sim_units": null,
    "build_ms": null,
    "sim_ms": null,
-   "why_not": "котировка не SOL: нужен второй шаг (кэш шаблонов не передан)"
-  },
-  {
-   "signature": "4LyrwiTNqKCvB8YmyB28VnhY5Z1YUbUF1rPAe2rxGaMoi5CfibEXKxGneyHzF5UfjsFBk6pXVEthiutmEUoC5zy1",
-   "mint": "D5GWkj9od5wupHML1npgxCVxTmLy3d5YKVrnx3Lkpump",
-   "source": "DAEdBmTPEKM6xkwfzC3d411QUe6coKpkND6UURa4CvHC",
-   "ts_utc": "2026-10-10T22:29:16Z",
-   "ix_disc": "c2ab1c46684d5b2f",
-   "ix_accounts": 27,
-   "ix_data_len": 24,
-   "ix_args": [
-    2000000000,
-    27504477592525
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": "So11111111111111111111111111111111111111112",
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 109803878069,
-   "expected_out": 168929043184,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 0.415,
-   "sim_ms": 117.9,
-   "why_not": null
-  },
-  {
-   "signature": "4Qit4FRyqXe9o4aUvBBz7UrgRvDPePnPZniu1Y9Y1Ky6xvAh8MrR3iEsLRHtEcFGmdHt5QiZ3MG7eWZXPDRvUYYW",
-   "mint": "4TUnjmEckBx7jr3DbwDBpKayu6aZrYTESpzMmMe7pump",
-   "source": "C9s6hwgurdYfmnCNgdRou44ihPcssZmu7X45wBQ3y5t3",
-   "ts_utc": "2026-10-10T22:27:43Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    271768991,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 18148461958,
-   "expected_out": 27920710705,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 3.881,
-   "sim_ms": 116.9,
-   "why_not": null
-  },
-  {
-   "signature": "33NLfzuWncuv8nsVKTAh2nAUZsqk9VodG4uwLtyo3btcU6scDu4hfikwWxT76RdnPjFXx91CZuFrk3iH6UD8P6SH",
-   "mint": "4TUnjmEckBx7jr3DbwDBpKayu6aZrYTESpzMmMe7pump",
-   "source": "2kv8X2a9bxnBM8NKLc6BBTX2z13GFNRL4oRotMUJRva9",
-   "ts_utc": "2026-10-10T22:27:43Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    223231010,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 18596747217,
-   "expected_out": 28610380334,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 4.136,
-   "sim_ms": 112.3,
-   "why_not": null
-  },
-  {
-   "signature": "eknEcDpdsMDy94BuwKTFPDmY1SUjZS9Hdv8Cbbx4DvfyrHQGM4K9NPZbAZkDrMCCNqmZKWM5VoMZPuazEKdT9Gu",
-   "mint": "HW3mTNeN9D7dFzBxRyeVzt3EfTMVHJzorRDpKCpnpump",
-   "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9",
-   "ts_utc": "2026-10-10T22:26:43Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    24750000,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 24599106539,
-   "expected_out": 37844779292,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 4.357,
-   "sim_ms": 116.4,
-   "why_not": null
-  },
-  {
-   "signature": "5wGYAoRVPytdX2NHd1hVdD9AFuUkbaUSi5uvB5iNVypLb2s6xGrAgFHDLdqoSrgb4Cq1GRNSfiZAq5BiKZ3dhaxf",
-   "mint": "HW3mTNeN9D7dFzBxRyeVzt3EfTMVHJzorRDpKCpnpump",
-   "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9",
-   "ts_utc": "2026-10-10T22:26:35Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    247500000,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 36320328752,
-   "expected_out": 55877428850,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 4.383,
-   "sim_ms": 103.3,
-   "why_not": null
-  },
-  {
-   "signature": "3qQzJ24BSFB3uoSBREzXJUrm2vRPFhTa6nhQHpn1UGbRgpqMajyqfKG9RYmw352eNKDftUeAf4XA7uB9XNkMhdFt",
-   "mint": "HW3mTNeN9D7dFzBxRyeVzt3EfTMVHJzorRDpKCpnpump",
-   "source": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9",
-   "ts_utc": "2026-10-10T22:26:32Z",
-   "why_not": "узел не отдал сделку источника"
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 5df6823ce7e940b2"
   }
  ]
 }
