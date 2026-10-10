@@ -769,15 +769,43 @@ def self_test() -> int:
             зовы.append({"url": адрес, "body": данные, "headers": dict(заг)})
             return 200, json.dumps({"signature": "ПОДПИСЬ_BR"})
 
-        р2 = отправить_через("blockrazor", "BBBB", отправитель=сендер_br)
-        chk("BlockRazor: своё тело с mode=fast, ключ в заголовке apikey",
-            р2["ok"] and зовы[-1]["body"] == {"transaction": "BBBB", "mode": "fast",
-                                               "revertProtection": False}
-            and зовы[-1]["headers"].get("apikey") == "СЕКРЕТ_BR", зовы[-1])
-        chk("BlockRazor: подпись берётся из его поля signature",
-            р2["signature"] == "ПОДПИСЬ_BR", р2)
-        chk("ключ не попадает ни в url отчёта, ни в саму запись результата",
-            "СЕКРЕТ_BR" not in json.dumps(р2, ensure_ascii=False), р2)
+        # BLOCKRAZOR ВЫКЛЮЧЕН СЛОВОМ ВЛАДЕЛЬЦА 10.10 -- и это проверяется
+        # отдельно, по живому реестру: иначе "из набора" осталось бы словами.
+        р_выкл = отправить_через("blockrazor", "BBBB", отправитель=сендер_br)
+        chk("BlockRazor ВЫКЛЮЧЕН в живом реестре: отправки нет, причина в словах",
+            р_выкл["ok"] is False
+            and "выключен словом владельца" in (р_выкл.get("why_not") or "")
+            and not зовы, (р_выкл.get("why_not"), len(зовы)))
+        chk("выключенного нет и среди подключённых -- значит и чаевых ему не платим",
+            "blockrazor" not in подключённые(), подключённые())
+        # ПРОВОДКА ЕГО ПРОТОКОЛА ОСТАЁТСЯ ПРОВЕРЕННОЙ. Вернуть отправителя --
+        # это убрать ОДНО поле реестра, и к тому дню должно быть доказано, что
+        # тело, заголовок и разбор ответа у нас верные. Поэтому проверка идёт
+        # по КОПИИ реестра без поля vyklyuchen, а не по живому файлу.
+        import tempfile as _врем_br  # noqa: PLC0415
+        _сырое_br = json.loads(путь_реестра(None).read_text(encoding="utf-8"))
+        _сырое_br["senders"]["blockrazor"].pop("vyklyuchen", None)
+        with _врем_br.TemporaryDirectory() as _вр_br:
+            _п_br = Path(_вр_br) / "senders.json"
+            _п_br.write_text(json.dumps(_сырое_br, ensure_ascii=False),
+                              encoding="utf-8")
+            зовы.clear()
+            р2 = отправить_через("blockrazor", "BBBB", отправитель=сендер_br,
+                                  путь=str(_п_br))
+            chk("BlockRazor: своё тело с mode=fast, ключ в заголовке apikey",
+                р2["ok"] and зовы[-1]["body"] == {"transaction": "BBBB",
+                                                   "mode": "fast",
+                                                   "revertProtection": False}
+                and зовы[-1]["headers"].get("apikey") == "СЕКРЕТ_BR", зовы[-1])
+            chk("BlockRazor: подпись берётся из его поля signature",
+                р2["signature"] == "ПОДПИСЬ_BR", р2)
+            chk("ключ не попадает ни в url отчёта, ни в саму запись результата",
+                "СЕКРЕТ_BR" not in json.dumps(р2, ensure_ascii=False), р2)
+            chk("вернуть отправителя -- это убрать ОДНО поле: без vyklyuchen он "
+                "снова подключён",
+                готов("blockrazor",
+                       _сырое_br["senders"]["blockrazor"])["ok"] is True)
+        зовы.clear()
 
         os.environ["ZEROX_API"] = "СЕКРЕТ_0S"
         зовы.clear()
@@ -937,7 +965,15 @@ def self_test() -> int:
             отправить_через("zeroslot", "HHHH", отправитель=сендер)["ok"] is False, "")
 
         # --- ВСЕМИ СРАЗУ. Один байт, одна подпись, параллельно.
+        # ТРЕХ ПОДКЛЮЧЁННЫХ НУЖНО ПО СУТИ ПРОВЕРКИ: "параллельно, а не по
+        # кругу" доказывается только тем, что общее время меньше суммы. После
+        # выключения blockrazor живьём остаются helius и jito, поэтому здесь
+        # ставятся секреты zeroslot, nozomi и astralane -- они вернутся как
+        # были в finally ниже.
         os.environ["BLOCKRAZOR_AUTH_TOKEN"] = "СЕКРЕТ_BR"
+        os.environ["ZEROX_API"] = "СЕКРЕТ_0S_ВЕЕР"
+        os.environ["NOZOMI_API_KEY"] = "СЕКРЕТ_NZ"
+        os.environ["ASTRALANE_API_KEY"] = "СЕКРЕТ_AS"
         порядок: list = []
 
         def сендер_медленный(адрес, данные, заг, таймаут):
