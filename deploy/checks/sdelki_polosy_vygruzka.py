@@ -228,6 +228,61 @@ def отказ_ряда(п: dict) -> dict:
 # 4122 свой_в_пул, 4868 jupiter, 3615 two_step). Выводить путь из набора
 # программ сделки было бы вторым источником правды и стоило бы чтения цепи на
 # каждую сделку; поле ставит тот, кто решал, и оно дешевле и точнее.
+# ПЛОЩАДКА -- ИМЕНЕМ, А НЕ ТОЛЬКО АДРЕСОМ ПРОГРАММЫ (слово владельца 10.10,
+# п.3: в выгрузке должна быть заполнена площадка). Имена берутся ОТТУДА ЖЕ,
+# откуда их берёт полоса (bloom_own_send.ИМЕНА_ТИПОВ плюс константы
+# c2_swap_build), а не пишутся здесь второй раз: разойдись они -- выгрузка
+# назвала бы тип, которого в политике группы нет.
+def _имена_площадок() -> dict:
+    """{адрес программы: слово полосы}. Модулей нет -- пустой словарь.
+
+    КАТАЛОГИ -- ТЕ ЖЕ ТРИ, ЧТО У ЗАГРУЗКИ УЧЁТА НИЖЕ: на хосте выгрузку
+    запускает таймер из своего каталога, и без этой вставки импорт не нашёл
+    бы ни полосу, ни сборку -- площадка осталась бы пустой с причиной
+    "модуль не найден", то есть поле, которое просил владелец, было бы
+    незаполненным на ЖИВОМ прогоне, а в песочнице выглядело бы объяснённым.
+    """
+    for кат in ("/home/bot/bloom_executor",
+                "/home/bot/robinhood-chain-alpha/analysis",
+                os.path.join(os.path.dirname(os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__)))), "analysis")):
+        if not os.path.exists(os.path.join(кат, "bloom_own_send.py")):
+            continue
+        if кат not in sys.path:
+            sys.path.insert(0, кат)
+        break
+    try:
+        import bloom_own_send as OS  # noqa: PLC0415
+        import c2_swap_build as B  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return {}
+    из_ = {}
+    for имя_конст, слово in (getattr(OS, "ИМЕНА_ТИПОВ", None) or {}).items():
+        знач = getattr(B, имя_конст, None)
+        if знач:
+            из_[str(знач)] = слово
+    return из_
+
+
+ИМЕНА_ПЛОЩАДОК = _имена_площадок()
+
+
+def ploshchadka(программа) -> dict:
+    """Имя площадки по программе пула: слово полосы или честный отказ."""
+    адрес = str(программа or "")
+    if not адрес:
+        return {"ploshchadka": None,
+                 "ploshchadka_why_not": "программы пула в записи нет"}
+    имя = ИМЕНА_ПЛОЩАДОК.get(адрес)
+    if имя:
+        return {"ploshchadka": имя, "ploshchadka_why_not": None}
+    return {"ploshchadka": None,
+             "ploshchadka_why_not": (
+                 f"программа {адрес[:12]} не из списка типов полосы"
+                 if ИМЕНА_ПЛОЩАДОК else
+                 "имена типов не прочитаны: модуль полосы или сборки не найден")}
+
+
 ПУТЬ_ПРОДАЖИ_ПО_ВИДУ = {
     "свой_в_пул": "наш",          # своя одна нога в пул (c3_prodavec_sborka)
     "two_step": "наш",            # своя двухшаговая продажа
@@ -806,7 +861,13 @@ def main() -> int:
             # lane_dlmm_* пишет полоса в позицию при успешной отправке (п.1 ночи
             # 29->30.09); без них разложить 39-56 мс сборки DLMM нечем, а
             # lane_dlmm_odno_godilos -- это и есть "сошлось/нет" для одного чтения.
-            "pool_program": п.get("pool_program"),
+            # pool_program: сперва своё поле, потом program (им и заполнено
+            # в живых записях). Откуда взято -- отдельным полем.
+            "pool_program": п.get("pool_program") or п.get("program"),
+            "pool_program_otkuda": ("запись позиции: pool_program"
+                                     if п.get("pool_program")
+                                     else ("запись позиции: program"
+                                           if п.get("program") else None)),
             "lane_dlmm_reads": п.get("lane_dlmm_reads"),
             "lane_dlmm_reads_ms": п.get("lane_dlmm_reads_ms"),
             "lane_dlmm_odno_godilos": п.get("lane_dlmm_odno_godilos"),
@@ -910,6 +971,13 @@ def main() -> int:
             # скольких рядов он так и остался пустым.
             "stroitel": п.get("program"),
             "stroitel_otkuda": ("запись позиции: program" if п.get("program") else None),
+            # ПЛОЩАДКА: имя типа пула. Поле pool_program ниже служба НЕ
+            # ПИШЕТ ВОВСЕ -- замер 10.10 по живой выгрузке: 0 из 55 рядов, --
+            # а в записи позиции программа лежит в program. Поэтому площадка
+            # считается от того же значения, что и строитель, а pool_program
+            # дозаполняется им же: пустая колонка с правильным именем хуже
+            # отсутствующей, по ней Code-2 посчитал бы "типа пула нет".
+            **ploshchadka(п.get("program") or п.get("pool_program")),
             "итог_sol": None, "расход_sol": None,
             # ПОЛЯ, КОТОРЫЕ ПРОСИЛ ВЛАДЕЛЕЦ ОТДЕЛЬНО (п.5, 28.09): подписи
             # покупки и продажи и СЕВШАЯ подпись со своим слотом. Севшая --
@@ -1570,6 +1638,28 @@ def самопроверка() -> int:
                            ("our_slot", "слот нашей покупки")):
         chk(f"поле ряда {_поле} ({_зачем}) есть в рабочем коде выгрузки",
             f'"{_поле}"' in рабочая_в, _поле)
+    # --- ПЛОЩАДКА (слово владельца 10.10, п.3)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: pool_program в записи позиции НЕ ПИШЕТСЯ (0 из 55 "
+        "рядов 10.10), поэтому колонка дозаполняется полем program -- тем же, "
+        "чем заполнен строитель",
+        '"pool_program": п.get("pool_program") or п.get("program")' in рабочая_в
+        and '"pool_program_otkuda"' in рабочая_в, None)
+    chk("имя площадки собирается из ТЕХ ЖЕ имён, что у полосы, а не пишется "
+        "здесь второй раз",
+        'getattr(OS, "ИМЕНА_ТИПОВ", None)' in рабочая_в
+        and '**ploshchadka(' in рабочая_в, None)
+    _пл_крив = ploshchadka("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
+    _пл_нет = ploshchadka(None)
+    _пл_чужая = ploshchadka("11111111111111111111111111111111")
+    chk(f"кривая pump.fun названа словом полосы ({_пл_крив.get('ploshchadka')}), "
+        "пустая программа и чужая -- названный отказ, а не пустое поле молча",
+        (_пл_крив.get("ploshchadka") == "bonding"
+         or "модуль" in str(_пл_крив.get("ploshchadka_why_not")))
+        and _пл_нет.get("ploshchadka") is None
+        and "программы пула в записи нет" in str(_пл_нет.get("ploshchadka_why_not"))
+        and _пл_чужая.get("ploshchadka") is None
+        and str(_пл_чужая.get("ploshchadka_why_not")),
+        (_пл_крив, _пл_нет, _пл_чужая))
     chk("our_slot больше НЕ берётся только из полей, которых в записи нет "
         "(own_tx_seen_slot и our_slot -- 0 из 66 рядов 09.10)",
         'п.get("lane_landed_slot")' in рабочая_в, None)
