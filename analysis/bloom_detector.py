@@ -4187,6 +4187,57 @@ class Детектор:
         из_.update(ok=True, zapis=зп)
         return из_
 
+    def zapusk_k_pokupke(self, res: dict) -> dict:
+        """Годен ли этот сигнал запуска к ПОКУПКЕ. По умолчанию -- НЕТ.
+
+        ТРИ ДВЕРИ, И ВСЕ ТРИ ЗАКРЫТЫ, ПОКА ВЛАДЕЛЕЦ НЕ СКАЖЕТ:
+          1. BLOOM_ZAPUSK_TORGUET=1 -- отдельный флаг окружения, которого в env
+             нет; деплой идёт с keep_env=yes, то есть завести его может только
+             правка окружения по слову владельца;
+          2. группа zapusk_dev должна быть в файле групп;
+          3. у неё должен быть включён lane_trades.
+        Любая закрыта -- возвращается ok=False с названной причиной, и
+        уведомление уходит только в журнал, как и сегодня.
+
+        Сами условия сигнала (создатель купил, не mayhem, котировка SOL,
+        разновидность v3) проверяет c1_zapusk_zhurnal.signal_zapuska -- здесь
+        только двери включения.
+        """
+        из_ = {"ok": False, "why_not": None, "istochnik": None,
+               "signature": None, "slot": None, "tx": None}
+        if ZH is None:
+            из_["why_not"] = ZH_ПОЧЕМУ_НЕТ or "модуль журнала не привезён"
+            return из_
+        if ST.env_int("BLOOM_ZAPUSK_TORGUET", 0) != 1:
+            из_["why_not"] = "BLOOM_ZAPUSK_TORGUET не равен 1 -- покупок нет"
+            return из_
+        try:
+            import bloom_source_groups as SG  # noqa: PLC0415
+
+            if ZH.ГРУППА_ЗАПУСКОВ_ИМЯ not in (SG.загрузить().get("политики") or {}):
+                из_["why_not"] = (f"группы {ZH.ГРУППА_ЗАПУСКОВ_ИМЯ} в файле "
+                                   "групп нет")
+                return из_
+            if not SG.политика(ZH.ГРУППА_ЗАПУСКОВ_ИМЯ).get("lane_trades"):
+                из_["why_not"] = (f"у группы {ZH.ГРУППА_ЗАПУСКОВ_ИМЯ} "
+                                   "lane_trades выключен")
+                return из_
+        except Exception as сбой:  # noqa: BLE001
+            из_["why_not"] = f"файл групп не прочитан: {type(сбой).__name__}"
+            return из_
+        соо = res if isinstance(res, dict) else {}
+        tx = (соо.get("transaction")
+              if isinstance(соо.get("transaction"), dict) else соо)
+        подпись, слот = подпись_и_слот(соо)
+        сг = ZH.signal_zapuska(tx, podpis=подпись, slot=слот)
+        if not сг.get("ok"):
+            из_.update(why_not=сг.get("why_not"),
+                       otkaz_vid=сг.get("otkaz_vid"))
+            return из_
+        из_.update(ok=True, istochnik=сг["istochnik"], signature=подпись,
+                   slot=сг.get("slot_sozdanija") or слот, tx=tx)
+        return из_
+
     def _dlina_slota_dlja_zapuska(self):
         """Длина слота ИЗ ЗАМЕРА, а не из константы. Нет замера -- None.
 
@@ -7511,6 +7562,21 @@ async def слушать(детектор: Детектор, ключ: str, *, �
                             res, bajt=(len(raw) if isinstance(raw, (str, bytes))
                                        else 0),
                             t_polucheno=t_получено)
+                        # ПОКУПКА ПО СОЗДАНИЮ -- ТОЛЬКО КОГДА ВСЕ ТРИ ДВЕРИ
+                        # ОТКРЫТЫ (флаг окружения, группа в файле, lane_trades).
+                        # Пока хоть одна закрыта, уведомление уходит ТОЛЬКО в
+                        # журнал, ровно как до этой правки.
+                        #
+                        # ИСТОЧНИКОМ ИДЁТ СОЗДАТЕЛЬ, а не счёт подписки: весь
+                        # разбор сигнала считается по балансам источника, и у
+                        # PDA счёта создания ни один минт не двигается -- сигнал
+                        # вышел бы пустым. Группу создателю даёт правило
+                        # bloom_own_send.группа_запуска_по_транзакции.
+                        _кп = детектор.zapusk_k_pokupke(res)
+                        if _кп.get("ok"):
+                            await детектор.обработать_бережно(
+                                _кп["signature"], _кп["slot"],
+                                _кп["istochnik"], метод, _кп["tx"], t_получено)
                         continue
                     if источник in детектор.кэш_ног_адреса:
                         детектор.учесть_байты_ног(
@@ -12318,6 +12384,41 @@ def self_test() -> int:
             encoding="utf-8").split("def self_test")[0]
         chk("раскол журнала запусков отделил его самопроверку от кода",
             "chk(" not in _ист_зж and "def signal_zapuska" in _ист_зж)
+        # ТРИ ДВЕРИ ПОКУПКИ ПО СОЗДАНИЮ -- ВСЕ ЗАКРЫТЫ. Главная проверка п.2:
+        # пока владелец не сказал, уведомление создания уходит ТОЛЬКО в журнал.
+        _был_тг = os.environ.get("BLOOM_ZAPUSK_TORGUET")
+        try:
+            os.environ.pop("BLOOM_ZAPUSK_TORGUET", None)
+            _кп = детектор_б.zapusk_k_pokupke({"transaction": {"message": {
+                "accountKeys": [], "instructions": []}}})
+            chk("ДОКАЗАННЫЙ КРАСНЫЙ: без BLOOM_ZAPUSK_TORGUET=1 покупка по "
+                "созданию не идёт, и это сказано причиной",
+                _кп["ok"] is False and "BLOOM_ZAPUSK_TORGUET" in _кп["why_not"],
+                _кп)
+            os.environ["BLOOM_ZAPUSK_TORGUET"] = "1"
+            _кп2 = детектор_б.zapusk_k_pokupke({"transaction": {"message": {
+                "accountKeys": [], "instructions": []}}})
+            chk("ДОКАЗАННЫЙ КРАСНЫЙ: флаг есть, а группы zapusk_dev в файле "
+                "нет -- покупка всё равно не идёт",
+                _кп2["ok"] is False
+                and "zapusk_dev" in (_кп2["why_not"] or ""), _кп2)
+        finally:
+            if _был_тг is None:
+                os.environ.pop("BLOOM_ZAPUSK_TORGUET", None)
+            else:
+                os.environ["BLOOM_ZAPUSK_TORGUET"] = _был_тг
+        chk("имя группы запусков -- ОДНО на два модуля, не два написанных руками",
+            ZH is not None and ZH.ГРУППА_ЗАПУСКОВ_ИМЯ == "zapusk_dev"
+            and "_имя_группы_запусков" in (REPO_ROOT / "analysis"
+                                            / "bloom_own_send.py").read_text(
+                                                encoding="utf-8"))
+        _и_зап = _ист.find("детектор.zapusk_uchest(")
+        _и_кп = _ист.find("детектор.zapusk_k_pokupke(")
+        _и_торг2 = _ист.find('_кп["signature"], _кп["slot"],')
+        chk("ветка покупки по созданию стоит ВНУТРИ ветки журнала и ПОСЛЕ "
+            "записи -- создание сперва попадает в журнал, и только потом "
+            "может стать сигналом",
+            0 < _и_зап < _и_кп < _и_торг2, (_и_зап, _и_кп, _и_торг2))
         chk("в рабочей части журнала запусков нет ни отправки, ни подписи",
             not any(с in _ист_зж for с in ("sendTransaction", "Keypair",
                                             "sign_message", "partial_sign")),
