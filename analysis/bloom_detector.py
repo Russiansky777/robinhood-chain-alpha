@@ -4228,8 +4228,23 @@ class Детектор:
         соо = res if isinstance(res, dict) else {}
         tx = (соо.get("transaction")
               if isinstance(соо.get("transaction"), dict) else соо)
-        подпись, слот = подпись_и_слот(соо)
-        сг = ZH.signal_zapuska(tx, podpis=подпись, slot=слот)
+        # РАЗБОР -- В СВОЁМ try, И ВОТ ЧЕМ ИНАЧЕ ПЛАТИТСЯ. Эти две строки
+        # стояли без защиты. Пока BLOOM_ZAPUSK_TORGUET снят, они недостижимы;
+        # как только флаг поставлен, ЛЮБОЕ исключение в разборе (чужая
+        # кодировка, неожиданная раскладка данных, сбой borsh) ушло бы наверх
+        # в `слушать` и было бы поймано там широким except как ОБРЫВ ПОДПИСКИ:
+        # обрывов += 1 и переподключение всего websocket. При ~2500 созданиях
+        # в час это шторм переподключений, который снёс бы и обычные
+        # источники -- то есть ошибка в НОВОЙ ветке остановила бы СТАРУЮ
+        # торговлю. Теперь отказ называется словами и остаётся внутри ветки.
+        try:
+            подпись, слот = подпись_и_слот(соо)
+            сг = ZH.signal_zapuska(tx, podpis=подпись, slot=слот)
+        except Exception as сбой:  # noqa: BLE001
+            из_["why_not"] = (f"разбор создания упал: {type(сбой).__name__}: "
+                               f"{str(сбой)[:120]}")
+            из_["otkaz_vid"] = "razbor_upal"
+            return из_
         if not сг.get("ok"):
             из_.update(why_not=сг.get("why_not"),
                        otkaz_vid=сг.get("otkaz_vid"))
@@ -12402,6 +12417,52 @@ def self_test() -> int:
                 "нет -- покупка всё равно не идёт",
                 _кп2["ok"] is False
                 and "zapusk_dev" in (_кп2["why_not"] or ""), _кп2)
+            # ТРЕТЬЯ ПРОВЕРКА: ОБЕ ДВЕРИ ОТКРЫТЫ, А РАЗБОР ПАДАЕТ.
+            # Так выглядит обрыв подписки, которого быть не должно: до правки
+            # 10.10 исключение из signal_zapuska уходило наверх в `слушать` и
+            # считалось там ОБРЫВОМ -- переподключение всего websocket на
+            # каждом созданиии, то есть ошибка новой ветки гасила бы и старую
+            # торговлю. Проверяется НАСТОЯЩИМ падением разбора на временном
+            # файле групп, где zapusk_dev есть и lane_trades включён.
+            import json as _json_зап  # noqa: PLC0415
+            import tempfile as _tmp_зап  # noqa: PLC0415
+
+            _был_сг = os.environ.get("BLOOM_SOURCE_GROUPS")
+            _врем_гр = Path(_tmp_зап.mkdtemp()) / "gruppy_zapusk_test.json"
+            _врем_гр.write_text(_json_зап.dumps({
+                "groups": {"zapusk_dev": {"lane_sol": 0.01,
+                                           "lane_trades": True,
+                                           "bloom_trades": False,
+                                           "addresses": {"АДРЕСЗАП": 1}}}},
+                ensure_ascii=False), encoding="utf-8")
+            _прежний_сигнал = ZH.signal_zapuska
+
+            def _падающий_сигнал(*_а, **_к):
+                raise ValueError("нарочно: разбор создания упал")
+
+            try:
+                os.environ["BLOOM_SOURCE_GROUPS"] = str(_врем_гр)
+                import bloom_source_groups as _SGt  # noqa: PLC0415
+                _SGt.загрузить(заново=True)
+                ZH.signal_zapuska = _падающий_сигнал
+                _кп3 = детектор_б.zapusk_k_pokupke({"transaction": {"message": {
+                    "accountKeys": [], "instructions": []}}})
+                chk("ДОКАЗАННЫЙ КРАСНЫЙ: обе двери открыты, разбор создания "
+                    "упал -- отказ НАЗВАН словами, а не улетел наверх как "
+                    "обрыв подписки (иначе переподключение на каждом создании)",
+                    _кп3["ok"] is False
+                    and _кп3.get("otkaz_vid") == "razbor_upal"
+                    and "ValueError" in (_кп3.get("why_not") or ""), _кп3)
+            finally:
+                ZH.signal_zapuska = _прежний_сигнал
+                if _был_сг is None:
+                    os.environ.pop("BLOOM_SOURCE_GROUPS", None)
+                else:
+                    os.environ["BLOOM_SOURCE_GROUPS"] = _был_сг
+                try:
+                    _SGt.загрузить(заново=True)
+                except Exception:  # noqa: BLE001, S110
+                    pass
         finally:
             if _был_тг is None:
                 os.environ.pop("BLOOM_ZAPUSK_TORGUET", None)
