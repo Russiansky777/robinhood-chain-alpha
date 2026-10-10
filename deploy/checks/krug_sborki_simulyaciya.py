@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import datetime
 import inspect
 import json
 import os
@@ -1247,6 +1248,63 @@ def otkazy_cherez_denezhnyj_put(*, podpisi: list, koshelek: str,
     return из_
 
 
+def chaevye_zhivy(*, adresa: list, pauza: float, rubezh_utc: str = "") -> dict:
+    """ЖИВЫ ЛИ СЧЕТА ЧАЕВЫХ ОТПРАВИТЕЛЯ -- по цепи, только чтение.
+
+    ЗАЧЕМ. BlockRazor с 10.10 13:49:37Z отказывает одним и тем же текстом
+    ("Insufficient tip ... at least 100000 lamports") при чаевых 100 000,
+    101 000, 200 000 и 1 000 000 лампортов и при любом порядке инструкции --
+    то есть он НАШИХ ЧАЕВЫХ НЕ ВИДИТ, а не считает их малыми. Одна из двух
+    оставшихся причин -- что он сменил счета чаевых, и наш список из его же
+    документации устарел. Спорить об этом словами нельзя: если на счёт и
+    сейчас идут чужие чаевые, счёт живой и дело не в нём; если поток на нём
+    кончился ровно в тот час -- причина найдена.
+
+    Документация сюда не ходит (сеть прогона её не отдаёт), ходит ЦЕПЬ.
+    """
+    из_ = {"adresa": [], "vsego": len(adresa or []), "zhivyh": 0,
+           "posle_rubezha": 0, "rubezh_utc": rubezh_utc or None,
+           "ne_prochitano": 0, "why_not": None}
+    рубеж = None
+    if rubezh_utc:
+        try:
+            рубеж = int(datetime.datetime.strptime(
+                rubezh_utc, "%Y-%m-%dT%H:%M:%SZ").replace(
+                    tzinfo=datetime.timezone.utc).timestamp())
+        except ValueError:
+            из_["why_not"] = f"рубеж не разобран: {rubezh_utc}"
+            return из_
+    for адрес in (adresa or []):
+        з = {"adres": адрес, "podpisej": 0, "svezhaya_ts": None,
+             "svezhaya_utc": None, "minut_nazad": None, "posle_rubezha": None,
+             "why_not": None}
+        о = зов("getSignaturesForAddress", [адрес, {"limit": 25}])
+        if not о["ok"]:
+            з["why_not"] = о["why_not"]
+            из_["ne_prochitano"] += 1
+            из_["adresa"].append(з)
+            time.sleep(float(pauza))
+            continue
+        записи = о.get("result") or []
+        з["podpisej"] = len(записи)
+        времена = [int(x.get("blockTime") or 0) for x in записи
+                   if x.get("blockTime")]
+        if времена:
+            свежая = max(времена)
+            з["svezhaya_ts"] = свежая
+            з["svezhaya_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                              time.gmtime(свежая))
+            з["minut_nazad"] = round((time.time() - свежая) / 60.0, 1)
+            из_["zhivyh"] += 1
+            if рубеж is not None:
+                з["posle_rubezha"] = sum(1 for т in времена if т >= рубеж)
+                if з["posle_rubezha"]:
+                    из_["posle_rubezha"] += 1
+        из_["adresa"].append(з)
+        time.sleep(float(pauza))
+    return из_
+
+
 def podpisi_istochnika(*, istochnik: str, chasov: float, predel: int,
                        pauza: float) -> dict:
     """Покупки v3 ИСТОЧНИКА за окно -- с цепи, по его же подписям.
@@ -1617,6 +1675,13 @@ def main() -> int:
     п.add_argument("--mesta-v-bloke", default="",
                     help="ТОЛЬКО ЧТЕНИЕ: путь к выгрузке сделок -- места в "
                          "блоках источника и наших по архивному узлу")
+    п.add_argument("--chaevye-zhivy", default="",
+                    help="ТОЛЬКО ЧТЕНИЕ: имя отправителя из реестра (или "
+                         "адреса через запятую) -- идут ли на его счета чаевых "
+                         "чужие переводы и когда шли последний раз")
+    п.add_argument("--rubezh-utc", default="",
+                    help="рубеж вида 2026-10-10T13:49:37Z: сколько подписей "
+                         "счёта свежее него")
     п.add_argument("--mayhem", default="",
                     help="ТОЛЬКО ЧТЕНИЕ: минты через запятую -- is_mayhem_mode "
                          "и котировка по СЧЁТУ КРИВОЙ (смещения из IDL)")
@@ -1643,6 +1708,40 @@ def main() -> int:
         return 0
     if а.mesta_v_bloke.strip():
         из_ = mesta_v_bloke(vygruzka=а.mesta_v_bloke.strip(), pauza=а.pauza)
+        из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
+        return 0
+    if а.chaevye_zhivy.strip():
+        зн = а.chaevye_zhivy.strip()
+        адреса = [x.strip() for x in зн.replace(";", ",").split(",") if x.strip()]
+        имя_отпр = None
+        # ИМЯ ОТПРАВИТЕЛЯ -- АДРЕСА ИЗ РЕЕСТРА, А НЕ ИЗ РУК: свой список
+        # счетов чаевых выдумывать нельзя, проверять надо ровно тот, которым
+        # платит полоса.
+        if len(адреса) == 1 and len(адреса[0]) < 30:
+            имя_отпр = адреса[0]
+            try:
+                sys.path.insert(0, str(Path(__file__).resolve().parents[2]
+                                        / "analysis"))
+                import bloom_senders as SS  # noqa: PLC0415
+                адреса = list(((SS.реестр() or {}).get(имя_отпр) or {})
+                               .get("tip_accounts") or [])
+            except Exception as сбой:  # noqa: BLE001
+                print(json.dumps({"why_not": f"реестр не прочитан: "
+                                             f"{type(сбой).__name__}"},
+                                  ensure_ascii=False))
+                return 2
+            if not адреса:
+                print(json.dumps({"why_not": f"у {имя_отпр} в реестре нет "
+                                             f"счетов чаевых"},
+                                  ensure_ascii=False))
+                return 2
+        из_ = chaevye_zhivy(adresa=адреса, pauza=а.pauza,
+                            rubezh_utc=а.rubezh_utc.strip())
+        из_["otpravitel"] = имя_отпр
         из_["uzel"] = затереть(узел())
         текст = json.dumps(из_, ensure_ascii=False, indent=1)
         print(текст)
