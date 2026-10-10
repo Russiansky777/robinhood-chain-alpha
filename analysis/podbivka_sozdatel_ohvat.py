@@ -49,6 +49,21 @@ WSOL = "So11111111111111111111111111111111111111112"
 р_qam = re.compile(r'"quoteAmount":\s*"?([0-9.eE+-]+)')
 р_qmint = re.compile(r'"quoteMint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
 р_sig = re.compile(r'"signature":\s*"([1-9A-HJ-NP-Za-km-z]{64,90})"')
+р_q = re.compile(r'"(quoteInPool|tokensInPool|vQuoteInBondingCurve|vTokensInBondingCurve)":'
+                 r'\s*"?([0-9.eE+-]+)')
+X0_КРИВОЙ = 30.0        # канонический старт виртуальной квоты pump.fun, SOL
+Y0_КРИВОЙ = 1073000000.0
+
+
+def состояние(стр: str) -> tuple | None:
+    поля = dict(р_q.findall(стр))
+    x = поля.get("vQuoteInBondingCurve") or поля.get("quoteInPool")
+    y = поля.get("vTokensInBondingCurve") or поля.get("tokensInPool")
+    try:
+        x, y = float(x), float(y)
+    except (TypeError, ValueError):
+        return None
+    return (x, y) if x > 0 and y > 0 else None
 
 
 def часы(с: str, сколько: int) -> list:
@@ -110,6 +125,8 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
                 "txSigner": sм.group(1) if sм else None,
                 "sol": (float(qм.group(1)) if qм and qmм and qmм.group(1) == WSOL
                         and _число(qм.group(1)) else None),
+                "сост": состояние(стр),
+                "quoteMint": qmм.group(1) if qmм else None,
                 "подпись": sig.group(1) if sig else None})
             счёт["строк_минта"] += 1
 
@@ -140,6 +157,8 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
 
     # ---- сверка по минтам ------------------------------------------------------
     итог: collections.Counter = collections.Counter()
+    доли: list = []        # quoteAmount строки создания / sol создателя из журнала
+    восст: list = []       # (x - 30) / sol создателя -- восстановление по резерву
     по_журналу: dict = {True: collections.Counter(), False: collections.Counter()}
     примеры: list = []
     разбор: list = []
@@ -168,6 +187,27 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
             if з["sozdatel"] in адрес_созд:
                 итог["адрес_создания_совпал"] += 1
                 к["адрес_создания_совпал"] += 1
+            # Два архивных признака покупки в транзакции создания, рядом:
+            #   (а) quoteAmount на самой строке создания -- сколько SOL вошло в кривую
+            #       этой инструкцией;
+            #   (б) состояние кривой на строке создания: x > 30.0 значит, что внутри
+            #       транзакции уже кто-то купил (создатель или связка снайперов).
+            с0 = созд[0]
+            сол0 = с0.get("sol")
+            сост0 = с0.get("сост")
+            сол_есть = bool(сол0 and сол0 > 0)
+            x_выше = bool(сост0 and с0.get("quoteMint") == WSOL
+                          and сост0[0] > X0_КРИВОЙ + 1e-9)
+            if сол_есть:
+                итог["создание_quoteAmount_больше_нуля"] += 1
+                к["создание_quoteAmount_больше_нуля"] += 1
+            if x_выше:
+                итог["создание_x_выше_30"] += 1
+                к["создание_x_выше_30"] += 1
+            if сол_есть and з["sol"]:
+                доли.append(сол0 / з["sol"])
+                if x_выше and сост0:
+                    восст.append((сост0[0] - X0_КРИВОЙ) / з["sol"])
         if покуп_створ:
             итог["покупка_в_створе_есть"] += 1
             к["покупка_в_створе_есть"] += 1
@@ -199,6 +239,8 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
          "счёт_потока": dict(счёт), "сверка": dict(итог),
          "по_журналу_купил": dict(по_журналу[True]),
          "по_журналу_не_купил": dict(по_журналу[False]),
+         "quoteAmount_создания_к_sol_журнала": _кванты(доли),
+         "x_минус_30_к_sol_журнала": _кванты(восст),
          "примеры_купил_но_покупки_в_архиве_нет": примеры,
          "разбор": разбор}
     (П / f"sozdatel_ohvat{а.metka}.json").write_text(
@@ -208,6 +250,18 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
                                "по_журналу_не_купил")}, ensure_ascii=False, indent=1),
           flush=True)
     return 0
+
+
+def _кванты(v: list) -> dict:
+    """Кванты отношения -- чтобы увидеть, ровно ли признак равен покупке создателя."""
+    if not v:
+        return {"n": 0}
+    v = sorted(v)
+    def q(p):
+        return round(v[min(len(v) - 1, int(p * len(v)))], 6)
+    return {"n": len(v), "p1": q(0.01), "p10": q(0.10), "медиана": q(0.5),
+            "p90": q(0.90), "p99": q(0.99),
+            "среднее": round(sum(v) / len(v), 6)}
 
 
 def _число(s: str) -> bool:
