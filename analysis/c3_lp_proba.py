@@ -558,6 +558,30 @@ def _rez(e: dict) -> tuple | None:
         return float(x), float(y)
 
 
+def _учесть_вывод(действие: str, y_до: float, y_после: float,
+                  прошло: float, вывод: dict) -> None:
+    """ВЫХОД ЛИКВИДНОСТИ: сколько, когда впервые, какую долю глубины забрали.
+
+    `withdraw` в ленте и падение резервов -- ДВА РАЗНЫХ ПУТИ одного события,
+    и они считаются по отдельности: по какому пути увидено, столько и стоит
+    доверия. Если лента несёт действие -- верим ей; если нет, остаётся только
+    падение резервов, и об этом в отчёте сказано числом.
+    """
+    if y_после >= y_до or y_до <= 0:
+        if "deposit" in действие or "add_liquidity" in действие:
+            вывод["vklad_chuzhoj"] += 1
+        return
+    забрали = 1 - y_после / y_до
+    вывод["sobytij"] += 1
+    вывод["dolja_glubiny"] += забрали
+    if вывод["sekund_do_pervogo"] is None:
+        вывод["sekund_do_pervogo"] = прошло
+    if "rezerv" in действие:
+        вывод["po_rezervam"] += 1
+    else:
+        вывод["po_dejstviju"] += 1
+
+
 def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
                 lp_bps: int = LP_BPS_ИЗМЕРЕНО,
                 fee_torgovli: float | None = None) -> dict:
@@ -597,6 +621,10 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
     буст_объём = буст_событий = 0.0
     ликв_событий = 0
     ликв_сдвиг_доли = 0.0
+    # ВЫХОД ЛИКВИДНОСТИ -- ОТДЕЛЬНОЙ СТРОКОЙ: сколько раз, когда впервые,
+    # какую долю глубины забрали и каким путём это увидено.
+    вывод = {"sobytij": 0, "sekund_do_pervogo": None, "dolja_glubiny": 0.0,
+             "po_dejstviju": 0, "po_rezervam": 0, "vklad_chuzhoj": 0}
     y, x = y0, x0
     последнее = первое
     событий_в_окне_порога = 0
@@ -642,6 +670,26 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
                     доля = min(max(доля, 0.0), 1.0)
                     ликв_событий += 1
                     ликв_сдвиг_доли += доля - было
+                    _учесть_вывод(действие, y, yн, прошло, вывод)
+        # ВТОРОЙ ПУТЬ ОБНАРУЖЕНИЯ -- ПО РЕЗЕРВАМ, И ОН ИДЁТ ОТДЕЛЬНОЙ
+        # ПРОВЕРКОЙ, А НЕ ВЕТКОЙ `elif`. Здесь стоял elif после ветки
+        # оборота, и для действий buy/sell он был НЕДОСТИЖИМ: первая ветка
+        # уже сработала. То есть второй путь не работал вовсе, а проверка
+        # это поймала.
+        # Лента PumpApi может не нести отдельного действия withdraw -- тогда
+        # вывод виден только так: ОБА резерва падают пропорционально, глубина
+        # ушла, а цена осталась. Сделка так выглядеть не может: она двигает
+        # цену. Порог 2 % взят выше шума округления резервов.
+        if (действие not in НЕ_ОБОРОТ_ДЕЙСТВИЯ and y > 0 and x > 0
+                and yн < y and xн < x and yн > 0 and xн > 0):
+            дол_y, дол_x = 1 - yн / y, 1 - xн / x
+            цена_стоит = abs((yн / xн) / (y / x) - 1) < 0.02
+            if цена_стоит and min(дол_y, дол_x) > 0.02:
+                было = доля
+                доля = min(max(доля * y / yн, 0.0), 1.0)
+                ликв_событий += 1
+                ликв_сдвиг_доли += доля - было
+                _учесть_вывод("withdraw_po_rezervam", y, yн, прошло, вывод)
         y, x = yн, xн
         последнее = е
     if последнее is первое:
@@ -667,6 +715,7 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
             "oborot": оборот, "dohod": доход,
             "boost_objom": буст_объём, "boost_sobytij": буст_событий,
             "likv_sobytij": ликв_событий, "likv_sdvig_doli": ликв_сдвиг_доли,
+            "vyhod_likvidnosti": вывод,
             "dolja_pula_vhod": X / (y0 + X), "dolja_pula_vyhod": доля,
             "pozicija": позиция, "vklad": вклад,
             "poterja_ceny": потеря_цены,
@@ -709,6 +758,28 @@ def rjady_iz_fajla(put: Path) -> dict:
         "в файле не нашлось рядов пулов: ждал ключ 'ряды' / 'ленты_минтов' "
         "или плоский список событий с poolId -- того, что пишет читалка "
         "Code-2. Своего формата не придумываю")
+
+
+def _svod_vyhoda(stroki: list) -> dict:
+    """ВЫХОД ЛИКВИДНОСТИ ПО ВЫБОРКЕ: доля пулов, когда, сколько."""
+    с_выводом = [с for с in stroki if (с["vyhod_likvidnosti"]["sobytij"] or 0)]
+    если = [с["vyhod_likvidnosti"] for с in с_выводом]
+    когда = [в["sekund_do_pervogo"] for в in если
+             if в["sekund_do_pervogo"] is not None]
+    сколько = [в["dolja_glubiny"] for в in если]
+    return {
+        "pulov_vsego": len(stroki), "pulov_s_vyhodom": len(с_выводом),
+        "dolja_pulov": (len(с_выводом) / len(stroki)) if stroki else None,
+        "sekund_do_pervogo_med": (statistics.median(когда) if когда else None),
+        "minut_do_pervogo_med": (statistics.median(когда) / 60
+                                 if когда else None),
+        "dolja_glubiny_med": (statistics.median(сколько) if сколько else None),
+        "dolja_glubiny_p90": (sorted(сколько)[int(0.9 * (len(сколько) - 1))]
+                              if сколько else None),
+        "uvideno_po_dejstviju": sum(в["po_dejstviju"] for в in если),
+        "uvideno_po_rezervam": sum(в["po_rezervam"] for в in если),
+        "vkladov_chuzhih": sum(в["vklad_chuzhoj"] for в in
+                               (с["vyhod_likvidnosti"] for с in stroki))}
 
 
 def sutki_rjada(rjad: list) -> str:
@@ -782,6 +853,7 @@ def progon_rjady(puti: list, *, razmery: tuple = (1.0, 5.0, 20.0)) -> dict:
                 "pulov_s_boost": sum(1 for с in стр if с["boost_sobytij"]),
                 "pulov_s_dvizhenijem_likvidnosti": sum(
                     1 for с in стр if с["likv_sobytij"]),
+                "vyhod_likvidnosti": _svod_vyhoda(стр),
                 "dolja_vhod_med": statistics.median(
                     [с["dolja_pula_vhod"] for с in стр]),
                 "dolja_vyhod_med": statistics.median(
@@ -831,7 +903,7 @@ def progon_rjady(puti: list, *, razmery: tuple = (1.0, 5.0, 20.0)) -> dict:
 
 # ЧИСЛО ОБЪЯВЛЕНО. Меньше -- проверку убрали и никто не заметил; больше --
 # добавили и не сказали. И то и другое здесь ПРОВАЛ.
-ZHDEM_PROVEROK = 33
+ZHDEM_PROVEROK = 38
 
 
 def self_test() -> int:  # noqa: C901, PLR0915
@@ -1092,6 +1164,46 @@ def self_test() -> int:  # noqa: C901, PLR0915
         f"{р1ч['oborot']:.0f} / {р24['oborot']:.0f} SOL на 10 мин / 1 ч / 24 ч",
         abs(р10["oborot"] - 10.0) < 1e-9 and abs(р1ч["oborot"] - 20.0) < 1e-9
         and abs(р24["oborot"] - 30.0) < 1e-9, (р10, р1ч, р24))
+    # ----- 9. ВЫХОД ЛИКВИДНОСТИ -- ОТДЕЛЬНОЙ СТРОКОЙ
+    ряд_в = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+             сд("buy", 5.0, 105.0, 960.0, 60_000, 2),
+             сд("withdraw", 0, 52.5, 480.0, 600_000, 3),
+             сд("buy", 5.0, 57.5, 440.0, 900_000, 4)]
+    рв = lp_po_rjadu(ряд_в, razmer=1.0, gorizont_sekund=86400)
+    в = рв["vyhod_likvidnosti"]
+    chk("ВЫХОД ЛИКВИДНОСТИ НАЗВАН ТРЕМЯ ЧИСЛАМИ -- сколько раз, КОГДА впервые "
+        f"и СКОЛЬКО глубины забрали: {в['sobytij']} раз, через "
+        f"{в['sekund_do_pervogo']:.0f} с, забрали {в['dolja_glubiny'] * 100:.0f} % "
+        "котировочной стороны",
+        в["sobytij"] == 1 and abs(в["sekund_do_pervogo"] - 600) < 1e-6
+        and 0.45 < в["dolja_glubiny"] < 0.55 and в["po_dejstviju"] == 1, рв)
+    chk("ПОСЛЕ ВЫХОДА ЧУЖОЙ ЛИКВИДНОСТИ НАША ДОЛЯ РАСТЁТ -- пул стал вдвое "
+        f"мельче, доля с {рв['dolja_pula_vhod'] * 100:.2f} % до "
+        f"{рв['dolja_pula_vyhod'] * 100:.2f} %",
+        рв["dolja_pula_vyhod"] > рв["dolja_pula_vhod"] * 1.8, рв)
+    # ВТОРОЙ ПУТЬ: в ленте НЕТ действия withdraw вовсе -- только резервы.
+    ряд_р = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+             сд("buy", 5.0, 105.0, 960.0, 60_000, 2),
+             сд("buy", 0.0, 52.5, 480.0, 600_000, 3)]
+    рр = lp_po_rjadu(ряд_р, razmer=1.0, gorizont_sekund=86400)
+    вр = рр["vyhod_likvidnosti"]
+    chk("ВТОРОЙ ПУТЬ: ЕСЛИ В ЛЕНТЕ НЕТ ДЕЙСТВИЯ withdraw ВОВСЕ, вывод виден "
+        "по резервам -- оба упали пропорционально, цена стоит. Сделка так "
+        "выглядеть не может: она двигает цену и растит k",
+        вр["sobytij"] == 1 and вр["po_rezervam"] == 1
+        and вр["po_dejstviju"] == 0, рр)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: обычная сделка, двигающая цену, за вывод НЕ "
+        "считается -- иначе половина оборота пошла бы в выход ликвидности",
+        lp_po_rjadu([сд("buy", 0, 100.0, 1000.0, 0, 1),
+                     сд("buy", 20.0, 120.0, 840.0, 60_000, 2)],
+                    razmer=1.0,
+                    gorizont_sekund=86400)["vyhod_likvidnosti"]["sobytij"] == 0)
+    chk("СВОД ПО ВЫБОРКЕ СЧИТАЕТ ДОЛЮ ПУЛОВ С ВЫХОДОМ, А НЕ ЧИСЛО СОБЫТИЙ: "
+        "на двух пулах, из которых вывод был у одного, доля 50 %",
+        abs(_svod_vyhoda([рв, lp_po_rjadu(ряд, razmer=1.0,
+                                          gorizont_sekund=86400)]
+                         )["dolja_pulov"] - 0.5) < 1e-9)
+
     # МЕТКИ НЕ ПО ПОРЯДКУ БЛОКОВ: ряд НЕ должен обрезаться.
     ряд_кривой = [сд("buy", 0, 100.0, 1000.0, 0, 1),
                   сд("buy", 10.0, 100.0, 1000.0, 50_000_000, 2),
