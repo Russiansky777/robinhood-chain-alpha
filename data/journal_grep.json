@@ -1,182 +1,715 @@
 {
- "patterns": "vol_4vw",
+ "patterns": "\"stage\": \"sent\"",
  "file": "decisions",
  "okno": {
-  "ot": "2026-10-10T21:49:59Z",
-  "do": "2026-10-10T21:50:09Z",
-  "zapisej": 12,
-  "predel": 12,
+  "ot": "2026-10-10T19:58:51Z",
+  "do": "2026-10-10T20:49:21Z",
+  "zapisej": 6,
+  "predel": 6,
   "usecheno": true,
   "chem_grozit": "предел достигнут -- за краем остались записи СТАРШЕ границы 'ot'; окно считать по этим границам, а не по задуманному"
  },
  "rows": [
   {
-   "ts_utc": "2026-10-10T21:49:59Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "5YMoky5vLoyfppwzttw4QvatRmakVUaY4a5abkGhWE9iYktpNxUbauym2SZG7B85NNmaQogKwmimkabwZD9DWMqQ",
+   "ts_utc": "2026-10-10T19:58:51Z",
+   "group": "vol_4vw",
+   "stage": "sent",
+   "podshagi_ms": {
+    "разбор и размер": 8.487,
+    "гейт полосы": 1.973,
+    "веер контролей": 0.003,
+    "чаевые пула и нонс": 0.1,
+    "сборка": 5.942,
+    "симуляция": 0.207,
+    "blockhash": 0.004,
+    "подпись": 40.622,
+    "всего": 57.338
+   },
+   "sign_ms": 0.32,
+   "variants_ms": 40.28,
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "EU",
+     "лидер": "CQdLgwkmmHF8DE6t4sguXMTXWDxq3oLh3xfekDTmow12",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "candidates": [
+     "4U6Fanf7SwKT78q6mk6ph3W8gMzPVy4xgMUXUZ8T7enxfkUvt94rfdMTx42oXHxx65Hu7hjSLLzqW2rRc1k5KH2U",
+     "5XVGjxoh4gDT5fW24D2u3CuYj9vZFVkU4m94WWkGn9dJbC9crYL54G3s5SxPEEFAiUYucXyGWLNfKh8oZSKxEwLh",
+     "2G28s3e72cTGN6Dyzr5TmZEsQyS6dzsHqYN3RytVXcG6dbCMZQd3TwAkCHorwLjizSYWNA4c1djJ3KYX7XBYXSzw",
+     "388iRS9RFyCfEDWRapCZ8sg5Uw1zafdtHXt2zNE9prumdoDw2o1sv4BM3tgSxb4sj6wKcNz9LuUHC4eoWnkMJijx",
+     "V8Q1SHT5r5VbigvihMFHviEAfGeHBx11FfgHKURtF177d2Qnq7UJge4frJ8CDQePQS2ZPabZ5QKJ6J4USL2TzFL",
+     "5afgQups6FMizrYdWSFSutv45zWLgD5eEJknMWu2RXVnb2w7fHHhNneuhtDG1rgiHgnqDkM5G6La87ayUDsn4bAj"
+    ],
+    "tips_total_lamports": 4102000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "4U6Fanf7SwKT78q6mk6ph3W8gMzPVy4xgMUXUZ8T7enxfkUvt94rfdMTx42oXHxx65Hu7hjSLLzqW2rRc1k5KH2U",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.75,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "5XVGjxoh4gDT5fW24D2u3CuYj9vZFVkU4m94WWkGn9dJbC9crYL54G3s5SxPEEFAiUYucXyGWLNfKh8oZSKxEwLh",
+      "tip_lamports": 101000,
+      "size": 949,
+      "ok": false,
+      "http": 500,
+      "send_ms": 7.77,
+      "why_not": "отказ: \"rpc error: code = Unknown desc = Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\""
+     },
+     {
+      "sender": "helius",
+      "signature": "2G28s3e72cTGN6Dyzr5TmZEsQyS6dzsHqYN3RytVXcG6dbCMZQd3TwAkCHorwLjizSYWNA4c1djJ3KYX7XBYXSzw",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 11.77,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "388iRS9RFyCfEDWRapCZ8sg5Uw1zafdtHXt2zNE9prumdoDw2o1sv4BM3tgSxb4sj6wKcNz9LuUHC4eoWnkMJijx",
+      "tip_lamports": 1000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 2.44,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "V8Q1SHT5r5VbigvihMFHviEAfGeHBx11FfgHKURtF177d2Qnq7UJge4frJ8CDQePQS2ZPabZ5QKJ6J4USL2TzFL",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 12.46,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "5afgQups6FMizrYdWSFSutv45zWLgD5eEJknMWu2RXVnb2w7fHHhNneuhtDG1rgiHgnqDkM5G6La87ayUDsn4bAj",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 11.22,
+      "why_not": null
+     }
+    ],
+    "accepted_first": "jito"
+   },
    "s_plus": null,
-   "why_not": null
+   "signature": "3qHJwpxkzVPKsfenMiQY69gxBVmhNsE9uFYxP8SiVX2bPCfJjSCa58EBhSwiboa2kUerxPLw1JpxDWAoeYuiozGS"
   },
   {
-   "ts_utc": "2026-10-10T21:50:05Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "2Vmt1ZdNfnESCL1UKKa6Nwo8hcz7YppFD33RT9qfnBTgqzizipCzUSrjpbAJbdzeYJdScCviC93tcthFdtSzD95t",
+   "ts_utc": "2026-10-10T20:06:14Z",
+   "group": "vol_4vw",
+   "stage": "sent",
+   "podshagi_ms": {
+    "разбор и размер": 7.274,
+    "гейт полосы": 1.093,
+    "веер контролей": 0.002,
+    "чаевые пула и нонс": 0.099,
+    "сборка": 5.442,
+    "симуляция": 0.654,
+    "blockhash": 0.003,
+    "подпись": 44.139,
+    "всего": 58.706
+   },
+   "sign_ms": 0.25,
+   "variants_ms": 43.87,
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "EU",
+     "лидер": "Awes4Tr6TX8JDzEhCZY2QVNimT6iD1zWHzf1vNyGvpLM",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "candidates": [
+     "31gSoF5868ERHNCJofMMtvzoheFEYnvc9srMhhndswTLSRPqfi4zsPBjWZ2fDkogULb9zNE9vzAicEevt5PJuwcC",
+     "2sYuiDnNbvJ2WdRzTpXBKnXwfku27Jiv3q9JdGau2xR6t2LsBe3hTzJuuLu6QkgNWumENhScePJ5kbDKN8DKycoK",
+     "XpFL7QqVGkVWGu4LwcoNS47hCmjgxkqRxJoFQrxkxBrVF7xaeD6u1qaT3thwQiLYEWv6rdXMBHQuCxu2WhiYSQk",
+     "juiwhcxR7o9LLytKL27hub1VoykDihKZmr9W6kpfs3MivBMPdZrWDQ7pySfeacAdf2x63ogBidstbVSDeGNbQC8",
+     "57DLHWKeXukEjPpcsB9TLkXqE74Krvd3Pn6dpc5yQLPpPRLPnwv3Q628rmB3vgdCPgoLshjjUQAhiCP3RTkiTeNM",
+     "3JTtHJ7BRG8ExbnLZCY1BCnpnpDnqk4ttyzfL3rz33xmpCn173HPV1hsam9ebXM9N99KPDec4c4sx9rNod9GDqGG"
+    ],
+    "tips_total_lamports": 4102000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "31gSoF5868ERHNCJofMMtvzoheFEYnvc9srMhhndswTLSRPqfi4zsPBjWZ2fDkogULb9zNE9vzAicEevt5PJuwcC",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.97,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "2sYuiDnNbvJ2WdRzTpXBKnXwfku27Jiv3q9JdGau2xR6t2LsBe3hTzJuuLu6QkgNWumENhScePJ5kbDKN8DKycoK",
+      "tip_lamports": 101000,
+      "size": 949,
+      "ok": false,
+      "http": 500,
+      "send_ms": 7.49,
+      "why_not": "отказ: \"rpc error: code = Unknown desc = Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\""
+     },
+     {
+      "sender": "helius",
+      "signature": "XpFL7QqVGkVWGu4LwcoNS47hCmjgxkqRxJoFQrxkxBrVF7xaeD6u1qaT3thwQiLYEWv6rdXMBHQuCxu2WhiYSQk",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 7.15,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "juiwhcxR7o9LLytKL27hub1VoykDihKZmr9W6kpfs3MivBMPdZrWDQ7pySfeacAdf2x63ogBidstbVSDeGNbQC8",
+      "tip_lamports": 1000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 2.68,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "57DLHWKeXukEjPpcsB9TLkXqE74Krvd3Pn6dpc5yQLPpPRLPnwv3Q628rmB3vgdCPgoLshjjUQAhiCP3RTkiTeNM",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 69.78,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "3JTtHJ7BRG8ExbnLZCY1BCnpnpDnqk4ttyzfL3rz33xmpCn173HPV1hsam9ebXM9N99KPDec4c4sx9rNod9GDqGG",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 25.76,
+      "why_not": null
+     }
+    ],
+    "accepted_first": "jito"
+   },
    "s_plus": null,
-   "why_not": null
+   "signature": "yZejmtWjFoDNmRepiNRg3tBv4KknS4bWhFquBqsQ6PNPuoboYkErU4QNzZAXi93epyfxCnwYSPr8KczXkyKogoM"
   },
   {
-   "ts_utc": "2026-10-10T21:50:08Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "2kUAojQNqycgVWtBQ6fFs2xrcaN5krRSqCsz3xC4V4SH8U8jZzWtZrCHXxj6Y2qDoN5NCVx3B3czJ1qxNSxz56Y2",
+   "ts_utc": "2026-10-10T20:06:34Z",
+   "group": "vol_4vw",
+   "stage": "sent",
+   "podshagi_ms": {
+    "разбор и размер": 6.841,
+    "гейт полосы": 1.09,
+    "веер контролей": 0.004,
+    "чаевые пула и нонс": 0.13,
+    "сборка": 5.853,
+    "симуляция": 0.693,
+    "blockhash": 0.003,
+    "подпись": 38.609,
+    "всего": 53.222
+   },
+   "sign_ms": 0.26,
+   "variants_ms": 38.33,
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "EU",
+     "лидер": "BXAxLMMMUNYfC1z166VjWHR3WjTmqzLxB837o5ghmRtH",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "candidates": [
+     "VawMXuQaJ5TtzZNTiiXba89ab4xFKahWbwrxMzAhyW9VcmZVTjjN5yV5pVQoXJCrkWyEcP9jEDbP3WhjTnGikv5",
+     "3uoUSGUtvc1VoLEhMuraG8jKTFWa1gskKWjwPebeHjLkpeJ1mbrGSrbyWXpLVpj7q8pErjEk2etbYmrpxADajvat",
+     "2f1pJPRHY6vNYKNMGviDK3gS9soxu7L54KvJj2Lp4CBNjzNoje47a9VhADYRicGhYaRQJ6jF8Vgs9KGGD4px9QNx",
+     "4kTHhFBorEws2NRg3W9vykd8UapH3AaaR8BAFoGEXv7jeyVeT8kHPiqVUfQ1Cq3FGuAS4FwRsqPL4ScfuBD8KYBf",
+     "ETxszirJdL5dqPdgDdTysRSMHpN1VXLKYLKxf1yCypQELzJreWgaCKY3dkUfHMANSA7pozoCnz7TqPEyUt1Litc",
+     "3EnNS8x53VRijVsJMrQjUrE439EftqYJ6jcRQTkUPKqAt198Zk5nkYC7zU96ySJakqGdszyG5dtbSNkwKJYuTgGr"
+    ],
+    "tips_total_lamports": 4102000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "VawMXuQaJ5TtzZNTiiXba89ab4xFKahWbwrxMzAhyW9VcmZVTjjN5yV5pVQoXJCrkWyEcP9jEDbP3WhjTnGikv5",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.43,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "3uoUSGUtvc1VoLEhMuraG8jKTFWa1gskKWjwPebeHjLkpeJ1mbrGSrbyWXpLVpj7q8pErjEk2etbYmrpxADajvat",
+      "tip_lamports": 101000,
+      "size": 949,
+      "ok": false,
+      "http": 500,
+      "send_ms": 7.66,
+      "why_not": "отказ: \"rpc error: code = Unknown desc = Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\""
+     },
+     {
+      "sender": "helius",
+      "signature": "2f1pJPRHY6vNYKNMGviDK3gS9soxu7L54KvJj2Lp4CBNjzNoje47a9VhADYRicGhYaRQJ6jF8Vgs9KGGD4px9QNx",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 6.36,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "4kTHhFBorEws2NRg3W9vykd8UapH3AaaR8BAFoGEXv7jeyVeT8kHPiqVUfQ1Cq3FGuAS4FwRsqPL4ScfuBD8KYBf",
+      "tip_lamports": 1000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 2.85,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "ETxszirJdL5dqPdgDdTysRSMHpN1VXLKYLKxf1yCypQELzJreWgaCKY3dkUfHMANSA7pozoCnz7TqPEyUt1Litc",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 17.39,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "3EnNS8x53VRijVsJMrQjUrE439EftqYJ6jcRQTkUPKqAt198Zk5nkYC7zU96ySJakqGdszyG5dtbSNkwKJYuTgGr",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 12.48,
+      "why_not": null
+     }
+    ],
+    "accepted_first": "jito"
+   },
    "s_plus": null,
-   "why_not": null
+   "signature": "5PgsmEAemsPRcEw8PX46x7pY8DHKQGsEZ9654zLwQXzXzThZ3W79RWWgGV5DcUaxYhWLrjQb6MB5fmcCgum3LEEq"
   },
   {
-   "ts_utc": "2026-10-10T21:50:08Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "67J9rjmLpwrTQ3ygwybhAVbWmtu5c875Z49tUtWGPKbNVNuFHTan1uj9n1DJCnQK2duja5xZcKFCSKFEwFkBTbhc",
+   "ts_utc": "2026-10-10T20:34:51Z",
+   "group": "vol_4vw",
+   "stage": "sent",
+   "podshagi_ms": {
+    "разбор и размер": 7.251,
+    "гейт полосы": 1.694,
+    "веер контролей": 0.002,
+    "чаевые пула и нонс": 0.105,
+    "сборка": 5.467,
+    "симуляция": 0.3,
+    "blockhash": 0.005,
+    "подпись": 46.797,
+    "всего": 61.622
+   },
+   "sign_ms": 0.33,
+   "variants_ms": 46.44,
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "EU",
+     "лидер": "Df16xM2XWzTXEGYxFBXtwXRhCdE6hwBbxS162TyS4r65",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "candidates": [
+     "3j6UeQKdYGtPeYXXqqDrwidJr5KoAYi8oXio2MncPVLaAgrrBR6ecnziJVQrMXqAA3hGwY6JSrc8WQhyQvJRWAiG",
+     "2cYCvFn5VbHpMf8QDvfjNtkZD89EDpr95bWUMGNm3ZNMEHyV7UdJFUpkGSkm31UpUyCdnnnKdPw4fGtxcsH7Gv9F",
+     "2KDyE7V3L3C47npNetqLYLuHesjTzUfWa11RqVW1PWiX9V3MjtGm4maTALBHxMqJT4aihAZGorgWBR1iw9fecUMr",
+     "2arJiX79eBxYcfGUHHQ1HVTRMydkB8KWpjvECVVUQei7J76qEeCTMJGWoKDEPsMW6Q1hHoQTE69MGPc93LuzCP2p",
+     "516wRQWSc65MRaqmLaTQ4mZ5xqY3F8Tw6poLHcjz6jBrKm9BYbrm6yZkjzcShMLAAsZxbp8d7Rxxa3e4danT8fjT",
+     "5ZujRh5KD6t659oMDHgA1ysVCW734pW65WvSq2qBZ5qPZ4JwGCspmx2sjx35iQMYSte7nSEyjQPb5hzDM3iydphW"
+    ],
+    "tips_total_lamports": 4102000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "3j6UeQKdYGtPeYXXqqDrwidJr5KoAYi8oXio2MncPVLaAgrrBR6ecnziJVQrMXqAA3hGwY6JSrc8WQhyQvJRWAiG",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.42,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "2cYCvFn5VbHpMf8QDvfjNtkZD89EDpr95bWUMGNm3ZNMEHyV7UdJFUpkGSkm31UpUyCdnnnKdPw4fGtxcsH7Gv9F",
+      "tip_lamports": 101000,
+      "size": 949,
+      "ok": false,
+      "http": 500,
+      "send_ms": 7.23,
+      "why_not": "отказ: \"rpc error: code = Unknown desc = Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\""
+     },
+     {
+      "sender": "helius",
+      "signature": "2KDyE7V3L3C47npNetqLYLuHesjTzUfWa11RqVW1PWiX9V3MjtGm4maTALBHxMqJT4aihAZGorgWBR1iw9fecUMr",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 8.52,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "2arJiX79eBxYcfGUHHQ1HVTRMydkB8KWpjvECVVUQei7J76qEeCTMJGWoKDEPsMW6Q1hHoQTE69MGPc93LuzCP2p",
+      "tip_lamports": 1000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 2.08,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "516wRQWSc65MRaqmLaTQ4mZ5xqY3F8Tw6poLHcjz6jBrKm9BYbrm6yZkjzcShMLAAsZxbp8d7Rxxa3e4danT8fjT",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 63.76,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "5ZujRh5KD6t659oMDHgA1ysVCW734pW65WvSq2qBZ5qPZ4JwGCspmx2sjx35iQMYSte7nSEyjQPb5hzDM3iydphW",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 36.31,
+      "why_not": null
+     }
+    ],
+    "accepted_first": "jito"
+   },
    "s_plus": null,
-   "why_not": null
+   "signature": "57MygSVNcbvTo9VobC4RUwiku75jkaavAtLC1K3deCdTvAuUfaAvuccdzdpJXxYEwhTVJc2Mbftd1eLcgbrB2hv2"
   },
   {
-   "ts_utc": "2026-10-10T21:50:08Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "4fuWghZ9DCFHJxCdZRP85Pu4hvvj8LdinW3HfifxBVYxxoAAfjkxJYCjHY7NXiWYGpkBmEmK1gJENWnCsq9QGLex",
+   "ts_utc": "2026-10-10T20:42:24Z",
+   "group": "vol_4vw",
+   "stage": "sent",
+   "podshagi_ms": {
+    "разбор и размер": 9.502,
+    "гейт полосы": 2.298,
+    "веер контролей": 0.003,
+    "чаевые пула и нонс": 0.142,
+    "сборка": 6.357,
+    "симуляция": 0.599,
+    "blockhash": 0.003,
+    "подпись": 47.137,
+    "всего": 66.04
+   },
+   "sign_ms": 0.23,
+   "variants_ms": 46.89,
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "EU",
+     "лидер": "CAo1dCGYrB6NhHh5xb1cGjUiu86iyCfMTENxgHumSve4",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "candidates": [
+     "4NiD3ssfahoftN8jDKvANXMx7ei1NFSPWiguEWKx7ms4Dvdy3zib6QGt4Bat9kBYqHDnUSQbnocBEtPAyZFsStPX",
+     "5LaFQWoEnQRqVV4fcPEaBRq9U3aD84CvbfBvDH1UDoQQi4bMQZWAuHEXVAPNTMePfKVsAwSGreYPaccnApMmCkk6",
+     "ccU9Y4iWqUF4uJdbyDdqmtNEb8dAN9n6wtxr89Z2BUJsegMNKh4YhwCFAgYcdARCkHf5MTSKp5ivzuS6hRcAP9D",
+     "5GbqLdjWVnriiKEsDT3L72UNr3K5L9fLchaTdMK69HmKCzVv9YvFad9W65DfjFCicv7VXkuXHg1geabzKb1SkFhw",
+     "5d8qHsLxS3uuNZUo82TYH6psQeUdfKkpVhoDAKbhWjLVgkbbwZDQfF1RrdCfonA7mpgmeEnfywFuEtNUJsR274tE",
+     "5LcrUHVjQR4SnTKE28Ay7oPKSwcVQsoe4qkvw6c5YMcr4APLhK2pTqt13pbodvd3SDax7t5MqRxfXFo7A6kUDSwP"
+    ],
+    "tips_total_lamports": 4102000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "4NiD3ssfahoftN8jDKvANXMx7ei1NFSPWiguEWKx7ms4Dvdy3zib6QGt4Bat9kBYqHDnUSQbnocBEtPAyZFsStPX",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.85,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "5LaFQWoEnQRqVV4fcPEaBRq9U3aD84CvbfBvDH1UDoQQi4bMQZWAuHEXVAPNTMePfKVsAwSGreYPaccnApMmCkk6",
+      "tip_lamports": 101000,
+      "size": 949,
+      "ok": false,
+      "http": 500,
+      "send_ms": 7.94,
+      "why_not": "отказ: \"rpc error: code = Unknown desc = Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\""
+     },
+     {
+      "sender": "helius",
+      "signature": "ccU9Y4iWqUF4uJdbyDdqmtNEb8dAN9n6wtxr89Z2BUJsegMNKh4YhwCFAgYcdARCkHf5MTSKp5ivzuS6hRcAP9D",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 5.95,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "5GbqLdjWVnriiKEsDT3L72UNr3K5L9fLchaTdMK69HmKCzVv9YvFad9W65DfjFCicv7VXkuXHg1geabzKb1SkFhw",
+      "tip_lamports": 1000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 2.83,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "5d8qHsLxS3uuNZUo82TYH6psQeUdfKkpVhoDAKbhWjLVgkbbwZDQfF1RrdCfonA7mpgmeEnfywFuEtNUJsR274tE",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 51.52,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "5LcrUHVjQR4SnTKE28Ay7oPKSwcVQsoe4qkvw6c5YMcr4APLhK2pTqt13pbodvd3SDax7t5MqRxfXFo7A6kUDSwP",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 46.72,
+      "why_not": null
+     }
+    ],
+    "accepted_first": "jito"
+   },
    "s_plus": null,
-   "why_not": null
+   "signature": "2cZ7Fq47c3gHHVuqoXrDVj2PXDdxPBvHsyM1QZnDeYX79bjjXith9XPrzvaRKWjDhMdLYBKEE7mK3MK2HgJU4LDN"
   },
   {
-   "ts_utc": "2026-10-10T21:50:08Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "29xQ8sM1tQ6aaVCXpPCG1v9MMHq8ian7mBZrZKCG5duvQ8Y3xn2CTipag3KNrEZdXW273RLfUKmEEMZhr7nLrkTa",
+   "ts_utc": "2026-10-10T20:49:21Z",
+   "group": "vol_4vw",
+   "stage": "sent",
+   "podshagi_ms": {
+    "разбор и размер": 7.077,
+    "гейт полосы": 1.014,
+    "веер контролей": 0.002,
+    "чаевые пула и нонс": 0.09,
+    "сборка": 5.033,
+    "симуляция": 0.258,
+    "blockhash": 0.003,
+    "подпись": 36.504,
+    "всего": 49.981
+   },
+   "sign_ms": 0.25,
+   "variants_ms": 36.24,
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "US-West",
+     "лидер": "5Cchr1XGEg7dbBXByV5NY2ad8jfxAM7HA3x8D56rq9Ux",
+     "точек": 6,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "blockrazor",
+     "helius",
+     "jito",
+     "nozomi",
+     "zeroslot"
+    ],
+    "ok_senders": [
+     "astralane",
+     "helius",
+     "jito",
+     "nozomi"
+    ],
+    "candidates": [
+     "3aqQjUXTsN2TGvHnLPHyKYXpywT2RxkB7opUa1EzyzTZGSWMqeJNmpGfb6E4EXkoTqCwN5X15DB4sPDJayznvyTL",
+     "47ta34VqyH5XwYZTmxroBz8v5u2wUBcehYi4Kt7TaHWxszBoDb4tEoqSftHazGFgBUdCsSCN2RG3sm2shkD7bMB9",
+     "cR42tzESTMo2VayU8SnfQZUrjYbGujYSU2UuACnXZh1dhuLJL7KihZfh3R2ka5AZPG9n5Y9YJJrwndaderGu5RT",
+     "5sPtSA3z5mi1xZEQFvKHJ4GLX5NaAsvHwpfh4ymGQLfGvxp5QhQfghA673Gewzys9HWUcGush6BcDk9D8oqgy7m3",
+     "5LzDWRKdWyAkPd5K4J1XTERGJMuunZ9kBHF8UcJPt6ib3QpadEd1LeDyH4vBtB6dSspQ1nwjLGiYvhB5m4ktf4g3",
+     "LJ7ci6qHGJUxTkJehMn42LhEeg1nTGuwPs1KWcjDeWRdLLs63QRy8Nc61fHmRc6U35Ytnd55nB1rULv84FAvFUL"
+    ],
+    "tips_total_lamports": 4102000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "3aqQjUXTsN2TGvHnLPHyKYXpywT2RxkB7opUa1EzyzTZGSWMqeJNmpGfb6E4EXkoTqCwN5X15DB4sPDJayznvyTL",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 9.97,
+      "why_not": null
+     },
+     {
+      "sender": "blockrazor",
+      "signature": "47ta34VqyH5XwYZTmxroBz8v5u2wUBcehYi4Kt7TaHWxszBoDb4tEoqSftHazGFgBUdCsSCN2RG3sm2shkD7bMB9",
+      "tip_lamports": 101000,
+      "size": 949,
+      "ok": false,
+      "http": 500,
+      "send_ms": 262.78,
+      "why_not": "отказ: \"rpc error: code = Unknown desc = Insufficient tip, please increase the tip amount and try again, at least 100000 lamports\""
+     },
+     {
+      "sender": "helius",
+      "signature": "cR42tzESTMo2VayU8SnfQZUrjYbGujYSU2UuACnXZh1dhuLJL7KihZfh3R2ka5AZPG9n5Y9YJJrwndaderGu5RT",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 232.78,
+      "why_not": null
+     },
+     {
+      "sender": "jito",
+      "signature": "5sPtSA3z5mi1xZEQFvKHJ4GLX5NaAsvHwpfh4ymGQLfGvxp5QhQfghA673Gewzys9HWUcGush6BcDk9D8oqgy7m3",
+      "tip_lamports": 1000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 361.72,
+      "why_not": null
+     },
+     {
+      "sender": "nozomi",
+      "signature": "5LzDWRKdWyAkPd5K4J1XTERGJMuunZ9kBHF8UcJPt6ib3QpadEd1LeDyH4vBtB6dSspQ1nwjLGiYvhB5m4ktf4g3",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "http": 200,
+      "send_ms": 312.12,
+      "why_not": null
+     },
+     {
+      "sender": "zeroslot",
+      "signature": "LJ7ci6qHGJUxTkJehMn42LhEeg1nTGuwPs1KWcjDeWRdLLs63QRy8Nc61fHmRc6U35Ytnd55nB1rULv84FAvFUL",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": false,
+      "http": 403,
+      "send_ms": 169.85,
+      "why_not": "отказ: {\"code\": 403, \"message\": \"api-key does not exist\"}"
+     }
+    ],
+    "accepted_first": "astralane"
+   },
    "s_plus": null,
-   "why_not": null
-  },
-  {
-   "ts_utc": "2026-10-10T21:50:09Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "2L78Anq3xBmLTtcQ7C3aFmyA7NEhaND7F7TZtcc6JMyiJ2yDNg6T5Jp5qbZuNNomrvECLv4n1m3oUG3X9o7iU6rt",
-   "s_plus": null,
-   "why_not": null
-  },
-  {
-   "ts_utc": "2026-10-10T21:50:09Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "3xDYfHyybX3Y1gy6EfCVSiPNKgsMvtNmQKhmw4jeGFgaNvR3R2WdpotoUsaExoLzmyNM4evjw1ZuhJcR2WrD7cqt",
-   "s_plus": null,
-   "why_not": null
-  },
-  {
-   "ts_utc": "2026-10-10T21:50:09Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "gYyXs5drZZaQ6exre6ZQCNc69S15gcRZRBcXBciB5jKpQXTWkHHCwT1gZUUDGrnQiMV6drWzBQB7yyzk5LADaxc",
-   "s_plus": null,
-   "why_not": null
-  },
-  {
-   "ts_utc": "2026-10-10T21:50:09Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "3MCUXnfmqoRdnbnJKUroh6FQ7xpyz8K8GWLFs6gebQdziNJVve1rWKYkxa7eWE8faPTd93e5tkMXW97KKQUEZUbM",
-   "s_plus": null,
-   "why_not": null
-  },
-  {
-   "ts_utc": "2026-10-10T21:50:09Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "4U6CGYU6R1tQXWo7AEzUDQVkMopEq5Z1ta31nsxLQdx7ktmev6LVKZ2Gb9FVT1F9bEWZUWaGA5bfGGUEmU4suY94",
-   "s_plus": null,
-   "why_not": null
-  },
-  {
-   "ts_utc": "2026-10-10T21:50:09Z",
-   "action": "skip",
-   "stage": null,
-   "group": null,
-   "podshagi_ms": null,
-   "sign_ms": null,
-   "variants_ms": null,
-   "pool": null,
-   "pool_excluded": null,
-   "signature": "5f4RP2qdSMxYnWjdmXqoV3bZVMb37LfWx6yQ5qghgnXbboey63SPRm9KyhS5ndRBuru7g7Cy3ZamQTd7BLeJixXe",
-   "s_plus": null,
-   "why_not": null
+   "signature": "rLfpZt5m62etmzqYR4XvWDU5WqAtQGHi28UivSid7vVCQqRptbgMySybA6JzKXfiz8iZqYrnpRHcWdmoRWrVdsT"
   }
  ]
 }
