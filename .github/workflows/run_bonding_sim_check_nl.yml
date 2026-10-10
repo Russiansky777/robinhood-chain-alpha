@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой (только чтение)"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение)"
         required: false
         default: "bonding"
       sravnit:
@@ -45,6 +45,10 @@ on:
         # vol_4vw торговал 09.10 16:29Z -- 10.10 01:59Z. Полным sha, а не
         # "e222b934^": в копии глубиной 1 такой ref не разворачивается.
         default: "540a998b15b252b4efe1eb4636218cd782f60867"
+      vygruzka:
+        description: "mesta_v_bloke: путь к выгрузке сделок в data/ -- места в блоках берутся по её рядам"
+        required: false
+        default: "data/sdelki_polosy_2026-10-10_urs_1010.json"
       minty:
         description: "mayhem_krivoj: минты через запятую -- is_mayhem_mode и котировка по счёту кривой"
         required: false
@@ -131,7 +135,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj)
+            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -313,6 +317,23 @@ jobs:
             --pauza "${{ inputs.pauza }}" \
             --out data/mayhem_krivoj.json | tail -60
 
+      - name: "mesta_v_bloke: места в блоках по АРХИВНОМУ узлу (только чтение)"
+        if: ${{ inputs.zadacha == 'mesta_v_bloke' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          VYGRUZKA: ${{ inputs.vygruzka }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "СБОЙ: HELIUS_API не задан"; exit 1; }
+          [ -f "$VYGRUZKA" ] || { echo "СБОЙ: нет файла выгрузки $VYGRUZKA"; exit 1; }
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py --self-test | tail -2
+          export BLOOM_TREKKER_RPC="https://mainnet.helius-rpc.com/?api-key=$HELIUS_API_KEY"
+          PYTHONPATH=analysis $PY deploy/checks/krug_sborki_simulyaciya.py \
+            --mesta-v-bloke "$VYGRUZKA" \
+            --pauza "${{ inputs.pauza }}" \
+            --out data/mesta_v_bloke.json | tail -40
+
       - name: "pereezdy: архив Code-2 и сборщик Code-3"
         if: ${{ inputs.zadacha == 'pereezdy' }}
         run: |
@@ -351,7 +372,7 @@ jobs:
           echo "код выхода: $RC"
 
       - name: "SSH key"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' && inputs.zadacha != 'versii_razbora' && inputs.zadacha != 'mayhem_krivoj' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' && inputs.zadacha != 'versii_razbora' && inputs.zadacha != 'mayhem_krivoj' && inputs.zadacha != 'mesta_v_bloke' }}
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -363,7 +384,7 @@ jobs:
           echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: "Свежие сигналы кривой из живого журнала (потоком)"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' && inputs.zadacha != 'versii_razbora' && inputs.zadacha != 'mayhem_krivoj' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' && inputs.zadacha != 'versii_razbora' && inputs.zadacha != 'mayhem_krivoj' && inputs.zadacha != 'mesta_v_bloke' }}
         run: |
           set -e
           set -o pipefail
@@ -382,7 +403,7 @@ jobs:
           wc -l < /tmp/bsim/curve.jsonl
 
       - name: "Симуляция нашей покупки на кривой"
-        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' && inputs.zadacha != 'versii_razbora' && inputs.zadacha != 'mayhem_krivoj' }}
+        if: ${{ inputs.zadacha != 'pump_sborka' && inputs.zadacha != 'pereezdy' && inputs.zadacha != 'krug_sborki' && inputs.zadacha != 'otkazy_puti' && inputs.zadacha != 'chem_sobrana' && inputs.zadacha != 'versii_razbora' && inputs.zadacha != 'mayhem_krivoj' && inputs.zadacha != 'mesta_v_bloke' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
@@ -440,7 +461,7 @@ jobs:
             cp /tmp/krug.json data/krug_sborki_simulyaciya.json 2>/dev/null || true
             git add data/krug_sborki_simulyaciya.json || true
           fi
-          for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json data/versii_razbora.json data/mayhem_krivoj.json; do
+          for F in data/bonding_sim_check.json data/c2_curve_variant_samples.json data/versii_razbora.json data/mayhem_krivoj.json data/mesta_v_bloke.json; do
             [ -f "$F" ] && git add "$F"
           done
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }

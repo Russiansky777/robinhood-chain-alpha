@@ -1023,6 +1023,153 @@ def mayhem_mintov(*, minty: list, pauza: float) -> dict:
     return из_
 
 
+def _blok_po_schetam(слот: int, *, таймаут: float = 90.0) -> dict:
+    """Блок одним запросом: подписи В ПОРЯДКЕ БЛОКА и счета каждой сделки.
+
+    transactionDetails="accounts" НАРОЧНО, А НЕ "full". Полный блок кривой
+    весит единицы мегабайт, и 69 сделок дали бы сотни мегабайт трафика ради
+    двух чисел. Раскладка "accounts" отдаёт подписи и список счетов -- этого
+    хватает и на место в блоке, и на счёт соседей по минту, и стоит на
+    порядок меньше.
+    """
+    о = зов("getBlock", [int(слот), {
+        "encoding": "jsonParsed",
+        "transactionDetails": "accounts",
+        "rewards": False,
+        "commitment": "confirmed",
+        "maxSupportedTransactionVersion": ПОТОЛОК_ВЕРСИИ_TX}], таймаут=таймаут)
+    if not о["ok"]:
+        return {"ok": False, "why_not": о.get("why_not")}
+    б = о.get("result") or {}
+    сделки = б.get("transactions") or []
+    ряды = []
+    for т in сделки:
+        тр = т.get("transaction") or {}
+        подписи = тр.get("signatures") or []
+        счета = [(с.get("pubkey") if isinstance(с, dict) else str(с))
+                  for с in (тр.get("accountKeys") or [])]
+        ряды.append({"podpis": подписи[0] if подписи else None,
+                      "scheta": счета,
+                      "err": bool((т.get("meta") or {}).get("err"))})
+    return {"ok": True, "vsego": len(ряды), "ryady": ряды,
+            "blockTime": б.get("blockTime"), "blockHeight": б.get("blockHeight")}
+
+
+def mesta_v_bloke(*, vygruzka: str, pauza: float) -> dict:
+    """Место сделки ИСТОЧНИКА и нашей в их блоках + соседи по минту.
+
+    Вопрос владельца 10.10 (вечер, п.1): "место транзакции источника в её
+    блоке (индекс / размер), ночь против дня. Если днём источник сам садится
+    позже в своём блоке -- +40 мс не наши. Из тех же блоков: сколько покупок
+    того же минта стояло перед нами".
+
+    ЗАЧЕМ АРХИВНЫЙ УЗЕЛ. Догонялка соседей на хосте отказывала словами
+    "getBlock: Block not available for slot ..." -- узел хоста старых блоков
+    не держит. Этот прогон идёт с бегунка по Helius, у которого они есть.
+
+    ТОЛЬКО ЧТЕНИЕ: getBlock и ничего больше.
+    """
+    из_ = {"vygruzka": vygruzka, "sdelok": 0, "prochitano": 0,
+            "ne_prochitano": 0, "slotov_sprosheno": 0, "stroki": [],
+            "why_not": None}
+    путь = Path(vygruzka)
+    if not путь.exists():
+        из_["why_not"] = f"выгрузки нет: {vygruzka}"
+        return из_
+    with open(путь, encoding="utf-8") as ф:
+        д = json.load(ф)
+    ряды = [r for r in (д.get("ряды") or []) if r.get("source_sig")]
+    из_["sdelok"] = len(ряды)
+    кэш: dict = {}
+
+    def блок(слот):
+        if слот in кэш:
+            return кэш[слот]
+        б = _blok_po_schetam(слот)
+        кэш[слот] = б
+        из_["slotov_sprosheno"] += 1
+        if pauza:
+            time.sleep(pauza)
+        return б
+
+    for r in ряды:
+        стр = {"utc": r.get("utc"), "mint": r.get("mint"),
+                "source_sig": r.get("source_sig"),
+                "source_slot": r.get("source_slot"),
+                "our_slot": r.get("landed_slot") or r.get("our_slot"),
+                "s_plus": r.get("s_plus"),
+                "itog_po_cepi_sol": r.get("itog_po_cepi_sol")}
+        наша = r.get("landed_sig") or r.get("buy_sig")
+        # --- БЛОК ИСТОЧНИКА: его место в СВОЁМ блоке
+        бс = блок(r.get("source_slot")) if r.get("source_slot") else {
+            "ok": False, "why_not": "слота источника в выгрузке нет"}
+        if бс.get("ok"):
+            подписи = [x["podpis"] for x in бс["ryady"]]
+            try:
+                и = подписи.index(r["source_sig"])
+            except ValueError:
+                и = None
+            стр["ist_index"] = и
+            стр["ist_vsego"] = бс["vsego"]
+            стр["ist_dolya"] = (round(и / бс["vsego"], 4)
+                                 if и is not None and бс["vsego"] else None)
+            if и is None:
+                стр["ist_why_not"] = ("подписи источника в блоке его слота "
+                                       "нет -- слот в записи не тот")
+        else:
+            стр["ist_why_not"] = бс.get("why_not")
+        # --- НАШ БЛОК: место нашей и соседи по минту ПЕРЕД нами
+        сл_наш = стр["our_slot"]
+        бн = блок(сл_наш) if сл_наш else {
+            "ok": False, "why_not": "слота нашей посадки в выгрузке нет"}
+        if бн.get("ok") and наша:
+            подписи = [x["podpis"] for x in бн["ryady"]]
+            try:
+                ин = подписи.index(наша)
+            except ValueError:
+                ин = None
+            стр["nash_index"] = ин
+            стр["nash_vsego"] = бн["vsego"]
+            стр["nash_dolya"] = (round(ин / бн["vsego"], 4)
+                                  if ин is not None and бн["vsego"] else None)
+            if ин is None:
+                стр["nash_why_not"] = "нашей подписи в блоке нашего слота нет"
+            else:
+                # СОСЕДИ ПО МИНТУ ПЕРЕД НАМИ. Признак -- сделка той же
+                # программы кривой, у которой В СЧЕТАХ есть этот минт. Чужую
+                # покупку от чужой продажи здесь не отличить (раскладка
+                # "accounts" инструкций не отдаёт), поэтому поле названо
+                # "сделок по минту", а не "покупок": врать числом хуже, чем
+                # назвать его тем, что оно есть.
+                минт = r.get("mint")
+                прогр = r.get("pool_program") or СБ.ПРОГ_КРИВОЙ
+                до, после = 0, 0
+                for н, x in enumerate(бн["ryady"]):
+                    if x["podpis"] == наша:
+                        continue
+                    сч = x["scheta"]
+                    if минт in сч and прогр in сч:
+                        if н < ин:
+                            до += 1
+                        else:
+                            после += 1
+                стр["po_mintu_do_nas"] = до
+                стр["po_mintu_posle_nas"] = после
+                стр["sosedi_vid"] = ("сделки той же программы кривой с этим "
+                                      "минтом в счетах; покупка и продажа не "
+                                      "различаются")
+        elif not наша:
+            стр["nash_why_not"] = "нашей подписи в выгрузке нет"
+        else:
+            стр["nash_why_not"] = бн.get("why_not")
+        if стр.get("ist_index") is not None or стр.get("nash_index") is not None:
+            из_["prochitano"] += 1
+        else:
+            из_["ne_prochitano"] += 1
+        из_["stroki"].append(стр)
+    return из_
+
+
 def k_why(к: dict) -> str:
     """Причина, по которой в сделке не нашлось кривой. Короткой строкой."""
     return str((к or {}).get("why_not") or "хранилища базы в сделке нет")[:140]
@@ -1395,6 +1542,30 @@ def самопроверка() -> int:
         and '_кот not in (WSOL, ПУСТОЙ_PUBKEY)' in _ист_м
         and 'ряд["kotirovka"]' in _ист_м
         and ПУСТОЙ_PUBKEY == "11111111111111111111111111111111")
+    # --- МЕСТА В БЛОКЕ (вопрос владельца 10.10, п.1) ---
+    # ПОРЯДОК БЛОКА И РАСКЛАДКА ЗАПРОСА. Индекс в блоке имеет смысл только
+    # если мы читаем сделки В ПОРЯДКЕ блока и не теряем их: поэтому проверяется
+    # и разбор ответа (подписи и счета по порядку), и то, что запрос просит
+    # ИМЕННО accounts -- с "signatures" счетов не будет и соседей по минту не
+    # посчитать, а с "full" прогон потащил бы сотни мегабайт.
+    _ист_мб = inspect.getsource(_blok_po_schetam)
+    chk('блок запрашивается раскладкой "accounts", без наград и с потолком '
+        'версии транзакции',
+        '"transactionDetails": "accounts"' in _ист_мб
+        and '"rewards": False' in _ист_мб
+        and 'ПОТОЛОК_ВЕРСИИ_TX' in _ист_мб)
+    _ист_мв = inspect.getsource(mesta_v_bloke)
+    chk("соседи по минту считаются по ИНДЕКСУ (до нас / после нас), а не по "
+        "всему блоку, и своя подпись из счёта исключена",
+        'if н < ин:' in _ист_мв
+        and 'if x["podpis"] == наша:' in _ист_мв
+        and 'continue' in _ист_мв
+        and '"po_mintu_do_nas"' in _ист_мв)
+    # ПОДПИСИ НЕТ В БЛОКЕ -- ЭТО НАЗВАННЫЙ ОТКАЗ, А НЕ ИНДЕКС None МОЛЧА:
+    # иначе "места нет" и "место нулевое" читались бы одинаково.
+    chk("подписи нет в блоке -- причина словами, а не пустой индекс молча",
+        'подписи источника в блоке его слота' in _ист_мв
+        and 'нашей подписи в блоке нашего слота нет' in _ист_мв)
     print(f"самопроверка круга сборки: {всего - сбоев}/{всего} пройдено")
     return 1 if сбоев else 0
 
@@ -1425,6 +1596,9 @@ def main() -> int:
                          "(нынешней и из --ref-staryj) и назвать расхождения")
     п.add_argument("--ref-staryj", default="e222b934^",
                     help="коммит старой версии c2_swap_build для сравнения")
+    п.add_argument("--mesta-v-bloke", default="",
+                    help="ТОЛЬКО ЧТЕНИЕ: путь к выгрузке сделок -- места в "
+                         "блоках источника и наших по архивному узлу")
     п.add_argument("--mayhem", default="",
                     help="ТОЛЬКО ЧТЕНИЕ: минты через запятую -- is_mayhem_mode "
                          "и котировка по СЧЁТУ КРИВОЙ (смещения из IDL)")
@@ -1448,6 +1622,14 @@ def main() -> int:
             Path(а.out).write_text(текст + "\n", encoding="utf-8")
         # РАСХОЖДЕНИЕ -- НЕ СБОЙ ПРОГОНА: его и искали. Код 0, чтобы отчёт
         # коммитился, а судить по числам.
+        return 0
+    if а.mesta_v_bloke.strip():
+        из_ = mesta_v_bloke(vygruzka=а.mesta_v_bloke.strip(), pauza=а.pauza)
+        из_["uzel"] = затереть(узел())
+        текст = json.dumps(из_, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.out:
+            Path(а.out).write_text(текст + "\n", encoding="utf-8")
         return 0
     if а.mayhem.strip():
         из_ = mayhem_mintov(
