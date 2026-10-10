@@ -66,6 +66,7 @@ jobs:
       - name: "Самопроверка пробы ДО любого запроса (сеть запрещена стражем)"
         run: |
           set -e
+          set -o pipefail  # иначе код шага берётся у tail: провал самопроверки отдаёт 0
           cd analysis
           "$PY" sender_key_probe.py --self-test | tail -1
           "$PY" bloom_senders.py --self-test | tail -1

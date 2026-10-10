@@ -47,6 +47,7 @@ jobs:
       - name: "Самопроверки ДО всякой цепи"
         run: |
           set -e
+          set -o pipefail  # иначе код шага берётся у tail: провал самопроверки отдаёт 0
           cd analysis
           python3 lane_nonce.py --self-test | tail -1
           python3 bloom_own_send.py --self-test | tail -1
