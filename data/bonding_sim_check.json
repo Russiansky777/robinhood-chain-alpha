@@ -1,17 +1,17 @@
 {
- "utc": "2026-10-10T23:45:30Z",
+ "utc": "2026-10-10T23:48:28Z",
  "кошелёк": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
  "трата_sol": 0.01,
  "сигналов": 10,
- "вызовов_rpc": 19,
- "секунд": 2.2,
+ "вызовов_rpc": 17,
+ "секунд": 1.9,
  "по_вердикту": {
-  "other_error": 9,
-  "кривая: минимум не посчитан (нет события сделки кривой pump.fun в логах)": 1
+  "other_error": 7,
+  "шаблон: разновидность инструкции кривой не известна: 1c92de7726c469d5": 3
  },
  "по_инструкции": {
   "e1f7501ed5b38488": {
-   "сигналов": 10,
+   "сигналов": 6,
    "счетов": [
     17
    ],
@@ -22,10 +22,160 @@
     2
    ],
    "котировка_не_sol": 0
+  },
+  "1c92de7726c469d5": {
+   "сигналов": 3,
+   "счетов": [
+    17
+   ],
+   "байт": [
+    24
+   ],
+   "программ_токена": [
+    2
+   ],
+   "котировка_не_sol": 3
+  },
+  "c2ab1c46684d5b2f": {
+   "сигналов": 1,
+   "счетов": [
+    27
+   ],
+   "байт": [
+    24
+   ],
+   "программ_токена": [
+    2
+   ],
+   "котировка_не_sol": 1
   }
  },
  "прошло_бы": 0,
  "ряды": [
+  {
+   "signature": "3mVZwyVjkXhnjMM81Zj14SeeGdmLCECrozYHRWQVwNvCtSR8ozcVjBbqj9ELqq2jTefHqXGyLBxaUmxReJj2ZMU3",
+   "mint": "FoSba4Gq9s4pN8MwbcK1jJTwVdPAQwncbJKmu2UnbGgx",
+   "source": "6qudAN2kV8mtCcYJxb5QQ6Vr15itdHHdeVbYm99NKMhy",
+   "ts_utc": "2026-10-10T23:48:12Z",
+   "ix_disc": "c2ab1c46684d5b2f",
+   "ix_accounts": 27,
+   "ix_data_len": 24,
+   "ix_args": [
+    3635372171,
+    16361954070150
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "So11111111111111111111111111111111111111112",
+   "ok": true,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "native_sol",
+   "supported": true,
+   "route": "one_hop",
+   "min_out": 34835006126,
+   "expected_out": 53592317118,
+   "min_out_method": "pumpfun_curve_after_source",
+   "sol_to_curve": 9876542,
+   "max_sol_cost": 10000000,
+   "sim_verdict": "other_error",
+   "sim_err": "AccountNotFound",
+   "sim_units": 0,
+   "build_ms": 2.618,
+   "sim_ms": 29.6,
+   "why_not": null
+  },
+  {
+   "signature": "5dqty3wWBg9BGtS3ZkXRB718YP7A9a6Bz4sAwQKag3VSuTq3BXGeWeh5LqGx791WuPVFkqNVsxy5v1TLfFiUBLXt",
+   "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:46:37Z",
+   "ix_disc": "1c92de7726c469d5",
+   "ix_accounts": 17,
+   "ix_data_len": 24,
+   "ix_args": [
+    8516417599846,
+    923045983
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "AGDC5GePfE9riZHtJhR8NJWTWbX5JgjsGs6go5WSpump",
+   "ok": false,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "AGDC5GePfE9riZHtJhR8NJWTWbX5JgjsGs6go5WSpump",
+   "supported": false,
+   "route": "one_hop",
+   "min_out": null,
+   "expected_out": null,
+   "min_out_method": null,
+   "sol_to_curve": null,
+   "max_sol_cost": null,
+   "sim_verdict": null,
+   "sim_err": null,
+   "sim_units": null,
+   "build_ms": null,
+   "sim_ms": null,
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 1c92de7726c469d5"
+  },
+  {
+   "signature": "5x6KLYzvKXcu3ETiuzvduMCZoFQ8FDAZmPon5Ehg8QLoXuGPi1aHBuiX675Ywy9sRiQ3KpotHQ2pprvi5FP3k7vQ",
+   "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:46:26Z",
+   "ix_disc": "1c92de7726c469d5",
+   "ix_accounts": 17,
+   "ix_data_len": 24,
+   "ix_args": [
+    1064552199980,
+    110087315
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "AGDC5GePfE9riZHtJhR8NJWTWbX5JgjsGs6go5WSpump",
+   "ok": false,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "AGDC5GePfE9riZHtJhR8NJWTWbX5JgjsGs6go5WSpump",
+   "supported": false,
+   "route": "one_hop",
+   "min_out": null,
+   "expected_out": null,
+   "min_out_method": null,
+   "sol_to_curve": null,
+   "max_sol_cost": null,
+   "sim_verdict": null,
+   "sim_err": null,
+   "sim_units": null,
+   "build_ms": null,
+   "sim_ms": null,
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 1c92de7726c469d5"
+  },
+  {
+   "signature": "3u23CxxRqBhgsVhysN53PqdeSvrfqE7SQ2kQx82DJNeiNcfGm34HYXyAEBDcU8hSntedkBFg45S2mj1RHiDhoxXN",
+   "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+   "source": "7JVQMwRj82STgsG57spj6vpE6XY3RqG8B64PczVc7jJr",
+   "ts_utc": "2026-10-10T23:46:26Z",
+   "ix_disc": "1c92de7726c469d5",
+   "ix_accounts": 17,
+   "ix_data_len": 24,
+   "ix_args": [
+    1064552199980,
+    107427678
+   ],
+   "ix_token_programs": 2,
+   "ix_other_mint": "AGDC5GePfE9riZHtJhR8NJWTWbX5JgjsGs6go5WSpump",
+   "ok": false,
+   "pool_label": "Pump.fun bonding curve",
+   "quote_mint": "AGDC5GePfE9riZHtJhR8NJWTWbX5JgjsGs6go5WSpump",
+   "supported": false,
+   "route": "one_hop",
+   "min_out": null,
+   "expected_out": null,
+   "min_out_method": null,
+   "sol_to_curve": null,
+   "max_sol_cost": null,
+   "sim_verdict": null,
+   "sim_err": null,
+   "sim_units": null,
+   "build_ms": null,
+   "sim_ms": null,
+   "why_not": "шаблон: разновидность инструкции кривой не известна: 1c92de7726c469d5"
+  },
   {
    "signature": "3mYRqD4BjU5Fy3zZueDMh4kxc8FuFm5pFS7YYSw2cEZKNbu2RSsMhoeieX124EGniJLhQcTKPusKup87SEmFxs2G",
    "mint": "9SW2kLpw8mFS2dhHQ1fbpfEeyYqSKN3athMufxaPpump",
@@ -53,8 +203,8 @@
    "sim_verdict": "other_error",
    "sim_err": "AccountNotFound",
    "sim_units": 0,
-   "build_ms": 13.129,
-   "sim_ms": 55.0,
+   "build_ms": 5.236,
+   "sim_ms": 44.2,
    "why_not": null
   },
   {
@@ -84,8 +234,8 @@
    "sim_verdict": "other_error",
    "sim_err": "AccountNotFound",
    "sim_units": 0,
-   "build_ms": 6.142,
-   "sim_ms": 111.5,
+   "build_ms": 5.22,
+   "sim_ms": 51.3,
    "why_not": null
   },
   {
@@ -115,8 +265,8 @@
    "sim_verdict": "other_error",
    "sim_err": "AccountNotFound",
    "sim_units": 0,
-   "build_ms": 6.225,
-   "sim_ms": 111.7,
+   "build_ms": 5.197,
+   "sim_ms": 56.2,
    "why_not": null
   },
   {
@@ -146,8 +296,8 @@
    "sim_verdict": "other_error",
    "sim_err": "AccountNotFound",
    "sim_units": 0,
-   "build_ms": 5.991,
-   "sim_ms": 111.3,
+   "build_ms": 5.18,
+   "sim_ms": 57.0,
    "why_not": null
   },
   {
@@ -177,8 +327,8 @@
    "sim_verdict": "other_error",
    "sim_err": "AccountNotFound",
    "sim_units": 0,
-   "build_ms": 6.138,
-   "sim_ms": 111.7,
+   "build_ms": 5.181,
+   "sim_ms": 57.3,
    "why_not": null
   },
   {
@@ -208,132 +358,8 @@
    "sim_verdict": "other_error",
    "sim_err": "AccountNotFound",
    "sim_units": 0,
-   "build_ms": 6.032,
-   "sim_ms": 111.4,
-   "why_not": null
-  },
-  {
-   "signature": "3xew5dLEkip8rc8KoQmhRJKZvaiUVV2QmmcWrBhYbpgmwPAssFjp49kPpr2QSC25LW7bLAAmBLAZuy5ukKeXTYCV",
-   "mint": "9SW2kLpw8mFS2dhHQ1fbpfEeyYqSKN3athMufxaPpump",
-   "source": "FLyBjfWGsxH4zDDfoUJHwA9774TmPVpR8kB5B46PtbaZ",
-   "ts_utc": "2026-10-10T23:44:16Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    39857164,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 83841893666,
-   "expected_out": 128987528717,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 6.082,
-   "sim_ms": 107.1,
-   "why_not": null
-  },
-  {
-   "signature": "3LpwaY6jYbugN2X4nfQLhwgo3QPDYvkfwK4Wdo9NW17bJAUcQd8yJx5WKmH71REsPddop4SoJ1DZzjAPkAp8EWV5",
-   "mint": "9SW2kLpw8mFS2dhHQ1fbpfEeyYqSKN3athMufxaPpump",
-   "source": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
-   "ts_utc": "2026-10-10T23:44:16Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    38230722,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": false,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": null,
-   "expected_out": null,
-   "min_out_method": "не выдаётся: нет события сделки кривой pump.fun в логах",
-   "sol_to_curve": null,
-   "max_sol_cost": null,
-   "sim_verdict": null,
-   "sim_err": null,
-   "sim_units": null,
-   "build_ms": null,
-   "sim_ms": null,
-   "why_not": "кривая: минимум не посчитан (нет события сделки кривой pump.fun в логах)"
-  },
-  {
-   "signature": "3TpjcnEzGA8yYcaDdn9pMzc4tokksyfeuZymuvjMh5XiMHv2L74oiUSwis29Mo7eBK7Bt3QWCCEvqq8pDFuV9np7",
-   "mint": "9SW2kLpw8mFS2dhHQ1fbpfEeyYqSKN3athMufxaPpump",
-   "source": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
-   "ts_utc": "2026-10-10T23:44:15Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    902611865,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 117785118375,
-   "expected_out": 181207874424,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 6.072,
-   "sim_ms": 114.8,
-   "why_not": null
-  },
-  {
-   "signature": "oYa6wbaLmx2WLTRMjAFEKKq8cDdQVvmzQPibP5GUsVoT8NWfiyYEQKYbnhXEdajk26Uswv9JA8msG8LDFa5au6C",
-   "mint": "9SW2kLpw8mFS2dhHQ1fbpfEeyYqSKN3athMufxaPpump",
-   "source": "FLyBjfWGsxH4zDDfoUJHwA9774TmPVpR8kB5B46PtbaZ",
-   "ts_utc": "2026-10-10T23:44:15Z",
-   "ix_disc": "e1f7501ed5b38488",
-   "ix_accounts": 17,
-   "ix_data_len": 25,
-   "ix_args": [
-    815908401,
-    1
-   ],
-   "ix_token_programs": 2,
-   "ix_other_mint": null,
-   "ok": true,
-   "pool_label": "Pump.fun bonding curve",
-   "quote_mint": "native_sol",
-   "supported": true,
-   "route": "one_hop",
-   "min_out": 122963468345,
-   "expected_out": 189174566686,
-   "min_out_method": "pumpfun_curve_after_source",
-   "sol_to_curve": 9876542,
-   "max_sol_cost": 10000000,
-   "sim_verdict": "other_error",
-   "sim_err": "AccountNotFound",
-   "sim_units": 0,
-   "build_ms": 6.092,
-   "sim_ms": 110.6,
+   "build_ms": 5.194,
+   "sim_ms": 57.0,
    "why_not": null
   }
  ]
