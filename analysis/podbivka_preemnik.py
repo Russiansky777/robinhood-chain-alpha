@@ -39,6 +39,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 RPS = float(os.environ.get("PODB_HELIUS_RPS") or 6.0)
 ГЕРОЙ = "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
 ПРОГРАММА = "DhpyNWkdxFh3DRPsBrwRwrK3TYC5t7Q4arnSvf3t84HY"
+# Вторая программа нашлась в тех же транзакциях и встречается ЧАЩЕ целевой: 102
+# инструкции против 6 на сорока свежих транзакциях.
+ПРОГРАММА_2 = "BMofZXeaBSzWWdSnMbnRQNFCabDfziwxMMeS32jKUoyf"
 ЗАГРУЗЧИК_V3 = "BPFLoaderUpgradeab1e11111111111111111111111"
 СИСТЕМНАЯ = "11111111111111111111111111111111"
 LAMPORT = 1_000_000_000
@@ -96,7 +99,7 @@ def программа_данные(ключ: str) -> str:
     return str(пда)
 
 
-def что_за_программа(rpc, темп: Темп) -> dict:
+def что_за_программа(rpc, темп: Темп, ПРОГРАММА: str) -> dict:
     """Пункт а, часть первая: сама программа по цепи."""
     темп.ждать()
     о = rpc.call("getAccountInfo", [ПРОГРАММА, {"encoding": "base64"}])
@@ -134,8 +137,10 @@ def разбор_транзакции(подпись: str, tx: dict) -> dict:
     """Что транзакция делает: инструкции, журнал, расход вычислений, движение SOL."""
     м = (tx or {}).get("meta") or {}
     сообщение = ((tx or {}).get("transaction") or {}).get("message") or {}
-    ключи = [k.get("pubkey") if isinstance(k, dict) else k
-             for k in (сообщение.get("accountKeys") or [])]
+    сырые_ключи = сообщение.get("accountKeys") or []
+    ключи = [k.get("pubkey") if isinstance(k, dict) else k for k in сырые_ключи]
+    подписанты = [k.get("pubkey") for k in сырые_ключи
+                  if isinstance(k, dict) and k.get("signer")]
     инстр = []
     for и in (сообщение.get("instructions") or []):
         д = и.get("data") or ""
@@ -158,6 +163,10 @@ def разбор_транзакции(подпись: str, tx: dict) -> dict:
         if i < len(до) and i < len(после) and после[i] != до[i]:
             дельты[к] = (после[i] - до[i]) / LAMPORT
     return {"подпись": подпись, "слот": (tx or {}).get("slot"),
+            "подписант": ключи[0] if ключи else None,
+            "подписанты": подписанты,
+            "герой_подписант": ГЕРОЙ in подписанты,
+            "герой_в_счетах": ГЕРОЙ in ключи,
             "ts": (tx or {}).get("blockTime"),
             "ошибка": м.get("err"), "плата_sol": (м.get("fee") or 0) / LAMPORT,
             "вычислений": м.get("computeUnitsConsumed"),
@@ -227,9 +236,11 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
                   "источник": ГЕРОЙ, "программа": ПРОГРАММА, "параметры": vars(а)}
 
     if а.chto:
-        print("== программа по цепи", flush=True)
-        тело["программа_по_цепи"] = что_за_программа(rpc, темп)
-        print(json.dumps(тело["программа_по_цепи"], ensure_ascii=False, indent=1),
+        print("== программы по цепи", flush=True)
+        тело["программы_по_цепи"] = {
+            п_: что_за_программа(rpc, темп, п_)
+            for п_ in (ПРОГРАММА, ПРОГРАММА_2)}
+        print(json.dumps(тело["программы_по_цепи"], ensure_ascii=False, indent=1),
               flush=True)
 
     счёт_ошибок: collections.Counter = collections.Counter()
@@ -334,6 +345,18 @@ def главное(а) -> int:  # noqa: PLR0912, PLR0915
     тело["sol_пришло_от"] = {k: round(v, 6) for k, v in пришло.most_common(20)}
     тело["плат_sol_на_разобранных"] = round(платы, 6)
     тело["ошибки_запросов"] = dict(счёт_ошибок.most_common(8))
+    # Главный вопрос пункта (а): он ли это делает. Подписант -- первый ключ сообщения,
+    # он же платит. Если герой лишь один из счетов, то поток транзакций идёт НЕ от него.
+    подп: collections.Counter = collections.Counter()
+    для_героя = collections.Counter()
+    for т_ in разобрано:
+        if т_.get("подписант"):
+            подп[т_["подписант"]] += 1
+        для_героя["герой_подписант" if т_.get("герой_подписант")
+                  else "герой_только_в_счетах" if т_.get("герой_в_счетах")
+                  else "героя_в_транзакции_нет"] += 1
+    тело["подписанты_частое"] = dict(подп.most_common(12))
+    тело["герой_в_разобранных"] = dict(для_героя)
     тело["транзакции"] = разобрано[:a_предел(а)]
     тело["запросов"] = dict(getattr(rpc, "calls_by_method", {}) or {})
 

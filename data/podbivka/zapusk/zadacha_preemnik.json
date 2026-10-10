@@ -5,20 +5,20 @@
    "--s",
    "2026-10-10T03:00",
    "--do",
-   "2026-10-10T04:00",
+   "2026-10-10T04:30",
    "--chto",
    "--perepis",
    "--dengi",
    "--svezhih",
-   "40",
+   "120",
    "--predel-podpisey",
-   "700000",
+   "1800000",
    "--predel-razbora",
-   "4000",
+   "3000",
    "--metka",
    "_03Z"
   ]
  ],
  "helius_rps_na_paket": 4,
- "zachem": "Povtor p.1 (a) i (b) s dvumya ispravleniyami. Pervyy progon: programma prochitana (obnovlyaemyy zagruzchik, programdata 88413 bayt, zalito v slote 454813567, avtoritet obnovleniya 2KP9miexioqgNbjPwysggcbi3sKqhH8JsPaDmFxRPURD), no VSE 1239 getTransaction upali RuntimeError -- prichina v maxSupportedTransactionVersion 0, pri kotorom uzel otvechaet -32015 na tranzakciyah versii 1 (u Code-1 dlya etogo est C.TX_VERSION = 1). Teper versiya beryotsya ottuda, a soobschenie uzla sohranyaetsya celikom. Vtoroe: perepis upiralas v predel 60000 podpisey i pokryvala tolko poslednie 48 minut -- temp istochnika 955 podpisey v minutu, iz nih 57802 iz 60000 s oshibkoy. Predel podnyat do 700000, i razbor tranzakciy ogranichen oknom --do: chitaetsya CHAS 03:00..04:00Z celikom, do nachala spama, gde perevody i dolzhny byt. Tolko chtenie."
+ "zachem": "Tretiy progon p.1 (a) i (b) -- posle togo, kak razbor nakonec zarabotal i perevernul kartinu. Na 40 svezhih tranzakciyah: celevaya programma Dhpy встречается vsego v 6, a v 34 rabotaet DRUGAYA -- BMofZXeaBSzWWdSnMbnRQNFCabDfziwxMMeS32jKUoyf (102 instrukcii protiv 6). Instrukciya Dhpy -- 10 bayt, 61 schyot, ~7800 vychisleniy, padaet s custom error 0xd; BMofZXea -- tri instrukcii na 21/57/2 schyota, 729 vychisleniy, padaet s custom error 0x7. Vsego 603348 iz 700000 podpisey s oshibkoy (86 %). Glavnoe: platyat za eti tranzakcii DRUGIE adresa -- Buek..., 3zNWpe... i 2KP9miexioqgNbjPwysggcbi3sKqhH8JsPaDmFxRPURD, kotoryy est avtoritet obnovleniya samoy Dhpy. To est 4vw tam, pohozhe, lish odin iz 61 schyota, a potok idyot NE ot nego. Etот progon eto proveryaet pryamo: pishet podpisanta kazhdoy tranzakcii i flag 'geroy podpisant / tolko v schetah / ego net', chitaet OBE programmy, i podnimaet predel podpisey do 1.8 mln, chtoby perepis dotyanulas do 03:00Z (predyduschiy progon na 700000 doshyol tolko do 04:29Z pri tempe 987 v minutu). Tolko chtenie."
 }
