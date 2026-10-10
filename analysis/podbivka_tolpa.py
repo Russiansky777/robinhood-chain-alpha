@@ -1,0 +1,453 @@
+#!/usr/bin/env python3
+"""«Человеческая толпа»: события, после которых люди заходят минутами, а не слотами.
+
+Три события на кривой pump.fun -- только канонической: x*y/1e9 = 32.19 +- 0.05, то есть
+Mayhem и нестандартные кривые отсеиваются сами (произведение на кривой постоянно, поэтому
+проверка годится в любой точке жизни пула):
+
+  а) ПОРОГ пути до переезда. Переезд наступает, когда виртуальный резерв доходит до 115
+     SOL (30 SOL старт + 85 SOL реальных). Проверено по собранным сигналам: у канонических
+     состояний p99 = 112.1 SOL, выше 116 -- 49 из 55 589. Доля пути = (x - 30)/85,
+     событие -- первое пересечение 20 / 30 / 50 / 70 % вверх.
+  б) ВСПЛЕСК. N разных покупателей за 60 с (273 слота по 0.220 с -- замер по живым
+     сделкам). N берётся из сетки ТОЛЬКО на подборе. Повторное событие по тому же пулу --
+     не раньше, чем через 60 с.
+  в) ВТОРАЯ ВОЛНА. После первого всплеска -- вход на s0+72 слота, и только если резерв на
+     +72 не ниже, чем на s0 (толпа не разошлась).
+
+Вход: СЛЕДУЮЩИЙ слот после события, по цене конца этого слота -- так, как мы садимся на
+самом деле (замер по живым сделкам: доля наплыва слота при лаге 0 -- медиана 0.991). Если
+в слоте входа событий нет, цена конца слота равна цене сразу после события.
+Выход: 1 / 3 / 10 минут (273 / 818 / 2727 слотов) и стоп по падению реального резерва на
+20 / 30 %. Билет 0.3 и предельный по глубине (2 % реального резерва, не больше 3 SOL).
+Издержки -- медиана круга из kalibrovka.json, поправки круга -- три рядом.
+
+Заглядывания вперёд нет: на выходе по времени берётся состояние ДО первого события после
+целевого слота (то есть состояние на сам целевой слот: если сделок не было, цена не
+двигалась), стоп срабатывает по состоянию ПОСЛЕ события (так его видно живьём), а позиции,
+чей целевой слот за концом прочитанного, закрываются по состоянию входа и считаются
+отдельной строкой «выход_за_концом».
+
+Два режима:
+  --sbor  -- один проход по часам архива за сутки: строки событий в
+             data/podbivka/tolpa/<метка>.json.gz;
+  --svod  -- стандарт по собранным суткам: подбор 7 -> проверка 4, сдвиг 4, параметры
+             (вид события, выход/стоп, билет) выбираются ТОЛЬКО на подборе, контроль на
+             перемешанных знаках суток, поправка на все посчитанные сочетания.
+"""
+from __future__ import annotations
+
+import argparse
+import calendar
+import collections
+import glob
+import gzip
+import io
+import json
+import math
+import random
+import re
+import statistics
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import podbivka_istochniki_novyj as И  # noqa: E402
+import podbivka_paket_obshee as O      # noqa: E402
+import podbivka_zapuski_svod as Z      # noqa: E402
+
+П = O.П
+ПАПКА = П / "tolpa"
+К_СТАРТ = 32.19          # x*y/1e9 канонической кривой
+К_ДОПУСК = 0.05
+X_СТАРТ = 30.0           # виртуальный резерв SOL в начале
+X_ПЕРЕЕЗД = 115.0        # виртуальный резерв SOL на переезде
+СЛОТ_С = 0.220           # секунд в слоте
+МИНУТА = round(60 / СЛОТ_С)          # 273 слота
+ВЫХОДЫ = {"1м": МИНУТА, "3м": 3 * МИНУТА, "10м": 10 * МИНУТА}
+СТОПЫ = (0.2, 0.3)
+ПОРОГИ = (0.2, 0.3, 0.5, 0.7)
+ВСПЛЕСКИ = (8, 12, 16, 20, 25)
+ВТОРАЯ_ВОЛНА_СЛОТОВ = 72
+FEE_КРИВОЙ = 0.0125
+БИЛЕТ = 0.3
+ДОЛЯ_РЕЗЕРВА = 0.02
+БИЛЕТ_ПРЕДЕЛ = 3.0
+СЕМЯ = 20261010
+
+р_pool = re.compile(r'"poolId":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
+р_block = re.compile(r'"block":\s*(\d+)')
+р_q = re.compile(r'"(vQuoteInBondingCurve|vTokensInBondingCurve)":\s*"?([0-9.eE+-]+)')
+р_qmint = re.compile(r'"quoteMint":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
+р_trader = re.compile(r'"trader":\s*"([1-9A-HJ-NP-Za-km-z]{32,44})"')
+р_action = re.compile(r'"action":\s*"(buy|sell)"')
+
+
+def круг(x_вх: float, y_вх: float, билет: float, x_вых: float, y_вых: float,
+         изд: float, к_g: float) -> float:
+    """Итог круга в SOL после всех расходов: покупка на входе, продажа на выходе."""
+    net = билет / (1.0 + FEE_КРИВОЙ)
+    т = y_вх * net / (x_вх + net)
+    if т <= 0:
+        return -билет - изд
+    out = x_вых * т / (y_вых + т) * (1.0 - FEE_КРИВОЙ) * к_g
+    return out - билет - изд
+
+
+def билет_по_глубине(x: float) -> float | None:
+    """Предельный билет: 2 % реального резерва (виртуальный минус 30 SOL старта)."""
+    б = ДОЛЯ_РЕЗЕРВА * max(0.0, x - X_СТАРТ)
+    return round(min(б, БИЛЕТ_ПРЕДЕЛ), 4) if б > 0.01 else None
+
+
+class Пул:
+    __slots__ = ("x", "y", "слот", "покупатели", "пороги", "всплеск_до",
+                 "вторая_ждёт", "позиции")
+
+    def __init__(self, x: float, y: float, слот: int):
+        self.x, self.y, self.слот = x, y, слот
+        self.покупатели: collections.deque = collections.deque()
+        self.пороги: set = set()
+        self.всплеск_до: dict = {}
+        self.вторая_ждёт: tuple | None = None
+        self.позиции: list = []
+
+
+def собрать(а) -> int:  # noqa: PLR0912, PLR0915
+    import requests  # noqa: PLC0415
+    import zstandard  # noqa: PLC0415
+    import podbivka_arhiv_den as A  # noqa: PLC0415
+
+    кал = (json.loads((П / "kalibrovka.json").read_text(encoding="utf-8"))
+           .get("калибровка") or {})
+    изд = float(кал.get("издержки_медиана_sol") or 0.002)
+    t0 = calendar.timegm(time.strptime(а.s, "%Y-%m-%dT%H"))
+    # +1 час хвоста: чтобы у событий последнего часа десятиминутный выход лежал внутри
+    часы = [time.strftime("%Y/%m/%d/%H", time.gmtime(t0 + 3600 * k))
+            for k in range(а.chasov + 1)]
+    пулы: dict = {}
+    строки: list = []
+    счёт: collections.Counter = collections.Counter()
+    посл_слот = 0
+
+    def закрыть(поз: dict, почему: str) -> None:
+        x_вх, y_вх = поз["x_вх"], поз["y_вх"]
+        бг = билет_по_глубине(x_вх)
+        итоги = {}
+        for имя_б, б in (("0.3", БИЛЕТ), ("глубина", бг)):
+            if not б:
+                continue
+            for имя_в, (xв, yв) in поз["выходы"].items():
+                for кг in И.К_G_РЯДОМ:
+                    итоги[f"{имя_в}|{имя_б}|k{кг}"] = round(
+                        круг(x_вх, y_вх, б, xв, yв, изд, float(кг)), 6)
+            for s, (xс, yс) in поз["стопы"].items():
+                for кг in И.К_G_РЯДОМ:
+                    итоги[f"стоп{s}|{имя_б}|k{кг}"] = round(
+                        круг(x_вх, y_вх, б, xс, yс, изд, float(кг)), 6)
+        строки.append({"вид": поз["вид"], "слот": поз["событие_слот"],
+                       "резерв_вх": round(x_вх - X_СТАРТ, 4),
+                       "билет_глубина": бг, "почему": почему, "итоги": итоги})
+        счёт[f"закрыто|{почему}"] += 1
+
+    def открыть(п: Пул, вид: str, слот: int, x: float, y: float) -> None:
+        п.позиции.append({"вид": вид, "событие_слот": слот, "вход_слот": слот + 1,
+                          "x_вх": x, "y_вх": y, "вход_закрыт": False,
+                          "выходы": {}, "стопы": {}})
+        счёт[f"событий|{вид}"] += 1
+
+    for ч in часы:
+        url = f"https://replay.pumpapi.io/{ч}.jsonl.zst"
+        for попытка in range(4):
+            прочитано = 0
+            try:
+                with A.открыть_час(requests, url, ч) as о:
+                    if о.status_code != 200:
+                        счёт[f"http|{о.status_code}"] += 1
+                        break
+                    if попытка == 0:
+                        счёт["часов"] += 1
+                    for стр in io.TextIOWrapper(
+                            zstandard.ZstdDecompressor().stream_reader(о.raw),
+                            encoding="utf-8", errors="replace"):
+                        прочитано += 1
+                        счёт["строк"] += 1
+                        if (qm := р_qmint.search(стр)) and qm.group(1) != O.WSOL:
+                            continue
+                        пм, бм = р_pool.search(стр), р_block.search(стр)
+                        if not (пм and бм):
+                            continue
+                        поля = dict(р_q.findall(стр))
+                        x_ = поля.get("vQuoteInBondingCurve")
+                        y_ = поля.get("vTokensInBondingCurve")
+                        if not (x_ and y_):
+                            continue
+                        try:
+                            x, y, слот = float(x_), float(y_), int(бм.group(1))
+                        except ValueError:
+                            continue
+                        if x <= 0 or y <= 0:
+                            continue
+                        посл_слот = слот if слот > посл_слот else посл_слот
+                        pid = пм.group(1)
+                        п = пулы.get(pid)
+                        if п is None:
+                            if abs(x * y / 1e9 - К_СТАРТ) > К_ДОПУСК:
+                                continue          # не каноническая кривая
+                            п = пулы[pid] = Пул(x, y, слот)
+                            счёт["пулов"] += 1
+                        x_до, y_до = п.x, п.y     # состояние НА целевой слот
+                        # --- позиции этого пула
+                        for поз in list(п.позиции):
+                            if not поз["вход_закрыт"]:
+                                if слот == поз["вход_слот"]:
+                                    поз["x_вх"], поз["y_вх"] = x, y   # конец слота входа
+                                    continue
+                                if слот > поз["вход_слот"]:
+                                    поз["вход_закрыт"] = True
+                                else:
+                                    continue
+                            рез_вх = поз["x_вх"] - X_СТАРТ
+                            for имя_в, h in ВЫХОДЫ.items():
+                                if имя_в not in поз["выходы"] and \
+                                        слот >= поз["вход_слот"] + h:
+                                    поз["выходы"][имя_в] = (x_до, y_до)
+                            for s in СТОПЫ:
+                                if s not in поз["стопы"] and рез_вх > 0 and \
+                                        (x - X_СТАРТ) <= рез_вх * (1 - s):
+                                    поз["стопы"][s] = (x, y)
+                            if len(поз["выходы"]) == len(ВЫХОДЫ):
+                                закрыть(поз, "по времени")
+                                п.позиции.remove(поз)
+                        п.x, п.y, п.слот = x, y, слот
+                        # --- событие а: пороги пути до переезда
+                        доля = (x - X_СТАРТ) / (X_ПЕРЕЕЗД - X_СТАРТ)
+                        for t in ПОРОГИ:
+                            if t not in п.пороги and доля >= t:
+                                п.пороги.add(t)
+                                открыть(п, f"порог{t}", слот, x, y)
+                        # --- событие б: всплеск разных покупателей за 60 с
+                        if (am := р_action.search(стр)) and am.group(1) == "buy" \
+                                and (тм := р_trader.search(стр)):
+                            п.покупатели.append((слот, тм.group(1)))
+                        while п.покупатели and п.покупатели[0][0] < слот - МИНУТА:
+                            п.покупатели.popleft()
+                        разных = len({т for _, т in п.покупатели})
+                        for N in ВСПЛЕСКИ:
+                            if разных >= N and слот >= п.всплеск_до.get(N, -1):
+                                п.всплеск_до[N] = слот + МИНУТА
+                                открыть(п, f"всплеск{N}", слот, x, y)
+                                if N == ВСПЛЕСКИ[0] and п.вторая_ждёт is None:
+                                    п.вторая_ждёт = (слот + ВТОРАЯ_ВОЛНА_СЛОТОВ, x)
+                        # --- событие в: вторая волна на +72, если резерв не ниже
+                        if п.вторая_ждёт and слот >= п.вторая_ждёт[0]:
+                            _, x0 = п.вторая_ждёт
+                            п.вторая_ждёт = None
+                            if x >= x0:
+                                открыть(п, "вторая_волна", слот, x, y)
+                            else:
+                                счёт["вторая_волна_резерв_упал"] += 1
+                break
+            except Exception as exc:  # noqa: BLE001
+                счёт[f"сбой|{type(exc).__name__}|строк{прочитано}"] += 1
+                if попытка == 3:
+                    счёт["часов_потеряно"] += 1
+    # позиции без полного выхода: круг в неизменном пуле, отдельной строкой
+    for п in пулы.values():
+        for поз in п.позиции:
+            for имя_в in ВЫХОДЫ:
+                поз["выходы"].setdefault(имя_в, (поз["x_вх"], поз["y_вх"]))
+            закрыть(поз, "выход_за_концом")
+    ПАПКА.mkdir(parents=True, exist_ok=True)
+    вых = ПАПКА / f"{а.metka}.json.gz"
+    вых.write_bytes(gzip.compress(json.dumps(
+        {"что": "события человеческой толпы и круги по ним", "часы": часы,
+         "сутки": а.s[:10], "последний_слот": посл_слот, "издержки_sol": изд,
+         "счёт": dict(счёт), "строки": строки}, ensure_ascii=False).encode("utf-8")))
+    import podbivka_run as R  # noqa: PLC0415
+    R.записано(вых)
+    print(f"сутки {а.s[:10]}: часов {счёт['часов']}, строк {счёт['строк']}, "
+          f"пулов {счёт['пулов']}, кругов {len(строки)}", flush=True)
+    return 0
+
+
+def p_знаков(суммы: dict) -> float | None:
+    v = [s for s in суммы.values() if s]
+    if len(v) < 4:
+        return None
+    n, k = len(v), sum(1 for s in v if s > 0)
+    return sum(math.comb(n, i) for i in range(k, n + 1)) / 2 ** n
+
+
+def подряд(дни: list) -> bool:
+    import datetime as dt  # noqa: PLC0415
+    try:
+        д = [dt.date.fromisoformat(x) for x in дни]
+    except ValueError:
+        return False
+    return all((д[i + 1] - д[i]).days == 1 for i in range(len(д) - 1))
+
+
+def свод(а) -> int:  # noqa: PLR0915
+    по_виду_дню: dict = collections.defaultdict(list)
+    дни_набор: set = set()
+    for ф in sorted(glob.glob(str(ПАПКА / f"{а.shablon}.json.gz"))):
+        д = json.loads(gzip.open(ф, "rt", encoding="utf-8").read())
+        дни_набор.add(д["сутки"])
+        for с in д.get("строки") or []:
+            по_виду_дню[(с["вид"], д["сутки"])].append(с["итоги"])
+    дни = sorted(дни_набор)
+    if len(дни) < И.ПОДБОР_СУТОК + И.ПРОВЕРКА_СУТОК:
+        print(f"суток всего {len(дни)} -- для окна нужно "
+              f"{И.ПОДБОР_СУТОК + И.ПРОВЕРКА_СУТОК}", flush=True)
+        return 2
+    окна = [(п_, пр_) for п_, пр_ in И.окна_скольжения(
+        дни, И.ПОДБОР_СУТОК, И.ПРОВЕРКА_СУТОК, И.СДВИГ_СУТОК) if подряд(п_ + пр_)]
+    виды = sorted({в for в, _ in по_виду_дню})
+    ключи = sorted({к for сп in по_виду_дню.values() for и in сп for к in и
+                    if f"k{а.k_g}" in к})
+    семьи = {"порог": [v for v in виды if v.startswith("порог")],
+             "всплеск": [v for v in виды if v.startswith("всплеск")],
+             "вторая_волна": [v for v in виды if v == "вторая_волна"]}
+    сочетаний = sum(len(в) for в in семьи.values()) * max(1, len(ключи))
+    порог_p = 0.05 / max(1, сочетаний)
+    рнд = random.Random(СЕМЯ)
+
+    def итоги(вид: str, ключ: str, дни_: list, перемешать: bool = False) -> dict:
+        знак: dict = {}
+        все: list = []
+        по_дню: dict = collections.defaultdict(list)
+        for д in дни_:
+            for и in по_виду_дню.get((вид, д), ()):
+                v = и.get(ключ)
+                if v is None:
+                    continue
+                if перемешать:
+                    v *= знак.setdefault(д, 1 if рнд.random() < 0.5 else -1)
+                все.append(v)
+                по_дню[д].append(v)
+        if not все:
+            return {}
+        суммы = {д: sum(v) for д, v in по_дню.items()}
+        низ, _ = Z.ди_по_суткам(по_дню, seed=СЕМЯ)
+        плюс = sum(1 for s in суммы.values() if s > 0)
+        return {"n": len(все), "суток": len(суммы),
+                "среднее_sol": round(statistics.fmean(все), 6),
+                "sol_в_сутки": round(sum(все) / max(1, len(суммы)), 5),
+                "ди_низ": round(низ, 6) if низ is not None else None,
+                "без_верх_5": round(Z.срезанное(все, 0.05), 6),
+                "суток_в_плюсе": плюс, "суммы": суммы}
+
+    def прогон(перемешать: bool = False) -> dict:
+        из_: dict = {}
+        for семья, вид_сп in семьи.items():
+            окна_плюс: list = []
+            выбор: list = []
+            по_дню: dict = collections.defaultdict(list)
+            проверки: list = []
+            for подб, пров in окна:
+                лучшее = луч_оц = None
+                for вид in вид_сп:
+                    for ключ in ключи:
+                        о = итоги(вид, ключ, подб, перемешать)
+                        if not о or о["n"] < И.N_МИН:
+                            continue
+                        if луч_оц is None or о["sol_в_сутки"] > луч_оц:
+                            лучшее, луч_оц = (вид, ключ), о["sol_в_сутки"]
+                if лучшее is None:
+                    continue
+                о = итоги(лучшее[0], лучшее[1], пров, перемешать)
+                if not о:
+                    continue
+                выбор.append({"подбор": [подб[0], подб[-1]],
+                              "проверка": [пров[0], пров[-1]],
+                              "вид": лучшее[0], "ключ": лучшее[1], "n": о["n"],
+                              "sol_в_сутки": о["sol_в_сутки"],
+                              "без_верх_5": о["без_верх_5"],
+                              "ди_низ": о["ди_низ"],
+                              "суток_в_плюсе": о["суток_в_плюсе"]})
+                окна_плюс.append(о["sol_в_сутки"] > 0)
+                проверки.append(о)
+                for д, v in о["суммы"].items():
+                    по_дню[д].append(v)
+            if not проверки:
+                из_[семья] = {"n": 0}
+                continue
+            суммы = {д: sum(v) for д, v in по_дню.items()}
+            плюс = sum(1 for s in суммы.values() if s > 0)
+            p = p_знаков(суммы)
+            из_[семья] = {
+                "n": sum(о["n"] for о in проверки), "окон": len(проверки),
+                "окон_в_плюсе": sum(окна_плюс), "суток_в_плюсе": плюс,
+                "суток": len(суммы),
+                "sol_в_сутки": round(sum(о["sol_в_сутки"] for о in проверки)
+                                     / len(проверки), 5),
+                "без_верх_5_худшее": round(min(о["без_верх_5"] for о in проверки), 6),
+                "ди_низ_худшее": round(min((о["ди_низ"] if о["ди_низ"] is not None
+                                            else -9) for о in проверки), 6),
+                "p": p, "выбор_по_окнам": выбор,
+                "прошло": bool(проверки and all(окна_плюс)
+                               and all(о["без_верх_5"] > 0 for о in проверки)
+                               and all((о["ди_низ"] or -1) > 0 for о in проверки)
+                               and плюс / max(1, len(суммы)) >= 0.6
+                               and p is not None and p < порог_p)}
+        return из_
+
+    основное = прогон()
+    контроль = [{"прогон": i + 1,
+                 "прошло": sum(1 for v in прогон(перемешать=True).values()
+                               if v.get("прошло")),
+                 "из": len(семьи)} for i in range(а.kontrolej)]
+    тело = {"что": "человеческая толпа: три события по стандарту",
+            "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "суток": len(дни), "дни": дни, "окон": len(окна), "k_g": а.k_g,
+            "сочетаний_посчитано": сочетаний, "порог_p": порог_p,
+            "итог": основное, "контроль_перемешано": контроль}
+    вых = П / f"tolpa_svod{а.metka}.json"
+    вых.write_text(json.dumps(тело, ensure_ascii=False, indent=1), encoding="utf-8")
+    import podbivka_run as R  # noqa: PLC0415
+    R.записано(вых)
+    print(f"суток {len(дни)}, окон {len(окна)}, сочетаний {сочетаний}, "
+          f"порог p {порог_p:.3e}", flush=True)
+    for семья, v in основное.items():
+        if not v.get("n"):
+            print(f"{семья}: событий нет или не хватило n", flush=True)
+            continue
+        print(f"{семья}: {'ПРОХОДИТ' if v['прошло'] else 'не проходит'} -- n {v['n']}, "
+              f"окон+ {v['окон_в_плюсе']}/{v['окон']}, "
+              f"сут+ {v['суток_в_плюсе']}/{v['суток']}, "
+              f"SOL/сут {v['sol_в_сутки']:+.4f}, худшее без верх 5 % "
+              f"{v['без_верх_5_худшее']:+.5f}, p "
+              f"{('%.2e' % v['p']) if v['p'] is not None else 'нет'}", flush=True)
+    for к in контроль:
+        print(f"контроль перемешано {к['прогон']}: прошло {к['прошло']} из {к['из']}",
+              flush=True)
+    return 0
+
+
+def main() -> int:
+    р = argparse.ArgumentParser()
+    р.add_argument("--sbor", action="store_true", help="собрать события за сутки из архива")
+    р.add_argument("--svod", action="store_true", help="стандарт по собранным суткам")
+    р.add_argument("--s", default="", help="первый час сбора: YYYY-MM-DDTHH")
+    р.add_argument("--chasov", type=int, default=24)
+    р.add_argument("--shablon", default="tolpa_*", help="какие собранные сутки брать")
+    р.add_argument("--k-g", default="0.989", help="поправка круга для вердикта")
+    р.add_argument("--kontrolej", type=int, default=2)
+    р.add_argument("--metka", default="")
+    а = р.parse_args()
+    if а.sbor:
+        if not (а.s and а.metka):
+            print("нужны --s и --metka", flush=True)
+            return 2
+        return собрать(а)
+    if а.svod:
+        return свод(а)
+    print("нужен --sbor или --svod", flush=True)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
