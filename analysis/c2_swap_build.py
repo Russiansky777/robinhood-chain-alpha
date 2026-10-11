@@ -1003,6 +1003,130 @@ def close_account(account: str, destination: str, authority: str,
         AccountMeta(Pubkey.from_string(authority), True, False)])
 
 
+def zagotovka_pokupki(tpl: dict, tx: dict, *, user: str, payer: str,
+                      amount_in: int, min_out: int, cu_units: int = 200_000,
+                      cu_price_micro: int = 0, wrap_sol: bool = True,
+                      nonce: tuple | None = None,
+                      close_wsol: bool = True) -> dict:
+    """ОБЩАЯ ЧАСТЬ покупки -- всё, что НЕ зависит от чаевых. Один раз на сигнал.
+
+    ЗАЧЕМ (п.(а) владельца 11.10). Пул отправителей посылает по транзакции на
+    сервис, и варианты отличаются ровно одним -- инструкцией чаевых (адрес,
+    лампорты) и тем, идёт ли она ПЕРЕД свопом. Всё остальное -- минты и
+    хранилища, бюджет вычислений, счёта ATA, обёртка WSOL, сама инструкция
+    свопа, nonce, закрытие WSOL -- у вариантов побайтово ОДИНАКОВОЕ, потому что
+    и nonce у них один (bloom_own_send: пара_нонса считается ДО цикла по
+    сервисам). Прежде каждый вариант собирал это заново: замер 11.10 на живом
+    пути (IDL, buy_exact_quote_in_v3) -- три build_buy 41.442 мс, 13.814 мс на
+    вариант, из них swap_instruction 11.710 мс. Общая часть, собранная один
+    раз, стоит 13.482 мс -- то есть повторялось 85 % счёта.
+
+    ЧТО ЗДЕСЬ НЕ ЛЕЖИТ: сама транзакция. MessageV0.try_compile обязан идти на
+    КАЖДЫЙ вариант -- набор инструкций у них разный (разные чаевые -- разные
+    счёта в раскладке и другие байты), и подменять этот шаг кэшем нельзя.
+    Экономится сборка инструкций, а не сборка сообщения.
+
+    ИНСТРУКЦИИ ОТДАЮТСЯ НАРУЖУ И ПЕРЕИСПОЛЬЗУЮТСЯ. Объекты solders.Instruction
+    неизменяемы (Rust), поэтому один и тот же объект можно компилировать в
+    несколько сообщений. Но СПИСКИ "до"/"после" -- обычные питоновские, и
+    build_buy_iz_zagotovki обязан делать list(...) прежде чем дописывать:
+    забыть это -- значит накапливать чаевые предыдущих вариантов в заготовке.
+    Случай не выдуманный, он измерен: без list() второй вариант даёт 1322
+    байта вместо 1213. Проверка на это стоит в bloom_own_send (сверка байтов
+    повторных вариантов из одной заготовки).
+    """
+    mv = mints_and_vaults(tpl, tx)
+    if not mv:
+        raise ValueError("минты/хранилища не восстановились")
+    до = []
+    if nonce:
+        # ПЕРВОЙ -- и никак иначе: системная программа принимает
+        # AdvanceNonceAccount только как первую инструкцию транзакции.
+        до.append(advance_nonce(str(nonce[0]), str(nonce[1])))
+    до.append(cu_limit(cu_units))
+    if cu_price_micro:
+        до.append(cu_price(cu_price_micro))
+    до.append(ata_idempotent(payer, user, mv["base_mint"], mv["base_program"]))
+    if mv["quote_program"]:   # нативная котировка (кривая pump.fun): счёта нет
+        до.append(ata_idempotent(payer, user, mv["quote_mint"],
+                                 mv["quote_program"]))
+    обёрнут_wsol = None
+    if mv["quote_mint"] == C.WSOL and wrap_sol and amount_in:
+        wsol_ata = ata(user, C.WSOL, mv["quote_program"])
+        до += [sol_transfer(user, wsol_ata, amount_in), sync_native(wsol_ata)]
+        обёрнут_wsol = wsol_ata
+    точный_выход = (tpl.get("exact_out") if tpl.get("exact_out") is not None
+                    else spec_of(tpl).get("exact_out"))
+    if точный_выход:
+        # «Точный выход»: программа сама считает цену наших min_out токенов и
+        # отказывается, если она выше amount_in. То есть оба денежных предела --
+        # минимум токенов и максимум траты -- стоят в одной инструкции.
+        своп = swap_instruction(tpl, tx, user, min_out, amount_in)
+    else:
+        своп = swap_instruction(tpl, tx, user, amount_in, min_out)
+    после = []
+    # РАСПАКОВКА В ТОЙ ЖЕ ТРАНЗАКЦИИ (слово владельца 01.10, вечер). Закрытие
+    # идёт ПОСЛЕ свопа: своп берёт из счёта WSOL столько, сколько ему нужно, а
+    # всё, что осталось, вместе с рентой счёта возвращается в кошелёк тем же
+    # действием. Не обёртывали -- закрывать нечего, и инструкции нет вовсе.
+    if обёрнут_wsol and close_wsol:
+        # ПРОГРАММА -- ИЗ РАСКЛАДКИ (место quote_token_program), а не константой.
+        после.append(close_account(обёрнут_wsol, user, user,
+                                   mv["quote_program"] or TOKEN_PROGRAM))
+    return {"до": до, "своп": своп, "после": после,
+            # ПЛАТЕЛЬЩИК СТРОКОЙ И РАЗОБРАННЫЙ: строка нужна инструкции
+            # чаевых, разобранный -- try_compile. Разбор адреса на вариант
+            # повторять незачем.
+            "payer": payer, "payer_pk": Pubkey.from_string(payer),
+            "quote_mint": mv["quote_mint"], "base_mint": mv["base_mint"],
+            "wrapped_wsol": обёрнут_wsol,
+            "closed_wsol": bool(обёрнут_wsol and close_wsol)}
+
+
+def build_buy_iz_zagotovki(z: dict, *, tip: tuple | None = None,
+                           tip_first: bool = False) -> dict:
+    """Готовая транзакция из заготовки. Вариант отличает ТОЛЬКО чаевые.
+
+    ПОРЯДОК ИНСТРУКЦИЙ ТОТ ЖЕ, ЧТО В ПОЛНОЙ СБОРКЕ, и это не на слово:
+    чаевые вперёд -- сразу после бюджета вычислений, обёртки и nonce (раньше
+    нельзя, nonce обязан быть первой инструкцией), иначе -- после свопа и
+    ПЕРЕД закрытием WSOL. Байты сверены самопроверкой полосы против build_buy.
+
+    ЧАЕВЫХ МОЖЕТ БЫТЬ НЕСКОЛЬКО. Боевой пул отправителей (слово владельца
+    25.09) посылает ОДНУ подписанную покупку сразу всеми сервисами, а каждый
+    сервис проверяет СВОИ чаевые и ниже своего минимума молча отбрасывает
+    транзакцию. Поэтому tip -- это либо пара (адрес, лампорты), либо список
+    таких пар; проверка суммы и списка получателей -- у вызывающего
+    (bloom_own_send), здесь только сборка.
+    """
+    чаевые = []
+    if tip:
+        пары = (tip if isinstance(tip, (list, tuple))
+                and tip and isinstance(tip[0], (list, tuple)) else [tip])
+        чаевые = [sol_transfer(z["payer"], а_, int(л_)) for а_, л_ in пары]
+    # list() -- НЕ УКРАШЕНИЕ: без него чаевые дописываются в сам список
+    # заготовки и достаются следующему варианту (измерено: 1322 байта вместо
+    # 1213 на втором варианте).
+    ixs = list(z["до"])
+    if чаевые and tip_first:
+        ixs += чаевые
+    ixs.append(z["своп"])
+    if чаевые and not tip_first:
+        ixs += чаевые
+    ixs += z["после"]
+    msg = MessageV0.try_compile(z["payer_pk"], ixs, [], Hash.default())
+    n_sig = msg.header.num_required_signatures
+    vtx = VersionedTransaction.populate(msg, [Signature.default()] * n_sig)
+    raw = bytes(vtx)
+    return {"tx_base64": base64.b64encode(raw).decode(), "size": len(raw),
+            "n_instructions": len(ixs), "quote_mint": z["quote_mint"],
+            "base_mint": z["base_mint"],
+            # ОБЁРТКА И ЕЁ ЗАКРЫТИЕ -- В ОТЧЁТ СБОРКИ, чтобы по записи позиции
+            # было видно: обёртывали ли и вернули ли то, что своп не забрал.
+            "wrapped_wsol": z["wrapped_wsol"],
+            "closed_wsol": z["closed_wsol"]}
+
+
 def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min_out: int,
               cu_units: int = 200_000, cu_price_micro: int = 0, tip: tuple | None = None,
               wrap_sol: bool = True, nonce: tuple | None = None,
@@ -1014,78 +1138,18 @@ def build_buy(tpl: dict, tx: dict, *, user: str, payer: str, amount_in: int, min
     nonce=(аккаунт, распорядитель) добавляет AdvanceNonceAccount ПЕРВОЙ
     инструкцией: так делается вариант пула, где на каждого отправителя своя
     транзакция со своими чаевыми, а исполниться может только одна.
-    """
-    mv = mints_and_vaults(tpl, tx)
-    if not mv:
-        raise ValueError("минты/хранилища не восстановились")
-    ixs = []
-    if nonce:
-        # ПЕРВОЙ -- и никак иначе: системная программа принимает
-        # AdvanceNonceAccount только как первую инструкцию транзакции.
-        ixs.append(advance_nonce(str(nonce[0]), str(nonce[1])))
-    ixs.append(cu_limit(cu_units))
-    if cu_price_micro:
-        ixs.append(cu_price(cu_price_micro))
-    ixs.append(ata_idempotent(payer, user, mv["base_mint"], mv["base_program"]))
-    if mv["quote_program"]:   # нативная котировка (кривая pump.fun): счёта нет
-        ixs.append(ata_idempotent(payer, user, mv["quote_mint"], mv["quote_program"]))
-    обёрнут_wsol = None
-    if mv["quote_mint"] == C.WSOL and wrap_sol and amount_in:
-        wsol_ata = ata(user, C.WSOL, mv["quote_program"])
-        ixs += [sol_transfer(user, wsol_ata, amount_in), sync_native(wsol_ata)]
-        обёрнут_wsol = wsol_ata
-    # ЧАЕВЫЕ ПЕРЕД СВОПОМ -- по требованию отправителя. 0slot в письме 25.09:
-    # "инструкцию чаевых ставить в начало транзакции" (он ищет её там). Ставим
-    # сразу после бюджета вычислений и nonce: раньше нельзя -- nonce обязан быть
-    # первой инструкцией по правилу системной программы.
-    def _чаевые_инструкции(tip_):
-        пары_ = (tip_ if isinstance(tip_, (list, tuple)) and tip_
-                 and isinstance(tip_[0], (list, tuple)) else [tip_])
-        return [sol_transfer(payer, а_, int(л_)) for а_, л_ in пары_]
 
-    if tip and tip_first:
-        ixs += _чаевые_инструкции(tip)
-    точный_выход = (tpl.get("exact_out") if tpl.get("exact_out") is not None
-                    else spec_of(tpl).get("exact_out"))
-    if точный_выход:
-        # «Точный выход»: программа сама считает цену наших min_out токенов и
-        # отказывается, если она выше amount_in. То есть оба денежных предела --
-        # минимум токенов и максимум траты -- стоят в одной инструкции.
-        ixs.append(swap_instruction(tpl, tx, user, min_out, amount_in))
-    else:
-        ixs.append(swap_instruction(tpl, tx, user, amount_in, min_out))
-    if tip and tip_first:
-        tip = None
-    if tip:
-        # ЧАЕВЫХ МОЖЕТ БЫТЬ НЕСКОЛЬКО. Боевой пул отправителей (слово
-        # владельца 25.09) посылает ОДНУ подписанную покупку сразу всеми
-        # сервисами, а каждый сервис проверяет СВОИ чаевые и ниже своего
-        # минимума молча отбрасывает транзакцию. Поэтому tip -- это либо пара
-        # (адрес, лампорты), либо список таких пар; проверка суммы и списка
-        # получателей -- у вызывающего (bloom_own_send), здесь только сборка.
-        пары = (tip if isinstance(tip, (list, tuple))
-                and tip and isinstance(tip[0], (list, tuple)) else [tip])
-        for адрес_ч, лам_ч in пары:
-            ixs.append(sol_transfer(payer, адрес_ч, int(лам_ч)))
-    # РАСПАКОВКА В ТОЙ ЖЕ ТРАНЗАКЦИИ (слово владельца 01.10, вечер). Закрытие
-    # идёт ПОСЛЕ свопа: своп берёт из счёта WSOL столько, сколько ему нужно, а
-    # всё, что осталось, вместе с рентой счёта возвращается в кошелёк тем же
-    # действием. Не обёртывали -- закрывать нечего, и инструкции нет вовсе.
-    if обёрнут_wsol and close_wsol:
-        # ПРОГРАММА -- ИЗ РАСКЛАДКИ (место quote_token_program), а не константой.
-        ixs.append(close_account(обёрнут_wsol, user, user,
-                                 mv["quote_program"] or TOKEN_PROGRAM))
-    msg = MessageV0.try_compile(Pubkey.from_string(payer), ixs, [], Hash.default())
-    n_sig = msg.header.num_required_signatures
-    vtx = VersionedTransaction.populate(msg, [Signature.default()] * n_sig)
-    raw = bytes(vtx)
-    return {"tx_base64": base64.b64encode(raw).decode(), "size": len(raw),
-            "n_instructions": len(ixs), "quote_mint": mv["quote_mint"],
-            "base_mint": mv["base_mint"],
-            # ОБЁРТКА И ЕЁ ЗАКРЫТИЕ -- В ОТЧЁТ СБОРКИ, чтобы по записи позиции
-            # было видно: обёртывали ли и вернули ли то, что своп не забрал.
-            "wrapped_wsol": обёрнут_wsol,
-            "closed_wsol": bool(обёрнут_wsol and close_wsol)}
+    ДВЕРЬ НЕ ИЗМЕНИЛАСЬ (п.(а) владельца 11.10): тело разделено на
+    zagotovka_pokupki (общая часть, один раз на сигнал) и
+    build_buy_iz_zagotovki (вариант по чаевым), а здесь они зовутся подряд --
+    то есть один зов build_buy стоит столько же, сколько прежде, и отдаёт те
+    же байты. Выигрыш берёт тот, кто собирает НЕСКОЛЬКО вариантов.
+    """
+    z = zagotovka_pokupki(tpl, tx, user=user, payer=payer, amount_in=amount_in,
+                          min_out=min_out, cu_units=cu_units,
+                          cu_price_micro=cu_price_micro, wrap_sol=wrap_sol,
+                          nonce=nonce, close_wsol=close_wsol)
+    return build_buy_iz_zagotovki(z, tip=tip, tip_first=tip_first)
 
 
 # ------------------------------------------------------------ минимум по резервам
@@ -3112,6 +3176,133 @@ def self_test() -> int:
         except Exception as _e_кот:  # noqa: BLE001
             checks.append((f"проверка котировки не состоялась: "
                            f"{type(_e_кот).__name__}", False))
+
+    # ------------------------------------------------------------------
+    # ЗАГОТОВКА ПОКУПКИ: ТЕ ЖЕ БАЙТЫ, ЧТО У ПОЛНОЙ СБОРКИ (п.(а) владельца
+    # 11.10). Правка разделила build_buy на общую часть (zagotovka_pokupki,
+    # один раз на сигнал) и вариант по чаевым (build_buy_iz_zagotovki), и
+    # владелец поставил условие: "байты транзакций до/после равны (проверка
+    # красным)". Проверка стоит из ДВУХ половин, потому что одна половина
+    # закрывает только одну беду.
+    #
+    # ПОЛОВИНА ПЕРВАЯ -- ПЕРЕИСПОЛЬЗОВАНИЕ. На горячем пути новое ровно одно:
+    # одна заготовка кормит ШЕСТЬ вариантов подряд. Здесь ловится забытый
+    # list(): без него чаевые варианта остаются в списке заготовки и достаются
+    # следующему. Это не выдумка -- измерено: второй вариант даёт 1322 байта
+    # вместо 1213. Сверяется с build_buy, у которого заготовка на каждый зов
+    # СВОЯ, поэтому накопления у него не бывает и расхождение видно.
+    #
+    # ПОЛОВИНА ВТОРАЯ -- ЗАКРЕПЛЁННЫЕ ОТПЕЧАТКИ. Первая половина сравнивает
+    # два пути ОДНОГО кода: испорти обоим порядок инструкций -- и она
+    # останется зелёной (проверено пятью порчами: три из пяти она не видит).
+    # Поэтому байты закреплены числом, снятым с кода ДО правки: sha256 по
+    # "размер:число инструкций:база64" всех случаев программы. Любая смена
+    # порядка инструкций, суммы чаевых или состава счетов красит это место.
+    # ПЕРЕСНИМАТЬ отпечаток можно ТОЛЬКО вместе со словом владельца о том, что
+    # транзакция меняется нарочно: иначе красное здесь означает "байты уехали".
+    _ОТПЕЧАТКИ_СБОРКИ = {
+        "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P":
+            ("87dd0d7cc6d4df71cc0f246b7399d06b", 30),
+        "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK":
+            ("7b5d3a3995d319af46e630a54ec5ae2a", 35),
+        "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C":
+            ("74c5c8091137aa125d23bd007a9b394c", 125),
+        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo":
+            ("00e2fb9019616a1f2dab68a1e5f25b2b", 45),
+        "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj":
+            ("e8c336dd6888a1fbb8b96a6f75e8e029", 160),
+        "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG":
+            ("c46dda92263990731344f83e4257af1e", 85),
+        "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN":
+            ("47eeac8f09cb49176204d95dea2e0485", 10),
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA":
+            ("fea747cedcbc533241710a0abe5df47e", 125),
+    }
+    # МИНИМУМ ВЫХОДА -- ЧИСЛОМ, А НЕ ИЗ РЕЗЕРВОВ, И ЭТО НЕ ЛЕНЬ. Первый
+    # отпечаток я снял через min_out_from_reserves, и он разошёлся на двух
+    # программах из восьми (CLMM, DLMM) -- не из-за правки: ТОТ ЖЕ разброс даёт
+    # и код ДО неё, стоит сменить способ запуска (python3 -I из корня против
+    # PYTHONPATH с модулем строителя на пути). То есть min_out этих двух
+    # кривых зависит от того, загрузился ли свой строитель, и закреплять байты
+    # через него значило бы краснеть на хосте по постороннему поводу. Здесь
+    # проверяется СОСТАВ И ПОРЯДОК ИНСТРУКЦИЙ, а счёт минимума проверяют свои
+    # места (min_out_from_reserves, damm2_min_out и проверки строителей).
+    _З_MIN = 1_000_000
+    _З_КОШ = "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"
+    _З_НОНС = ("9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+                "7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3")
+    _З_А = "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"
+    _З_Б = "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe"
+    # ПОРЯДОК СЛУЧАЕВ -- ЧАСТЬ ОТПЕЧАТКА. Менять его нельзя, не переснимая
+    # отпечатки: sha256 берётся по склейке в этом самом порядке.
+    _З_СЛУЧАИ = [(None, False), ([(_З_А, 1_000_000)], False),
+                  ([(_З_А, 1_000_000)], True),
+                  ([(_З_А, 1_000_000), (_З_Б, 1_500_000)], False),
+                  ([(_З_А, 1_000_000), (_З_Б, 1_500_000)], True)]
+    # ПОВТОРЫ НАРОЧНО: тот же вариант, собранный первым и последним из ОДНОЙ
+    # заготовки, обязан дать те же байты.
+    _З_ПОВТОРЫ = _З_СЛУЧАИ + [([(_З_А, 1_000_000)], False),
+                               ([(_З_Б, 2_500_000)], True)]
+    _з_сверено = _з_расх = _з_прог = 0
+    _з_отп_сошлось = _з_отп_всего = 0
+    _з_беда = []
+    for _з_прг, (_з_ждём, _з_сколько) in sorted(_ОТПЕЧАТКИ_СБОРКИ.items()):
+        _з_файл = SAMPLES_DIR / f"{_з_прг}.json"
+        if not _з_файл.exists():
+            _з_беда.append(f"образцов {_з_прг[:10]} нет")
+            continue
+        try:
+            _з_обр = json.loads(_з_файл.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as _з_e:
+            _з_беда.append(f"{_з_прг[:10]}: {type(_з_e).__name__}")
+            continue
+        _з_куски = []
+        _з_было_прог = False
+        for _з_о in (_з_обр if isinstance(_з_обр, list) else [_з_обр]):
+            if not isinstance(_з_о, dict) or not _з_о.get("tx") \
+                    or not _з_о.get("pool_vault"):
+                continue
+            _з_ш = extract_template(_з_о["tx"], _з_прг, _з_о["pool_vault"])
+            if not _з_ш.get("ok"):
+                continue
+            _з_общ = dict(user=_З_КОШ, payer=_З_КОШ, amount_in=10_000_000,
+                           min_out=_З_MIN, cu_units=180_000,
+                           cu_price_micro=12345, wrap_sol=True,
+                           nonce=_З_НОНС, close_wsol=True)
+            # ОДНА ЗАГОТОВКА НА ВСЕ ВАРИАНТЫ -- так её зовёт полоса.
+            _з_з = zagotovka_pokupki(_з_ш, _з_о["tx"], **_з_общ)
+            for _з_ч, _з_вп in _З_ПОВТОРЫ:
+                _з_из = build_buy_iz_zagotovki(_з_з, tip=_з_ч, tip_first=_з_вп)
+                _з_полн = build_buy(_з_ш, _з_о["tx"], tip=_з_ч,
+                                     tip_first=_з_вп, **_з_общ)
+                _з_сверено += 1
+                _з_расх += int(_з_из != _з_полн)
+            for _з_ч, _з_вп in _З_СЛУЧАИ:
+                _з_п = build_buy(_з_ш, _з_о["tx"], tip=_з_ч, tip_first=_з_вп,
+                                  **_з_общ)
+                _з_куски.append(f"{_з_п['size']}:{_з_п['n_instructions']}:"
+                                 f"{_з_п['tx_base64']}")
+            _з_было_прог = True
+        _з_прог += int(_з_было_прог)
+        _з_отп_всего += 1
+        _з_дано = hashlib.sha256("\n".join(_з_куски).encode()).hexdigest()[:32]
+        if _з_дано == _з_ждём and len(_з_куски) == _з_сколько:
+            _з_отп_сошлось += 1
+        else:
+            _з_беда.append(f"{_з_прг[:10]}: отпечаток {_з_дано} при ждём "
+                            f"{_з_ждём}, случаев {len(_з_куски)} при "
+                            f"{_з_сколько}")
+    checks.append((
+        f"заготовка покупки: {_з_сверено} повторных вариантов из ОДНОЙ "
+        f"заготовки на {_з_прог} программах пула -- байт в байт то же, что "
+        f"полная сборка (расхождений {_з_расх})",
+        _з_сверено >= 700 and _з_расх == 0 and _з_прог >= 8))
+    checks.append((
+        f"ЗАКРЕПЛЁННЫЕ БАЙТЫ: отпечатки сборки сошлись у "
+        f"{_з_отп_сошлось}/{_з_отп_всего} программ пула -- транзакция та же, "
+        f"что до разделения build_buy"
+        + (f"; беда: {_з_беда[:3]}" if _з_беда else ""),
+        _з_отп_всего >= 8 and _з_отп_сошлось == _з_отп_всего and not _з_беда))
 
     for name, ok in checks:
         print(f"  [{'ok  ' if ok else 'СБОЙ'}] {name}")
