@@ -86,7 +86,13 @@ def главное(а) -> int:
         if not с.get("chain_ok"):
             счёт["нет_цепи"] += 1
             continue
-        вх = с.get("vhod_sol_likvid_po_cepi") or с.get("vhod_sol_po_cepi")
+        # В ПУЛ уходит ровно билет (`sol_in`), а `vhod_sol_likvid_po_cepi` несёт ещё
+        # ренту счёта, комиссию пула, чаевые и приоритет. При билете 0.3 это 1.6 %
+        # разницы, при 0.01 -- до 49 %, и первый прогон на мелком билете дал из-за
+        # этого факт/модель 0.63 и q в разы больше единицы. Берём sol_in, если он есть.
+        вх = (с.get("sol_in") or с.get("билет_sol")
+              or с.get("vhod_sol_likvid_po_cepi") or с.get("vhod_sol_po_cepi"))
+        счёт["вход_по_sol_in" if с.get("sol_in") else "вход_по_ликвиду"] += 1
         ток = с.get("tokenov_polucheno_raw")
         if not (вх and ток):
             счёт["нет_входа_или_токенов"] += 1
