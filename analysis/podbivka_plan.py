@@ -15,6 +15,7 @@ import argparse
 import csv
 import json
 import os
+import re
 from pathlib import Path
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
@@ -34,9 +35,22 @@ def длина_списка(имя: str) -> int:
     raise SystemExit(f"неизвестный список {имя}")
 
 
+def имя_пакета(скрипт: str, н: int, арг: list) -> str:
+    """Имя работы матрицы: по --metka прогона, а не по номеру в маркере.
+
+    По номеру они СТАЛКИВАЛИСЬ, когда в одном пуше два маркера: 10.10 оба маркера
+    глубины дали по podbivka_arhiv_den_0..29, и по списку работ стало не разобрать,
+    какие сутки уже закрыты (пришлось считать по файлам в ветке).
+    """
+    м = арг[арг.index("--metka") + 1] if "--metka" in арг else ""
+    хвост = re.sub(r"[^0-9A-Za-z_.-]", "_", м) if м else str(н)
+    return f"{скрипт[:-3]}_{хвост}"
+
+
 def пакеты(м: dict) -> list:
     if м.get("zapuski"):
-        return [{"skript": м["skript"], "args": " ".join(a), "name": f"{м['skript'][:-3]}_{н}",
+        return [{"skript": м["skript"], "args": " ".join(a),
+                 "name": имя_пакета(м["skript"], н, a),
                  "_rps": м.get("helius_rps_na_paket")} for н, a in enumerate(м["zapuski"])]
     if м.get("skript", "podbivka_run.py") != "podbivka_run.py":
         return [{"skript": м["skript"], "args": " ".join(м.get("args") or []), "name": м["skript"],
