@@ -541,21 +541,88 @@ def ст_code2(e: dict):
 # Снятие и вклад ликвидности -- тоже не оборот:
 #   deposit  f223c68952e1f2b6 / DepositEvent  78f83d531f8e6b90
 #   withdraw b712469c946da122 / WithdrawEvent 1609851aa02c47c0
-НЕ_ОБОРОТ_ДЕЙСТВИЯ = frozenset({
-    "boost_buy_and_burn", "boost", "init_boost",
-    "deposit", "withdraw", "add_liquidity", "remove_liquidity"})
+# ИМЕНА ДЕЙСТВИЙ -- ТЕ, ЧТО В ЛЕНТЕ, А НЕ ТЕ, ЧТО Я ЖДАЛ.
+# Поправка Code-2 от 11.10: в ленте PumpApi движения ликвидности зовутся
+# `remove` и `add`, а НЕ `withdraw`/`deposit`, как в инструкциях программы.
+# Прежние имена оставлены синонимами: имена ленты я не выбираю, и если они
+# снова поменяются, старое не должно начать молча проваливаться в оборот.
 ОБОРОТ_ДЕЙСТВИЯ = frozenset({"buy", "sell"})
+ВЫВОД_ДЕЙСТВИЯ = frozenset({"remove", "withdraw", "remove_liquidity"})
+ВКЛАД_ДЕЙСТВИЯ = frozenset({"add", "deposit", "add_liquidity"})
+BOOST_ДЕЙСТВИЯ = frozenset({"boost_buy_and_burn", "boost", "init_boost"})
+# РОЖДЕНИЕ ПУЛА. `createPool`, `migrate` и `create` меняют резервы, но это НЕ
+# оборот и НЕ движение чужой ликвидности: это появление пула и перенос
+# ликвидности с кривой. Наш вход -- первое событие ряда, то есть ровно это
+# место; считать рождение выводом значило бы увидеть выход ликвидности у
+# каждого пула. Считаются отдельной строкой, чтобы не пропасть молча.
+РОЖДЕНИЕ_ДЕЙСТВИЯ = frozenset({"createpool", "create_pool", "migrate",
+                               "migrate_v2", "create", "create_v2"})
+НЕ_ОБОРОТ_ДЕЙСТВИЯ = (BOOST_ДЕЙСТВИЯ | ВЫВОД_ДЕЙСТВИЯ | ВКЛАД_ДЕЙСТВИЯ
+                      | РОЖДЕНИЕ_ДЕЙСТВИЯ)
+# ЧИСЛА МАНИФЕСТА, ОБЪЯВЛЕННЫЕ ВЛАДЕЛЬЦЕМ 11.10. Расхождение с манифестом --
+# СТОП, по его же слову. Сумма по действиям сверяется с итогом: 2 213 701 +
+# 1 928 798 + 125 505 + 84 760 + 230 + 185 + 175 = 4 353 354, сходится.
+#
+# «4.57 МЛН» И 4 353 354 -- НЕ ПРОТИВОРЕЧИЕ, А ДВА РАЗНЫХ СЧЁТЧИКА. Это
+# видно из самого урезателя Code-2: событий во входной ленте 4 574 311, а с
+# непустым `poolId` -- 4 353 354; разницу 220 957 он кладёт в `без_пула` и в
+# ряды не пишет. Сверяемся с `событий` (выход), а не с `событий_во_входе`:
+# ряды -- это то, что с пулом. Прежние 213 856 оказались счётчиком «наших
+# событий» в журнале его прохода, а не числом событий ленты -- отсюда и мой
+# замер 7 МБ против фактических ~123 МБ, из-за которых файл и поехал
+# частями.
+МАНИФЕСТ_ЖДЁМ = {
+    "pulov": 842, "sobytij": 4_353_354,
+    "po_dejstvijam": {"buy": 2_213_701, "sell": 1_928_798,
+                      "remove": 125_505, "add": 84_760,
+                      "createPool": 230, "migrate": 185, "create": 175}}
+
+
+# РЕЗЕРВЫ КРИВОЙ -- ОТДЕЛЬНЫЕ ПОЛЯ, И ЭТО НЕ ПУЛ.
+# Урезатель Code-2 (analysis/podbivka_c3_rjady_urezat.py, ветка
+# claude/podbivka) кладёт vQuoteInBondingCurve / vTokensInBondingCurve
+# ТОЛЬКО когда пуловых резервов в событии нет -- то есть на событиях
+# КРИВОЙ, до переезда: «иначе резервы пришли бы пустыми».
+# Его собственная `ст` их отсюда НЕ отдаёт: она выбирает пару по полю
+# `pool`, а `pool` в семь полей урезанного файла не входит -- значит для
+# события кривой она идёт в пуловую ветку, видит там None и возвращает
+# None. Без ветки ниже такие события молча пропадали бы -- ровно те,
+# которые он сохранил специально.
+ПОЛЯ_КРИВОЙ = ("vQuoteInBondingCurve", "vTokensInBondingCurve")
+
+
+def _rez_pula(e: dict) -> tuple | None:
+    """Резервы ПУЛА. На кривой их нет -- тогда None, и это не ошибка.
+
+    Поле `pool` здесь не спрашивается нарочно: в урезанном файле его нет, а
+    определение пулового события -- наличие пуловых резервов, а не метки.
+    """
+    x, y = e.get("quoteInPool"), e.get("tokensInPool")
+    if not x or not y:
+        return None
+    return float(x), float(y)
+
+
+def _rez_krivoj(e: dict) -> tuple | None:
+    """Резервы КРИВОЙ (виртуальные). Шкала у них СВОЯ, с пуловой не мешать."""
+    x, y = e.get(ПОЛЯ_КРИВОЙ[0]), e.get(ПОЛЯ_КРИВОЙ[1])
+    if not x or not y:
+        return None
+    return float(x), float(y)
+
+
+def _na_krivoj(e: dict) -> bool:
+    """Событие НА КРИВОЙ: пуловых резервов нет, а резервы кривой есть."""
+    return _rez_pula(e) is None and _rez_krivoj(e) is not None
 
 
 def _rez(e: dict) -> tuple | None:
-    """Резервы события -- через функцию Code-2, если путь к нему задан."""
+    """Резервы события: функция Code-2, иначе пуловые, иначе кривой."""
     try:
-        return ст_code2(e)
+        если = ст_code2(e)
     except НетДанных:
-        x, y = e.get("quoteInPool"), e.get("tokensInPool")
-        if not x or not y:
-            return None
-        return float(x), float(y)
+        если = None
+    return если or _rez_pula(e) or _rez_krivoj(e)
 
 
 def _учесть_вывод(действие: str, y_до: float, y_после: float,
@@ -568,7 +635,7 @@ def _учесть_вывод(действие: str, y_до: float, y_после:
     падение резервов, и об этом в отчёте сказано числом.
     """
     if y_после >= y_до or y_до <= 0:
-        if "deposit" in действие or "add_liquidity" in действие:
+        if действие in ВКЛАД_ДЕЙСТВИЯ:
             вывод["vklad_chuzhoj"] += 1
         return
     забрали = 1 - y_после / y_до
@@ -578,8 +645,12 @@ def _учесть_вывод(действие: str, y_до: float, y_после:
         вывод["sekund_do_pervogo"] = прошло
     if "rezerv" in действие:
         вывод["po_rezervam"] += 1
-    else:
+    elif действие in ВЫВОД_ДЕЙСТВИЯ:
         вывод["po_dejstviju"] += 1
+    else:
+        # Падение резервов на действии, которого я не знаю. Не молчим.
+        вывод["po_neizvestnomu_dejstviju"] = (
+            вывод.get("po_neizvestnomu_dejstviju", 0) + 1)
 
 
 def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
@@ -592,9 +663,22 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
     пересчитывается на каждом движении чужой ликвидности -- в этом и смысл
     ряда: по двум снимкам такое движение неотличимо от оборота.
     """
-    события = [е for е in rjad if _rez(е)]
+    # СОБЫТИЯ КРИВОЙ -- НЕ ПОЗИЦИЯ LP, И НЕ ОДНА ШКАЛА С ПУЛОМ.
+    # На кривой поставщика ликвидности нет вовсе: глубина там задана
+    # формулой, встать в неё нельзя -- позиция начинается с ПЕРВОГО
+    # ПУЛОВОГО события. А резервы кривой ВИРТУАЛЬНЫЕ и по величине другие:
+    # смешай их с пуловыми в одном ряду -- и r = p1/p0 посчитается между
+    # двумя разными шкалами, то есть выйдет мусор, который на вид число.
+    # Поэтому и отбор, и весь обход идут по _rez_pula, а события кривой
+    # считаются ОТДЕЛЬНОЙ СТРОКОЙ: молча пропадать им нельзя, их Code-2
+    # сохранил нарочно.
+    на_кривой = [е for е in rjad if _na_krivoj(е)]
+    события = [е for е in rjad if _rez_pula(е)]
     if len(события) < 2:
-        raise НетДанных("в ряду меньше двух событий с резервами")
+        raise НетДанных(
+            "в ряду меньше двух событий с ПУЛОВЫМИ резервами"
+            + (f"; событий кривой {len(на_кривой)} -- до переезда позиции LP "
+               "нет" if на_кривой else ""))
     события.sort(key=lambda е: (е.get("block") or 0, е.get("timestamp") or 0))
     первое = события[0]
     # МЕТКА ВРЕМЕНИ ОБЯЗАТЕЛЬНА, И ПРОВЕРЯЕТСЯ НА None, А НЕ НА ЛОЖЬ.
@@ -606,7 +690,7 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
     if т0 is None:
         raise НетДанных("у первого события ряда нет метки времени -- горизонт "
                         "в секундах считать нечем")
-    р0 = _rez(первое)
+    р0 = _rez_pula(первое)
     y0, x0 = р0[0], р0[1]
     if min(y0, x0) <= 0:
         raise НетДанных(WHY_НЕТ_СОСТОЯНИЙ)
@@ -621,10 +705,12 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
     буст_объём = буст_событий = 0.0
     ликв_событий = 0
     ликв_сдвиг_доли = 0.0
+    рождений = 0
     # ВЫХОД ЛИКВИДНОСТИ -- ОТДЕЛЬНОЙ СТРОКОЙ: сколько раз, когда впервые,
     # какую долю глубины забрали и каким путём это увидено.
     вывод = {"sobytij": 0, "sekund_do_pervogo": None, "dolja_glubiny": 0.0,
-             "po_dejstviju": 0, "po_rezervam": 0, "vklad_chuzhoj": 0}
+             "po_dejstviju": 0, "po_rezervam": 0, "vklad_chuzhoj": 0,
+             "po_neizvestnomu_dejstviju": 0}
     y, x = y0, x0
     последнее = первое
     событий_в_окне_порога = 0
@@ -649,15 +735,18 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
             # предполагается.
             за_горизонтом += 1
             continue
-        р = _rez(е)
+        р = _rez_pula(е)
         yн, xн = р[0], р[1]
         действие = str(е.get("action") or "").lower()
         q = abs(float(е.get("quoteAmount") or 0.0))
         if действие in ОБОРОТ_ДЕЙСТВИЯ:
             оборот += q
             доход += (lp_bps / 10_000) * q * доля
+        elif действие in РОЖДЕНИЕ_ДЕЙСТВИЯ:
+            # РОЖДЕНИЕ ПУЛА -- ни в оборот, ни в вывод. Только счётчик.
+            рождений += 1
         elif действие in НЕ_ОБОРОТ_ДЕЙСТВИЯ:
-            if "boost" in действие:
+            if действие in BOOST_ДЕЙСТВИЯ:
                 буст_объём += q
                 буст_событий += 1
             else:
@@ -725,7 +814,9 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
             "itog": итог,
             "sobytij_pervyh_10_min": событий_в_окне_порога,
             "sobytij_bez_metki": без_метки,
-            "sobytij_za_gorizontom": за_горизонтом}
+            "sobytij_za_gorizontom": за_горизонтом,
+            "sobytij_rozhdenija": рождений,
+            "sobytij_krivoj": len(на_кривой)}
 
 
 def rjady_iz_fajla(put: Path) -> dict:
@@ -778,6 +869,8 @@ def _svod_vyhoda(stroki: list) -> dict:
                               if сколько else None),
         "uvideno_po_dejstviju": sum(в["po_dejstviju"] for в in если),
         "uvideno_po_rezervam": sum(в["po_rezervam"] for в in если),
+        "uvideno_po_neizvestnomu": sum(в.get("po_neizvestnomu_dejstviju") or 0
+                                       for в in если),
         "vkladov_chuzhih": sum(в["vklad_chuzhoj"] for в in
                                (с["vyhod_likvidnosti"] for с in stroki))}
 
@@ -789,6 +882,155 @@ def _svod_vyhoda(stroki: list) -> dict:
 # разреза -- ПОЛОВИНА СУТОК, 12 часов: 10-08/00--11 и 10-08/12--23. Названо
 # это так, как есть: не «сутки», а половина, и в отчёте стоит именно она.
 ЧАСОВ_В_ПОЛОВИНЕ = 12
+
+
+ЧАСТИ_ШАБЛОН = "*part*.json.gz"
+МАНИФЕСТ_ШАБЛОН = "*.manifest.json"
+
+
+def najti_chasti(gde: str) -> dict:
+    """ЧАСТИ И МАНИФЕСТ ПО ПУТИ: каталог, шаблон или сам манифест.
+
+    Файл приходит ЧАСТЯМИ (`...partN.json.gz`) плюс `.manifest.json`.
+    Манифест ищется рядом с частями и обязателен: без него сверять нечего, а
+    сверка -- условие прогона (расхождение = стоп).
+    """
+    п = Path(gde)
+    if п.is_dir():
+        части = sorted(п.glob(ЧАСТИ_ШАБЛОН))
+        манифесты = sorted(п.glob(МАНИФЕСТ_ШАБЛОН))
+    elif п.name.endswith(".manifest.json"):
+        манифесты = [п]
+        основа = п.name[: -len(".manifest.json")]
+        части = sorted(п.parent.glob(f"{основа}*part*.json.gz"))
+    else:
+        части = sorted(Path(".").glob(gde)) or ([п] if п.exists() else [])
+        род = части[0].parent if части else п.parent
+        манифесты = sorted(род.glob(МАНИФЕСТ_ШАБЛОН))
+    if not части:
+        raise НетДанных(f"частей по пути {gde!r} не нашлось "
+                        f"(ждал {ЧАСТИ_ШАБЛОН})")
+    if not манифесты:
+        raise НетДанных(
+            f"рядом с частями нет манифеста ({МАНИФЕСТ_ШАБЛОН}): сверять "
+            "нечего, а сверка -- условие прогона. Расхождение = стоп, "
+            "отсутствие манифеста -- тоже")
+    return {"chasti": [str(ч) for ч in части],
+            "manifest": str(манифесты[0])}
+
+
+def _chislo_dejstvij(m: dict) -> dict:
+    """Счётчик по действиям из манифеста, под любым из ожидаемых имён."""
+    for ключ in ("po_dejstvijam", "по_действиям", "actions", "действия",
+                 "dejstvija"):
+        если = m.get(ключ)
+        if isinstance(если, dict) and если:
+            return {str(к): int(в) for к, в in если.items()}
+    return {}
+
+
+def _chislo(m: dict, imena: tuple) -> int | None:
+    for и in imena:
+        если = m.get(и)
+        if isinstance(если, (int, float)):
+            return int(если)
+    return None
+
+
+def svericht_s_manifestom(rjady: dict, manifest: dict, *,
+                          zhdjom: dict | None = None) -> dict:
+    """СВЕРКА ЗАГРУЖЕННОГО С МАНИФЕСТОМ. Расхождение -- СТОП, по имени.
+
+    Сверяются три вещи: число пулов, число событий и счётчик по действиям.
+    Плюс -- числа манифеста против ОБЪЯВЛЕННЫХ владельцем (МАНИФЕСТ_ЖДЁМ):
+    если манифест сам поменялся, это тоже расхождение и тоже стоп.
+    """
+    ж = МАНИФЕСТ_ЖДЁМ if zhdjom is None else zhdjom
+    пулов = len(rjady)
+    событий = sum(len(в) for в in rjady.values())
+    по_факту: dict = {}
+    for ряд in rjady.values():
+        for е in ряд:
+            д = str(е.get("action") or "?")
+            по_факту[д] = по_факту.get(д, 0) + 1
+    м_пулов = _chislo(manifest, ("pulov", "пулов", "pools"))
+    м_событий = _chislo(manifest, ("sobytij", "событий", "events"))
+    м_действий = _chislo_dejstvij(manifest)
+    расхождения = []
+    if м_пулов is not None and м_пулов != пулов:
+        расхождения.append(f"пулов: загружено {пулов}, манифест {м_пулов}")
+    if м_событий is not None and м_событий != событий:
+        расхождения.append(
+            f"событий: загружено {событий}, манифест {м_событий}")
+    for д, н in sorted(м_действий.items()):
+        б = по_факту.get(д, 0)
+        if б != н:
+            расхождения.append(f"действие {д}: загружено {б}, манифест {н}")
+    # СОБЫТИЯ БЕЗ ПУЛОВЫХ РЕЗЕРВОВ -- ПРОТИВ СЧЁТЧИКА МАНИФЕСТА. Урезатель
+    # считает их в `с_резервами_кривой` (события кривой, до переезда) и
+    # кладёт им резервы кривой вместо пуловых. Сверяем: если их у нас
+    # другое число, значит читаем доставку не так, как её писали, -- и это
+    # расхождение, а не мелочь. Молча разойтись тут нельзя: эти события в
+    # позицию LP не идут, и их число решает, сколько ряда вообще осталось.
+    без_пуловых = sum(1 for р in rjady.values() for е in р
+                      if _rez_pula(е) is None)
+    м_кривой = _chislo(manifest, ("s_rezervami_krivoj", "с_резервами_кривой"))
+    if м_кривой is not None and м_кривой != без_пуловых:
+        расхождения.append(
+            f"событий без пуловых резервов: загружено {без_пуловых}, "
+            f"манифест (с_резервами_кривой) {м_кривой}")
+    лишние = sorted(set(по_факту) - set(м_действий)) if м_действий else []
+    for д in лишние:
+        расхождения.append(
+            f"действие {д} ({по_факту[д]}) есть в данных, но НЕ в манифесте")
+    # МАНИФЕСТ ПРОТИВ ОБЪЯВЛЕННОГО -- отдельно: поменялся сам манифест, и об
+    # этом надо узнать, а не сверить данные с новым числом молча.
+    против_объявленного = []
+    if м_пулов is not None and м_пулов != ж["pulov"]:
+        против_объявленного.append(
+            f"пулов: манифест {м_пулов}, объявлено {ж['pulov']}")
+    if м_событий is not None and м_событий != ж["sobytij"]:
+        против_объявленного.append(
+            f"событий: манифест {м_событий}, объявлено {ж['sobytij']}")
+    for д, н in sorted((ж.get("po_dejstvijam") or {}).items()):
+        если = м_действий.get(д)
+        if если is not None and если != н:
+            против_объявленного.append(
+                f"действие {д}: манифест {если}, объявлено {н}")
+    из_ = {"pulov": пулов, "sobytij": событий, "po_dejstvijam": по_факту,
+           "sobytij_bez_pulovyh": без_пуловых,
+           "manifest_s_rezervami_krivoj": м_кривой,
+           "manifest_pulov": м_пулов, "manifest_sobytij": м_событий,
+           "manifest_po_dejstvijam": м_действий,
+           "rashozhdenija": расхождения,
+           "protiv_objavlennogo": против_объявленного,
+           "soshlos": not расхождения and not против_объявленного}
+    if расхождения or против_объявленного:
+        raise НетДанных(
+            "СТОП: сверка с манифестом не сошлась. "
+            + "; ".join(расхождения + против_объявленного))
+    return из_
+
+
+def rjady_iz_chastej(gde: str, *, zhdjom: dict | None = None) -> dict:
+    """РЯДЫ ИЗ ЧАСТЕЙ СО СВЕРКОЙ. Ряд одного пула может лежать в РАЗНЫХ
+    частях, поэтому части склеиваются, а уже потом сверяются и сортируются."""
+    найдено = najti_chasti(gde)
+    with open(найдено["manifest"], encoding="utf-8") as ф:
+        манифест = json.load(ф)
+    ряды: dict = {}
+    по_частям = []
+    for ч in найдено["chasti"]:
+        своё = rjady_iz_fajla(Path(ч))
+        n = 0
+        for пул, р in своё.items():
+            ряды.setdefault(пул, []).extend(р)
+            n += len(р)
+        по_частям.append({"chast": Path(ч).name, "pulov": len(своё),
+                          "sobytij": n})
+    сверка = svericht_s_manifestom(ряды, манифест, zhdjom=zhdjom)
+    return {"rjady": ряды, "manifest": манифест, "sverka": сверка,
+            "po_chastjam": по_частям, "najdeno": найдено}
 
 
 def sutki_rjada(rjad: list, *, chasov: int = ЧАСОВ_В_ПОЛОВИНЕ) -> str:
@@ -819,10 +1061,20 @@ def progon_rjady(puti: list, *, razmery: tuple = (1.0, 5.0, 20.0),
     ПЕРВОЙ ПОЛОВИНЕ суток, проверка на второй: иначе порог подогнан под свой
     же шум.
     """
+    сверка = None
     ряды: dict = {}
-    for п in puti:
-        for пул, р in rjady_iz_fajla(Path(п)).items():
-            ряды.setdefault(пул, []).extend(р)
+    if len(puti) == 1 and (Path(puti[0]).is_dir()
+                           or puti[0].endswith(".manifest.json")
+                           or "part" in Path(puti[0]).name):
+        # ЧАСТИ СО СВЕРКОЙ -- основной путь с 11.10: файл приходит
+        # `...partN.json.gz` плюс `.manifest.json`, и расхождение = стоп.
+        загр = rjady_iz_chastej(puti[0])
+        ряды, сверка = загр["rjady"], загр["sverka"]
+        сверка["po_chastjam"] = загр["po_chastjam"]
+    else:
+        for п in puti:
+            for пул, р in rjady_iz_fajla(Path(п)).items():
+                ряды.setdefault(пул, []).extend(р)
     if not ряды:
         raise НетДанных("ни одного ряда пула не прочитано")
     по_суткам: dict = {}
@@ -840,6 +1092,7 @@ def progon_rjady(puti: list, *, razmery: tuple = (1.0, 5.0, 20.0),
     из_ = {"fajlov": [str(п) for п in puti], "pulov": len(ряды),
            "chasov_v_otrezke": chasov_otrezka,
            "otrezkov": сутки, "kalibr": калибр, "proverka": проверка,
+           "sverka_s_manifestom": сверка,
            "po_gorizontam": {}, "porog": {}}
 
     def счёт(дни, X, H, порог):
@@ -931,7 +1184,7 @@ def progon_rjady(puti: list, *, razmery: tuple = (1.0, 5.0, 20.0),
 
 # ЧИСЛО ОБЪЯВЛЕНО. Меньше -- проверку убрали и никто не заметил; больше --
 # добавили и не сказали. И то и другое здесь ПРОВАЛ.
-ZHDEM_PROVEROK = 41
+ZHDEM_PROVEROK = 57
 
 
 def self_test() -> int:  # noqa: C901, PLR0915
@@ -1232,6 +1485,99 @@ def self_test() -> int:  # noqa: C901, PLR0915
                                           gorizont_sekund=86400)]
                          )["dolja_pulov"] - 0.5) < 1e-9)
 
+    # ----- 11. ЧАСТИ, МАНИФЕСТ И ИМЕНА ДЕЙСТВИЙ ЛЕНТЫ (поправка 11.10)
+    chk("СУММА ПО ДЕЙСТВИЯМ МАНИФЕСТА СХОДИТСЯ С ЕГО ИТОГОМ: "
+        f"{' + '.join(str(в) for в in МАНИФЕСТ_ЖДЁМ['po_dejstvijam'].values())}"
+        f" = {МАНИФЕСТ_ЖДЁМ['sobytij']}",
+        sum(МАНИФЕСТ_ЖДЁМ["po_dejstvijam"].values())
+        == МАНИФЕСТ_ЖДЁМ["sobytij"],
+        (sum(МАНИФЕСТ_ЖДЁМ["po_dejstvijam"].values()),
+         МАНИФЕСТ_ЖДЁМ["sobytij"]))
+    chk("ИМЕНА ЛЕНТЫ -- remove И add, а не withdraw/deposit: поправка Code-2 "
+        "от 11.10. Прежние имена оставлены синонимами -- имена ленты я не "
+        "выбираю, и смена не должна молча провалиться в оборот",
+        {"remove", "add"} <= НЕ_ОБОРОТ_ДЕЙСТВИЯ
+        and "remove" in ВЫВОД_ДЕЙСТВИЯ and "add" in ВКЛАД_ДЕЙСТВИЯ
+        and "withdraw" in ВЫВОД_ДЕЙСТВИЯ and "deposit" in ВКЛАД_ДЕЙСТВИЯ)
+    ряд_имена = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+                 сд("buy", 10.0, 110.0, 910.0, 60_000, 2),
+                 сд("remove", 0, 55.0, 455.0, 600_000, 3)]
+    ри = lp_po_rjadu(ряд_имена, razmer=1.0, gorizont_sekund=86400)
+    chk("remove В ЛЕНТЕ ЧИТАЕТСЯ КАК ВЫВОД ЛИКВИДНОСТИ, и увидено ПО "
+        f"ДЕЙСТВИЮ, а не по резервам: {ри['vyhod_likvidnosti']['sobytij']} раз, "
+        f"по действию {ри['vyhod_likvidnosti']['po_dejstviju']}, по резервам "
+        f"{ри['vyhod_likvidnosti']['po_rezervam']}",
+        ри["vyhod_likvidnosti"]["sobytij"] == 1
+        and ри["vyhod_likvidnosti"]["po_dejstviju"] == 1
+        and ри["vyhod_likvidnosti"]["po_rezervam"] == 0, ри)
+    ряд_add = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+               сд("add", 0, 300.0, 3000.0, 60_000, 2),
+               сд("buy", 10.0, 310.0, 2910.0, 120_000, 3)]
+    ра = lp_po_rjadu(ряд_add, razmer=1.0, gorizont_sekund=86400)
+    chk("add В ЛЕНТЕ -- ЧУЖОЙ ВКЛАД: наша доля размывается, и в выводе он НЕ "
+        f"числится (доля с {ра['dolja_pula_vhod'] * 100:.3f} % до "
+        f"{ра['dolja_pula_vyhod'] * 100:.3f} %, выводов "
+        f"{ра['vyhod_likvidnosti']['sobytij']})",
+        ра["vyhod_likvidnosti"]["sobytij"] == 0
+        and ра["vyhod_likvidnosti"]["vklad_chuzhoj"] == 1
+        and ра["dolja_pula_vyhod"] < ра["dolja_pula_vhod"] / 2.5, ра)
+    ряд_рожд = [сд("createPool", 0, 100.0, 1000.0, 0, 1),
+                сд("migrate", 0, 100.0, 1000.0, 1_000, 2),
+                сд("buy", 10.0, 110.0, 910.0, 60_000, 3)]
+    рр2 = lp_po_rjadu(ряд_рожд, razmer=1.0, gorizont_sekund=86400)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: createPool и migrate -- РОЖДЕНИЕ ПУЛА, ни в "
+        "оборот, ни в вывод. Иначе выход ликвидности нашёлся бы у КАЖДОГО "
+        f"пула: рождений {рр2['sobytij_rozhdenija']}, выводов "
+        f"{рр2['vyhod_likvidnosti']['sobytij']}, оборот {рр2['oborot']:.0f}",
+        рр2["sobytij_rozhdenija"] == 1
+        and рр2["vyhod_likvidnosti"]["sobytij"] == 0
+        and abs(рр2["oborot"] - 10.0) < 1e-9, рр2)
+    # СВЕРКА С МАНИФЕСТОМ: сходится и НЕ сходится.
+    ряды_проб = {"PUL": [сд("buy", 1.0, 100.0, 1000.0, 0, 1),
+                         сд("remove", 0, 50.0, 500.0, 1000, 2)]}
+    м_ок = {"pulov": 1, "sobytij": 2, "po_dejstvijam": {"buy": 1, "remove": 1}}
+    св = svericht_s_manifestom(ряды_проб, м_ок,
+                               zhdjom={"pulov": 1, "sobytij": 2,
+                                       "po_dejstvijam": {"buy": 1,
+                                                         "remove": 1}})
+    chk("СВЕРКА С МАНИФЕСТОМ СХОДИТСЯ, когда числа те же -- и сверяется "
+        "КАЖДОЕ действие, а не только итог",
+        св["soshlos"] and св["sobytij"] == 2
+        and св["po_dejstvijam"] == {"buy": 1, "remove": 1}, св)
+    упало7 = None
+    try:
+        svericht_s_manifestom(
+            ряды_проб, {"pulov": 1, "sobytij": 3,
+                        "po_dejstvijam": {"buy": 2, "remove": 1}},
+            zhdjom={"pulov": 1, "sobytij": 3,
+                    "po_dejstvijam": {"buy": 2, "remove": 1}})
+    except НетДанных as сбой:
+        упало7 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: манифест говорит 3 события и buy 2, а загружено "
+        "2 и buy 1 -- СТОП по имени, с обоими числами, а не прогон на том, "
+        "что загрузилось",
+        упало7 and упало7.startswith("СТОП") and "событий" in упало7
+        and "buy" in упало7, упало7)
+    упало8 = None
+    try:
+        svericht_s_manifestom(ряды_проб, м_ок,
+                              zhdjom={"pulov": 842, "sobytij": 4_353_354,
+                                      "po_dejstvijam": {"buy": 2_213_701}})
+    except НетДанных as сбой:
+        упало8 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: сам МАНИФЕСТ разошёлся с объявленным (842 пула и "
+        "4 353 354 события) -- тоже СТОП: данные сошлись бы с новым манифестом "
+        "молча, и подмену никто бы не увидел",
+        упало8 and "объявлено" in упало8, упало8)
+    упало9 = None
+    try:
+        najti_chasti(str(КОРЕНЬ / "data" / "idl"))
+    except НетДанных as сбой:
+        упало9 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: частей по пути нет -- отказ по имени с шаблоном, "
+        "а не пустой прогон",
+        упало9 and "частей по пути" in упало9, упало9)
+
     # ----- 10. РАЗРЕЗ НА ПОЛОВИНЫ СУТОК (артефакт -- одни сутки входов)
     т_утро = 1791417600000      # 2026-10-08T00:00:00Z в миллисекундах
     т_вечер = т_утро + 13 * 3600_000
@@ -1269,6 +1615,85 @@ def self_test() -> int:  # noqa: C901, PLR0915
         "по чему идёт отбор: на суточном горизонте их всё равно одно",
         р24["sobytij_pervyh_10_min"] == 1
         and р10["sobytij_pervyh_10_min"] == 1, (р24, р10))
+
+
+    # ----- 12. СОБЫТИЯ КРИВОЙ В ДОСТАВКЕ (урезатель Code-2, 11.10)
+    # Урезатель кладёт vQuoteInBondingCurve/vTokensInBondingCurve, когда
+    # пуловых резервов нет. Семь полей `pool` НЕ несут, поэтому его `ст`
+    # для таких событий возвращает None -- и без ветки резервов кривой они
+    # исчезали бы молча.
+    def кр(действие, q, y, x, t_, blok):
+        """Событие КРИВОЙ ровно как его пишет урезатель: пуловых полей нет."""
+        return {"action": действие, "quoteAmount": q,
+                "quoteInPool": None, "tokensInPool": None,
+                "vQuoteInBondingCurve": y, "vTokensInBondingCurve": x,
+                "poolFeeRate": 0.0, "timestamp": t_, "block": blok}
+
+    е_кр = кр("buy", 5.0, 30.0, 1_000_000_000.0, 0, 1)
+    е_пул = сд("buy", 5.0, 100.0, 1000.0, 0, 1)
+    chk("СОБЫТИЕ КРИВОЙ ОТЛИЧАЕТСЯ ОТ ПУЛОВОГО ПО НАЛИЧИЮ РЕЗЕРВОВ, а не по "
+        "метке `pool`: её в семи полях урезанного файла нет вовсе",
+        _na_krivoj(е_кр) and not _na_krivoj(е_пул)
+        and _rez_pula(е_кр) is None and _rez_pula(е_пул) is not None,
+        (_na_krivoj(е_кр), _na_krivoj(е_пул)))
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: у события кривой пуловых резервов НЕТ, и `ст` "
+        "Code-2 отдала бы None -- резервы берутся из полей кривой, иначе "
+        f"событие пропало бы молча: {_rez(е_кр)}",
+        _rez(е_кр) == (30.0, 1_000_000_000.0), _rez(е_кр))
+    # РЯД С ГОЛОВОЙ НА КРИВОЙ: позиция начинается с ПУЛОВОГО события.
+    ряд_см = [кр("buy", 5.0, 30.0, 1_000_000_000.0, 0, 1),
+              кр("buy", 5.0, 35.0, 900_000_000.0, 1_000, 2),
+              сд("migrate", 0, 100.0, 1000.0, 2_000, 3),
+              сд("buy", 10.0, 110.0, 910.0, 60_000, 4)]
+    рсм = lp_po_rjadu(ряд_см, razmer=1.0, gorizont_sekund=86400)
+    ртолько = lp_po_rjadu(ряд_см[2:], razmer=1.0, gorizont_sekund=86400)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: голова ряда на КРИВОЙ -- позиция LP начинается "
+        "с ПЕРВОГО ПУЛОВОГО события, и итог тот же, что без кривой вовсе "
+        f"(p0 {рсм['p0']:.4f} против {ртолько['p0']:.4f}; событий кривой "
+        f"{рсм['sobytij_krivoj']}). Иначе r = p1/p0 считался бы между "
+        "виртуальной и пуловой шкалой -- мусор на вид числом",
+        рсм["sobytij_krivoj"] == 2
+        and abs(рсм["p0"] - ртолько["p0"]) < 1e-12
+        and abs(рсм["itog"] - ртолько["itog"]) < 1e-12
+        and abs(рсм["oborot"] - 10.0) < 1e-9, (рсм, ртолько))
+    chk("ОБОРОТ КРИВОЙ В ДОХОД LP НЕ ИДЁТ: до переезда поставщика "
+        f"ликвидности нет, 10 SOL пулового оборота против 20 всего ряда "
+        f"(кривой {рсм['sobytij_krivoj']} событий, их 10 SOL отброшены)",
+        abs(рсм["oborot"] - 10.0) < 1e-9, рсм["oborot"])
+    упало10 = None
+    try:
+        lp_po_rjadu(ряд_см[:2], razmer=1.0, gorizont_sekund=86400)
+    except НетДанных as сбой:
+        упало10 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: в ряду ТОЛЬКО события кривой -- отказ по имени "
+        "с их числом, а не позиция LP на кривой, где её быть не может",
+        упало10 and "ПУЛОВЫМИ" in упало10 and "кривой 2" in упало10, упало10)
+    # СВЕРКА ПО ЕГО ЖЕ СЧЁТЧИКУ `с_резервами_кривой` + РЕАЛЬНЫЕ ИМЕНА КЛЮЧЕЙ
+    # МАНИФЕСТА (пулов / событий / по_действиям -- как их пишет урезатель).
+    ряды_кр = {"PUL": [кр("buy", 5.0, 30.0, 1e9, 0, 1),
+                       сд("buy", 1.0, 100.0, 1000.0, 1_000, 2)]}
+    м_жив = {"пулов": 1, "событий": 2, "событий_во_входе": 3, "без_пула": 1,
+             "с_резервами_кривой": 1, "по_действиям": {"buy": 2}}
+    жд_кр = {"pulov": 1, "sobytij": 2, "po_dejstvijam": {"buy": 2}}
+    скр = svericht_s_manifestom(ряды_кр, м_жив, zhdjom=жд_кр)
+    chk("МАНИФЕСТ ЧИТАЕТСЯ ПОД ЕГО РЕАЛЬНЫМИ ИМЕНАМИ (пулов / событий / "
+        "по_действиям), а сверяемся с `событий` (выход, 4 353 354), НЕ с "
+        f"`событий_во_входе` (4.57 млн): событий кривой {скр['sobytij_bez_pulovyh']}",
+        скр["soshlos"] and скр["sobytij"] == 2
+        and скр["manifest_sobytij"] == 2
+        and скр["sobytij_bez_pulovyh"] == 1
+        and скр["manifest_s_rezervami_krivoj"] == 1, скр)
+    упало11 = None
+    try:
+        svericht_s_manifestom(ряды_кр, {**м_жив, "с_резервами_кривой": 7},
+                              zhdjom=жд_кр)
+    except НетДанных as сбой:
+        упало11 = str(сбой)
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: манифест говорит событий кривой 7, а загружено 1 -- "
+        "СТОП: значит доставку читаем не так, как её писали, и сколько ряда "
+        "осталось на позицию LP -- неизвестно",
+        упало11 and упало11.startswith("СТОП")
+        and "без пуловых резервов" in упало11, упало11)
 
     print(f"\nпроверок {было}, ждали {ZHDEM_PROVEROK}, не прошло {плохо}")
     for и in упавшие:
@@ -1356,9 +1781,11 @@ def main() -> int:
     p.add_argument("--prefiks", default="konv")
     p.add_argument("--sutok", type=int, default=7)
     p.add_argument("--rjady", default=None,
-                   help="файл(ы) читалки Code-2 с рядами сделок пулов на 24 ч, "
-                        "через запятую: тогда считаются горизонты 10 мин/1 ч/"
-                        "6 ч/24 ч, а не окно суточного файла")
+                   help="ряды сделок пулов на 24 ч: КАТАЛОГ с частями "
+                        "(...partN.json.gz) и манифестом, путь к "
+                        "*.manifest.json, либо один файл / несколько через "
+                        "запятую. С частями сверка с манифестом обязательна: "
+                        "расхождение -- стоп")
     p.add_argument("--chasov-otrezka", type=int,
                    default=ЧАСОВ_В_ПОЛОВИНЕ,
                    help="единица разреза для подбора и проверки, часов "
@@ -1370,9 +1797,19 @@ def main() -> int:
     if a.self_test:
         return 1 if self_test() else 0
     if a.rjady:
-        итог = progon_rjady([п for п in a.rjady.split(",") if п],
-                            razmery=РАЗМЕРЫ,
-                            chasov_otrezka=a.chasov_otrezka)
+        # ОТКАЗ -- СТРОКОЙ, А НЕ ТРАССИРОВКОЙ. Стоп по сверке с манифестом --
+        # штатный исход, заказанный владельцем («расхождение = стоп»), и
+        # читаться он должен как причина, а не как падение программы.
+        # Обхода у этого стопа НАРОЧНО нет: флаг «сверить с манифестом, а не
+        # с объявленным» снимал бы ровно ту проверку, ради которой числа и
+        # были названы.
+        try:
+            итог = progon_rjady([п for п in a.rjady.split(",") if п],
+                                razmery=РАЗМЕРЫ,
+                                chasov_otrezka=a.chasov_otrezka)
+        except НетДанных as сбой:
+            print(f"ОТКАЗ: {сбой}", file=sys.stderr)
+            return 2
         print(json.dumps(итог, ensure_ascii=False, indent=1, default=str))
         return 0
     if not a.arhiv:
@@ -1381,8 +1818,12 @@ def main() -> int:
               "(data/podbivka/arhiv_den). Свою читалку архива здесь не пишу -- "
               "берутся ГОТОВЫЕ файлы Code-2 и его же модули (C3_LP_KOD_CODE2).")
         return 1
-    итог = progon(Path(a.arhiv), prefiks=a.prefiks, sutok=a.sutok,
-                  razmery=РАЗМЕРЫ)
+    try:
+        итог = progon(Path(a.arhiv), prefiks=a.prefiks, sutok=a.sutok,
+                      razmery=РАЗМЕРЫ)
+    except НетДанных as сбой:
+        print(f"ОТКАЗ: {сбой}", file=sys.stderr)
+        return 2
     print(json.dumps(итог, ensure_ascii=False, indent=1, default=str))
     return 0
 
