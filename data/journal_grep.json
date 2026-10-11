@@ -1,170 +1,410 @@
 {
- "patterns": "own_send",
+ "patterns": "pool_nonce",
  "file": "positions",
  "okno": {
   "ot": null,
   "do": null,
-  "zapisej": 12,
-  "predel": 12,
+  "zapisej": 3,
+  "predel": 3,
   "usecheno": true,
   "chem_grozit": "предел достигнут -- за краем остались записи СТАРШЕ границы 'ot'; окно считать по этим границам, а не по задуманному"
  },
  "rows": [
   {
-   "ts": null,
-   "client_order_id": "lane-own-47bwcoSNb2mJ39U7DNi6aXMgCjyYQVsELwu8uA5G",
-   "lane": "own_send",
-   "source": "HSeCG7T2KCTuVAARGXZuxBNZg6pas1EdJdjn7Xyy1ENB",
-   "mint": "B1LNfn3wfoJMc4JXULiiWVNodTbvyHHpABdpj3VVYGK6",
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "intent"
-  },
-  {
-   "ts": null,
-   "client_order_id": "lane-own-47bwcoSNb2mJ39U7DNi6aXMgCjyYQVsELwu8uA5G",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": null
-  },
-  {
-   "ts": null,
-   "client_order_id": "lane-own-47bwcoSNb2mJ39U7DNi6aXMgCjyYQVsELwu8uA5G",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "bought"
-  },
-  {
-   "ts": null,
+   "schema_version": 2,
    "client_order_id": "lane-own-yCHS47ETqqZBTrMpEYWYnaoXcjL1GHyRuAjgo4tH",
+   "ts_update": 1791726921.8954217,
+   "ts_update_utc": "2026-10-11T13:55:21Z",
+   "state": "bought",
    "lane": "own_send",
-   "source": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
-   "mint": "33jENUQnjoitkMFpvNJcSHyLAHFWJuHwT6E3E8CNpump",
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "intent"
+   "lane_signature": "2i5fyY9ftkAwXq9xrqHZTKTgrMyPpJpULXV7SaW5dMuotuA8X5ZXt3HuKfYiUz9RDLue4t28ACAuefsEXNACNjKp",
+   "lane_signature_local": "3RoMH7gEVnVbKgYv5BoX18LrMWvWRxPLAnxgqdR2KYUxEdt4FHnhQPZ9yt6V2cfDa2cRgEPJpKBnwSxBCnsM2PRK",
+   "ts_sent": 1791726918.6566577,
+   "ts_accepted": 1791726921.8953886,
+   "ts_decision": 1791726918.6533697,
+   "ts_signed": 1791726918.6566446,
+   "pool": null,
+   "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+   "program_gen": 1,
+   "lane_min_out": 1124606409,
+   "lane_expected_out": 1874344015,
+   "lane_send_point": null,
+   "lane_send_ms": 5.46,
+   "lane_build_ms": 0.537,
+   "lane_dlmm_reads": null,
+   "lane_dlmm_reads_ms": null,
+   "lane_dlmm_odno_godilos": null,
+   "lane_dlmm_odno_why_not": null,
+   "lane_dlmm_nol_godilos": null,
+   "lane_dlmm_nol_why_not": null,
+   "lane_dlmm_nol_cena_polosy": null,
+   "lane_dlmm_nol_cena_teni": null,
+   "lane_dlmm_nol_min_out_polosy": null,
+   "lane_dlmm_nol_min_out_teni": null,
+   "lane_dlmm_nol_otklonenie_pct": null,
+   "lane_nonce_ms": 0.007,
+   "lane_sign_ms": 0.25,
+   "lane_variants_ms": 1.29,
+   "lane_variants_cpu_ms": 1.18,
+   "lane_variants_zhdali_ms": 0.11,
+   "lane_potokov_v_processe": 12,
+   "lane_gc_prohodov": [
+    0,
+    0,
+    0
+   ],
+   "lane_resursy_potoka": {
+    "polzovatelskoe_ms": 1.312,
+    "sistemnoe_ms": 0.0,
+    "promahov_stranic": 0,
+    "promahov_s_diska": 0,
+    "why_not": null
+   },
+   "lane_gc_porogi": [
+    700,
+    10,
+    10
+   ],
+   "lane_variants_reads_net": 0,
+   "lane_variants_reads_cached": 0,
+   "lane_nonce_warm": true,
+   "lane_tip_account": "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
+   "lane_priority_lamports": 1000000,
+   "lane_ts_sent_buy": 1791726918.6566577,
+   "lane_region": "EU",
+   "lane_region_leader": "EU",
+   "lane_region_leader_slot": 455675170,
+   "lane_region_point": {
+    "astralane": {
+     "host": "fr.gateway.astralane.io",
+     "регион_точки": "EU"
+    },
+    "helius": {
+     "host": "ams-sender.helius-rpc.com",
+     "регион_точки": "EU"
+    },
+    "jito": {
+     "host": "amsterdam.mainnet.block-engine.jito.wtf",
+     "регион_точки": "EU"
+    }
+   },
+   "lane_region_senders": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "lane_region_why_not": null,
+   "lane_pool_winner": "helius",
+   "lane_pool_senders": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "lane_pool_ok_senders": [
+    "jito"
+   ],
+   "lane_pool_accepted_first": "jito",
+   "lane_pool_ne_otvetili": [
+    "astralane",
+    "helius"
+   ],
+   "lane_pool_isklyucheny": [],
+   "lane_pool_excluded_before": null,
+   "lane_podshagi_ms": {
+    "разбор и размер": 2.569,
+    "гейт полосы": 1.896,
+    "веер контролей": 0.006,
+    "чаевые пула и нонс": 0.214,
+    "сборка": 0.625,
+    "симуляция": 0.768,
+    "blockhash": 0.045,
+    "подпись": 1.618,
+    "всего": 7.742
+   },
+   "lane_podshagi_cpu_ms": {
+    "разбор и размер": 1.687,
+    "гейт полосы": 1.395,
+    "веер контролей": 0.005,
+    "чаевые пула и нонс": 0.214,
+    "сборка": 0.625,
+    "симуляция": 0.106,
+    "blockhash": 0.045,
+    "подпись": 1.499,
+    "всего": 5.575
+   },
+   "lane_pool_mode": "nonce",
+   "lane_pool_candidates": [
+    "3crup1FtmR5GBGtz82FQmacziLkWMu13emsKTzWUeJvcQrG9SnMp5N7caXv2wvkPr83iU5VxnkFKyE9jo9Aw9XxW",
+    "4xUyuiKseJkhFpKvsrYZHATsqLNHkqVpwdjA3mx9EBQxjMZcMcTXDkeWnzAn8WZXFpPAbhCQS9bTXYHtSVatoUb",
+    "2i5fyY9ftkAwXq9xrqHZTKTgrMyPpJpULXV7SaW5dMuotuA8X5ZXt3HuKfYiUz9RDLue4t28ACAuefsEXNACNjKp"
+   ],
+   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+   "lane_tips_total_sol": 0.001,
+   "control_services": null
   },
   {
-   "ts": null,
-   "client_order_id": "lane-own-yCHS47ETqqZBTrMpEYWYnaoXcjL1GHyRuAjgo4tH",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": null
-  },
-  {
-   "ts": null,
-   "client_order_id": "lane-own-yCHS47ETqqZBTrMpEYWYnaoXcjL1GHyRuAjgo4tH",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "bought"
-  },
-  {
-   "ts": null,
+   "schema_version": 2,
    "client_order_id": "lane-own-ssXWXbi8LWinFmDaD3G3JdBo7H7MCZ7kunnD7WeL",
+   "ts_update": 1791728034.7356386,
+   "ts_update_utc": "2026-10-11T14:13:54Z",
+   "state": "bought",
    "lane": "own_send",
-   "source": "FxN3VZ4BosL5urG2yoeQ156JSdmavm9K5fdLxjkPmaMR",
-   "mint": "9bpZ6CgYgw3KH4PiJFAUXdY72yfKxvTs65iX7MTWozo",
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "intent"
+   "lane_signature": "4TArTi9KuERm48C4YzqtFAizajgcPDuD2LqDyVaJK95Nfjr7qEaZf86rqiXGwVM3iYSkFxoZbU9e7sA7ESLQEpwP",
+   "lane_signature_local": "4AfTbseTfNzSnXGR2UATV4Bh2jBjsmVuLutdNHRWKEmE9UGtZHQ7KM6AbKwWkYsYc44MC9wzFtjvAqAEWwaKyRrD",
+   "ts_sent": 1791728031.4896903,
+   "ts_accepted": 1791728034.7355628,
+   "ts_decision": 1791728031.4671993,
+   "ts_signed": 1791728031.489674,
+   "pool": null,
+   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+   "program_gen": 1,
+   "lane_min_out": 64466887808,
+   "lane_expected_out": 107444813015,
+   "lane_send_point": null,
+   "lane_send_ms": 3.59,
+   "lane_build_ms": 4.789,
+   "lane_dlmm_reads": null,
+   "lane_dlmm_reads_ms": null,
+   "lane_dlmm_odno_godilos": null,
+   "lane_dlmm_odno_why_not": null,
+   "lane_dlmm_nol_godilos": null,
+   "lane_dlmm_nol_why_not": null,
+   "lane_dlmm_nol_cena_polosy": null,
+   "lane_dlmm_nol_cena_teni": null,
+   "lane_dlmm_nol_min_out_polosy": null,
+   "lane_dlmm_nol_min_out_teni": null,
+   "lane_dlmm_nol_otklonenie_pct": null,
+   "lane_nonce_ms": 0.006,
+   "lane_sign_ms": 0.24,
+   "lane_variants_ms": 16.25,
+   "lane_variants_cpu_ms": 14.58,
+   "lane_variants_zhdali_ms": 1.67,
+   "lane_potokov_v_processe": 12,
+   "lane_gc_prohodov": [
+    1,
+    0,
+    0
+   ],
+   "lane_resursy_potoka": {
+    "polzovatelskoe_ms": 13.798,
+    "sistemnoe_ms": 1.054,
+    "promahov_stranic": 0,
+    "promahov_s_diska": 0,
+    "why_not": null
+   },
+   "lane_gc_porogi": [
+    700,
+    10,
+    10
+   ],
+   "lane_variants_reads_net": 0,
+   "lane_variants_reads_cached": 0,
+   "lane_nonce_warm": true,
+   "lane_tip_account": "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
+   "lane_priority_lamports": 1000000,
+   "lane_ts_sent_buy": 1791728031.4896903,
+   "lane_region": "EU",
+   "lane_region_leader": "EU",
+   "lane_region_leader_slot": 455680257,
+   "lane_region_point": {
+    "astralane": {
+     "host": "fr.gateway.astralane.io",
+     "регион_точки": "EU"
+    },
+    "helius": {
+     "host": "ams-sender.helius-rpc.com",
+     "регион_точки": "EU"
+    },
+    "jito": {
+     "host": "amsterdam.mainnet.block-engine.jito.wtf",
+     "регион_точки": "EU"
+    }
+   },
+   "lane_region_senders": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "lane_region_why_not": null,
+   "lane_pool_winner": "jito",
+   "lane_pool_senders": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "lane_pool_ok_senders": [
+    "jito"
+   ],
+   "lane_pool_accepted_first": "jito",
+   "lane_pool_ne_otvetili": [
+    "astralane",
+    "helius"
+   ],
+   "lane_pool_isklyucheny": [],
+   "lane_pool_excluded_before": null,
+   "lane_podshagi_ms": {
+    "разбор и размер": 8.443,
+    "гейт полосы": 0.905,
+    "веер контролей": 0.005,
+    "чаевые пула и нонс": 0.12,
+    "сборка": 4.883,
+    "симуляция": 0.824,
+    "blockhash": 0.067,
+    "подпись": 16.579,
+    "всего": 31.824
+   },
+   "lane_podshagi_cpu_ms": {
+    "разбор и размер": 2.125,
+    "гейт полосы": 0.905,
+    "веер контролей": 0.003,
+    "чаевые пула и нонс": 0.12,
+    "сборка": 4.884,
+    "симуляция": 0.129,
+    "blockhash": 0.052,
+    "подпись": 14.9,
+    "всего": 23.117
+   },
+   "lane_pool_mode": "nonce",
+   "lane_pool_candidates": [
+    "4aDaew4kNxTwxPjRpKsxKMskYUYnKuQvuq9jf4A3RSAWyHVjy4Unb8CJWnjjYguRzya25tyLMtUMSBnd4v97SqKo",
+    "Kox4wK4Mv2VfqAzSdgSHmei3cs3yMRy9FTJXQo4WMLR69FPhaijAca3U3z4edv4BizgT6QbjDLvXhs5L397XoGS",
+    "4TArTi9KuERm48C4YzqtFAizajgcPDuD2LqDyVaJK95Nfjr7qEaZf86rqiXGwVM3iYSkFxoZbU9e7sA7ESLQEpwP"
+   ],
+   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+   "lane_tips_total_sol": 0.001,
+   "control_services": null
   },
   {
-   "ts": null,
-   "client_order_id": "lane-own-ssXWXbi8LWinFmDaD3G3JdBo7H7MCZ7kunnD7WeL",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": null
-  },
-  {
-   "ts": null,
-   "client_order_id": "lane-own-ssXWXbi8LWinFmDaD3G3JdBo7H7MCZ7kunnD7WeL",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "bought"
-  },
-  {
-   "ts": null,
+   "schema_version": 2,
    "client_order_id": "lane-own-25ZpXqM2HSRSSoXFKb7Fsk8xkJwhC1mh15qgbBbP",
+   "ts_update": 1791728540.9456651,
+   "ts_update_utc": "2026-10-11T14:22:20Z",
+   "state": "bought",
    "lane": "own_send",
-   "source": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
-   "mint": "3vgHAej2inPHEy532CDrWyF79bVxVbWLEXti1CDMpump",
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "intent"
-  },
-  {
-   "ts": null,
-   "client_order_id": "lane-own-25ZpXqM2HSRSSoXFKb7Fsk8xkJwhC1mh15qgbBbP",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": null
-  },
-  {
-   "ts": null,
-   "client_order_id": "lane-own-25ZpXqM2HSRSSoXFKb7Fsk8xkJwhC1mh15qgbBbP",
-   "lane": "own_send",
-   "source": null,
-   "mint": null,
-   "istochnik_lag_slotov": null,
-   "indeks_v_bloke": null,
-   "mezhdu_nami_ms": null,
-   "podshagi_ms": null,
-   "pool_nonce": null,
-   "state": "bought"
+   "lane_signature": "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+   "lane_signature_local": "3CUqtrH2RuRN1v3FkCaP48ddgiTLqmUPAVhUxhXtkwWLvWDfXhZKaK6SnE2gpWesFDSvUrJfSvvw8sQ6q1Vs9P5c",
+   "ts_sent": 1791728537.1424522,
+   "ts_accepted": 1791728540.945622,
+   "ts_decision": 1791728537.1268866,
+   "ts_signed": 1791728537.142434,
+   "pool": null,
+   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+   "program_gen": 1,
+   "lane_min_out": 48979513132,
+   "lane_expected_out": 81632521887,
+   "lane_send_point": null,
+   "lane_send_ms": 9.09,
+   "lane_build_ms": 6.485,
+   "lane_dlmm_reads": null,
+   "lane_dlmm_reads_ms": null,
+   "lane_dlmm_odno_godilos": null,
+   "lane_dlmm_odno_why_not": null,
+   "lane_dlmm_nol_godilos": null,
+   "lane_dlmm_nol_why_not": null,
+   "lane_dlmm_nol_cena_polosy": null,
+   "lane_dlmm_nol_cena_teni": null,
+   "lane_dlmm_nol_min_out_polosy": null,
+   "lane_dlmm_nol_min_out_teni": null,
+   "lane_dlmm_nol_otklonenie_pct": null,
+   "lane_nonce_ms": 0.014,
+   "lane_sign_ms": 0.51,
+   "lane_variants_ms": 6.06,
+   "lane_variants_cpu_ms": 6.06,
+   "lane_variants_zhdali_ms": 0.0,
+   "lane_potokov_v_processe": 12,
+   "lane_gc_prohodov": [
+    0,
+    0,
+    0
+   ],
+   "lane_resursy_potoka": {
+    "polzovatelskoe_ms": 5.295,
+    "sistemnoe_ms": 0.921,
+    "promahov_stranic": 8,
+    "promahov_s_diska": 0,
+    "why_not": null
+   },
+   "lane_gc_porogi": [
+    700,
+    10,
+    10
+   ],
+   "lane_variants_reads_net": 0,
+   "lane_variants_reads_cached": 0,
+   "lane_nonce_warm": true,
+   "lane_tip_account": "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+   "lane_priority_lamports": 1000000,
+   "lane_ts_sent_buy": 1791728537.1424522,
+   "lane_region": "Asia",
+   "lane_region_leader": "Asia",
+   "lane_region_leader_slot": 455682574,
+   "lane_region_point": {
+    "astralane": {
+     "host": "fr.gateway.astralane.io",
+     "регион_точки": "EU"
+    },
+    "helius": {
+     "host": "sg-sender.helius-rpc.com",
+     "регион_точки": "Asia"
+    },
+    "jito": {
+     "host": "singapore.mainnet.block-engine.jito.wtf",
+     "регион_точки": "Asia"
+    }
+   },
+   "lane_region_senders": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "lane_region_why_not": null,
+   "lane_pool_winner": "astralane",
+   "lane_pool_senders": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "lane_pool_ok_senders": [
+    "astralane"
+   ],
+   "lane_pool_accepted_first": "astralane",
+   "lane_pool_ne_otvetili": [
+    "helius",
+    "jito"
+   ],
+   "lane_pool_isklyucheny": [],
+   "lane_pool_excluded_before": null,
+   "lane_podshagi_ms": {
+    "разбор и размер": 6.189,
+    "гейт полосы": 3.382,
+    "веер контролей": 0.009,
+    "чаевые пула и нонс": 0.648,
+    "сборка": 6.631,
+    "симуляция": 0.754,
+    "blockhash": 0.036,
+    "подпись": 7.471,
+    "всего": 25.121
+   },
+   "lane_podshagi_cpu_ms": {
+    "разбор и размер": 1.488,
+    "гейт полосы": 1.614,
+    "веер контролей": 0.007,
+    "чаевые пула и нонс": 0.498,
+    "сборка": 6.315,
+    "симуляция": 0.16,
+    "blockhash": 0.036,
+    "подпись": 7.055,
+    "всего": 17.172
+   },
+   "lane_pool_mode": "nonce",
+   "lane_pool_candidates": [
+    "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+    "4mKB4K86jiRpQss68YQSYpS1LxYNfKmSW1rZsmq5mWgCDRpDAPSxUVbAuWcuntTAd6x7kCwMBz3hDrNnU3Dzogdb",
+    "2wov3nUmjRyMik41qz213vVY3tXnWwKNcCjStEzj4HfmJsy1EKGPJPVogRpTd9m3KfoF1BsA1RnhUBzEcWGmAAoK"
+   ],
+   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+   "lane_tips_total_sol": 0.001,
+   "control_services": null
   }
  ]
 }
