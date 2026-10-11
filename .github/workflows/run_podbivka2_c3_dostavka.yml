@@ -1,0 +1,84 @@
+name: "Podbivka-2: dostavka ryadov Code-3 v vetku (bez povtornoy prokachki)"
+
+# ZACHEM. Polnyy fayl ryadov (782 MB) lezhit v artefakte zadaniya, a host artefaktov
+# GitHub (*.blob.core.windows.net) zakryt politikoy seti -- i u Code-3, i u menya:
+# 403 na CONNECT, skachivaetsya 0 bayt. Begunek zhe svoy artefakt vidit. Poetomu:
+# skachat artefakt NA BEGUNKE (actions/download-artifact, arhiv PumpApi ne chitaetsya
+# voobsche), urezat do semi poley ego kalkulyatora (~7 MB gz) i polozhit v vetku.
+#
+# Zapusk -- pushem markera data/podbivka/zapusk/c3_dostavka.json:
+#   {"run_id": 38102139499, "vyhod": "data/podbivka/c3_lp_rjady_..._urezan.json.gz"}
+on:
+  push:
+    branches:
+      - claude/podbivka
+    paths:
+      - "data/podbivka/zapusk/c3_dostavka*.json"
+  workflow_dispatch:
+
+concurrency:
+  group: podbivka2-c3-dostavka
+  cancel-in-progress: false
+
+jobs:
+  dostavka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/podbivka
+
+      - name: "Parametry iz markera"
+        run: |
+          set -e
+          python3 - <<'PY' > "$RUNNER_TEMP/c3d"
+          import json, pathlib
+          д = json.loads(pathlib.Path("data/podbivka/zapusk/c3_dostavka.json").read_text(encoding="utf-8"))
+          print(f"C3D_RUN={int(д['run_id'])}")
+          print(f"C3D_ARTEFAKT={д.get('artefakt') or 'c3-lp-chasy'}")
+          print(f"C3D_VYHOD={д['vyhod']}")
+          PY
+          cat "$RUNNER_TEMP/c3d" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/c3d"
+
+      - name: "Skachat artefakt zadaniya (ne arhiv)"
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.C3D_ARTEFAKT }}
+          run-id: ${{ env.C3D_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/art
+
+      - name: "Urezat ryady do semi poley"
+        env:
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          ls -la "$RUNNER_TEMP/art"
+          RJADY=$(ls "$RUNNER_TEMP"/art/c3_lp_rjady_*.json.gz | head -1)
+          echo "ryady: $RJADY"
+          python3 analysis/podbivka_c3_rjady_urezat.py \
+            --vhod "$RJADY" --vyhod "$C3D_VYHOD" --pushom
+          ls -la "$C3D_VYHOD"
+
+      - name: "Commit v vetku"
+        env:
+          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5 6; do
+            git fetch -q --depth=1 origin claude/podbivka
+            git reset -q FETCH_HEAD
+            git add -- "$C3D_VYHOD"
+            git diff --cached --quiet && { echo "already on branch"; exit 0; }
+            git commit -q -m "Podbivka-2: ryady LP dlya Code-3 (urezannye, 7 poley) [automated]"
+            git push -q origin HEAD:claude/podbivka && exit 0
+            sleep 4
+          done
+          exit 1
