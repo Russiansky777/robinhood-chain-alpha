@@ -1,11 +1,71 @@
 {
-    "pochemu": "Слово владельца 11.10: «Забор не включать», и п.4 того же пакета откладывает его до 20 сделок набора, на той группе, где доля лага 0 выше. Забор был включён мною 06:49:09Z по ПРЕЖНЕМУ слову (п.4 пакета 10.10, ворота «20 сделок» тогда были взяты). Новый пакет ворота снял и забор отложил -- значит снимаю.",
-    "chto_vazhno": "ЗАЧЕМ СРОЧНО, А НЕ ВМЕСТЕ С ОСТАЛЬНЫМ. С 06:49:09Z забор отказал ОБОИМ дошедшим до него сигналам vol_4vw (промах 3 и 2 слота при пределе 0) и покупок не пропустил ни одной: отказ стоит намеренно вместо отката на тёплый хеш (analysis/bloom_own_send.py:7979). Значит группа не торгует вовсе, и снятие забора -- это разблокировка, а не косметика. Перезапуска не требует: файл групп перечитывается на ходу (проверено 06:49:43Z).\nРУБИЛЬНИК КОЛЬЦА НЕ ТРОГАЕТСЯ: BLOOM_ZABOR_KOLCO_TEMPOM остаётся 1, как велено («env кольца» в п.1). Кольцо -- подвоз высот, забор -- флаг группы; это разные вещи.\npool_senders у vol_4vw остаётся [astralane, helius, jito] -- его владелец не отменял, а п.2 задаёт тот же набор и новой группе.",
+    "pochemu": "Слово владельца 11.10, п.2: группа «набор» на 0.01 КАК ПРИБОР. Пять адресов подбора 02-09.10, hold 108, обычный режим (забор false), pool_senders helius+astralane+jito, lane_open_max 3, порог входа 2.0, допуск 0.4. vol_4vw остаётся как есть.",
+    "primenyat_posle": "деплой п.1 (приборы заготовки + шаг GIL)",
+    "chto_vazhno": "ПОЛИТИКА -- ЗЕРКАЛО vol_4vw, И ЭТО НЕ ЛЕНЬ, А УСЛОВИЕ СРАВНЕНИЯ. Группа заведена прибором: по п.3 и п.4 мы будем сравнивать долю лага 0 у «набора» и у vol_4vw и по ней решать, где включать забор. Сравнение честно только если всё, кроме названных владельцем параметров, совпадает. Поэтому политика повторяет вычисленную политику vol_4vw ровно с двумя отличиями: hold_slots 36 -> 108 и zabor_s0 true -> false.\nПОЧЕМУ НЕ ВЫПИСАНЫ ПОЛЯ СО ЗНАЧЕНИЕМ null. У vol_4vw они null и в УМОЛЧАНИЯХ модуля тоже None (bloom_source_groups: pool_nonce, pool_senders, max_slots_from_source, sell_own_first, allow_taxed_route, slippage, slippage_thin_pool, thin_pool_below_sol, min_pool_sol_reserve, hold_slots_small). Значит пропуск поля даёт то же самое значение, что и явный null, и выписывать их незачем. Поля, у которых у vol_4vw значение НЕ null, выписаны все до одного.\npool_senders ЗАПИСАН СОРТИРОВАННЫМ. Прогон 06:47Z 11.10 уже отказался самопроверкой на том, что писали ['helius','astralane','jito'], а читается отсортированный список: _список_отправителей чистит имена, убирает повторы и СОРТИРУЕТ (analysis/bloom_source_groups.py:424). Набор тот же, что назвал владелец.\nСПИСКИ -- СПИСКАМИ, А НЕ СТРОКОЙ. pravka_grupp отказывает кодом 11, если lane_pools или pool_senders заданы не списком (живой случай 02.10 с cand1_05: строка прошла самопроверку, а читатель полосы молча её отбросил).\nПОРЯДОК В ПЛАНЕ ВАЖЕН: sozdat идёт ПЕРВЫМ, иначе перенос откажет кодом 6 («куда переносить -- группы нет»). Переносы идут после.\nТЕКУЩАЯ ГРУППА АДРЕСОВ НЕ НУЖНА: perenesti убирает адрес отовсюду, где он есть, и печатает, откуда взял; если его нет нигде, печатает «(нигде)». Снимок групп в ветке устарел (28.09), живой файл только на хосте, поэтому проверка «было N адресов, стало N» в самом прогоне -- и есть доказательство, что ни один не потерян.",
     "pravki": [
         {
-            "gruppa": "vol_4vw",
-            "pole": "zabor_s0",
-            "znachenie": "0"
+            "sozdat": "nabor",
+            "politika": {
+                "lane_sol": 0.01,
+                "lane_size": 0.01,
+                "bloom_trades": false,
+                "subscribe": true,
+                "lane_trades": true,
+                "fanout": false,
+                "min_target_sol": 2.0,
+                "lane_open_max": 3,
+                "lane_pools": [
+                    "amm_v4",
+                    "bonding",
+                    "clmm",
+                    "cpmm",
+                    "damm2",
+                    "dbc",
+                    "dlmm",
+                    "launchlab",
+                    "pump_amm",
+                    "two_step",
+                    "whirlpool"
+                ],
+                "max_slots_from_source": 3,
+                "skip_flippers": true,
+                "zabor_s0": false,
+                "pool_nonce": false,
+                "pool_senders": [
+                    "astralane",
+                    "helius",
+                    "jito"
+                ],
+                "allow_taxed_route": true,
+                "slippage": 0.4,
+                "hold_slots": 108
+            },
+            "pometka": "gruppa-pribor, slovo vladeltsa 11.10 p.2"
+        },
+        {
+            "perenesti": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
+            "v": "nabor",
+            "pometka": "nabor: podbor 02-09.10, slovo vladeltsa 11.10"
+        },
+        {
+            "perenesti": "HSeCG7T2KCTuVAARGXZuxBNZg6pas1EdJdjn7Xyy1ENB",
+            "v": "nabor",
+            "pometka": "nabor: podbor 02-09.10, slovo vladeltsa 11.10"
+        },
+        {
+            "perenesti": "H31vEBxSJk1nQdUN11qZgZyhScyShhscKhvhZZU3dQoU",
+            "v": "nabor",
+            "pometka": "nabor: podbor 02-09.10, slovo vladeltsa 11.10"
+        },
+        {
+            "perenesti": "FxN3VZ4BosL5urG2yoeQ156JSdmavm9K5fdLxjkPmaMR",
+            "v": "nabor",
+            "pometka": "nabor: podbor 02-09.10, slovo vladeltsa 11.10"
+        },
+        {
+            "perenesti": "BJ3WPii1DLJ1GiSGiSP5jip7DDugwoQpqFP4tQTYBtZp",
+            "v": "nabor",
+            "pometka": "nabor: podbor 02-09.10, slovo vladeltsa 11.10"
         }
     ]
 }
