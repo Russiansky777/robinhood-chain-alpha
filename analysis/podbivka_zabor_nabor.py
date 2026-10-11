@@ -279,10 +279,13 @@ def набор_на_сегодня(ряды: dict, дни: list, кг: str, K: i
 
 
 def главное(а) -> int:  # noqa: PLR0915
-    global СЕМЯ
+    global СЕМЯ, НЕПОЛНЫЕ, K_НАБОРА, ПОПРАВКА  # noqa: PLW0603
     if а.semya:
         СЕМЯ = а.semya
         З.СЕМЯ = а.semya
+    if а.k:
+        K_НАБОРА = tuple(int(x) for x in а.k.split(",") if x.strip())
+        ПОПРАВКА = len(K_НАБОРА)
     кал = (json.loads((П / "kalibrovka.json").read_text(encoding="utf-8"))
            .get("калибровка") or {})
     изд = float(кал.get("издержки_медиана_sol") or 0.002)
@@ -294,10 +297,6 @@ def главное(а) -> int:  # noqa: PLR0915
                         "поправка_на_перебор": f"0.05/{ПОПРАВКА}",
                         "издержки_sol": изд},
             "срезы": {}}
-    global НЕПОЛНЫЕ, K_НАБОРА, ПОПРАВКА  # noqa: PLW0603
-    if а.k:
-        K_НАБОРА = tuple(int(x) for x in а.k.split(",") if x.strip())
-        ПОПРАВКА = len(K_НАБОРА)
     НЕПОЛНЫЕ = неполные_сутки()
     if НЕПОЛНЫЕ:
         print(f"  неполные сутки выброшены: {', '.join(sorted(НЕПОЛНЫЕ))}", flush=True)
