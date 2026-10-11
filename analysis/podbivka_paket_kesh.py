@@ -101,6 +101,9 @@ def main() -> int:
     счёт = {"файлов": 0, "сигналов": 0, "записано": 0, "дублей": 0, "рано": 0}
     по_файлам: dict = collections.Counter()
     сутки: collections.Counter = collections.Counter()
+    # сколько РАЗНЫХ часов суток прочитано: суточный файл идёт 25 часов с 17:00Z, поэтому
+    # календарные сутки собраны двумя файлами, и по числу часов видно, целые они или нет
+    часы_суток: dict = collections.defaultdict(set)
     источники: collections.Counter = collections.Counter()
     out = ПАПКА / "signaly.jsonl.gz"
     with gzip.open(out, "wt", encoding="utf-8") as ф:
@@ -126,9 +129,12 @@ def main() -> int:
                 счёт["записано"] += 1
                 по_файлам[Path(f).name] += 1
                 сутки[д_] += 1
+                часы_суток[д_].add(time.strftime(
+                    "%H", time.gmtime((с.get("timestamp") or 0) / 1000)))
                 источники[с.get("trader")] += 1
     свод = {"что": "кэш сигналов архива для пакета 04.10", "файл": out.name, "счёт": счёт,
             "суток": len(сутки), "по_суткам": dict(sorted(сутки.items())),
+            "часов_в_сутках": {д: len(ч) for д, ч in sorted(часы_суток.items())},
             "источников": len(источники), "по_файлам": dict(по_файлам.most_common()),
             "верх_источников": источники.most_common(20)}
     СВОДКА.write_text(json.dumps(свод, ensure_ascii=False, indent=1),
