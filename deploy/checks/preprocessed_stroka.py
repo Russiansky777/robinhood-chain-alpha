@@ -48,6 +48,17 @@ def строки(д: dict) -> list:
                 f"slotov pre {д.get('slotov_pre')}, ws {д.get('slotov_ws')}, "
                 f"rabotal {д.get('sekund_raboty')} s, "
                 f"cena pre {д.get('kreditov_v_sutki_pre')} kreditov/sut")
+    if д.get("forma") or д.get("formy"):
+        ф = д.get("formy") or {}
+        из_.append(f"zond: forma podpiski {д.get('forma')}, "
+                    f"godnaya po probam {ф.get('godnaya_forma')}")
+        for р in (ф.get("ryady") or []):
+            из_.append(f"   forma {р.get('forma'):>18}: prinjal "
+                        f"{р.get('prinjal')}, {р.get('soobshchenij')} soobshch "
+                        f"({р.get('soobshchenij_v_sekundu')}/s), slotov "
+                        f"{р.get('slotov')}, filtr dejstvuet "
+                        f"{р.get('filtr_dejstvuet')}"
+                        + (f", why_not {р.get('why_not')}" if р.get("why_not") else ""))
     if д.get("pervye_podpisi_pre"):
         из_.append(f"zond: pervye podpisi pre: "
                     f"{','.join(д['pervye_podpisi_pre'][:3])}")
@@ -90,6 +101,19 @@ def самопроверка() -> int:
                               "rabotal 1200.0 s", "2592 kreditov/sut")), т)
     chk("первые подписи pre видны -- их можно проверить по цепи",
         "AAA,BBB,CCC" in т, т)
+    с_ф = строки({**полный, "forma": "objekt_bez_pustyh", "formy": {
+        "godnaya_forma": "objekt_bez_pustyh", "ryady": [
+            {"forma": "objekt", "prinjal": True, "soobshchenij": 500,
+             "soobshchenij_v_sekundu": 62.5, "slotov": 94,
+             "filtr_dejstvuet": False, "why_not": None},
+            {"forma": "objekt_bez_pustyh", "prinjal": True,
+             "soobshchenij": 1, "soobshchenij_v_sekundu": 0.12, "slotov": 1,
+             "filtr_dejstvuet": True, "why_not": None}]}})
+    тф = "\n".join(с_ф)
+    chk("строки показывают КАЖДУЮ пробу формы и годную из них",
+        "godnaya po probam objekt_bez_pustyh" in тф
+        and "62.5/s" in тф and "filtr dejstvuet False" in тф
+        and "filtr dejstvuet True" in тф, тф)
     chk("цель набрана -- да", достигнуто(полный) is True)
     chk("цель не набрана при недоборе",
         достигнуто({**полный, "tranzakcij_v_oboih": 29}) is False)

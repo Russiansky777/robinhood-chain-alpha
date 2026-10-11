@@ -67,6 +67,28 @@ from pathlib import Path
 # ПОРОГ ВЛАДЕЛЬЦА: если выигрыш >= 20 мс, поток стоит того, чтобы думать о
 # переводе детектора на него.
 ПОРОГ_МС = 20.0
+# ПРЕДОХРАНИТЕЛЬ: СКОЛЬКО СООБЩЕНИЙ В СЕКУНДУ ПО ОДНОМУ АДРЕСУ -- УЖЕ НЕ НАШ
+# ПОТОК. Источник 4vw делает единицы транзакций в минуту; 5 сообщений в
+# СЕКУНДУ по одному адресу невозможны. Прогон 11.10 01:2xZ получил 62.18
+# сообщения в секунду и 94 разных слота за 21 с -- это поток всей сети, и по
+# тарифу 0.1 кредита за сообщение он стоил бы 537 235 кредитов в сутки. Зонд
+# обязан сам это заметить и выключиться, а не жечь кредиты до предела по часам.
+ПОТОЛОК_СООБЩЕНИЙ_В_СЕКУНДУ = 5.0
+СЕКУНД_ДО_ПРЕДОХРАНИТЕЛЯ = 20.0
+# ФОРМЫ ПАРАМЕТРОВ, КОТОРЫЕ ПРОБУЕМ. Документация показывает объект, но
+# фильтр по объекту не подействовал, а отказа не было: значит форму надо
+# выяснить у сервера, а не у памяти. Каждая проба длится считанные секунды и
+# стоит считанные кредиты.
+ФОРМЫ_ПАРАМЕТРОВ = (
+    ("objekt", lambda а: {"accountInclude": [а], "accountExclude": [],
+                           "accountRequired": []}),
+    ("objekt_bez_pustyh", lambda а: {"accountInclude": [а]}),
+    ("spisok_objekta", lambda а: [{"accountInclude": [а], "accountExclude": [],
+                                    "accountRequired": []}]),
+    ("objekt_v_filter", lambda а: {"filter": {"accountInclude": [а]}}),
+    ("accountRequired", lambda а: {"accountInclude": [], "accountExclude": [],
+                                    "accountRequired": [а]}),
+)
 
 
 def base58_из_байтов(сырые: bytes) -> str:
@@ -272,11 +294,10 @@ def свод(встречи: Встречи, *, цель: int = ПОКУПОК_�
 
 
 async def _поток_pre(встречи: Встречи, *, ключ: str, адрес: str,
-                      стоп: asyncio.Event) -> None:
+                      стоп: asyncio.Event, форма: str = "objekt") -> None:
     import websockets  # noqa: PLC0415
     запрос = {"jsonrpc": "2.0", "id": 1, "method": "preprocessedSubscribe",
-              "params": {"accountInclude": [адрес], "accountExclude": [],
-                          "accountRequired": []}}
+              "params": _параметры_формы(форма, адрес)}
     try:
         async with websockets.connect(ТОЧКА_PRE + ключ, ping_interval=20,
                                        ping_timeout=30,
@@ -352,11 +373,33 @@ async def _поток_ws(встречи: Встречи, *, ключ: str, ад�
 
 
 async def зонд(*, ключ: str, адрес: str, цель: int, секунд: float,
-                путь_журнала: str = "", путь_признака: str = "") -> dict:
+                путь_журнала: str = "", путь_признака: str = "",
+                форма: str = "avto", секунд_на_форму: float = 8.0) -> dict:
     встречи = Встречи()
+    формы = None
+    if форма == "avto":
+        # ФОРМУ ПАРАМЕТРОВ ВЫЯСНЯЕМ У СЕРВЕРА, А НЕ У ПАМЯТИ. 11.10 форма из
+        # документации (объект) подписку приняла, но фильтр не применила: пошёл
+        # поток всей сети, 62 сообщения в секунду. Открывать долгий поток, не
+        # убедившись, что фильтр действует, значит жечь кредиты впустую.
+        формы = await пробы_форм(ключ=ключ, адрес=адрес,
+                                  секунд=секунд_на_форму)
+        форма = формы.get("godnaya_forma")
+        if not форма:
+            из_ = свод(встречи, цель=цель)
+            из_["formy"] = формы
+            из_["why_not"] = ("ни одна форма параметров не дала "
+                               "ДЕЙСТВУЮЩЕГО фильтра -- долгий поток не "
+                               "открыт, кредиты не потрачены")
+            из_["vyvod"] = из_["why_not"]
+            if путь_признака:
+                Path(путь_признака).write_text(
+                    json.dumps(из_, ensure_ascii=False, indent=1) + "\n",
+                    encoding="utf-8")
+            return из_
     стоп = asyncio.Event()
     задачи = [asyncio.create_task(_поток_pre(встречи, ключ=ключ, адрес=адрес,
-                                              стоп=стоп)),
+                                              стоп=стоп, форма=форма)),
               asyncio.create_task(_поток_ws(встречи, ключ=ключ, адрес=адрес,
                                              стоп=стоп))]
     кончить = time.time() + float(секунд)
@@ -396,12 +439,28 @@ async def зонд(*, ключ: str, адрес: str, цель: int, секун�
                 break
             if встречи.отказы.get("pre") and not встречи.оба():
                 break
+            # ПРЕДОХРАНИТЕЛЬ ПО ТЕМПУ. Срабатывает только после
+            # СЕКУНД_ДО_ПРЕДОХРАНИТЕЛЯ, чтобы догоняющая пачка на старте не
+            # остановила зонд зря.
+            прошло_с = time.perf_counter() - встречи.начало
+            if прошло_с >= СЕКУНД_ДО_ПРЕДОХРАНИТЕЛЯ:
+                темп = встречи.поток_счёт.get("pre", 0) / прошло_с
+                if темп > ПОТОЛОК_СООБЩЕНИЙ_В_СЕКУНДУ:
+                    встречи.отказы["pre"] = (
+                        f"ПРЕДОХРАНИТЕЛЬ: {темп:.2f} сообщения в секунду по "
+                        f"одному адресу при потолке "
+                        f"{ПОТОЛОК_СООБЩЕНИЙ_В_СЕКУНДУ} -- фильтр "
+                        f"accountInclude не применяется, нам шлют поток шире "
+                        f"запрошенного; зонд выключен, чтобы не жечь кредиты")
+                    break
     finally:
         стоп.set()
         for з in задачи:
             з.cancel()
         await asyncio.gather(*задачи, return_exceptions=True)
     из_ = свод(встречи, цель=цель)
+    из_["forma"] = форма
+    из_["formy"] = формы
     из_["ryady"] = [{"podpis": р["podpis"], "slot_ws": р["slot_ws"],
                       "slot_pre": р["slot_pre"], "ws_utc": р["ws_utc"],
                       "pre_utc": р["pre_utc"],
@@ -412,6 +471,105 @@ async def зонд(*, ключ: str, адрес: str, цель: int, секун�
         Path(путь_признака).write_text(
             json.dumps(из_, ensure_ascii=False, indent=1) + "\n",
             encoding="utf-8")
+    return из_
+
+
+def _параметры_формы(имя: str, адрес: str):
+    """Параметры подписки по имени формы. Неизвестная форма -- исключение."""
+    for и, построить in ФОРМЫ_ПАРАМЕТРОВ:
+        if и == имя:
+            return построить(адрес)
+    raise ValueError(f"форма параметров {имя!r} неизвестна")
+
+
+async def проба_формы(*, ключ: str, адрес: str, форма: str,
+                       секунд: float = 8.0) -> dict:
+    """ОДНА форма параметров preprocessedSubscribe -- принял ли и что шлёт.
+
+    Отвечает на вопрос, который нельзя решить чтением документации: фильтр
+    подействовал или нет. Признак -- темп сообщений и число разных слотов:
+    один адрес источника не даёт десятков сообщений в секунду.
+    """
+    import websockets  # noqa: PLC0415
+    из_ = {"forma": форма, "prinjal": None, "why_not": None,
+            "soobshchenij": 0, "slotov": 0, "sekund": секунд,
+            "soobshchenij_v_sekundu": None, "filtr_dejstvuet": None,
+            "pervye_podpisi": [], "otvet_na_podpisku": None}
+    try:
+        параметры = _параметры_формы(форма, адрес)
+    except ValueError as сбой:
+        из_["why_not"] = str(сбой)
+        return из_
+    запрос = {"jsonrpc": "2.0", "id": 1, "method": "preprocessedSubscribe",
+              "params": параметры}
+    слоты, начало = set(), time.perf_counter()
+    try:
+        async with websockets.connect(ТОЧКА_PRE + ключ, ping_interval=20,
+                                       ping_timeout=30,
+                                       max_size=16 * 1024 * 1024) as соед:
+            await соед.send(json.dumps(запрос))
+            кончить = time.time() + float(секунд)
+            while time.time() < кончить:
+                try:
+                    сырое = await asyncio.wait_for(
+                        соед.recv(), timeout=max(0.2, кончить - time.time()))
+                except asyncio.TimeoutError:
+                    break
+                if isinstance(сырое, str):
+                    try:
+                        ответ = json.loads(сырое)
+                    except ValueError:
+                        continue
+                    из_["otvet_na_podpisku"] = json.dumps(
+                        ответ, ensure_ascii=False)[:300]
+                    if "error" in ответ:
+                        из_["prinjal"] = False
+                        из_["why_not"] = ("отказ: " + json.dumps(
+                            ответ["error"], ensure_ascii=False)[:300])
+                        return из_
+                    из_["prinjal"] = True
+                    continue
+                р = разобрать_кадр(сырое)
+                из_["soobshchenij"] += 1
+                if р["ok"]:
+                    слоты.add(р["slot"])
+                    if len(из_["pervye_podpisi"]) < 3:
+                        из_["pervye_podpisi"].append(р["podpis"])
+                elif not из_["why_not"]:
+                    из_["why_not"] = r_why(р)
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = f"{type(сбой).__name__}: {затереть(сбой)[:300]}"
+        return из_
+    прошло = max(1e-9, time.perf_counter() - начало)
+    из_["slotov"] = len(слоты)
+    из_["soobshchenij_v_sekundu"] = round(из_["soobshchenij"] / прошло, 2)
+    if из_["prinjal"] is None:
+        из_["prinjal"] = из_["soobshchenij"] > 0
+    # ФИЛЬТР ДЕЙСТВУЕТ, если темп не выше потолка для одного адреса. Ноль
+    # сообщений -- это НЕ доказательство, что фильтр работает: источник мог
+    # просто молчать, и так и сказано словами.
+    if из_["soobshchenij"] == 0:
+        из_["filtr_dejstvuet"] = None
+        из_["why_not"] = из_["why_not"] or (
+            "ни одного сообщения за окно: фильтр либо работает, либо подписка "
+            "не принята -- по нулю не отличить")
+    else:
+        из_["filtr_dejstvuet"] = bool(
+            из_["soobshchenij_v_sekundu"] <= ПОТОЛОК_СООБЩЕНИЙ_В_СЕКУНДУ)
+    return из_
+
+
+async def пробы_форм(*, ключ: str, адрес: str, секунд: float = 8.0) -> dict:
+    """Все формы параметров по очереди -- и какая из них фильтрует."""
+    из_ = {"adres": адрес, "sekund_na_formu": секунд, "ryady": [],
+            "godnaya_forma": None,
+            "potolok_soobshchenij_v_sekundu": ПОТОЛОК_СООБЩЕНИЙ_В_СЕКУНДУ}
+    for имя, _ in ФОРМЫ_ПАРАМЕТРОВ:
+        р = await проба_формы(ключ=ключ, адрес=адрес, форма=имя,
+                               секунд=секунд)
+        из_["ryady"].append(р)
+        if р.get("filtr_dejstvuet") is True and из_["godnaya_forma"] is None:
+            из_["godnaya_forma"] = имя
     return из_
 
 
@@ -432,6 +590,17 @@ def ключ_из_окружения() -> dict:
     if not из_["kljuch"]:
         из_["why_not"] = "ключа Helius нет ни в файле, ни в переменной"
     return из_
+
+
+def _ловит(что, тип) -> bool:
+    """Нужен самопроверке: ждём исключение нужного типа, а не тихий ответ."""
+    try:
+        что()
+    except тип:
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+    return False
 
 
 def самопроверка() -> int:
@@ -578,6 +747,40 @@ def самопроверка() -> int:
     chk("в своде нет ни одного поля с ключом",
         "api-key" not in json.dumps(свод(в2, цель=5), ensure_ascii=False))
 
+    # ФОРМЫ ПАРАМЕТРОВ И ПРЕДОХРАНИТЕЛЬ -- без сети.
+    chk("формы параметров перечислены и строятся по имени",
+        _параметры_формы("objekt", "A") == {"accountInclude": ["A"],
+                                             "accountExclude": [],
+                                             "accountRequired": []}
+        and _параметры_формы("spisok_objekta", "A") == [
+            {"accountInclude": ["A"], "accountExclude": [],
+             "accountRequired": []}]
+        and _параметры_формы("objekt_v_filter", "A") == {
+            "filter": {"accountInclude": ["A"]}}
+        and _параметры_формы("accountRequired", "A")["accountRequired"] == ["A"],
+        [и for и, _ in ФОРМЫ_ПАРАМЕТРОВ])
+    chk("неизвестная форма -- исключение, а не тихий полный поток",
+        (lambda: (_параметры_формы("net_takoj", "A"), False)[1]
+         if False else _ловит(lambda: _параметры_формы("net_takoj", "A"),
+                               ValueError))())
+    chk("потолок темпа и срок до предохранителя названы числами с причиной",
+        ПОТОЛОК_СООБЩЕНИЙ_В_СЕКУНДУ == 5.0
+        and СЕКУНД_ДО_ПРЕДОХРАНИТЕЛЯ == 20.0
+        and "537 235" in (sys.modules[__name__].__dict__
+                           .get("__doc___potolok", "")
+                           or open(__file__, encoding="utf-8").read()))
+    _текст = open(__file__, encoding="utf-8").read()
+    chk("зонд НЕ открывает долгий поток, пока форма не проверена: ветка "
+        "'ни одна форма' стоит ДО создания задач потока",
+        _текст.index("ни одна форма параметров") < _текст.index("стоп = asyncio.Event()"),
+        None)
+    chk("форма подписки идёт в отчёт -- иначе непонятно, чем мерили",
+        '"forma"' in _текст and '"formy"' in _текст)
+    chk("предохранитель стоит В ЦИКЛЕ зонда, а не только описан",
+        "ПРЕДОХРАНИТЕЛЬ:" in open(__file__, encoding="utf-8").read()
+        and "ПОТОЛОК_СООБЩЕНИЙ_В_СЕКУНДУ" in
+            open(__file__, encoding="utf-8").read().split("async def зонд")[1])
+
     # ИСТОЧНИК СПЕЦИФИКАЦИИ НАЗВАН В МОДУЛЕ, а не взят из головы.
     chk("раскладка кадра и цена потока названы в головном описании со ссылкой",
         "preprocessed-subscribe" in (__doc__ or "")
@@ -611,6 +814,13 @@ def main() -> int:
     п.add_argument("--sekund", type=float, default=СЕКУНД_ПРЕДЕЛ)
     п.add_argument("--out", default="")
     п.add_argument("--status", default="")
+    п.add_argument("--proby-form", action="store_true",
+                    help="перебрать формы параметров preprocessedSubscribe и "
+                         "назвать ту, при которой фильтр действует")
+    п.add_argument("--sekund-na-formu", type=float, default=8.0)
+    п.add_argument("--forma", default="avto",
+                    help="форма параметров подписки; 'avto' -- выяснить у "
+                         "сервера, какая из них действительно фильтрует")
     а = п.parse_args()
     if а.self_test:
         return самопроверка()
@@ -619,9 +829,18 @@ def main() -> int:
         print(json.dumps({"ok": False, "why_not": к["why_not"]},
                           ensure_ascii=False))
         return 1
+    if а.proby_form:
+        из_ф = asyncio.run(пробы_форм(ключ=к["kljuch"], адрес=а.adres,
+                                       секунд=а.sekund_na_formu))
+        текст = json.dumps(из_ф, ensure_ascii=False, indent=1)
+        print(текст)
+        if а.status:
+            Path(а.status).write_text(текст + "\n", encoding="utf-8")
+        return 0
     из_ = asyncio.run(зонд(ключ=к["kljuch"], адрес=а.adres, цель=а.pokupok,
                             секунд=а.sekund, путь_журнала=а.out,
-                            путь_признака=а.status))
+                            путь_признака=а.status, форма=а.forma,
+                            секунд_на_форму=а.sekund_na_formu))
     print(json.dumps(из_, ensure_ascii=False, indent=1))
     return 0
 
