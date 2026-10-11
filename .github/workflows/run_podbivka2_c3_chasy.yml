@@ -12,7 +12,16 @@ name: "Podbivka-2: chasy arhiva dlya Code-3 (artefakt, ne v vetku)"
 #
 # Zapuskaetsya TOLKO vruchnuyu i TOLKO kogda tyazhelyy progon arhiva uzhe
 # zakonchen: eto odno zadanie, a ne shest, i mesta arhiva ono ne zanimaet.
+# Zapusk -- pushem markera data/podbivka/zapusk/c3_chasy.json (ruchnoy zapusk
+# workflow_dispatch nedostupen: GitHub otdayot ego tolko dlya faylov na vetke po
+# umolchaniyu, a etot process zhivyot v claude/podbivka -- proverено 11.10, HTTP 404).
+# Marker: {"s": "2026-10-08T00", "chasov": 48, "mintov": 250}.
 on:
+  push:
+    branches:
+      - claude/podbivka
+    paths:
+      - "data/podbivka/zapusk/c3_chasy*.json"
   workflow_dispatch:
     inputs:
       s:
@@ -40,6 +49,27 @@ jobs:
         with:
           ref: claude/podbivka
 
+      - name: "Parametry iz markera"
+        env:
+          IN_S: ${{ github.event.inputs.s }}
+          IN_CHASOV: ${{ github.event.inputs.chasov }}
+          IN_MINTOV: ${{ github.event.inputs.mintov }}
+        run: |
+          set -e
+          python3 - <<'PY' > "$RUNNER_TEMP/c3env"
+          import json, os, pathlib
+          ф = pathlib.Path("data/podbivka/zapusk/c3_chasy.json")
+          д = json.loads(ф.read_text(encoding="utf-8")) if ф.exists() else {}
+          s = os.environ.get("IN_S") or д.get("s") or "2026-10-08T00"
+          ч = os.environ.get("IN_CHASOV") or д.get("chasov") or 48
+          м = os.environ.get("IN_MINTOV") or д.get("mintov") or 250
+          print(f"C3_S={s}")
+          print(f"C3_CHASOV={int(ч)}")
+          print(f"C3_MINTOV={int(м)}")
+          PY
+          cat "$RUNNER_TEMP/c3env" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/c3env"
+
       - name: "Python venv"
         run: |
           set -e
@@ -52,7 +82,7 @@ jobs:
           set -e
           # 48 chasov ~ 21.7 GB (452 MB mediana po arhiv_glubina_proba.json).
           # S keshem chasy kachayutsya ODIN raz na dva prohoda; bez nego -- dvazhdy.
-          NUZHNO=$(( ${{ github.event.inputs.chasov }} * 500 ))   # MB s zapasom
+          NUZHNO=$(( C3_CHASOV * 500 ))   # MB s zapasom
           for D in /mnt /home/runner/work; do
             SVOB=$(df -Pm "$D" 2>/dev/null | awk 'NR==2{print $4}')
             [ -n "$SVOB" ] || continue
@@ -72,19 +102,19 @@ jobs:
         run: |
           set -e
           $PY analysis/podbivka_arhiv_den.py \
-            --s "${{ github.event.inputs.s }}" \
-            --chasov "${{ github.event.inputs.chasov }}" \
+            --s "$C3_S" \
+            --chasov "$C3_CHASOV" \
             --okno 160 --bez-sobytij \
-            --metka "c3_lp_otbor_${{ github.event.inputs.s }}_${{ github.event.inputs.chasov }}ch"
+            --metka "c3_lp_otbor_${C3_S}_${C3_CHASOV}ch"
 
       - name: "Vyborka mintov"
         run: |
           set -e
           $PY analysis/podbivka_c3_vybor_mintov.py \
-            --vhod "data/podbivka/arhiv_den/c3_lp_otbor_${{ github.event.inputs.s }}_${{ github.event.inputs.chasov }}ch.json.gz" \
+            --vhod "data/podbivka/arhiv_den/c3_lp_otbor_${C3_S}_${C3_CHASOV}ch.json.gz" \
             --vyhod "$RUNNER_TEMP/minty.txt" \
             --vyhod-json "data/podbivka/arhiv_den/c3_lp_vybor_mintov.json" \
-            --mintov "${{ github.event.inputs.mintov }}"
+            --mintov "$C3_MINTOV"
 
       - name: "Prohod 2: ryady po vybrannym mintam"
         env:
@@ -92,16 +122,16 @@ jobs:
         run: |
           set -e
           $PY analysis/podbivka_arhiv_den.py \
-            --s "${{ github.event.inputs.s }}" \
-            --chasov "${{ github.event.inputs.chasov }}" \
+            --s "$C3_S" \
+            --chasov "$C3_CHASOV" \
             --minty "$(cat "$RUNNER_TEMP/minty.txt")" \
-            --metka "c3_lp_rjady_${{ github.event.inputs.s }}_${{ github.event.inputs.chasov }}ch"
+            --metka "c3_lp_rjady_${C3_S}_${C3_CHASOV}ch"
 
       - name: "Artefakt dlya Code-3"
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: "c3-lp-chasy-${{ github.event.inputs.s }}-${{ github.event.inputs.chasov }}ch"
+          name: "c3-lp-chasy"
           path: |
             data/podbivka/arhiv_den/c3_lp_otbor_*.json.gz
             data/podbivka/arhiv_den/c3_lp_rjady_*.json.gz
