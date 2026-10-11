@@ -1,0 +1,46 @@
+{
+ "pid": 332975,
+ "sekund": 15.0,
+ "yader": 2,
+ "potokov": 1,
+ "ryady": [
+  {
+   "tid": 332975,
+   "imya": "python",
+   "sekund_cpu": 0.01,
+   "proc_odnogo_yadra": 0.067,
+   "proc_mashiny": 0.033,
+   "pochemu": null
+  }
+ ],
+ "why_not": null,
+ "takty_v_sekunde": 100,
+ "potokov_poyavilos_v_okne": 0,
+ "potokov_ischezlo_v_okne": 0,
+ "porog_zhzhet_proc": 1.0,
+ "zhgut_potokov": 0,
+ "zhgut_imena": [],
+ "summa_proc_odnogo_yadra": 0.067,
+ "bez_imeni_potokov": 1,
+ "vyvod": "в окне замера не жёг никто: окно попало в тишину, замер надо повторить В МОМЕНТ активности источника",
+ "nashli": {
+  "pid": 332975,
+  "why_not": null,
+  "vse": [
+   {
+    "pid": 332975,
+    "komanda": "/home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/bloom_executor/bloom_seller.py"
+   },
+   {
+    "pid": 391050,
+    "komanda": "bash -c python3 /tmp/potoki_zamer/potoki_processa.py --iskat bloom_seller --sekund 15 --out /tmp/potoki_zamer/out_bloom_seller.json > /dev/null"
+   },
+   {
+    "pid": 391051,
+    "komanda": "python3 /tmp/potoki_zamer/potoki_processa.py --iskat bloom_seller --sekund 15 --out /tmp/potoki_zamer/out_bloom_seller.json"
+   }
+  ],
+  "iskali": "bloom_seller",
+  "ogovorka": "совпало 3 процессов, взят младший pid; остальные названы в vse"
+ }
+}
