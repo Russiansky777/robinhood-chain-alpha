@@ -1459,20 +1459,26 @@ def budzhet_iz_instrukcij(инструкции: list) -> dict:
         разобрано = ((и or {}).get("parsed") or {})
         # ТИП -- ЦЕЛИКОМ, НЕ ОБРЕЗАННЫЙ. Обрезка до 8 знаков 10.10 не дала
         # ответить, лимит это или цена: по base58 обрезок не разобрать.
+        # BASE58 РАЗБИРАЕТСЯ ОДИН РАЗ. Прежде один и тот же blob декодировался
+        # до трёх раз на инструкцию (код, длина, а затем ещё раз ниже), а
+        # cu_verhnim ходит по нескольким подписям и нескольким инструкциям в
+        # каждой. И поле kod было то числом, то строкой "не base58" -- всякий,
+        # кто сравнивает kod с номером инструкции, должен был это особо
+        # оговаривать. Теперь kod -- int или None, а причина лежит рядом.
         _сырое = (и or {}).get("data") or ""
-        _код = None
+        _б, _код, _почему = None, None, None
         if _сырое:
             try:
                 _б = base58_v_bajty(_сырое)
+            except ValueError as _сбой:
+                _почему = f"не base58: {_сбой}"
+            else:
                 _код = (_б[0] if _б else None)
-            except ValueError:
-                _код = "не base58"
         из_["tipy"].append({"type": разобрано.get("type"),
                              "data": _сырое,
                              "kod": _код,
-                             "bajt": (len(base58_v_bajty(_сырое))
-                                      if (_сырое and _код not in (None, "не base58"))
-                                      else None)})
+                             "pochemu": _почему,
+                             "bajt": (len(_б) if _б is not None else None)})
         тип = (разобрано.get("type") or "")
         сведения = (разобрано.get("info") or {})
         if тип == "setComputeUnitPrice" and сведения.get("microLamports") is not None:
@@ -1483,15 +1489,14 @@ def budzhet_iz_instrukcij(инструкции: list) -> dict:
             из_["cu_predel"] = int(сведения["units"])
             из_["iz_parsed"] += 1
             continue
-        данные = (и or {}).get("data")
-        if not данные:
+        if not _сырое:
             continue
         из_["iz_base58"] += 1
-        try:
-            байты = base58_v_bajty(данные)
-        except ValueError as сбой:
-            из_["why_not"] = f"данные инструкции бюджета не разобрались: {сбой}"
+        if _б is None:
+            из_["why_not"] = (f"данные инструкции бюджета не разобрались: "
+                               f"{_почему}")
             continue
+        байты = _б
         if not байты:
             continue
         код = байты[0]
@@ -2443,6 +2448,14 @@ def самопроверка() -> int:
         and _рз0["tipy"][1]["kod"] == БЮДЖЕТ_ПРЕДЕЛ_CU
         and _рз0["tipy"][1]["bajt"] == 5
         and _рз0["tipy"][1]["data"] == предел_ix["data"], _рз0["tipy"])
+    # KOD -- ВСЕГДА ЧИСЛО ИЛИ None, причина отдельным полем: смешанный тип в
+    # одном поле заставлял бы всякого читателя особо оговаривать строку.
+    _кр = budzhet_iz_instrukcij([{"programId": ПРОГРАММА_БЮДЖЕТА,
+                                   "data": "0OIl"}])
+    chk("негодный base58: kod -- None, причина рядом, тип поля не смешан",
+        _кр["tipy"][0]["kod"] is None
+        and "не base58" in (_кр["tipy"][0]["pochemu"] or "")
+        and _кр["tipy"][0]["bajt"] is None, _кр["tipy"])
     chk("jsonParsed: цена и предел CU читаются из parsed, где data нет вовсе",
         _рз["cu_cena_mikrolamport"] == 63636 and _рз["cu_predel"] == 110000
         and _рз["iz_parsed"] == 2 and _рз["iz_base58"] == 0, _рз)

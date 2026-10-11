@@ -581,16 +581,24 @@ jobs:
           if [ "$ZHIV" != "active" ]; then
             # ЗАПУСК. Зонд живёт часами, поэтому он уходит под systemd-run, а
             # прогон выходит сразу -- так же, как зонд преконфов.
-            ssh -n $OPTS root@"$NL_HOST" "systemctl stop $UNIT.service 2>/dev/null || true; systemctl reset-failed $UNIT.service 2>/dev/null || true; install -d -m 755 $ZOND_DIR"
+            # ПРИЗНАК ПРЕЖНЕГО ПРОГОНА УБИРАЕТСЯ ВМЕСТЕ С ЗОНДОМ. Иначе шаг
+            # прочитал бы старый признак (новый зонд пишет первый только через
+            # ~40 с -- пробы форм), увидел бы в нём набранную цель и погасил
+            # только что поднятый зонд, а в ветвь лёг бы старый отчёт.
+            ssh -n $OPTS root@"$NL_HOST" "systemctl stop $UNIT.service 2>/dev/null || true; systemctl reset-failed $UNIT.service 2>/dev/null || true; install -d -m 755 $ZOND_DIR; rm -f $ZOND_DIR/status.json"
             ssh $OPTS root@"$NL_HOST" "cat > $ZOND_DIR/preprocessed_ab_zond.py" < analysis/preprocessed_ab_zond.py
             # КЛЮЧ -- ФАЙЛОМ 600 И ТОЛЬКО ЧЕРЕЗ stdin: в argv и в журнал он не попадает.
             printf '%s' "$HELIUS_API_KEY" | ssh $OPTS root@"$NL_HOST" "umask 077; cat > $ZOND_DIR/helius_key; chmod 600 $ZOND_DIR/helius_key; wc -c < $ZOND_DIR/helius_key"
             ssh -n $OPTS root@"$NL_HOST" "set -o pipefail; $VENV/bin/python $ZOND_DIR/preprocessed_ab_zond.py --self-test | tail -1"
             STAMP=$(date -u +%Y%m%dT%H%M%SZ)
             ssh -n $OPTS root@"$NL_HOST" "systemd-run --unit=$UNIT --description='Zond preprocessed protiv WS' --setenv=HELIUS_API_KEY_FILE=$ZOND_DIR/helius_key --working-directory=$ZOND_DIR $VENV/bin/python $ZOND_DIR/preprocessed_ab_zond.py --adres '$ADRES' --pokupok ${POKUPOK:-30} --sekund $(( ${CHASOV:-24} * 3600 )) --out $ZOND_DIR/vstrechi_$STAMP.jsonl --status $ZOND_DIR/status.json"
-            sleep 20
+            # ЖДЁМ ДОЛЬШЕ ПРОБ ФОРМ: 5 форм по 8 с -- это 40 с, и раньше
+            # первого признака просто нет.
+            sleep 55
+            TOLKO_PODNJALI=1
             echo "zond podnjat, pervyj priznak zhizni:"
           else
+            TOLKO_PODNJALI=0
             echo "zond uzhe rabotaet -- sobiraju otchjot, ne trogaja ego"
           fi
           ssh -n $OPTS root@"$NL_HOST" "cat $ZOND_DIR/status.json 2>/dev/null || echo '{\"why_not\": \"priznaka poka net\"}'" > /tmp/preprocessed_status.json
@@ -601,7 +609,11 @@ jobs:
           python3 deploy/checks/preprocessed_stroka.py /tmp/preprocessed_status.json || true
           # ЦЕЛЬ НАБРАНА -- ВЫКЛЮЧАЕМ, как просил владелец: дальше платить за
           # сообщения незачем. Зонд и сам выходит, это лишь страховка.
-          if python3 deploy/checks/preprocessed_stroka.py --dostignuto /tmp/preprocessed_status.json; then
+          # ТОЛЬКО ЧТО ПОДНЯЛИ -- НЕ ГАСИМ. Цель в признаке в этот момент
+          # может быть только из прежнего прогона, а он уже остановлен.
+          if [ "${TOLKO_PODNJALI:-0}" = "1" ]; then
+            echo "zond tolko podnjat -- ne gasim, dazhe esli priznak govorit o celi"
+          elif python3 deploy/checks/preprocessed_stroka.py --dostignuto /tmp/preprocessed_status.json; then
             echo "cel nabrana -- zond ostanovlen"
             ssh -n $OPTS root@"$NL_HOST" "systemctl stop $UNIT.service 2>/dev/null || true; systemctl reset-failed $UNIT.service 2>/dev/null || true; shred -u $ZOND_DIR/helius_key 2>/dev/null || rm -f $ZOND_DIR/helius_key"
           fi

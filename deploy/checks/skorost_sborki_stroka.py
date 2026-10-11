@@ -24,9 +24,14 @@ def строка(путь: str, имя: str) -> str:
     ж = (д.get("zhelezo") or {}).get("processor") or {}
     пт = ((д.get("zhelezo") or {}).get("python") or {}).get("versiya")
     пол = (сб.get("polnaya_ms") or {}).get("med")
+    пол90 = (сб.get("polnaya_ms") or {}).get("p90")
     заг = (сб.get("iz_zagotovki_ms") or {}).get("med")
+    заг90 = (сб.get("iz_zagotovki_ms") or {}).get("p90")
     эт = ((д.get("etalon") or {}).get("cikl_python") or {}).get("med")
-    return (f"{имя}: polnaya {пол} ms, iz zagotovki {заг} ms, "
+    # P90 РЯДОМ С МЕДИАНОЙ В ЖУРНАЛЕ ПРОГОНА. Без этого p90 считался, но
+    # никуда не доходил, и «медиана спрятала выброс» повторилось бы.
+    return (f"{имя}: polnaya {пол} ms (p90 {пол90}), "
+            f"iz zagotovki {заг} ms (p90 {заг90}), "
             f"etalon cikl {эт} ms, python {пт}, "
             f"cpu {ж.get('model')} ({ж.get('yader')} yad.), "
             f"why_not {сб.get('why_not')}")
@@ -46,12 +51,15 @@ def самопроверка() -> int:
             "zhelezo": {"processor": {"model": "CPU X", "yader": 2},
                          "python": {"versiya": "3.11.0"}},
             "etalon": {"cikl_python": {"med": 9.0}},
-            "sborka": {"polnaya_ms": {"med": 0.7},
-                        "iz_zagotovki_ms": {"med": 0.17}, "why_not": None}}),
+            "sborka": {"polnaya_ms": {"med": 0.7, "p90": 1.9},
+                        "iz_zagotovki_ms": {"med": 0.17, "p90": 0.4},
+                        "why_not": None}}),
                       encoding="utf-8")
         с = строка(str(п), "kontejner")
         chk("строка несёт оба числа, эталон, питон и процессор",
             all(т in с for т in ("0.7", "0.17", "9.0", "3.11.0", "CPU X")), с)
+        chk("p90 рядом с медианой -- иначе выброс снова спрячется",
+            "p90 1.9" in с and "p90 0.4" in с, с)
         chk("нет файла -- строка говорит это, а не падает",
             "ne prochitan" in строка(str(Path(кат) / "net.json"), "ams"))
         (Path(кат) / "krivoj.json").write_text("{не json", encoding="utf-8")

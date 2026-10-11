@@ -508,7 +508,13 @@ def таблица(своды: dict) -> dict:
             "python": (ж.get("python") or {}).get("versiya"),
             "solders": сб.get("solders"),
             "polnaya_ms": (сб.get("polnaya_ms") or {}).get("med"),
+            # P90 -- В ТАБЛИЦУ, А НЕ ТОЛЬКО В ЗАМЕР. Ровно за этим он и
+            # добавлялся: медиана 1.95 мс однажды спрятала выброс 56.57 мс, и
+            # если p90 не доходит до отчёта, та же ошибка повторится.
+            "polnaya_p90_ms": (сб.get("polnaya_ms") or {}).get("p90"),
             "iz_zagotovki_ms": (сб.get("iz_zagotovki_ms") or {}).get("med"),
+            "iz_zagotovki_p90_ms": (сб.get("iz_zagotovki_ms") or {}).get("p90"),
+            "etalon_cikl_p90_ms": (эт.get("cikl_python") or {}).get("p90"),
             "shest_polnyh_ms": сб.get("shest_polnyh_ms"),
             "shest_iz_zagotovki_ms": сб.get("shest_iz_zagotovki_ms"),
             "etalon_cikl_ms": (эт.get("cikl_python") or {}).get("med"),
@@ -632,18 +638,27 @@ def sosedi_i_ozhidanie(*, путь_образца: str = ОБРАЗЕЦ_ПО_У�
     def _без_сети(метод, *_а, **_к):
         raise RuntimeError(f"замер без сети: запрошен {метод}")
 
-    база, сам = None, None
-    for обр in обр_["pachka"]:
+    база, сам, причины = None, None, []
+    for н, обр in enumerate(обр_["pachka"]):
         сам = обр.get("tx") or обр
-        б = OS.собрать(tx_источника=сам, источник=обр.get("source") or "",
-                        минт=обр.get("mint") or "", наш_кошелёк=наш,
-                        лампорты=10_000_000, семя="ZAMER_SOSEDEJ",
-                        rpc_call=_без_сети)
+        # ТА ЖЕ ЗАЩИТА, ЧТО В сборка(): исключение на одном образце не должно
+        # уносить ни замер, ни самопроверку -- а её гоняет прогон под set -e,
+        # и падение убило бы весь замер четырёх машин.
+        try:
+            б = OS.собрать(tx_источника=сам, источник=обр.get("source") or "",
+                            минт=обр.get("mint") or "", наш_кошелёк=наш,
+                            лампорты=10_000_000, семя="ZAMER_SOSEDEJ",
+                            rpc_call=_без_сети)
+        except Exception as сбой:  # noqa: BLE001
+            причины.append(f"#{н}: {type(сбой).__name__}")
+            continue
         if б.get("ok") and (б.get("_zagotovka") or None):
             база = б
             break
+        причины.append(f"#{н}: {(б.get('why_not') or 'нет заготовки')[:60]}")
     if база is None:
-        из_["why_not"] = "ни один образец не дал базу с заготовкой без сети"
+        из_["why_not"] = ("ни один образец не дал базу с заготовкой без сети: "
+                           + "; ".join(причины[:6]))
         return из_
 
     def шесть():
@@ -653,7 +668,12 @@ def sosedi_i_ozhidanie(*, путь_образца: str = ОБРАЗЕЦ_ПО_У�
             OS.вариант_из_zagotovki(база, сам, чаевые_списком=чаевые,
                                      чаевые_вперёд=False, нонс=нонс)
 
-    шесть()  # прогрев
+    try:
+        шесть()  # прогрев
+    except Exception as сбой:  # noqa: BLE001
+        из_["why_not"] = (f"вариант из заготовки не строится: "
+                           f"{type(сбой).__name__}: {str(сбой)[:160]}")
+        return из_
     был_шаг = sys.getswitchinterval()
     try:
         for шаг in шаги_gil:
@@ -666,13 +686,22 @@ def sosedi_i_ozhidanie(*, путь_образца: str = ОБРАЗЕЦ_ПО_У�
                     if сколько:
                         time.sleep(0.3)  # дать потокам встать на ядра
                     стенное, процессорное = [], []
+                    сбой_замера = None
                     for _ in range(max(1, int(повторов))):
                         т, ц = time.perf_counter(), time.thread_time()
-                        шесть()
+                        try:
+                            шесть()
+                        except Exception as сбой:  # noqa: BLE001
+                            сбой_замера = (f"{type(сбой).__name__}: "
+                                            f"{str(сбой)[:160]}")
+                            break
                         стенное.append((time.perf_counter() - т) * 1000.0)
                         процессорное.append((time.thread_time() - ц) * 1000.0)
                 finally:
                     живых = погасить()
+                if сбой_замера and not стенное:
+                    из_["why_not"] = ("замер с соседями упал: " + сбой_замера)
+                    return из_
                 ст, цп = _мс(стенное), _мс(процессорное)
                 из_["ryady"].append({
                     "shag_gil_s": float(шаг),
@@ -940,6 +969,14 @@ def самопроверка() -> int:
     chk("пустой набор -- причина словами", таблица({})["why_not"] is not None)
     chk("ряды отсортированы от быстрой к медленной",
         [р["mashina"] for р in т["ryady"]] == ["быстрая", "медленная"])
+    # P90 ДОХОДИТ ДО ТАБЛИЦЫ, А НЕ ТОЛЬКО СЧИТАЕТСЯ. Ровно за этим он и
+    # добавлялся: медиана 1.95 мс однажды спрятала выброс 56.57 мс, и если p90
+    # не доходит до отчёта, та же ошибка повторится.
+    chk("таблица несёт p90 рядом с медианой по сборке, заготовке и эталону",
+        all(к in т["ryady"][0] for к in ("polnaya_p90_ms",
+                                          "iz_zagotovki_p90_ms",
+                                          "etalon_cikl_p90_ms")),
+        sorted(т["ryady"][0]))
     chk("порог разбега назван числом и объяснён в коде",
         РАЗБЕГ_ОТНОШЕНИЙ == 0.35)
 
