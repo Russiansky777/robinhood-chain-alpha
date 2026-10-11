@@ -4200,6 +4200,40 @@ def кэш_чтений(rpc_call, *, кэшируемые=("getMultipleAccounts"
     return зов
 
 
+def _snjat_resursy() -> dict:
+    """Пользовательское и системное время ЭТОГО потока плюс промахи страниц.
+
+    Отдельной функцией, чтобы самопроверка могла проверить арифметику и чтобы
+    отсутствие RUSAGE_THREAD (не Linux) не ломало полосу: там, где его нет,
+    возвращается пустой снимок, и в записи будет None, а не выдуманный ноль.
+    """
+    try:
+        import resource  # noqa: PLC0415
+        р = resource.getrusage(resource.RUSAGE_THREAD)
+    except (ImportError, AttributeError, OSError):
+        return {}
+    return {"utime": float(р.ru_utime), "stime": float(р.ru_stime),
+            "minflt": int(р.ru_minflt), "majflt": int(р.ru_majflt)}
+
+
+def _разница_ресурсов(до: dict, после: dict) -> dict:
+    """Разница снимков: пользовательское и системное время в мс, промахи."""
+    if not до or not после:
+        return {"polzovatelskoe_ms": None, "sistemnoe_ms": None,
+                 "promahov_stranic": None, "promahov_s_diska": None,
+                 "why_not": "getrusage(RUSAGE_THREAD) недоступен"}
+    return {"polzovatelskoe_ms": round((после["utime"] - до["utime"]) * 1000, 3),
+            "sistemnoe_ms": round((после["stime"] - до["stime"]) * 1000, 3),
+            "promahov_stranic": после["minflt"] - до["minflt"],
+            "promahov_s_diska": после["majflt"] - до["majflt"],
+            "why_not": None}
+
+
+def d_why(д: dict) -> bool:
+    """Нужен самопроверке: причина сказана словами, а не пустой строкой."""
+    return bool((д or {}).get("why_not"))
+
+
 def проходы_gc(до: list, после: list) -> list:
     """Сколько проходов сборщика мусора случилось между снимками, по поколениям.
 
@@ -8028,6 +8062,15 @@ def провести(*, tx_источника: dict, источник: str, ми
         import gc as _gc  # noqa: PLC0415
         _gc_до = [д.get("collections", 0) for д in _gc.get_stats()]
         _gc_счёт_до = _gc.get_count()
+        # ЧТО ИМЕННО СЪЕЛО ПРОЦЕССОРНОЕ ВРЕМЯ: НАШ PYTHON ИЛИ ЯДРО НА НАШ СЧЁТ.
+        # time.thread_time() складывает пользовательское и системное время
+        # потока в одно число, и по нему нельзя отличить "считали байты" от
+        # "ядро обслуживало промахи страниц и вызовы". getrusage(RUSAGE_THREAD)
+        # разделяет их и рядом даёт промахи страниц -- ровно то, чего не
+        # хватило 11.10, когда две версии (ожидание GIL и сборка мусора) были
+        # опровергнуты замерами, а 29 мс остались без адреса.
+        # Цена вызова -- 0.42 мкс, их два.
+        _рес_до = _snjat_resursy()
         ц_варианты = time.thread_time()
         т_варианты = time.perf_counter()
         в = собрать_варианты_нонсом(
@@ -8049,6 +8092,7 @@ def провести(*, tx_источника: dict, источник: str, ми
         из_["gil_interval_s"] = sys.getswitchinterval()
         # СКОЛЬКО ПРОХОДОВ СБОРЩИКА МУСОРА СЛУЧИЛОСЬ ПРЯМО В ЭТОМ ОКНЕ --
         # по поколениям. Ненулевое старшее поколение здесь и есть ответ.
+        из_["resursy_potoka"] = _разница_ресурсов(_рес_до, _snjat_resursy())
         _gc_после = [д.get("collections", 0) for д in _gc.get_stats()]
         из_["gc_prohodov"] = проходы_gc(_gc_до, _gc_после)
         из_["gc_schjot_do"] = list(_gc_счёт_до)
@@ -8371,6 +8415,7 @@ def провести(*, tx_источника: dict, источник: str, ми
                 lane_variants_zhdali_ms=из_.get("variants_zhdali_ms"),
                 lane_potokov_v_processe=из_.get("potokov_v_processe"),
                 lane_gc_prohodov=из_.get("gc_prohodov"),
+                lane_resursy_potoka=из_.get("resursy_potoka"),
                 lane_gc_porogi=из_.get("gc_porogi"),
                 # ЧТЕНИЯ ВАРИАНТОВ: сколько запросов было и сколько ушло в сеть.
                 # По этим двум числам видно, работает ли один снимок пула на все
@@ -9665,6 +9710,23 @@ def self_test() -> int:
     # Это последний подозреваемый на 29 мс процессорного времени в окне
     # вариантов (11.10): живьём шесть вариантов стоят 29.18 мс нашего CPU, а
     # тот же код без сети -- 0.068 мс.
+    # РЕСУРСЫ ПОТОКА: пользовательское против системного и промахи страниц.
+    # Две версии 11.10 (ожидание GIL и сборка мусора) опровергнуты замерами, и
+    # 29 мс остались без адреса. Это число делит их на "наш Python" и "ядро на
+    # наш счёт" -- и его арифметику надо проверять, а не верить.
+    _р1 = {"utime": 1.0, "stime": 2.0, "minflt": 100, "majflt": 1}
+    _р2 = {"utime": 1.005, "stime": 2.029, "minflt": 1300, "majflt": 4}
+    _рр = _разница_ресурсов(_р1, _р2)
+    chk("ресурсы потока: пользовательское и системное время в мс и промахи",
+        _рр["polzovatelskoe_ms"] == 5.0 and _рр["sistemnoe_ms"] == 29.0
+        and _рр["promahov_stranic"] == 1200 and _рр["promahov_s_diska"] == 3,
+        _рр)
+    chk("нет getrusage -- причина словами, а не выдуманные нули",
+        (lambda д: д["polzovatelskoe_ms"] is None and d_why(д))(
+            _разница_ресурсов({}, _р2)))
+    chk("живой снимок ресурсов даёт все четыре поля",
+        set(_snjat_resursy()) >= {"utime", "stime", "minflt", "majflt"},
+        sorted(_snjat_resursy()))
     chk("проходы gc считаются разностью снимков по поколениям",
         проходы_gc([10, 5, 2], [13, 6, 2]) == [3, 1, 0],
         проходы_gc([10, 5, 2], [13, 6, 2]))
@@ -9686,6 +9748,10 @@ def self_test() -> int:
         "_gc_до = [д.get(\"collections\", 0) for д in _gc.get_stats()]" in _тело_пров
         and "проходы_gc(_gc_до, _gc_после)" in _тело_пров
         and _тело_пров.index("_gc_до = ")
+        < _тело_пров.index("т_варианты = time.perf_counter()"), None)
+    chk("разница ресурсов потока идёт в запись рядом с окном вариантов",
+        "_разница_ресурсов(_рес_до, _snjat_resursy())" in _тело_пров
+        and _тело_пров.index("_рес_до = _snjat_resursy()")
         < _тело_пров.index("т_варианты = time.perf_counter()"), None)
     chk("пороги gc и признак «включён» тоже уходят в запись",
         '"gc_porogi"' in _тело_пров and '"gc_vkljuchjon"' in _тело_пров)

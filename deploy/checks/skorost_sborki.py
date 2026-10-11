@@ -1100,7 +1100,7 @@ def main() -> int:
                     help="корень дерева с analysis/ и data/ (пусто -- рядом с модулем)")
     п.add_argument("--out", default="")
     п.add_argument("--svod", action="append", default=[],
-                    help="имya=put k svodu mashiny; с ним модуль НЕ мерит, а "
+                    help="imya=put k svodu mashiny; с ним модуль НЕ мерит, а "
                          "сводит уже снятые числа в одну таблицу")
     а = п.parse_args()
     if а.koren:
