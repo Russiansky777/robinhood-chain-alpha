@@ -567,6 +567,17 @@ jobs:
           OPTS="-i $HOME/.ssh/nl_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
           ZHIV=$(ssh -n $OPTS root@"$NL_HOST" "systemctl is-active $UNIT.service 2>/dev/null || true")
           echo "sostojanie zonda: ${ZHIV:-net}"
+          # ЗОНД ОБЯЗАН ЕХАТЬ НА ТОМ КОДЕ, ЧТО В ВЕТВИ. Иначе живой зонд
+          # остаётся на прежней версии молча: 01:20Z он уже работал, а правку
+          # журнала всех приходов не получил бы вовсе. Сверка по sha256.
+          SHA_VETKI=$(sha256sum analysis/preprocessed_ab_zond.py | cut -c1-16)
+          SHA_HOSTA=$(ssh -n $OPTS root@"$NL_HOST" "sha256sum $ZOND_DIR/preprocessed_ab_zond.py 2>/dev/null | cut -c1-16" || true)
+          echo "sha zonda: vetka $SHA_VETKI, host ${SHA_HOSTA:-net}"
+          if [ "$ZHIV" = "active" ] && [ "$SHA_VETKI" != "${SHA_HOSTA:-net}" ]; then
+            echo "zond rabotaet na DRUGOM kode -- ostanavlivaju i podnimaju zanovo"
+            ssh -n $OPTS root@"$NL_HOST" "systemctl stop $UNIT.service 2>/dev/null || true; systemctl reset-failed $UNIT.service 2>/dev/null || true"
+            ZHIV="net"
+          fi
           if [ "$ZHIV" != "active" ]; then
             # ЗАПУСК. Зонд живёт часами, поэтому он уходит под systemd-run, а
             # прогон выходит сразу -- так же, как зонд преконфов.
