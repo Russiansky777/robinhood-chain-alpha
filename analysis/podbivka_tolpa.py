@@ -320,11 +320,15 @@ def подряд(дни: list) -> bool:
 def свод(а) -> int:  # noqa: PLR0915
     по_виду_дню: dict = collections.defaultdict(list)
     дни_набор: set = set()
+    мертвых = [0]          # круги мёртвых пулов, выброшенные при --bez-mertvyh
     накрутка: dict = collections.defaultdict(collections.Counter)
     for ф in sorted(glob.glob(str(ПАПКА / f"{а.shablon}.json.gz"))):
         д = json.loads(gzip.open(ф, "rt", encoding="utf-8").read())
         дни_набор.add(д["сутки"])
         for с in д.get("строки") or []:
+            if а.bez_mertvyh and с.get("почему") == "выход_за_концом":
+                мертвых[0] += 1
+                continue
             по_виду_дню[(с["вид"], д["сутки"])].append(с["итоги"])
             семья_ = ("порог" if с["вид"].startswith("порог")
                       else "всплеск" if с["вид"].startswith("всплеск")
@@ -449,6 +453,8 @@ def свод(а) -> int:  # noqa: PLR0915
             "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "суток": len(дни), "дни": дни, "окон": len(окна), "k_g": а.k_g,
             "сочетаний_посчитано": сочетаний, "порог_p": порог_p,
+            "мёртвые_пулы_выброшены": bool(а.bez_mertvyh),
+            "кругов_мёртвых_выброшено": мертвых[0],
             "итог": основное, "контроль_перемешано": контроль}
     вых = П / f"tolpa_svod{а.metka}.json"
     вых.write_text(json.dumps(тело, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -485,6 +491,8 @@ def main() -> int:
     р.add_argument("--chasov", type=int, default=24)
     р.add_argument("--shablon", default="tolpa_*", help="какие собранные сутки брать")
     р.add_argument("--k-g", default="0.989", help="поправка круга для вердикта")
+    р.add_argument("--bez-mertvyh", action="store_true",
+                   help="выбросить круги мёртвых пулов (выход за концом прочитанного)")
     р.add_argument("--kontrolej", type=int, default=2)
     р.add_argument("--metka", default="")
     а = р.parse_args()
