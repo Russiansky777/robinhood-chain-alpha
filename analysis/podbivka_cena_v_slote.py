@@ -75,7 +75,8 @@ def главное(а) -> int:
         if all(т):
             по_троице[т] = р
     д = json.loads(Path(а.vhod).read_text(encoding="utf-8"))
-    сделки = д.get("сделки") if isinstance(д, dict) else д
+    сделки = ((д.get("ряды") or д.get("сделки") or [])
+              if isinstance(д, dict) else д)
     счёт: collections.Counter = collections.Counter()
     ряды: list = []
     for с in сделки:
