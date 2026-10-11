@@ -4221,6 +4221,15 @@ def вариант_из_zagotovki(база: dict, tx_источника: dict, *
     """
     из_ = {"ok": False, "why_not": None, "tx_base64": None, "size": None,
             "min_out": None, "nonce_account": None, "tip_account": None}
+    # ЭТАПЫ ВНУТРИ ВАРИАНТА -- ПРОЦЕССОРНЫМ ВРЕМЕНЕМ ПОТОКА. 11.10 живая
+    # сделка показала: шесть вариантов стоят 29.32 мс, из них 27.585 мс --
+    # ПРОЦЕССОРНОЕ время, то есть это счёт, а не ожидание GIL. При этом тот же
+    # вариант без сети стоит 0.068 мс на кривой pump.fun и 0.164 мс на pump
+    # AMM, а build_buy под профилировщиком -- 0.007 с на 60 вызовов. Значит
+    # время уходит не туда, куда я думал, и гадать больше нельзя: пусть каждый
+    # этап назовёт себя сам. Цена замера -- четыре обращения к часам.
+    _ц0 = time.thread_time()
+    этапы = {}
     з = (база or {}).get("_zagotovka") or {}
     if not з or not з.get("shablon") or not з.get("mo"):
         из_["why_not"] = ("заготовки сборки нет -- вариант из неё не собрать "
@@ -4241,6 +4250,8 @@ def вариант_из_zagotovki(база: dict, tx_источника: dict, *
         return из_
     # СБОРЩИК -- ТОТ ЖЕ, ЧТО У БАЗЫ. Прямой сборщик и строитель собирают
     # по-разному, и взять не тот значило бы собрать другую транзакцию.
+    этапы["proverki_ms"] = round((time.thread_time() - _ц0) * 1000, 3)
+    _ц1 = time.thread_time()
     _C, _PP, _SB, _B = _модули()
     if з.get("sborshchik") == "pryamoy":
         _сборщик_в = _B
@@ -4252,6 +4263,8 @@ def вариант_из_zagotovki(база: dict, tx_источника: dict, *
                                f"{str(з.get('programma'))[:12]} не загружен -- "
                                "вариант из заготовки не собрать")
             return из_
+    этапы["moduli_ms"] = round((time.thread_time() - _ц1) * 1000, 3)
+    _ц2 = time.thread_time()
     t0 = time.perf_counter()
     try:
         собрано = _сборщик_в.build_buy(
@@ -4264,7 +4277,10 @@ def вариант_из_zagotovki(база: dict, tx_источника: dict, *
             tip_first=bool(чаевые_вперёд), nonce=нонс)
     except Exception as exc:  # noqa: BLE001
         из_["why_not"] = f"вариант: {type(exc).__name__}: {str(exc)[:160]}"
+        из_["z_etapy_ms"] = этапы
         return из_
+    этапы["build_buy_ms"] = round((time.thread_time() - _ц2) * 1000, 3)
+    _ц3 = time.thread_time()
     if int(собрано.get("size") or 0) > ПРЕДЕЛ_РАЗМЕРА_TX:
         из_["size"] = собрано.get("size")
         из_["why_not"] = (f"вариант {собрано.get('size')} байт при пределе сети "
@@ -4277,6 +4293,9 @@ def вариант_из_zagotovki(база: dict, tx_источника: dict, *
                 tip_account=чаевые_списком[0][0],
                 tips=list(чаевые_списком), tips_total_lamports=сумма_ч,
                 build_ms=round((time.perf_counter() - t0) * 1000, 3))
+    этапы["hvost_ms"] = round((time.thread_time() - _ц3) * 1000, 3)
+    этапы["vsego_ms"] = round((time.thread_time() - _ц0) * 1000, 3)
+    из_["z_etapy_ms"] = этапы
     return из_
 
 
@@ -4359,6 +4378,7 @@ def собрать_варианты_нонсом(*, сборщик, сервис
                 база, tx_источника or {}, чаевые_списком=[(адрес, int(лам))],
                 чаевые_вперёд=вперёд, нонс=пара_нонса)
             строка["iz_zagotovki"] = True
+            строка["z_etapy_ms"] = сб.get("z_etapy_ms")
         else:
             сб = сборщик([(адрес, int(лам))], пара_нонса, вперёд)
             строка["iz_zagotovki"] = False
@@ -8024,7 +8044,14 @@ def провести(*, tx_источника: dict, источник: str, ми
                 "sborka_cpu": round(sum(float(с.get("sborka_cpu_ms") or 0.0)
                                          for с in (в.get("rows") or [])), 3),
                 "podpis_cpu": round(sum(float(с.get("podpis_cpu_ms") or 0.0)
-                                         for с in (в.get("rows") or [])), 3)},
+                                         for с in (в.get("rows") or [])), 3),
+                # ЭТАПЫ ВНУТРИ ВАРИАНТА -- СУММАМИ. Без них "29 мс счёта"
+                # остаётся числом без адреса.
+                **{f"z_{к}": round(sum(
+                    float((с.get("z_etapy_ms") or {}).get(к) or 0.0)
+                    for с in (в.get("rows") or [])), 3)
+                   for к in ("proverki_ms", "moduli_ms", "build_buy_ms",
+                              "hvost_ms", "vsego_ms")}},
             # ПОЧЕМУ ЗАГОТОВКИ НЕ БЫЛО -- тоже в запись: без этого "нет"
             # неотличимо от "не дошло".
             zagotovka_why_not=(None if (сб.get("_zagotovka") or None)
@@ -13876,6 +13903,22 @@ def self_test() -> int:
                     for с in (_св.get("rows") or []) if с.get("ok")),
                 [(с.get("sborka_cpu_ms"), с.get("podpis_cpu_ms"))
                  for с in (_св.get("rows") or [])])
+            chk("вариант из заготовки называет СВОИ этапы процессорным "
+                "временем -- иначе «29 мс счёта» остаётся без адреса",
+                all(isinstance(с.get("z_etapy_ms"), dict)
+                    and set(с["z_etapy_ms"]) >= {"proverki_ms", "moduli_ms",
+                                                  "build_buy_ms", "hvost_ms",
+                                                  "vsego_ms"}
+                    for с in (_св.get("rows") or []) if с.get("ok")),
+                [(с.get("z_etapy_ms")) for с in (_св.get("rows") or [])][:2])
+            chk("сумма этапов не больше общего времени варианта",
+                all(sum(float(с["z_etapy_ms"][к] or 0.0)
+                        for к in ("proverki_ms", "moduli_ms", "build_buy_ms",
+                                   "hvost_ms"))
+                    <= float(с["z_etapy_ms"]["vsego_ms"]) + 0.5
+                    for с in (_св.get("rows") or [])
+                    if с.get("ok") and с.get("z_etapy_ms")),
+                [(с.get("z_etapy_ms")) for с in (_св.get("rows") or [])][:2])
             chk("процессорное время не больше стенного -- иначе часы врут",
                 all(float(с.get("sborka_cpu_ms") or 0.0)
                     <= float(с.get("sborka_ms") or 0.0) + 0.5
