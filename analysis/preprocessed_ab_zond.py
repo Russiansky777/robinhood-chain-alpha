@@ -145,13 +145,23 @@ def подпись_из_ws(сообщение: dict) -> dict:
 class Встречи:
     """Кто какую подпись увидел и когда -- по ОДНИМ часам процесса."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, ПЕРВЫХ_В_ОТЧЁТ: int = 8) -> None:
         self.ряды: dict = {}
         self.поток_счёт = {"ws": 0, "pre": 0}
         self.отказы: dict = {"ws": None, "pre": None}
+        self.начало = time.perf_counter()
+        # ОЧЕРЕДЬ ВСЕХ ПРИХОДОВ -- её выгребает журнал зонда.
+        self.очередь: list = []
+        self.слоты = {"ws": set(), "pre": set()}
+        self.первые: dict = {"ws": [], "pre": []}
+        self.первых_в_отчёт = int(ПЕРВЫХ_В_ОТЧЁТ)
 
     def принять(self, поток: str, подпись: str, *, слот=None,
                 мono: float | None = None) -> dict:
+        # КАЖДЫЙ ПРИХОД -- В ОЧЕРЕДЬ НА ЗАПИСЬ, а не только парные встречи.
+        # Прогон 01:20Z это и показал: preprocessed отдал 2196 сообщений по
+        # молчащему адресу, обычный поток -- ни одного, и по журналу встреч
+        # нельзя было даже посмотреть, ЧТО это за подписи.
         """Первое появление подписи в потоке. Повтор НЕ переписывает время."""
         if not подпись:
             return {}
@@ -162,6 +172,14 @@ class Встречи:
             "ws_utc": None, "pre_utc": None, "slot_ws": None,
             "slot_pre": None, "ws_povtorov": 0, "pre_povtorov": 0})
         ключ = f"{поток}_mono"
+        if слот is not None:
+            self.слоты[поток].add(слот)
+        self.очередь.append({"potok": поток, "podpis": подпись, "slot": слот,
+                              "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                    time.gmtime()),
+                              "s_nachala_s": round(сейчас - self.начало, 4)})
+        if len(self.первые[поток]) < self.первых_в_отчёт:
+            self.первые[поток].append(подпись)
         if ряд[ключ] is None:
             ряд[ключ] = сейчас
             ряд[f"{поток}_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ",
@@ -206,8 +224,28 @@ def свод(встречи: Встречи, *, цель: int = ПОКУПОК_�
                                        if р["pre_mono"] is not None
                                        and р["ws_mono"] is None),
             "otkazy": dict(встречи.отказы),
+            # ТЕМП СООБЩЕНИЙ -- ГЛАВНЫЙ ПРИЗНАК, ЧТО ФИЛЬТР НЕ РАБОТАЕТ. Один
+            # адрес источника даёт единицы сообщений в минуту; десятки в
+            # секунду означают, что нам шлют поток шире, чем мы просили, и
+            # платить за него по 0.1 кредита за сообщение незачем.
+            "soobshchenij_pre_v_sekundu": None,
+            "soobshchenij_ws_v_sekundu": None,
+            "slotov_pre": len(встречи.слоты.get("pre") or ()),
+            "slotov_ws": len(встречи.слоты.get("ws") or ()),
+            "pervye_podpisi_pre": list(встречи.первые.get("pre") or ()),
+            "pervye_podpisi_ws": list(встречи.первые.get("ws") or ()),
+            "sekund_raboty": None,
             "mediana_ms": None, "p90_ms": None, "min_ms": None, "max_ms": None,
             "pre_ranshe_dolya": None, "vyvod": None, "porog_ms": ПОРОГ_МС}
+    прошло = max(1e-9, time.perf_counter() - встречи.начало)
+    из_["sekund_raboty"] = round(прошло, 1)
+    из_["soobshchenij_pre_v_sekundu"] = round(
+        встречи.поток_счёт.get("pre", 0) / прошло, 2)
+    из_["soobshchenij_ws_v_sekundu"] = round(
+        встречи.поток_счёт.get("ws", 0) / прошло, 2)
+    # ЦЕНА ПОТОКА ПО ФАКТУ: 0.1 кредита за сообщение (тариф Helius).
+    из_["kreditov_v_sutki_pre"] = int(round(
+        из_["soobshchenij_pre_v_sekundu"] * 86400 * 0.1))
     if not разницы:
         из_["vyvod"] = ("ни одной транзакции в ОБОИХ потоках: "
                          + (встречи.отказы.get("pre")
@@ -329,12 +367,19 @@ async def зонд(*, ключ: str, адрес: str, цель: int, секун�
             # ЖУРНАЛ ПОПОЛНЯЕТСЯ НА ХОДУ: зонд живёт часами, и ждать конца,
             # чтобы увидеть первое число, незачем.
             if путь_журнала:
+                # ВСЕ ПРИХОДЫ, А НЕ ТОЛЬКО ВСТРЕЧИ. Иначе нельзя проверить, те
+                # ли это подписи вообще: 01:20Z preprocessed отдал 2196
+                # сообщений по молчащему адресу, и посмотреть на них было негде.
+                очередь, встречи.очередь = встречи.очередь, []
                 with open(путь_журнала, "a", encoding="utf-8") as ф:
+                    for з in очередь:
+                        ф.write(json.dumps(з, ensure_ascii=False) + "\n")
                     for р in встречи.оба():
                         if р["podpis"] in записано:
                             continue
                         записано.add(р["podpis"])
                         ф.write(json.dumps({
+                            "vstrecha": True,
                             "podpis": р["podpis"], "slot_ws": р["slot_ws"],
                             "slot_pre": р["slot_pre"],
                             "ws_utc": р["ws_utc"], "pre_utc": р["pre_utc"],
@@ -486,6 +531,26 @@ def самопроверка() -> int:
         свод(в2, цель=5)["pre_ranshe_dolya"] == 1.0)
     chk("свод: сообщения каждого потока посчитаны",
         с["soobshchenij_pre"] == 5 and с["soobshchenij_ws"] == 5, с)
+    # ТЕМП И СЛОТЫ -- ПРИЗНАК «ФИЛЬТР НЕ РАБОТАЕТ». Без них 2196 сообщений по
+    # молчащему адресу читались бы как удача, а не как чужой поток.
+    chk("свод: темп сообщений в секунду и цена потока в кредитах -- числом",
+        с["soobshchenij_pre_v_sekundu"] is not None
+        and с["kreditov_v_sutki_pre"] is not None
+        and с["sekund_raboty"] is not None, 
+        (с["soobshchenij_pre_v_sekundu"], с["kreditov_v_sutki_pre"]))
+    в6 = Встречи()
+    for и in range(40):
+        в6.принять("pre", f"Q{и}", слот=1000 + (и // 4), мono=0.001 * и)
+    с6 = свод(в6)
+    chk("свод: разные слоты потока посчитаны -- один адрес не даёт десятки "
+        "слотов за секунды",
+        с6["slotov_pre"] == 10 and с6["soobshchenij_pre"] == 40, с6)
+    chk("свод: первые подписи попадают в отчёт -- их можно проверить по цепи",
+        len(с6["pervye_podpisi_pre"]) == 8
+        and с6["pervye_podpisi_pre"][0] == "Q0", с6["pervye_podpisi_pre"])
+    chk("встречи: очередь приходов накапливается для журнала",
+        len(в6.очередь) == 40 and в6.очередь[0]["potok"] == "pre"
+        and в6.очередь[0]["podpis"] == "Q0", в6.очередь[:1])
 
     # КЛЮЧ -- ИЗ ФАЙЛА, И В ОТЧЁТ НЕ ПОПАДАЕТ.
     import tempfile  # noqa: PLC0415

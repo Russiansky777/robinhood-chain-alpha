@@ -41,6 +41,16 @@ def строки(д: dict) -> list:
                 f"pre {д.get('soobshchenij_pre')}")
     из_.append(f"zond: tolko ws {д.get('podpisej_tolko_ws')}, "
                 f"tolko pre {д.get('podpisej_tolko_pre')}")
+    # ТЕМП -- ПРИЗНАК ЧУЖОГО ПОТОКА: один адрес источника даёт единицы
+    # сообщений в минуту, а не десятки в секунду.
+    из_.append(f"zond: temp pre {д.get('soobshchenij_pre_v_sekundu')}/s, "
+                f"ws {д.get('soobshchenij_ws_v_sekundu')}/s, "
+                f"slotov pre {д.get('slotov_pre')}, ws {д.get('slotov_ws')}, "
+                f"rabotal {д.get('sekund_raboty')} s, "
+                f"cena pre {д.get('kreditov_v_sutki_pre')} kreditov/sut")
+    if д.get("pervye_podpisi_pre"):
+        из_.append(f"zond: pervye podpisi pre: "
+                    f"{','.join(д['pervye_podpisi_pre'][:3])}")
     из_.append(f"zond: mediana {д.get('mediana_ms')} ms, p90 {д.get('p90_ms')} ms, "
                 f"min {д.get('min_ms')}, max {д.get('max_ms')}, "
                 f"dolja pre ranshe {д.get('pre_ranshe_dolya')}")
@@ -61,7 +71,12 @@ def самопроверка() -> int:
     def chk(имя, ок, что=None):
         проверки.append((имя, bool(ок), что))
 
-    полный = {"tranzakcij_v_oboih": 30, "cel": 30, "soobshchenij_ws": 44,
+    полный = {"soobshchenij_pre_v_sekundu": 0.3,
+              "soobshchenij_ws_v_sekundu": 0.3, "slotov_pre": 29,
+              "slotov_ws": 29, "sekund_raboty": 1200.0,
+              "kreditov_v_sutki_pre": 2592,
+              "pervye_podpisi_pre": ["AAA", "BBB", "CCC", "DDD"],
+              "tranzakcij_v_oboih": 30, "cel": 30, "soobshchenij_ws": 44,
               "soobshchenij_pre": 41, "podpisej_tolko_ws": 3,
               "podpisej_tolko_pre": 1, "mediana_ms": 27.5, "p90_ms": 41.2,
               "min_ms": 4.0, "max_ms": 55.0, "pre_ranshe_dolya": 0.97,
@@ -70,6 +85,11 @@ def самопроверка() -> int:
     т = "\n".join(строки(полный))
     chk("строки несут все числа свода", all(з in т for з in
         ("30 iz 30", "27.5", "41.2", "0.97", "44", "41")), т)
+    chk("строки несут темп, слоты, время работы и цену потока в кредитах",
+        all(з in т for з in ("temp pre 0.3/s", "slotov pre 29",
+                              "rabotal 1200.0 s", "2592 kreditov/sut")), т)
+    chk("первые подписи pre видны -- их можно проверить по цепи",
+        "AAA,BBB,CCC" in т, т)
     chk("цель набрана -- да", достигнуто(полный) is True)
     chk("цель не набрана при недоборе",
         достигнуто({**полный, "tranzakcij_v_oboih": 29}) is False)
