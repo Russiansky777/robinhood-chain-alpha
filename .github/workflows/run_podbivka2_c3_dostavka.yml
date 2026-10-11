@@ -41,6 +41,7 @@ jobs:
           print(f"C3D_RUN={int(д['run_id'])}")
           print(f"C3D_ARTEFAKT={д.get('artefakt') or 'c3-lp-chasy'}")
           print(f"C3D_VYHOD={д['vyhod']}")
+          print(f"C3D_NA_CHAST={int(д.get('sobytij_na_chast') or 1200000)}")
           PY
           cat "$RUNNER_TEMP/c3d" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/c3d"
@@ -53,29 +54,30 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/art
 
-      - name: "Urezat ryady do semi poley"
-        env:
-          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
+      - name: "Urezat ryady do semi poley (chastyami)"
         run: |
           set -e
           ls -la "$RUNNER_TEMP/art"
           RJADY=$(ls "$RUNNER_TEMP"/art/c3_lp_rjady_*.json.gz | head -1)
           echo "ryady: $RJADY"
+          # podbivka_run zdes ne trebuetsya: na etom begunke net solders, i proshlyy
+          # progon upal imenno na ego importe. Fayly kommityatsya po glob nizhe.
           python3 analysis/podbivka_c3_rjady_urezat.py \
-            --vhod "$RJADY" --vyhod "$C3D_VYHOD" --pushom
-          ls -la "$C3D_VYHOD"
+            --vhod "$RJADY" --vyhod "$C3D_VYHOD" \
+            --sobytij-na-chast "${C3D_NA_CHAST:-1200000}"
+          KOREN="${C3D_VYHOD%.json.gz}"
+          ls -la "$KOREN".part*.json.gz "$KOREN".manifest.json
 
       - name: "Commit v vetku"
-        env:
-          PODB_MANIFEST: ${{ runner.temp }}/manifest.txt
         run: |
           set -e
+          KOREN="${C3D_VYHOD%.json.gz}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5 6; do
             git fetch -q --depth=1 origin claude/podbivka
             git reset -q FETCH_HEAD
-            git add -- "$C3D_VYHOD"
+            git add -- "$KOREN".part*.json.gz "$KOREN".manifest.json
             git diff --cached --quiet && { echo "already on branch"; exit 0; }
             git commit -q -m "Podbivka-2: ryady LP dlya Code-3 (urezannye, 7 poley) [automated]"
             git push -q origin HEAD:claude/podbivka && exit 0
