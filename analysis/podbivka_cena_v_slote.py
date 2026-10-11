@@ -126,6 +126,7 @@ def главное(а) -> int:
                  and isinstance(ии, int) and ои > ии else None)
         ряды.append({
             "utc": с.get("utc"), "минт": с.get("mint"), "лаг": лаг,
+            "источник": с.get("source"),
             "доля_блока_факт": с.get("our_block_share"),
             "индекс_в_блоке": ои,
             "индекс_источника": ии,
@@ -137,6 +138,25 @@ def главное(а) -> int:
             "факт_к_модели_по_q": мод,
             "итог_sol": с.get("итог_sol"), "билет": с.get("size_sol"),
         })
+    # по источнику: q при лаге 0 и доля сделок с лагом 0 -- для набора, где у каждого
+    # источника своё место в своём блоке
+    по_источнику: dict = collections.defaultdict(list)
+    for r in ряды:
+        по_источнику[r.get("источник") or "?"].append(r)
+    свод_ист = {}
+    for ист, сп in по_источнику.items():
+        л0 = [r for r in сп if r["лаг"] == 0]
+        qs = sorted(r["q_замеренное"] for r in л0)
+        меж = [r["транзакций_между"] for r in л0
+               if r.get("транзакций_между") is not None]
+        свод_ист[ист] = {
+            "сделок": len(сп), "лаг0": len(л0),
+            "доля_лага_0": round(len(л0) / len(сп), 3) if сп else None,
+            "q_медиана": round(statistics.median(qs), 3) if qs else None,
+            "q_p10": round(qs[int(0.1 * len(qs))], 3) if qs else None,
+            "q_p90": round(qs[min(len(qs) - 1, int(0.9 * len(qs)))], 3) if qs else None,
+            "транзакций_между_медиана": statistics.median(меж) if меж else None,
+            "итог_sol": round(sum(r["итог_sol"] or 0 for r in сп), 5)}
     по_лагу: dict = collections.defaultdict(list)
     for r in ряды:
         по_лагу["лаг 0" if r["лаг"] == 0 else
@@ -184,7 +204,10 @@ def главное(а) -> int:
             "сдвиг_против_прошлого": сдвиг,
             "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "вход": str(а.vhod), "группа": а.gruppa or "все",
-            "счёт": dict(счёт), "по_лагу": свод, "сделки": ряды}
+            "счёт": dict(счёт), "по_лагу": свод,
+            "по_источнику": dict(sorted(
+                свод_ист.items(), key=lambda kv: -kv[1]["сделок"])),
+            "сделки": ряды}
     вых = П / f"cena_v_slote{а.metka}.json"
     вых.write_text(json.dumps(тело, ensure_ascii=False, indent=1), encoding="utf-8")
     import podbivka_run as R  # noqa: PLC0415
@@ -203,6 +226,11 @@ def главное(а) -> int:
         print(f"q при лаге 0: {л0.get('q_медиана')} (n {л0.get('n')}), "
               "сравнивать не с чем -- прошлый прогон не передан", flush=True)
     print(f"счёт: {dict(счёт)}", flush=True)
+    for ист, v in list(свод_ист.items())[:12]:
+        print(f"  {ист[:10]}…: сделок {v['сделок']}, лаг 0 {v['лаг0']} "
+              f"(доля {v['доля_лага_0']}), q медиана {v['q_медиана']}, "
+              f"между {v['транзакций_между_медиана']}, итог {v['итог_sol']:+.4f}",
+              flush=True)
     for имя, с_ in свод.items():
         print(f"{имя}: n {с_['n']}, q медиана {с_['q_медиана']} "
               f"(p10 {с_['q_p10']}, p90 {с_['q_p90']}), q<0.5 у "
