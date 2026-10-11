@@ -35,7 +35,7 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение) | 'blocksubscribe' -- даёт ли наш план Helius подписку на блоки (только чтение) | 'golova' -- первые N покупок того же минта ПОСЛЕ источника в его блоке: плательщик, площадка, чаевые, размер (только чтение) | 'platelshchiki' -- одна таблица по верхним плательщикам головы: доля в блоке источника, цена CU с цепи, в скольких сделках раньше 100-й позиции (только чтение) | 'skorost_sborki' -- ТА ЖЕ полная сборка на четырёх машинах рядом (контейнер, NL-хост, AMS, Miami) + железо и соседи по ядрам (только чтение) | 'potoki' -- КТО из потоков процесса полосы жжёт процессор: имена и CPU за окно, чтением /proc на хосте (только чтение)"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение) | 'blocksubscribe' -- даёт ли наш план Helius подписку на блоки (только чтение) | 'golova' -- первые N покупок того же минта ПОСЛЕ источника в его блоке: плательщик, площадка, чаевые, размер (только чтение) | 'platelshchiki' -- одна таблица по верхним плательщикам головы: доля в блоке источника, цена CU с цепи, в скольких сделках раньше 100-й позиции (только чтение) | 'skorost_sborki' -- ТА ЖЕ полная сборка на четырёх машинах рядом (контейнер, NL-хост, AMS, Miami) + железо и соседи по ядрам (только чтение) | 'potoki' -- КТО из потоков процесса полосы жжёт процессор: имена и CPU за окно, чтением /proc на хосте (только чтение) | 'preprocessed' -- зонд «видеть раньше»: preprocessedSubscribe против обычного transactionSubscribe по адресу источника, рядом с торговлей; задача идемпотентна -- первый запуск поднимает зонд, следующие собирают его отчёт (денежный путь не трогается). Адрес берётся из входа istochnik, предел по времени -- из chasov"
         required: false
         default: "bonding"
       sravnit:
@@ -171,7 +171,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy|blocksubscribe|golova|platelshchiki|skorost_sborki|potoki)
+            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy|blocksubscribe|golova|platelshchiki|skorost_sborki|potoki|preprocessed)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -539,6 +539,63 @@ jobs:
           [ -n "$ARGI" ] || { echo "SBOY: ni odnoj mashiny ne izmereno"; exit 1; }
           python3 deploy/checks/skorost_sborki.py $ARGI --out data/skorost_sborki_4_mashiny.json | tail -90
 
+      - name: "preprocessed: зонд «видеть раньше» рядом с торговлей (денежный путь не трогается)"
+        if: ${{ inputs.zadacha == 'preprocessed' }}
+        env:
+          KLJUCH_NL: ${{ secrets.VPS_SSH_KEY }}
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          NL_HOST: 45.59.170.76
+          ZOND_DIR: /home/bot/preprocessed_zond
+          VENV: /home/bot/robinhood-chain-alpha/venv
+          ADRES: ${{ inputs.istochnik }}
+          CHASOV: ${{ inputs.chasov }}
+          # ЦЕЛЬ -- 30 ПОКУПОК, как сказал владелец. Входом не делаем: у
+          # прогона уже 25 входов, это предел GitHub.
+          POKUPOK: "30"
+          UNIT: preprocessed-zond
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$KLJUCH_NL" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          [ -n "$HELIUS_API_KEY" ] || { echo "SBOY: HELIUS_API ne zadan"; exit 1; }
+          case "$ADRES" in *[!1-9A-HJ-NP-Za-km-z]*|"") echo "SBOY: adres ne base58"; exit 1;; esac
+          case "${CHASOV:-24}" in ''|*[!0-9]*) echo "SBOY: chasov ne celoe"; exit 1;; esac
+          python3 analysis/preprocessed_ab_zond.py --self-test | tail -2
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_NL" > ~/.ssh/nl_key
+          chmod 600 ~/.ssh/nl_key
+          OPTS="-i $HOME/.ssh/nl_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
+          ZHIV=$(ssh -n $OPTS root@"$NL_HOST" "systemctl is-active $UNIT.service 2>/dev/null || true")
+          echo "sostojanie zonda: ${ZHIV:-net}"
+          if [ "$ZHIV" != "active" ]; then
+            # ЗАПУСК. Зонд живёт часами, поэтому он уходит под systemd-run, а
+            # прогон выходит сразу -- так же, как зонд преконфов.
+            ssh -n $OPTS root@"$NL_HOST" "systemctl stop $UNIT.service 2>/dev/null || true; systemctl reset-failed $UNIT.service 2>/dev/null || true; install -d -m 755 $ZOND_DIR"
+            ssh $OPTS root@"$NL_HOST" "cat > $ZOND_DIR/preprocessed_ab_zond.py" < analysis/preprocessed_ab_zond.py
+            # КЛЮЧ -- ФАЙЛОМ 600 И ТОЛЬКО ЧЕРЕЗ stdin: в argv и в журнал он не попадает.
+            printf '%s' "$HELIUS_API_KEY" | ssh $OPTS root@"$NL_HOST" "umask 077; cat > $ZOND_DIR/helius_key; chmod 600 $ZOND_DIR/helius_key; wc -c < $ZOND_DIR/helius_key"
+            ssh -n $OPTS root@"$NL_HOST" "set -o pipefail; $VENV/bin/python $ZOND_DIR/preprocessed_ab_zond.py --self-test | tail -1"
+            STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+            ssh -n $OPTS root@"$NL_HOST" "systemd-run --unit=$UNIT --description='Zond preprocessed protiv WS' --setenv=HELIUS_API_KEY_FILE=$ZOND_DIR/helius_key --working-directory=$ZOND_DIR $VENV/bin/python $ZOND_DIR/preprocessed_ab_zond.py --adres '$ADRES' --pokupok ${POKUPOK:-30} --sekund $(( ${CHASOV:-24} * 3600 )) --out $ZOND_DIR/vstrechi_$STAMP.jsonl --status $ZOND_DIR/status.json"
+            sleep 20
+            echo "zond podnjat, pervyj priznak zhizni:"
+          else
+            echo "zond uzhe rabotaet -- sobiraju otchjot, ne trogaja ego"
+          fi
+          ssh -n $OPTS root@"$NL_HOST" "cat $ZOND_DIR/status.json 2>/dev/null || echo '{\"why_not\": \"priznaka poka net\"}'" > /tmp/preprocessed_status.json
+          mkdir -p data/preprocessed
+          cp /tmp/preprocessed_status.json data/preprocessed/status.json
+          ssh -n $OPTS root@"$NL_HOST" "cat \$(ls -1t $ZOND_DIR/vstrechi_*.jsonl 2>/dev/null | head -1) 2>/dev/null || true" > /tmp/preprocessed_vstrechi.jsonl || true
+          [ -s /tmp/preprocessed_vstrechi.jsonl ] && cp /tmp/preprocessed_vstrechi.jsonl data/preprocessed/vstrechi.jsonl || true
+          python3 deploy/checks/preprocessed_stroka.py /tmp/preprocessed_status.json || true
+          # ЦЕЛЬ НАБРАНА -- ВЫКЛЮЧАЕМ, как просил владелец: дальше платить за
+          # сообщения незачем. Зонд и сам выходит, это лишь страховка.
+          if python3 deploy/checks/preprocessed_stroka.py --dostignuto /tmp/preprocessed_status.json; then
+            echo "cel nabrana -- zond ostanovlen"
+            ssh -n $OPTS root@"$NL_HOST" "systemctl stop $UNIT.service 2>/dev/null || true; systemctl reset-failed $UNIT.service 2>/dev/null || true; shred -u $ZOND_DIR/helius_key 2>/dev/null || rm -f $ZOND_DIR/helius_key"
+          fi
+          shred -u ~/.ssh/nl_key 2>/dev/null || true
+
       - name: "potoki: кто из потоков процесса полосы жжёт процессор (только чтение /proc)"
         if: ${{ inputs.zadacha == 'potoki' }}
         env:
@@ -726,6 +783,7 @@ jobs:
           # можно было перепроверить любое число из неё по его машине.
           [ -d data/skorost_sborki ] && git add data/skorost_sborki || true
           [ -d data/potoki ] && git add data/potoki || true
+          [ -d data/preprocessed ] && git add data/preprocessed || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Krivaya pump.fun: simulyatsiya nashey sborki [automated]"
           for i in 1 2 3 4 5; do
