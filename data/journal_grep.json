@@ -1,695 +1,241 @@
 {
- "patterns": "lane_pool_nonce",
- "file": "positions",
+ "patterns": "z_iz_gotovogo",
+ "file": "decisions",
  "okno": {
-  "ot": null,
-  "do": null,
-  "zapisej": 25,
-  "predel": 25,
-  "usecheno": true,
-  "chem_grozit": "предел достигнут -- за краем остались записи СТАРШЕ границы 'ot'; окно считать по этим границам, а не по задуманному"
+  "ot": "2026-10-11T14:22:20Z",
+  "do": "2026-10-11T14:22:20Z",
+  "zapisej": 1,
+  "predel": 2,
+  "usecheno": false,
+  "chem_grozit": null
  },
  "rows": [
   {
-   "ts_update_utc": "2026-10-10T22:26:32Z",
-   "ts_decision": 1791671189.1483989,
-   "client_order_id": "lane-own-3HmBXi9oPCd8XPf6WsXH6BFFMxj94VompanPLpRu",
-   "lane_podshagi_ms": {
-    "разбор и размер": 8.011,
-    "гейт полосы": 0.835,
-    "веер контролей": 0.003,
-    "чаевые пула и нонс": 0.134,
-    "сборка": 5.959,
-    "симуляция": 0.954,
-    "blockhash": 0.048,
-    "подпись": 32.574,
-    "всего": 48.519
+   "schema_version": 2,
+   "ts_utc": "2026-10-11T14:22:20Z",
+   "stage": "sent",
+   "signature": "3CUqtrH2RuRN1v3FkCaP48ddgiTLqmUPAVhUxhXtkwWLvWDfXhZKaK6SnE2gpWesFDSvUrJfSvvw8sQ6q1Vs9P5c",
+   "mint": "3vgHAej2inPHEy532CDrWyF79bVxVbWLEXti1CDMpump",
+   "source": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
+   "ok": true,
+   "sent": true,
+   "dry": false,
+   "why_not": null,
+   "lane": "own_send",
+   "source_sig": "25ZpXqM2HSRSSoXFKb7Fsk8xkJwhC1mh15qgbBbPQUkHKEoicAec4vVKfSNHt7ELVwmdw6fMHFPibEYoHLjbrxiz",
+   "cid": "lane-own-25ZpXqM2HSRSSoXFKb7Fsk8xkJwhC1mh15qgbBbP",
+   "group": "nabor",
+   "slippage": 0.4,
+   "hold_slots": 108.0,
+   "source_spend_sol_eq": 3.0020000000000002,
+   "slots_from_source": 0,
+   "size_why": null,
+   "first_trades": false,
+   "group_landed": 5,
+   "bilet_sol": 0.01,
+   "bilet_dolya": null,
+   "bilet_ot_rezerva": false,
+   "bilet_rezerv_sol": null,
+   "bilet_rezerv_otkuda": null,
+   "bilet_rezerv_vid": null,
+   "bilet_rezerv_why_not": "котировка -- нативный SOL (кривая): резерв там виртуальный, остатком счёта он не считается; события свопа CLMM этого пула в сделке нет",
+   "bilet_podjom": false,
+   "bilet_pol_sol": null,
+   "bilet_potolok_podjoma_sol": null,
+   "bilet_rezerv_max_sol": null,
+   "lamports": 10000000,
+   "size_sol": 0.01,
+   "lane_state": {
+    "open": 0,
+    "stuck": 0,
+    "day": "20261011",
+    "day_start_ts": 1791669600.0,
+    "day_how": "Europe/Madrid",
+    "pnl_all_groups_sol": -0.058350401,
+    "pnl_chain_sol": 0.004924223,
+    "pnl_chain_all_groups_sol": -0.022018241,
+    "pnl_chain_n": 5,
+    "pnl_chain_fields_n": 2,
+    "pnl_chain_open_n": 0,
+    "pnl_chain_why_not": [
+     "итог по цепи в записи не посчитан",
+     "итог по цепи в записи не посчитан"
+    ],
+    "pnl_vs_chain_sol": -0.0075692,
+    "today_all_groups": 29,
+    "today": 7,
+    "hour": 2,
+    "failed_in_row": 0,
+    "pnl_sol": -0.002644977,
+    "pnl_trade_sol": 0.019998823,
+    "spend_sol": 0.0226438,
+    "uncountable_today": 0,
+    "no_result_today": 0,
+    "uncountable_why": [],
+    "total": 7,
+    "group": "nabor",
+    "day_turnover_sol": 0.082035,
+    "day_spend_sol": 0.0226438
    },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 32.33,
-   "lane_variants_cpu_ms": null,
-   "lane_variants_zhdali_ms": null,
-   "lane_sign_ms": 0.22,
-   "lane_send_ms": 9.66,
-   "lane_pool_accepted_first": "zeroslot",
-   "lane_pool_ok_senders": [
-    "helius",
-    "jito",
-    "zeroslot"
-   ],
-   "lane_signature": "diPNqGMuK4fnzCyP47tF7W4Tju3W7pPggTrSAiNwxPHf7KT5FYFcxDYEMi6h4pDeAK2g1cq9uqz7YDa4X3EGbbk",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-10T22:32:43Z",
-   "ts_decision": 1791671559.9580898,
-   "client_order_id": "lane-own-2KjNHQA8KN8J4dWoJjrbFPT9wY4RQhwdaRbht7MM",
-   "lane_podshagi_ms": {
-    "разбор и размер": 7.136,
-    "гейт полосы": 0.809,
-    "веер контролей": 0.002,
-    "чаевые пула и нонс": 0.669,
-    "сборка": 5.863,
-    "симуляция": 0.744,
-    "blockhash": 0.082,
-    "подпись": 33.269,
-    "всего": 48.575
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 33.01,
-   "lane_variants_cpu_ms": null,
-   "lane_variants_zhdali_ms": null,
-   "lane_sign_ms": 0.24,
-   "lane_send_ms": 4.26,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "3i9bjntck4WuxL7bAfFijDN1Y9VngE17cE1K3p6oWgzfx79sAPSuhFvLEE2Bos2fhJEo8954gciwdMmKq4w3sh9i",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T01:53:18Z",
-   "ts_decision": 1791683595.1626003,
-   "client_order_id": "lane-own-GKfPPw2n2pfKmQ2g8xSCzyL6R3YVbeBgE2ZRZvn8",
-   "lane_podshagi_ms": {
-    "разбор и размер": 6.302,
-    "гейт полосы": 0.686,
-    "веер контролей": 0.006,
-    "чаевые пула и нонс": 0.14,
-    "сборка": 7.242,
-    "симуляция": 0.713,
-    "blockhash": 0.039,
-    "подпись": 31.462,
-    "всего": 46.591
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 31.12,
-   "lane_variants_cpu_ms": 29.18,
-   "lane_variants_zhdali_ms": 1.94,
-   "lane_sign_ms": 0.29,
-   "lane_send_ms": 4.49,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "2fKSQc5UCFo8f5vVMsucgy8CDjcAjNR7Q4AWvB8UmhggzHkXSXpdzf2aAmnPAv5oqC51x3UDc2CwUsPajddzJ3zX",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T03:21:26Z",
-   "ts_decision": 1791688883.1238103,
-   "client_order_id": "lane-own-5FW1cXW2X838SmaLEdLjDvBJxd6WUhhTvAPEAk3k",
-   "lane_podshagi_ms": {
-    "разбор и размер": 4.207,
-    "гейт полосы": 0.843,
-    "веер контролей": 0.012,
-    "чаевые пула и нонс": 0.306,
-    "сборка": 4.896,
-    "симуляция": 0.64,
-    "blockhash": 0.039,
-    "подпись": 28.566,
-    "всего": 39.509
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 28.31,
-   "lane_variants_cpu_ms": 28.31,
-   "lane_variants_zhdali_ms": 0.0,
-   "lane_sign_ms": 0.21,
-   "lane_send_ms": 8.86,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "36XXmhi6rUaNf9H2VZbNZakWL9otRgZJLFTqkUEmzKWEosNo9DSdV4iHBnf1Vsqvq7xJiiJPmJaGEPRTmXYUV57k",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T03:22:27Z",
-   "ts_decision": 1791688944.1366208,
-   "client_order_id": "lane-own-2L6f8ftws4bC3JXhk3zRcnTG7uaz3Lg28gCQQqHz",
-   "lane_podshagi_ms": {
-    "разбор и размер": 6.128,
-    "гейт полосы": 0.91,
-    "веер контролей": 0.005,
-    "чаевые пула и нонс": 0.154,
-    "сборка": 5.726,
-    "симуляция": 0.793,
-    "blockhash": 0.279,
-    "подпись": 35.01,
-    "всего": 49.004
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 34.74,
-   "lane_variants_cpu_ms": 34.08,
-   "lane_variants_zhdali_ms": 0.66,
-   "lane_sign_ms": 0.23,
-   "lane_send_ms": 4.81,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "5Lv1Kjw7sdy7k4AcZRzCmphdJ1Jk5a96yTm3qDgyGusDyh6n2stRi5U5t4t5h5N5G3YtE7P6RG1escRk2bcHZXkq",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T03:23:10Z",
-   "ts_decision": 1791688987.338482,
-   "client_order_id": "lane-own-3Q3eWKT8HbGWQ1QVQuCoi9MWrcMu3YpXa4rsDapX",
-   "lane_podshagi_ms": {
-    "разбор и размер": 3.304,
-    "гейт полосы": 1.543,
-    "веер контролей": 0.004,
-    "чаевые пула и нонс": 0.14,
-    "сборка": 5.554,
-    "симуляция": 0.751,
-    "blockhash": 0.313,
-    "подпись": 36.305,
-    "всего": 47.914
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 35.97,
-   "lane_variants_cpu_ms": 32.06,
-   "lane_variants_zhdali_ms": 3.91,
-   "lane_sign_ms": 0.3,
-   "lane_send_ms": 4.78,
-   "lane_pool_accepted_first": "helius",
-   "lane_pool_ok_senders": [
-    "helius"
-   ],
-   "lane_signature": "2fEJqj8GfDi4UpYgierSBe49Ygjpcv23ETR4L5PYJqmWhE71hGRFCYaXxv85gnScckW7WWwaChnqP8CmKupUmPzQ",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T03:27:47Z",
-   "ts_decision": 1791689264.4768474,
-   "client_order_id": "lane-own-2vUBWFvY9nhRL9tTVNVV9tufXfYPC6FEL7jLAgjj",
-   "lane_podshagi_ms": {
-    "разбор и размер": 2.083,
-    "гейт полосы": 0.771,
-    "веер контролей": 0.004,
-    "чаевые пула и нонс": 0.109,
-    "сборка": 5.27,
-    "симуляция": 0.719,
-    "blockhash": 0.056,
-    "подпись": 29.84,
-    "всего": 38.852
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 29.52,
-   "lane_variants_cpu_ms": 29.48,
-   "lane_variants_zhdali_ms": 0.04,
-   "lane_sign_ms": 0.28,
-   "lane_send_ms": 4.57,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "3qkjv5i8C4wDha9u6vCxqUzPa5oBq3Z6qvE6BprpUy514hSjK7sTfoaBuby5LXVeiqPCrbwYsjNDoZtVBFdiJRww",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T03:46:39Z",
-   "ts_decision": 1791690396.5544646,
-   "client_order_id": "lane-own-4AuVdzGMoGNohXJnHZMWB3S1EUs1YvtBrYwTtMF3",
-   "lane_podshagi_ms": {
-    "разбор и размер": 8.934,
-    "гейт полосы": 1.411,
-    "веер контролей": 0.005,
-    "чаевые пула и нонс": 0.135,
-    "сборка": 5.649,
-    "симуляция": 0.811,
-    "blockhash": 0.046,
-    "подпись": 36.267,
-    "всего": 53.259
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 35.94,
-   "lane_variants_cpu_ms": 31.71,
-   "lane_variants_zhdali_ms": 4.23,
-   "lane_sign_ms": 0.28,
-   "lane_send_ms": 6.84,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "3hGynztZKhDtRuapVej25hwSEqB8CuD1RibykkXMRwGBJ6SuDYyzAjAKVTYwvV1coSiXeN7Jg1pw8Dqup8USxnnv",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T04:08:53Z",
-   "ts_decision": 1791691729.534991,
-   "client_order_id": "lane-own-2BQBqisAnJbRbukS2HEjermEQHoMH1CMjgokmVyy",
-   "lane_podshagi_ms": {
-    "разбор и размер": 5.922,
-    "гейт полосы": 1.599,
-    "веер контролей": 0.004,
-    "чаевые пула и нонс": 0.134,
-    "сборка": 5.541,
-    "симуляция": 0.765,
-    "blockhash": 0.044,
-    "подпись": 32.652,
-    "всего": 46.66
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 32.4,
-   "lane_variants_cpu_ms": 31.69,
-   "lane_variants_zhdali_ms": 0.71,
-   "lane_sign_ms": 0.22,
-   "lane_send_ms": 5.76,
-   "lane_pool_accepted_first": "zeroslot",
-   "lane_pool_ok_senders": [
-    "zeroslot"
-   ],
-   "lane_signature": "2qFyawuXfuXmEj532hv4Jyi4P9mv2KBoJatRvQLgqGa6hB1R5Y4YRhy1VZK4359WBVwgiwhyLLHzyFmGUMYeQHTb",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T04:17:13Z",
-   "ts_decision": 1791692230.59976,
-   "client_order_id": "lane-own-2MSPkpnTnmMgmdQfdwJdukdyKkYq2HJ5tPdjvp8Q",
-   "lane_podshagi_ms": {
-    "разбор и размер": 7.8,
-    "гейт полосы": 0.955,
-    "веер контролей": 0.004,
-    "чаевые пула и нонс": 0.108,
-    "сборка": 6.397,
-    "симуляция": 0.842,
-    "blockhash": 0.096,
-    "подпись": 39.08,
-    "всего": 55.283
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 38.64,
-   "lane_variants_cpu_ms": 37.43,
-   "lane_variants_zhdali_ms": 1.21,
-   "lane_sign_ms": 0.4,
-   "lane_send_ms": 5.48,
-   "lane_pool_accepted_first": "zeroslot",
-   "lane_pool_ok_senders": [
-    "zeroslot"
-   ],
-   "lane_signature": "4m7GzZyMbC7pypn12R6z3CeFETSA5CktjpTJrtdoYm46nQqpYhn6nZVTbhsArmwSMFkhcYYPqcL96T7PwgFMJybD",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T04:19:25Z",
-   "ts_decision": 1791692361.861867,
-   "client_order_id": "lane-own-5NHM4gVRPuaisVSkqNZVmw71gvVCb6AaMDyba9wF",
-   "lane_podshagi_ms": {
-    "разбор и размер": 5.472,
-    "гейт полосы": 5.105,
-    "веер контролей": 0.006,
-    "чаевые пула и нонс": 0.253,
-    "сборка": 5.326,
-    "симуляция": 0.597,
-    "blockhash": 0.04,
-    "подпись": 29.634,
-    "всего": 46.433
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 29.29,
-   "lane_variants_cpu_ms": 28.27,
-   "lane_variants_zhdali_ms": 1.02,
-   "lane_sign_ms": 0.3,
-   "lane_send_ms": 6.92,
-   "lane_pool_accepted_first": "zeroslot",
-   "lane_pool_ok_senders": [
-    "zeroslot"
-   ],
-   "lane_signature": "4izxVzzfiEt59pcXAo5xZBhnwYUAYszQWrY7VUZGpKHNNSfVagQok5YJP1mwhvtFZji63BkMde98etyrU9U793Wg",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T04:40:32Z",
-   "ts_decision": 1791693629.0617032,
-   "client_order_id": "lane-own-5ncnUNk55TBc7DjrKNvq45TDKcWMnDdxMWnMdXTU",
-   "lane_podshagi_ms": {
-    "разбор и размер": 5.704,
-    "гейт полосы": 0.944,
-    "веер контролей": 0.005,
-    "чаевые пула и нонс": 0.149,
-    "сборка": 4.628,
-    "симуляция": 0.596,
-    "blockhash": 0.035,
-    "подпись": 30.191,
-    "всего": 42.25
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 29.93,
-   "lane_variants_cpu_ms": 29.58,
-   "lane_variants_zhdali_ms": 0.35,
-   "lane_sign_ms": 0.22,
-   "lane_send_ms": 5.31,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "3sFaR5DLnotbQAZyUHXDzgjG6J88h286EsF9sjPg6hL7yzR7PK7UKi6fHD1AM2GsAbJHxm899p7rH3CMr8ggs2go",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T05:24:27Z",
-   "ts_decision": 1791696264.0034313,
-   "client_order_id": "lane-own-xsVRQ7DWF87vHf5KXkN5ru3XAXBdmMxkdjbzhHPn",
-   "lane_podshagi_ms": {
-    "разбор и размер": 8.018,
-    "гейт полосы": 1.262,
-    "веер контролей": 0.008,
-    "чаевые пула и нонс": 0.207,
-    "сборка": 9.627,
-    "симуляция": 0.918,
-    "blockhash": 0.037,
-    "подпись": 36.933,
-    "всего": 57.009
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 36.58,
-   "lane_variants_cpu_ms": 34.02,
-   "lane_variants_zhdali_ms": 2.56,
-   "lane_sign_ms": 0.31,
-   "lane_send_ms": 9.73,
-   "lane_pool_accepted_first": "zeroslot",
-   "lane_pool_ok_senders": [
-    "astralane",
-    "zeroslot"
-   ],
-   "lane_signature": "44mYSZzbaPeiczdqoYAmXTSNwtk6SgdK82kkr19CDwvyBiRusvfWigiPpAJTdkwL3ZiyrDAXGDqVdjDe3MevbTRv",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T05:26:04Z",
-   "ts_decision": 1791696361.1398528,
-   "client_order_id": "lane-own-5NyezWy3o32vSrZHGa2AmXBcrboqyyR4Bdgh1ht7",
-   "lane_podshagi_ms": {
-    "разбор и размер": 2.67,
-    "гейт полосы": 1.132,
-    "веер контролей": 0.007,
-    "чаевые пула и нонс": 0.169,
-    "сборка": 7.791,
-    "симуляция": 1.369,
-    "blockhash": 0.042,
-    "подпись": 81.77,
-    "всего": 94.949
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 81.4,
-   "lane_variants_cpu_ms": 41.35,
-   "lane_variants_zhdali_ms": 40.05,
-   "lane_sign_ms": 0.31,
-   "lane_send_ms": 4.97,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "2qaXyeAEFEFY8kjXJuuBjKArnjZFi9zEGwqUEojZicrFAiCeUH3zY1FndKMn7R8LzpvPNKHsKDiQupPHETXBGvba",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T06:18:58Z",
-   "ts_decision": 1791699534.4756258,
-   "client_order_id": "lane-own-5HYCyCYfkUpH2uapHueWTbiRC1yrxBVi4yE55RbS",
-   "lane_podshagi_ms": {
-    "разбор и размер": 1.762,
-    "гейт полосы": 0.919,
-    "веер контролей": 0.004,
-    "чаевые пула и нонс": 0.123,
-    "сборка": 5.221,
-    "симуляция": 0.859,
-    "blockhash": 0.033,
-    "подпись": 29.778,
-    "всего": 38.7
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 29.5,
-   "lane_variants_cpu_ms": 29.46,
-   "lane_variants_zhdali_ms": 0.04,
-   "lane_sign_ms": 0.25,
-   "lane_send_ms": 6.47,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "2VwBG2Nm5dQSAaMY6usD5t6GBwWeyJdTraWKThXkjRDcAycAE5PBoXbfsHy5jAPB9PYRHySc3zLYMTjy2htDgYs",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T06:32:25Z",
-   "ts_decision": 1791700342.647038,
-   "client_order_id": "lane-own-3rg42kfkmwGpXveMeQAqz6PaZw9tWQSgFfDjYGVp",
-   "lane_podshagi_ms": {
-    "разбор и размер": 7.834,
-    "гейт полосы": 0.795,
-    "веер контролей": 0.012,
-    "чаевые пула и нонс": 0.428,
-    "сборка": 6.33,
-    "симуляция": 0.647,
-    "blockhash": 0.031,
-    "подпись": 39.422,
-    "всего": 55.498
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 39.17,
-   "lane_variants_cpu_ms": 36.54,
-   "lane_variants_zhdali_ms": 2.63,
-   "lane_sign_ms": 0.22,
-   "lane_send_ms": 9.04,
-   "lane_pool_accepted_first": "zeroslot",
-   "lane_pool_ok_senders": [
-    "zeroslot"
-   ],
-   "lane_signature": "53VyEVfiLArFFyt6PAFgRf1Avt111dFNMtjoRNbuRfN5W7Z4dj1e6JdzpXx2pVtv7JgDWi9eDiJiuAa476DM6LCQ",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T06:37:03Z",
-   "ts_decision": 1791700620.0169127,
-   "client_order_id": "lane-own-3dibYXjpAxuPqrFf8bUXFTnfPmMeCsy2U7tbCSkL",
-   "lane_podshagi_ms": {
-    "разбор и размер": 6.985,
-    "гейт полосы": 1.107,
-    "веер контролей": 0.004,
-    "чаевые пула и нонс": 0.145,
-    "сборка": 4.857,
-    "симуляция": 0.584,
-    "blockhash": 0.233,
-    "подпись": 30.885,
-    "всего": 44.799
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 30.61,
-   "lane_variants_cpu_ms": 29.7,
-   "lane_variants_zhdali_ms": 0.91,
-   "lane_sign_ms": 0.23,
-   "lane_send_ms": 6.02,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "3F9DEou7nBrCQ9CmEcEWCewXKqoMhPSL7ZH2aMtKT6vSv6W5bRhdvayTRBqAuawBwxh29PG4efdHoFe84ReweiGV",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T11:16:35Z",
-   "ts_decision": 1791717391.511193,
-   "client_order_id": "lane-own-66RBamCZ51aGaMBqX3Nts8THSZTN2UxKp3nC5An4",
-   "lane_podshagi_ms": {
-    "разбор и размер": 11.806,
-    "гейт полосы": 1.01,
-    "веер контролей": 0.005,
-    "чаевые пула и нонс": 0.186,
-    "сборка": 6.587,
-    "симуляция": 0.798,
-    "blockhash": 0.033,
-    "подпись": 23.456,
-    "всего": 43.881
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 20.47,
-   "lane_variants_cpu_ms": 19.49,
-   "lane_variants_zhdali_ms": 0.98,
-   "lane_sign_ms": 0.61,
-   "lane_send_ms": 10.52,
-   "lane_pool_accepted_first": "astralane",
-   "lane_pool_ok_senders": [
-    "astralane"
-   ],
-   "lane_signature": "5R3Fmqp5DzUvEaxswtemP2GWTv9QCU87sB9VjnKasgAoPSKtR7Gwc82WeTSV9BduhcxGxxqieFbDatzrPuwn7pDt",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T12:39:16Z",
-   "ts_decision": 1791722353.560462,
-   "client_order_id": "lane-own-ZWb4KPCXsiLDJCymvrVPkfNptX6XP7ouA5y516ng",
-   "lane_podshagi_ms": {
-    "разбор и размер": 2.629,
-    "гейт полосы": 1.758,
-    "веер контролей": 0.005,
-    "чаевые пула и нонс": 0.2,
-    "сборка": 5.749,
-    "симуляция": 0.978,
-    "blockhash": 0.104,
-    "подпись": 29.116,
-    "всего": 40.537
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 28.75,
-   "lane_variants_cpu_ms": 16.4,
-   "lane_variants_zhdali_ms": 12.35,
-   "lane_sign_ms": 0.27,
-   "lane_send_ms": 3.8,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "xsTdNQrQkZedd49z9zCwn8CqnkpB1Mq7ezWUAMCVpR23qJCnv9t4KW3YyjDfM8gRu3orxWyQejcx42hwUM7uqLz",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T13:13:37Z",
-   "ts_decision": 1791724413.8001592,
-   "client_order_id": "lane-own-YciM2toPXBvMTrJ6wrrUvVvgBbpu8ic7aERenUm7",
-   "lane_podshagi_ms": {
-    "разбор и размер": 7.004,
-    "гейт полосы": 1.522,
-    "веер контролей": 0.005,
-    "чаевые пула и нонс": 0.227,
-    "сборка": 9.245,
-    "симуляция": 1.255,
-    "blockhash": 0.045,
-    "подпись": 36.404,
-    "всего": 55.707
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 36.09,
-   "lane_variants_cpu_ms": 18.9,
-   "lane_variants_zhdali_ms": 17.19,
-   "lane_sign_ms": 0.24,
-   "lane_send_ms": 3.41,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "5kMc533D1oaoqccC8Ma3ntttdCFestuMvjzP8Efv6aaP9ArX3D1iyW36AtBFiZpRyfkuy84TXdZ1MKmSjJGQpHQj",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T13:21:24Z",
-   "ts_decision": 1791724880.8622723,
-   "client_order_id": "lane-own-2E3S7RaiYiKJGj7wtXySe2t3S8y1xX3Q2UvQkv2F",
-   "lane_podshagi_ms": {
-    "разбор и размер": 9.929,
-    "гейт полосы": 2.203,
-    "веер контролей": 0.006,
-    "чаевые пула и нонс": 0.824,
-    "сборка": 5.828,
-    "симуляция": 0.766,
-    "blockhash": 0.053,
-    "подпись": 25.691,
-    "всего": 45.3
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 25.28,
-   "lane_variants_cpu_ms": 17.8,
-   "lane_variants_zhdali_ms": 7.48,
-   "lane_sign_ms": 0.34,
-   "lane_send_ms": 3.82,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "D2e1wiYCiXrmnCaLnCsDVkgdHUv2imELqzGce3SYR3y8hiKKTVxpS7jhWM7o8FTDbmn1y3GbKwkV7kmfMNopG7z",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T13:21:43Z",
-   "ts_decision": 1791724900.0653207,
-   "client_order_id": "lane-own-47bwcoSNb2mJ39U7DNi6aXMgCjyYQVsELwu8uA5G",
-   "lane_podshagi_ms": {
-    "разбор и размер": 5.82,
-    "гейт полосы": 3.355,
-    "веер контролей": 0.007,
-    "чаевые пула и нонс": 0.253,
-    "сборка": 6.15,
-    "симуляция": 0.536,
-    "blockhash": 0.034,
-    "подпись": 18.52,
-    "всего": 34.674
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 18.12,
-   "lane_variants_cpu_ms": 15.58,
-   "lane_variants_zhdali_ms": 2.54,
-   "lane_sign_ms": 0.33,
-   "lane_send_ms": 4.09,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "cgwmUv7kaMZQVMXbHHNKw5LRmxJdQN1Am7pziLkWTS7nxyDB2tJeMrzWy825vW27sBqzhUwyJcP8AUVuiE3YyDM",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T13:55:21Z",
-   "ts_decision": 1791726918.6533697,
-   "client_order_id": "lane-own-yCHS47ETqqZBTrMpEYWYnaoXcjL1GHyRuAjgo4tH",
-   "lane_podshagi_ms": {
-    "разбор и размер": 2.569,
-    "гейт полосы": 1.896,
-    "веер контролей": 0.006,
-    "чаевые пула и нонс": 0.214,
-    "сборка": 0.625,
-    "симуляция": 0.768,
-    "blockhash": 0.045,
-    "подпись": 1.618,
-    "всего": 7.742
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 1.29,
-   "lane_variants_cpu_ms": 1.18,
-   "lane_variants_zhdali_ms": 0.11,
-   "lane_sign_ms": 0.25,
-   "lane_send_ms": 5.46,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "2i5fyY9ftkAwXq9xrqHZTKTgrMyPpJpULXV7SaW5dMuotuA8X5ZXt3HuKfYiUz9RDLue4t28ACAuefsEXNACNjKp",
-   "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
-  },
-  {
-   "ts_update_utc": "2026-10-11T14:13:54Z",
-   "ts_decision": 1791728031.4671993,
-   "client_order_id": "lane-own-ssXWXbi8LWinFmDaD3G3JdBo7H7MCZ7kunnD7WeL",
-   "lane_podshagi_ms": {
-    "разбор и размер": 8.443,
-    "гейт полосы": 0.905,
-    "веер контролей": 0.005,
-    "чаевые пула и нонс": 0.12,
-    "сборка": 4.883,
-    "симуляция": 0.824,
-    "blockhash": 0.067,
-    "подпись": 16.579,
-    "всего": 31.824
-   },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 16.25,
-   "lane_variants_cpu_ms": 14.58,
-   "lane_variants_zhdali_ms": 1.67,
-   "lane_sign_ms": 0.24,
-   "lane_send_ms": 3.59,
-   "lane_pool_accepted_first": "jito",
-   "lane_pool_ok_senders": [
-    "jito"
-   ],
-   "lane_signature": "4TArTi9KuERm48C4YzqtFAizajgcPDuD2LqDyVaJK95Nfjr7qEaZf86rqiXGwVM3iYSkFxoZbU9e7sA7ESLQEpwP",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-  },
-  {
-   "ts_update_utc": "2026-10-11T14:22:20Z",
    "ts_decision": 1791728537.1268866,
-   "client_order_id": "lane-own-25ZpXqM2HSRSSoXFKb7Fsk8xkJwhC1mh15qgbBbP",
-   "lane_podshagi_ms": {
+   "pool_senders_gruppy": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "pool_tips": {
+    "ok": true,
+    "tips": [
+     [
+      "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+      1000000
+     ],
+     [
+      "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+      1000000
+     ],
+     [
+      "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+      1000
+     ]
+    ],
+    "total_lamports": 2001000,
+    "senders": [
+     {
+      "sender": "astralane",
+      "tip_account": "astra4uejePWneqNaJKuFFA8oonqCE1sqF6b45kDMZm",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "helius",
+      "tip_account": "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+      "tip_lamports": 1000000
+     },
+     {
+      "sender": "jito",
+      "tip_account": "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+      "tip_lamports": 1000
+     }
+    ],
+    "why_not": null,
+    "total_sol": 0.002001
+   },
+   "nonce_ms": 0.014,
+   "pool_nonce": {
+    "account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "ok": true,
+    "why_not": null,
+    "warm": true,
+    "warm_age_s": 9.192,
+    "warm_why_not": null,
+    "nonce_ms": 0.014,
+    "n_variants": 3,
+    "candidates": [
+     "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+     "4mKB4K86jiRpQss68YQSYpS1LxYNfKmSW1rZsmq5mWgCDRpDAPSxUVbAuWcuntTAd6x7kCwMBz3hDrNnU3Dzogdb",
+     "2wov3nUmjRyMik41qz213vVY3tXnWwKNcCjStEzj4HfmJsy1EKGPJPVogRpTd9m3KfoF1BsA1RnhUBzEcWGmAAoK"
+    ],
+    "tips_total_lamports": 2001000,
+    "sizes": [
+     949,
+     949,
+     949
+    ],
+    "iz_zagotovki": {
+     "da": 3,
+     "net": 0
+    },
+    "split_ms": {
+     "sborka": 5.343,
+     "podpis": 0.636,
+     "sborka_cpu": 5.346,
+     "podpis_cpu": 0.652,
+     "z_proverki_ms": 0.016,
+     "z_moduli_ms": 0.01,
+     "z_build_buy_ms": 5.274,
+     "z_zag_ms": 5.047,
+     "z_hvost_ms": 0.012,
+     "z_vsego_ms": 5.328,
+     "z_iz_gotovogo": [
+      "собрано",
+      "взято",
+      "взято"
+     ]
+    },
+    "zagotovka_why_not": null,
+    "landing": {
+     "landed": true,
+     "signature": "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+     "sender": "astralane",
+     "why_not": null,
+     "waited_s": 3.2,
+     "waited_slots": 8
+    },
+    "shift": null
+   },
+   "lane_usdc_vetka": {
+    "да": false,
+    "почему": "причины отказа нет -- ветку не открываем",
+    "признак": null
+   },
+   "pool_program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+   "min_out": 48979513132,
+   "expected_out": 81632521887,
+   "build_ms": 6.485,
+   "size": 875,
+   "tip_account": "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+   "pool_reserve_sol": 62.401779321,
+   "pool_reserve_kind": "виртуальный",
+   "pool_senders": [
+    "astralane",
+    "helius",
+    "jito"
+   ],
+   "sim_shadow": "запущена в своём потоке",
+   "zabor_s0": null,
+   "blockhash_age_s": 0.15,
+   "sign_ms": 0.51,
+   "variants_ms": 6.06,
+   "variants_cpu_ms": 6.06,
+   "variants_zhdali_ms": 0.0,
+   "potokov_v_processe": 12,
+   "gil_interval_s": 0.0005,
+   "resursy_potoka": {
+    "polzovatelskoe_ms": 5.295,
+    "sistemnoe_ms": 0.921,
+    "promahov_stranic": 8,
+    "promahov_s_diska": 0,
+    "why_not": null
+   },
+   "gc_prohodov": [
+    0,
+    0,
+    0
+   ],
+   "gc_schjot_do": [
+    587,
+    5,
+    15
+   ],
+   "gc_schjot_posle": [
+    629,
+    5,
+    15
+   ],
+   "gc_vkljuchjon": true,
+   "gc_porogi": [
+    700,
+    10,
+    10
+   ],
+   "gc_otslezhivaetsja_objektov": null,
+   "variants_reads": {
+    "запросов": 0,
+    "в_сеть": 0,
+    "из_кэша": 0
+   },
+   "ts_signed": 1791728537.142434,
+   "podshagi_ms": {
     "разбор и размер": 6.189,
     "гейт полосы": 3.382,
     "веер контролей": 0.009,
@@ -700,18 +246,117 @@
     "подпись": 7.471,
     "всего": 25.121
    },
-   "lane_pool_nonce": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
-   "lane_variants_ms": 6.06,
-   "lane_variants_cpu_ms": 6.06,
-   "lane_variants_zhdali_ms": 0.0,
-   "lane_sign_ms": 0.51,
-   "lane_send_ms": 9.09,
-   "lane_pool_accepted_first": "astralane",
-   "lane_pool_ok_senders": [
-    "astralane"
-   ],
-   "lane_signature": "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
-   "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+   "podshagi_cpu_ms": {
+    "разбор и размер": 1.488,
+    "гейт полосы": 1.614,
+    "веер контролей": 0.007,
+    "чаевые пула и нонс": 0.498,
+    "сборка": 6.315,
+    "симуляция": 0.16,
+    "blockhash": 0.036,
+    "подпись": 7.055,
+    "всего": 17.172
+   },
+   "ts_sent_buy": 1791728537.1424522,
+   "region_send": {
+    "регион": "Asia",
+    "лидер": "HSDTxfgrqY8ZK88Q5Fx2DdX7zxMDqXgxJKgErTBSLoQJ",
+    "точек": 3,
+    "отправители": [
+     "astralane",
+     "helius",
+     "jito"
+    ],
+    "точки": {
+     "astralane": {
+      "host": "fr.gateway.astralane.io",
+      "регион_точки": "EU"
+     },
+     "helius": {
+      "host": "sg-sender.helius-rpc.com",
+      "регион_точки": "Asia"
+     },
+     "jito": {
+      "host": "singapore.mainnet.block-engine.jito.wtf",
+      "регион_точки": "Asia"
+     }
+    },
+    "слот": 455682574,
+    "why_not": null
+   },
+   "pool": {
+    "mode": "nonce",
+    "nonce_account": "7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz",
+    "region": {
+     "регион": "Asia",
+     "лидер": "HSDTxfgrqY8ZK88Q5Fx2DdX7zxMDqXgxJKgErTBSLoQJ",
+     "точек": 3,
+     "why_not": null
+    },
+    "senders": [
+     "astralane",
+     "helius",
+     "jito"
+    ],
+    "ok_senders": [
+     "astralane"
+    ],
+    "ne_otvetili": [
+     "helius",
+     "jito"
+    ],
+    "po_pervomu": true,
+    "isklyucheny": [],
+    "candidates": [
+     "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+     "4mKB4K86jiRpQss68YQSYpS1LxYNfKmSW1rZsmq5mWgCDRpDAPSxUVbAuWcuntTAd6x7kCwMBz3hDrNnU3Dzogdb",
+     "2wov3nUmjRyMik41qz213vVY3tXnWwKNcCjStEzj4HfmJsy1EKGPJPVogRpTd9m3KfoF1BsA1RnhUBzEcWGmAAoK"
+    ],
+    "tips_total_lamports": 2001000,
+    "rows": [
+     {
+      "sender": "astralane",
+      "signature": "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": true,
+      "pending": false,
+      "http": 200,
+      "send_ms": 8.85,
+      "why_not": null
+     },
+     {
+      "sender": "helius",
+      "signature": "4mKB4K86jiRpQss68YQSYpS1LxYNfKmSW1rZsmq5mWgCDRpDAPSxUVbAuWcuntTAd6x7kCwMBz3hDrNnU3Dzogdb",
+      "tip_lamports": 1000000,
+      "size": 949,
+      "ok": false,
+      "pending": true,
+      "http": null,
+      "send_ms": null,
+      "why_not": "ответ ещё не пришёл -- дописка в фоне"
+     },
+     {
+      "sender": "jito",
+      "signature": "2wov3nUmjRyMik41qz213vVY3tXnWwKNcCjStEzj4HfmJsy1EKGPJPVogRpTd9m3KfoF1BsA1RnhUBzEcWGmAAoK",
+      "tip_lamports": 1000,
+      "size": 949,
+      "ok": false,
+      "pending": true,
+      "http": null,
+      "send_ms": null,
+      "why_not": "ответ ещё не пришёл -- дописка в фоне"
+     }
+    ],
+    "accepted_first": "astralane"
+   },
+   "pool_winner": "astralane",
+   "signature_landed": "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+   "http": 200,
+   "send_ms": 9.09,
+   "duplicate": null,
+   "signature_sender": "5WiHAQFzdrvXxej1Ygj76vLo8YrEsXdofykhqsWWvyYCiw9ASpTdCcbx3digJ8W1c3o9vepRbZqP4zJwuUnr6Gd9",
+   "own_send_total_ms": 3830.79
   }
  ]
 }
