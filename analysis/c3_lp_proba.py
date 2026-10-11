@@ -734,7 +734,17 @@ def _учесть_вывод(действие: str, y_до: float, y_после:
         return
     забрали = 1 - y_после / y_до
     вывод["sobytij"] += 1
-    вывод["dolja_glubiny"] += забрали
+    # СКОЛЬКО ЗАБРАЛИ ВСЕГО -- ЧЕРЕЗ ПРОИЗВЕДЕНИЕ ОСТАТКОВ, А НЕ СУММУ
+    # ДОЛЕЙ. Здесь копилась сумма долей, и на живых данных она давала
+    # «забрали 193 % глубины» (p90 = 1.926) -- величина, которой быть не
+    # может: больше, чем есть, не выводят. Каждый вывод берёт долю ОТ
+    # ОСТАТКА, значит остаток перемножается, а забрали всего = 1 - остаток,
+    # и это всегда в пределах 100 %. Сумма долей оставлена отдельным
+    # полем под своим именем -- она отвечает на другой вопрос («сколько
+    # глубин сменилось за горизонт»), и путать их нельзя.
+    вывод["ostalos_doli"] *= (1 - забрали)
+    вывод["summa_dolej"] += забрали
+    вывод["za_raz_max"] = max(вывод["za_raz_max"], забрали)
     if вывод["sekund_do_pervogo"] is None:
         вывод["sekund_do_pervogo"] = прошло
     if "rezerv" in действие:
@@ -853,7 +863,8 @@ def lp_po_rjadu(rjad: list, *, razmer: float, gorizont_sekund: int,
     несвязных = 0
     # ВЫХОД ЛИКВИДНОСТИ -- ОТДЕЛЬНОЙ СТРОКОЙ: сколько раз, когда впервые,
     # какую долю глубины забрали и каким путём это увидено.
-    вывод = {"sobytij": 0, "sekund_do_pervogo": None, "dolja_glubiny": 0.0,
+    вывод = {"sobytij": 0, "sekund_do_pervogo": None,
+             "ostalos_doli": 1.0, "summa_dolej": 0.0, "za_raz_max": 0.0,
              "po_dejstviju": 0, "po_rezervam": 0, "vklad_chuzhoj": 0,
              "po_neizvestnomu_dejstviju": 0}
     y, x = y0, x0
@@ -1075,22 +1086,34 @@ def _svod_vyhoda(stroki: list) -> dict:
     если = [с["vyhod_likvidnosti"] for с in с_выводом]
     когда = [в["sekund_do_pervogo"] for в in если
              if в["sekund_do_pervogo"] is not None]
-    сколько = [в["dolja_glubiny"] for в in если]
+    # ВСЕГО забрали за горизонт: 1 - остаток. Всегда в пределах 100 %.
+    сколько = [1 - в["ostalos_doli"] for в in если]
+    за_раз = [в["za_raz_max"] for в in если]
+    сумм = [в["summa_dolej"] for в in если]
     return {
         "pulov_vsego": len(stroki), "pulov_s_vyhodom": len(с_выводом),
         "dolja_pulov": (len(с_выводом) / len(stroki)) if stroki else None,
         "sekund_do_pervogo_med": (statistics.median(когда) if когда else None),
         "minut_do_pervogo_med": (statistics.median(когда) / 60
                                  if когда else None),
-        "dolja_glubiny_med": (statistics.median(сколько) if сколько else None),
-        "dolja_glubiny_p90": (sorted(сколько)[int(0.9 * (len(сколько) - 1))]
+        "zabrali_vsego_med": (statistics.median(сколько) if сколько else None),
+        "zabrali_vsego_p90": (sorted(сколько)[int(0.9 * (len(сколько) - 1))]
                               if сколько else None),
-        "uvideno_po_dejstviju": sum(в["po_dejstviju"] for в in если),
-        "uvideno_po_rezervam": sum(в["po_rezervam"] for в in если),
-        "uvideno_po_neizvestnomu": sum(в.get("po_neizvestnomu_dejstviju") or 0
+        "za_raz_max_med": (statistics.median(за_раз) if за_раз else None),
+        "za_raz_max_p90": (sorted(за_раз)[int(0.9 * (len(за_раз) - 1))]
+                           if за_раз else None),
+        # СМЕНИЛОСЬ ГЛУБИН -- это сумма долей, и она МОЖЕТ быть больше 1:
+        # вывели, долили, снова вывели. Отвечает на другой вопрос, чем
+        # «сколько забрали», поэтому стоит под своим именем.
+        "smenilos_glubin_med": (statistics.median(сумм) if сумм else None),
+        # НИЖЕ -- СЧЁТ СОБЫТИЙ, А НЕ ПУЛОВ. Названо так, как есть.
+        "sobytij_po_dejstviju": sum(в["po_dejstviju"] for в in если),
+        "sobytij_po_rezervam": sum(в["po_rezervam"] for в in если),
+        "sobytij_po_neizvestnomu": sum(в.get("po_neizvestnomu_dejstviju") or 0
                                        for в in если),
-        "vkladov_chuzhih": sum(в["vklad_chuzhoj"] for в in
-                               (с["vyhod_likvidnosti"] for с in stroki))}
+        "sobytij_vkladov_chuzhih": sum(в["vklad_chuzhoj"] for в in
+                                       (с["vyhod_likvidnosti"]
+                                        for с in stroki))}
 
 
 # РАЗРЕЗ НА ПОЛОВИНЫ СУТОК. Артефакт Code-2 -- 48 часов 08--09.10, то есть
@@ -1413,7 +1436,7 @@ def progon_rjady(puti: list, *, razmery: tuple = (1.0, 5.0, 20.0),
 
 # ЧИСЛО ОБЪЯВЛЕНО. Меньше -- проверку убрали и никто не заметил; больше --
 # добавили и не сказали. И то и другое здесь ПРОВАЛ.
-ZHDEM_PROVEROK = 66
+ZHDEM_PROVEROK = 68
 
 
 def self_test() -> int:  # noqa: C901, PLR0915
@@ -1683,10 +1706,12 @@ def self_test() -> int:  # noqa: C901, PLR0915
     в = рв["vyhod_likvidnosti"]
     chk("ВЫХОД ЛИКВИДНОСТИ НАЗВАН ТРЕМЯ ЧИСЛАМИ -- сколько раз, КОГДА впервые "
         f"и СКОЛЬКО глубины забрали: {в['sobytij']} раз, через "
-        f"{в['sekund_do_pervogo']:.0f} с, забрали {в['dolja_glubiny'] * 100:.0f} % "
+        f"{в['sekund_do_pervogo']:.0f} с, забрали "
+        f"{(1 - в['ostalos_doli']) * 100:.0f} % "
         "котировочной стороны",
         в["sobytij"] == 1 and abs(в["sekund_do_pervogo"] - 600) < 1e-6
-        and 0.45 < в["dolja_glubiny"] < 0.55 and в["po_dejstviju"] == 1, рв)
+        and 0.45 < (1 - в["ostalos_doli"]) < 0.55
+        and в["po_dejstviju"] == 1, рв)
     chk("ПОСЛЕ ВЫХОДА ЧУЖОЙ ЛИКВИДНОСТИ НАША ДОЛЯ РАСТЁТ -- пул стал вдвое "
         f"мельче, доля с {рв['dolja_pula_vhod'] * 100:.2f} % до "
         f"{рв['dolja_pula_vyhod'] * 100:.2f} %",
@@ -2039,6 +2064,29 @@ def self_test() -> int:  # noqa: C901, PLR0915
         f"с вкладом ({рос['rashody']:.6g} против вклада {рос['vklad']:.6g}). "
         "Прежняя нога X*sqrt(r) давала расходы 1 787 SOL на вклад 2",
         рос["rashody"] < рос["vklad"], рос)
+
+    # ----- 15. СКОЛЬКО ЗАБРАЛИ -- НЕ БОЛЬШЕ 100 %
+    # Доказанный красный на живой доставке: поле копило СУММУ долей, и свод
+    # показывал p90 = 1.926, то есть «забрали 193 % глубины».
+    ряд_дв = [сд("buy", 0, 100.0, 1000.0, 0, 1),
+              сд("remove", 0, 50.0, 500.0, 60_000, 2),
+              сд("remove", 0, 25.0, 250.0, 120_000, 3),
+              сд("buy", 1.0, 26.0, 240.4, 180_000, 4)]
+    рдв = lp_po_rjadu(ряд_дв, razmer=1.0, gorizont_sekund=86400)
+    св_дв = _svod_vyhoda([рдв])
+    chk("ДОКАЗАННЫЙ КРАСНЫЙ: ДВА вывода по половине -- забрали ВСЕГО 75 %, а "
+        f"не 100 %: {св_дв['zabrali_vsego_med'] * 100:.1f} %. Второй берёт "
+        "половину ОТ ОСТАТКА, поэтому остатки перемножаются. Прежняя сумма "
+        f"долей дала бы 100 %, а на живых данных -- 193 %",
+        abs(св_дв["zabrali_vsego_med"] - 0.75) < 1e-9
+        and abs(св_дв["smenilos_glubin_med"] - 1.0) < 1e-9, св_дв)
+    chk("ЗАБРАЛИ ВСЕГО НИКОГДА НЕ БОЛЬШЕ 100 %, сколько бы выводов ни было: "
+        f"за раз максимум {св_дв['za_raz_max_med'] * 100:.0f} %, всего "
+        f"{св_дв['zabrali_vsego_med'] * 100:.0f} %, выводов "
+        f"{рдв['vyhod_likvidnosti']['sobytij']}",
+        0 <= св_дв["zabrali_vsego_med"] < 1.0
+        and св_дв["za_raz_max_med"] <= 1.0
+        and рдв["vyhod_likvidnosti"]["sobytij"] == 2, св_дв)
 
     print(f"\nпроверок {было}, ждали {ZHDEM_PROVEROK}, не прошло {плохо}")
     for и in упавшие:
