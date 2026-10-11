@@ -80,11 +80,16 @@ def корень() -> Path:
 def _мс(список: list) -> dict:
     """Медиана/минимум/максимум в мс -- и число повторов, чтобы верить числу."""
     if not список:
-        return {"med": None, "min": None, "max": None, "n": 0}
-    return {"med": round(statistics.median(список), 3),
-            "min": round(min(список), 3),
-            "max": round(max(список), 3),
-            "n": len(список)}
+        return {"med": None, "min": None, "p90": None, "max": None, "n": 0}
+    ряд = sorted(список)
+    # P90 РЯДОМ С МЕДИАНОЙ. 10.10 медиана 1.95 мс спрятала выброс 56.57 мс:
+    # по одной медиане «два потока почти бесплатны» -- неверный вывод.
+    место = min(len(ряд) - 1, int(round(0.9 * (len(ряд) - 1))))
+    return {"med": round(statistics.median(ряд), 3),
+            "min": round(ряд[0], 3),
+            "p90": round(ряд[место], 3),
+            "max": round(ряд[-1], 3),
+            "n": len(ряд)}
 
 
 def замер(функция, повторов: int) -> dict:
@@ -92,7 +97,7 @@ def замер(функция, повторов: int) -> dict:
     try:
         функция()
     except Exception as сбой:  # noqa: BLE001
-        return {"med": None, "min": None, "max": None, "n": 0,
+        return {"med": None, "min": None, "p90": None, "max": None, "n": 0,
                 "why_not": f"{type(сбой).__name__}: {str(сбой)[:200]}"}
     ряд = []
     for _ in range(max(1, int(повторов))):
@@ -554,6 +559,13 @@ def таблица(своды: dict) -> dict:
 # предполагать.
 СОСЕДЕЙ_ПО_УМОЛЧАНИЮ = (0, 1, 2, 4)
 ПОВТОРОВ_СОСЕДЕЙ = 15
+# ШАГИ ПЕРЕДАЧИ GIL, КОТОРЫЕ ПРОБУЕМ. 0.005 с -- значение CPython по
+# умолчанию: поток, захвативший GIL, держит его до 5 мс, и соперник ждёт
+# ровно столько. Шесть вариантов -- шесть таких ожиданий, то есть до 30 мс
+# ровно того, что видно в журнале. Меньший шаг чаще передаёт GIL: ожидание
+# короче, но накладных переключений больше, и это тоже надо измерить, а не
+# предположить.
+ШАГИ_GIL = (0.005, 0.0005, 0.0001)
 
 
 def _жечь_потоками(сколько: int):
@@ -577,7 +589,8 @@ def _жечь_потоками(сколько: int):
 
 def sosedi_i_ozhidanie(*, путь_образца: str = ОБРАЗЕЦ_ПО_УМОЛЧАНИЮ,
                         повторов: int = ПОВТОРОВ_СОСЕДЕЙ,
-                        потоков=СОСЕДЕЙ_ПО_УМОЛЧАНИЮ) -> dict:
+                        потоков=СОСЕДЕЙ_ПО_УМОЛЧАНИЮ,
+                        шаги_gil=ШАГИ_GIL) -> dict:
     """ПОЧЕМУ ШЕСТЬ ВАРИАНТОВ МОГУТ СТОИТЬ 33 МС, ХОТЯ СЧЁТА ТАМ НА 0.5 МС.
 
     Замер железа 10.10 показал: торговый хост делает шесть вариантов из
@@ -590,8 +603,10 @@ def sosedi_i_ozhidanie(*, путь_образца: str = ОБРАЗЕЦ_ПО_У�
     Ничего не отправляет и ничего не меняет: та же сборка из заготовки, что в
     остальных замерах, без сети.
     """
-    из_ = {"ok": False, "why_not": None, "gil_interval_s": sys.getswitchinterval(),
-            "yader": os.cpu_count(), "povtorov": повторов, "ryady": []}
+    из_ = {"ok": False, "why_not": None,
+            "gil_interval_s_byl": sys.getswitchinterval(),
+            "shagi_gil": list(шаги_gil), "yader": os.cpu_count(),
+            "povtorov": повторов, "ryady": []}
     корень_кода = str(корень() / "analysis")
     if корень_кода not in sys.path:
         sys.path.insert(0, корень_кода)
@@ -639,32 +654,87 @@ def sosedi_i_ozhidanie(*, путь_образца: str = ОБРАЗЕЦ_ПО_У�
                                      чаевые_вперёд=False, нонс=нонс)
 
     шесть()  # прогрев
-    for сколько in потоков:
-        погасить, потоки_ = _жечь_потоками(сколько)
-        try:
-            if сколько:
-                time.sleep(0.3)  # дать потокам реально встать на ядра
-            стенное, процессорное = [], []
-            for _ in range(max(1, int(повторов))):
-                т, ц = time.perf_counter(), time.thread_time()
-                шесть()
-                стенное.append((time.perf_counter() - т) * 1000.0)
-                процессорное.append((time.thread_time() - ц) * 1000.0)
-        finally:
-            живых = погасить()
-        ст, цп = _мс(стенное), _мс(процессорное)
-        из_["ryady"].append({
-            "zhgushchih_potokov": сколько,
-            "potokov_zapushcheno": len(потоки_),
-            "potokov_ostalos_zhivyh": живых,
-            "stennoe_ms": ст, "processornoe_ms": цп,
-            "zhdali_ms": (round(ст["med"] - цп["med"], 2)
-                           if (ст["med"] is not None and цп["med"] is not None)
-                           else None)})
-    опора = (из_["ryady"][0]["stennoe_ms"]["med"] if из_["ryady"] else None)
+    был_шаг = sys.getswitchinterval()
+    try:
+        for шаг in шаги_gil:
+            # ШАГ МЕНЯЕТСЯ ДО ЗАПУСКА ЖГУЩИХ ПОТОКОВ: иначе часть замера шла
+            # бы на прежнем шаге, и число означало бы смесь двух настроек.
+            sys.setswitchinterval(float(шаг))
+            for сколько in потоков:
+                погасить, потоки_ = _жечь_потоками(сколько)
+                try:
+                    if сколько:
+                        time.sleep(0.3)  # дать потокам встать на ядра
+                    стенное, процессорное = [], []
+                    for _ in range(max(1, int(повторов))):
+                        т, ц = time.perf_counter(), time.thread_time()
+                        шесть()
+                        стенное.append((time.perf_counter() - т) * 1000.0)
+                        процессорное.append((time.thread_time() - ц) * 1000.0)
+                finally:
+                    живых = погасить()
+                ст, цп = _мс(стенное), _мс(процессорное)
+                из_["ryady"].append({
+                    "shag_gil_s": float(шаг),
+                    "shag_gil_dejstvoval": sys.getswitchinterval(),
+                    "zhgushchih_potokov": сколько,
+                    "potokov_zapushcheno": len(потоки_),
+                    "potokov_ostalos_zhivyh": живых,
+                    "stennoe_ms": ст, "processornoe_ms": цп,
+                    "zhdali_ms": (round(ст["med"] - цп["med"], 2)
+                                   if (ст["med"] is not None
+                                       and цп["med"] is not None) else None),
+                    "zhdali_p90_ms": (round(ст["p90"] - цп["p90"], 2)
+                                       if (ст["p90"] is not None
+                                           and цп["p90"] is not None) else None)})
+    finally:
+        # ШАГ ВОЗВРАЩАЕТСЯ ВСЕГДА. Замер не имеет права оставить процесс с
+        # чужой настройкой передачи GIL -- это поведение, а не замер.
+        sys.setswitchinterval(был_шаг)
+    из_["gil_interval_s_posle"] = sys.getswitchinterval()
+    # ОПОРА -- БЕЗ СОСЕДЕЙ НА ШАГЕ ПО УМОЛЧАНИЮ: с ней сравнивается всё.
+    опора = None
+    for р in из_["ryady"]:
+        if р["zhgushchih_potokov"] == 0 and abs(р["shag_gil_s"] - 0.005) < 1e-9:
+            опора = р["stennoe_ms"]["med"]
+            break
+    if опора is None and из_["ryady"]:
+        опора = из_["ryady"][0]["stennoe_ms"]["med"]
+    из_["opora_ms"] = опора
     for р in из_["ryady"]:
         р["raz_k_opore"] = (round(р["stennoe_ms"]["med"] / опора, 2)
                              if (опора and р["stennoe_ms"]["med"]) else None)
+    # ЧТО ДАЁТ СМЕНА ШАГА -- ЧИСЛОМ В МИЛЛИСЕКУНДАХ, при том же числе соседей.
+    по_умолч = {р["zhgushchih_potokov"]: р for р in из_["ryady"]
+                 if abs(р["shag_gil_s"] - 0.005) < 1e-9}
+    for р in из_["ryady"]:
+        опорный = по_умолч.get(р["zhgushchih_potokov"])
+        if опорный and опорный["stennoe_ms"]["med"] and р["stennoe_ms"]["med"]:
+            р["vygoda_ms"] = round(опорный["stennoe_ms"]["med"]
+                                    - р["stennoe_ms"]["med"], 2)
+            р["vygoda_p90_ms"] = (round(опорный["stennoe_ms"]["p90"]
+                                         - р["stennoe_ms"]["p90"], 2)
+                                   if (опорный["stennoe_ms"]["p90"] is not None
+                                       and р["stennoe_ms"]["p90"] is not None)
+                                   else None)
+        else:
+            р["vygoda_ms"] = None
+            р["vygoda_p90_ms"] = None
+    # ЛУЧШАЯ ВЫГОДА ПО КАЖДОМУ ШАГУ -- чтобы решение "ставить или нет" (порог
+    # владельца: 20 мс) читалось одним числом, а не глазами по таблице.
+    из_["vygoda_po_shagu"] = {}
+    for шаг in шаги_gil:
+        ряды_ш = [р for р in из_["ryady"]
+                   if abs(р["shag_gil_s"] - float(шаг)) < 1e-9
+                   and р["vygoda_ms"] is not None]
+        из_["vygoda_po_shagu"][str(шаг)] = {
+            "luchshaya_vygoda_ms": (max((р["vygoda_ms"] for р in ряды_ш),
+                                         default=None)),
+            "luchshaya_vygoda_p90_ms": (
+                max((р["vygoda_p90_ms"] for р in ряды_ш
+                     if р["vygoda_p90_ms"] is not None), default=None)),
+            "po_potokam": {р["zhgushchih_potokov"]: р["vygoda_ms"]
+                            for р in ряды_ш}}
     из_["ok"] = bool(из_["ryady"])
     return из_
 
@@ -714,6 +784,18 @@ def самопроверка() -> int:
     пл = замер(_падает, 3)
     chk("падающая функция -- причина, а не число",
         пл["med"] is None and "ValueError" in (пл["why_not"] or ""), пл)
+    # P90 -- ПО БЛИЖАЙШЕМУ МЕСТУ В ОТСОРТИРОВАННОМ РЯДУ: место
+    # round(0.9*(n-1)). На одиннадцати значениях 1..11 это место 9, то есть 10.
+    chk("p90 берётся из отсортированного ряда по месту round(0.9*(n-1))",
+        _мс([11.0, 1.0, 7.0, 2.0, 9.0, 3.0, 10.0, 4.0, 8.0, 5.0, 6.0])["p90"]
+        == 10.0, _мс([11.0, 1.0, 7.0, 2.0, 9.0, 3.0, 10.0, 4.0, 8.0, 5.0, 6.0]))
+    chk("минимум и максимум тоже из отсортированного ряда, а не по порядку",
+        _мс([5.0, 1.0, 2.0, 3.0, 4.0])["min"] == 1.0
+        and _мс([5.0, 1.0, 2.0, 3.0, 4.0])["max"] == 5.0)
+    chk("медиана <= p90 <= максимум -- иначе это не процентиль",
+        (lambda д: д["med"] <= д["p90"] <= д["max"])(
+            _мс([3.0, 1.0, 9.0, 2.0, 5.0, 4.0, 7.0])))
+    chk("один замер -- p90 равен ему же, а не None", _мс([7.0])["p90"] == 7.0)
     хор = замер(lambda: sum(range(1000)), 5)
     chk("рабочая функция -- медиана, минимум, максимум и число повторов",
         хор["n"] == 5 and хор["med"] is not None
@@ -864,15 +946,48 @@ def самопроверка() -> int:
     # СОСЕДНИЕ ПОТОКИ И ОЖИДАНИЕ. Проверяется СТРОЕНИЕ замера, а не конкретное
     # отношение: на одном ядре или на занятой машине любое пороговое число
     # красило бы проверку от загрузки, а не от ошибки. Числа идут в отчёт.
-    _сос = sosedi_i_ozhidanie(повторов=3, потоков=(0, 2))
+    _шаг_до = sys.getswitchinterval()
+    _сос = sosedi_i_ozhidanie(повторов=3, потоков=(0, 2),
+                               шаги_gil=(0.005, 0.0001))
     if _сос.get("ok"):
-        chk("соседи: по ряду на каждое число потоков, и потоки реально "
-            "запущены и погашены",
-            [р["zhgushchih_potokov"] for р in _сос["ryady"]] == [0, 2]
-            and _сос["ryady"][1]["potokov_zapushcheno"] == 2
+        chk("соседи: ряд на КАЖДУЮ пару (шаг GIL, число потоков)",
+            [(р["shag_gil_s"], р["zhgushchih_potokov"]) for р in _сос["ryady"]]
+            == [(0.005, 0), (0.005, 2), (0.0001, 0), (0.0001, 2)],
+            [(р["shag_gil_s"], р["zhgushchih_potokov"])
+             for р in _сос["ryady"]])
+        chk("соседи: шаг GIL в замере ДЕЙСТВИТЕЛЬНО действовал, а не записан",
+            all(abs(р["shag_gil_dejstvoval"] - р["shag_gil_s"]) < 1e-12
+                for р in _сос["ryady"]),
+            [(р["shag_gil_s"], р["shag_gil_dejstvoval"])
+             for р in _сос["ryady"]])
+        chk("соседи: шаг GIL ВОЗВРАЩЁН как был -- замер не меняет процесс",
+            abs(sys.getswitchinterval() - _шаг_до) < 1e-12
+            and abs(_сос["gil_interval_s_posle"] - _шаг_до) < 1e-12,
+            (_шаг_до, sys.getswitchinterval()))
+        chk("соседи: потоки реально запущены и все погашены",
+            _сос["ryady"][1]["potokov_zapushcheno"] == 2
             and all(р["potokov_ostalos_zhivyh"] == 0 for р in _сос["ryady"]),
-            [(р["zhgushchih_potokov"], р["potokov_zapushcheno"],
-              р["potokov_ostalos_zhivyh"]) for р in _сос["ryady"]])
+            [(р["potokov_zapushcheno"], р["potokov_ostalos_zhivyh"])
+             for р in _сос["ryady"]])
+        chk("соседи: выгода считается ПРОТИВ того же числа соседей на шаге "
+            "по умолчанию, а не против опоры без соседей",
+            _сос["ryady"][0]["vygoda_ms"] == 0.0
+            and _сос["ryady"][1]["vygoda_ms"] == 0.0
+            and all(р["vygoda_ms"] is not None for р in _сос["ryady"]),
+            [(р["shag_gil_s"], р["zhgushchih_potokov"], р["vygoda_ms"])
+             for р in _сос["ryady"]])
+        chk("соседи: лучшая выгода по каждому шагу названа числом -- порог "
+            "владельца 20 мс читается без глаз",
+            set(_сос["vygoda_po_shagu"]) == {"0.005", "0.0001"}
+            and _сос["vygoda_po_shagu"]["0.005"]["luchshaya_vygoda_ms"] == 0.0,
+            _сос["vygoda_po_shagu"])
+        chk("соседи: p90 есть и у стенного, и у процессорного -- медиана "
+            "одна прячет выброс",
+            all(р["stennoe_ms"]["p90"] is not None
+                and р["processornoe_ms"]["p90"] is not None
+                for р in _сос["ryady"]),
+            [(р["stennoe_ms"]["p90"], р["processornoe_ms"]["p90"])
+             for р in _сос["ryady"]])
         chk("соседи: у каждого ряда есть и стенное, и процессорное время",
             all(р["stennoe_ms"]["med"] and р["processornoe_ms"]["med"]
                 for р in _сос["ryady"]),
@@ -889,10 +1004,11 @@ def самопроверка() -> int:
                 for р in _сос["ryady"]),
             [(р["zhdali_ms"], р["stennoe_ms"]["med"],
               р["processornoe_ms"]["med"]) for р in _сос["ryady"]])
-        chk("соседи: шаг GIL и число ядер названы -- без них отношение "
+        chk("соседи: шаги GIL и число ядер названы -- без них отношение "
             "ничего не значит",
-            _сос["gil_interval_s"] > 0 and (_сос["yader"] or 0) >= 1,
-            (_сос["gil_interval_s"], _сос["yader"]))
+            _сос["gil_interval_s_byl"] > 0 and (_сос["yader"] or 0) >= 1
+            and _сос["shagi_gil"] == [0.005, 0.0001],
+            (_сос["gil_interval_s_byl"], _сос["yader"], _сос["shagi_gil"]))
     else:
         chk("соседи: нет модулей или образца -- причина словами, а не число",
             _сос.get("why_not") is not None, _сос.get("why_not"))
@@ -901,7 +1017,8 @@ def самопроверка() -> int:
         os.environ["SKOROST_KOREN"] = "/tmp"
         chk("соседи с чужим корнем -- причина с именем файла, а не число",
             "dex_labels.json" in (sosedi_i_ozhidanie(повторов=1,
-                                                      потоков=(0,))
+                                                      потоков=(0,),
+                                                      шаги_gil=(0.005,))
                                    .get("why_not") or ""))
     finally:
         if _было_с is None:

@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       zadacha:
-        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение) | 'blocksubscribe' -- даёт ли наш план Helius подписку на блоки (только чтение) | 'golova' -- первые N покупок того же минта ПОСЛЕ источника в его блоке: плательщик, площадка, чаевые, размер (только чтение) | 'platelshchiki' -- одна таблица по верхним плательщикам головы: доля в блоке источника, цена CU с цепи, в скольких сделках раньше 100-й позиции (только чтение) | 'skorost_sborki' -- ТА ЖЕ полная сборка на четырёх машинах рядом (контейнер, NL-хост, AMS, Miami) + железо и соседи по ядрам (только чтение)"
+        description: "'bonding' | 'pump_sborka' | 'pereezdy' | 'krug_sborki' | 'otkazy_puti' -- отказанные сигналы денежным путём | 'chem_sobrana' -- чем собраны НАШИ транзакции | 'versii_razbora' -- ОДНИ сигналы ДВУМЯ версиями разбора и ВРЕМЯ разбора | 'mayhem_krivoj' -- is_mayhem_mode и котировка по счёту кривой | 'mesta_v_bloke' -- места в блоках источника и наших по АРХИВНОМУ узлу (только чтение) | 'chaevye_zhivy' -- идут ли чужие чаевые на счета отправителя и когда шли последний раз (только чтение) | 'blocksubscribe' -- даёт ли наш план Helius подписку на блоки (только чтение) | 'golova' -- первые N покупок того же минта ПОСЛЕ источника в его блоке: плательщик, площадка, чаевые, размер (только чтение) | 'platelshchiki' -- одна таблица по верхним плательщикам головы: доля в блоке источника, цена CU с цепи, в скольких сделках раньше 100-й позиции (только чтение) | 'skorost_sborki' -- ТА ЖЕ полная сборка на четырёх машинах рядом (контейнер, NL-хост, AMS, Miami) + железо и соседи по ядрам (только чтение) | 'potoki' -- КТО из потоков процесса полосы жжёт процессор: имена и CPU за окно, чтением /proc на хосте (только чтение)"
         required: false
         default: "bonding"
       sravnit:
@@ -57,6 +57,10 @@ on:
         description: "golova: сколько покупок головы брать на сделку (по умолчанию 30)"
         required: false
         default: "30"
+      potoki_sekund:
+        description: "potoki: окно замера расхода процессора потоками, с"
+        required: false
+        default: "10"
       zamer_mashiny:
         description: "skorost_sborki: 'vse' или через запятую kontejner,nl,ams,miami"
         required: false
@@ -167,7 +171,7 @@ jobs:
           "$RUNNER_TEMP/bs_venv/bin/pip" install -q requests solders
           echo "PY=$RUNNER_TEMP/bs_venv/bin/python" >> "$GITHUB_ENV"
           case "${{ inputs.zadacha }}" in
-            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy|blocksubscribe|golova|platelshchiki|skorost_sborki)
+            pump_sborka|pereezdy|krug_sborki|otkazy_puti|chem_sobrana|versii_razbora|mayhem_krivoj|mesta_v_bloke|chaevye_zhivy|blocksubscribe|golova|platelshchiki|skorost_sborki|potoki)
               echo "задача ${{ inputs.zadacha }}: свои самопроверки ниже, после доставки"
               exit 0 ;;
           esac
@@ -535,6 +539,40 @@ jobs:
           [ -n "$ARGI" ] || { echo "SBOY: ni odnoj mashiny ne izmereno"; exit 1; }
           python3 deploy/checks/skorost_sborki.py $ARGI --out data/skorost_sborki_4_mashiny.json | tail -90
 
+      - name: "potoki: кто из потоков процесса полосы жжёт процессор (только чтение /proc)"
+        if: ${{ inputs.zadacha == 'potoki' }}
+        env:
+          KLJUCH_NL: ${{ secrets.VPS_SSH_KEY }}
+          NL_HOST: 45.59.170.76
+          RABOTA: /tmp/potoki_zamer
+          SEKUND: ${{ inputs.potoki_sekund }}
+        run: |
+          set -e
+          set -o pipefail
+          case "${SEKUND:-10}" in ''|*[!0-9]*) echo "SBOY: potoki_sekund ne celoe"; exit 1;; esac
+          [ -n "$KLJUCH_NL" ] || { echo "SBOY: VPS_SSH_KEY ne zadan"; exit 1; }
+          python3 deploy/checks/potoki_processa.py --self-test | tail -2
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_NL" > ~/.ssh/nl_key
+          chmod 600 ~/.ssh/nl_key
+          OPTS="-i $HOME/.ssh/nl_key -o ConnectTimeout=15 -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
+          # ТОЛЬКО ЧТЕНИЕ /proc: ни одной записи на хост, кроме временного
+          # каталога с самим модулем, и он удаляется в конце.
+          ssh -n $OPTS root@"$NL_HOST" "rm -rf $RABOTA; install -d -m 755 $RABOTA"
+          ssh $OPTS root@"$NL_HOST" "cat > $RABOTA/potoki_processa.py" < deploy/checks/potoki_processa.py
+          ssh -n $OPTS root@"$NL_HOST" "set -o pipefail; python3 $RABOTA/potoki_processa.py --self-test | tail -1"
+          for SLUZHBA in bloom_detector bloom_seller; do
+            echo "=== $SLUZHBA ==="
+            ssh -n $OPTS root@"$NL_HOST" "python3 $RABOTA/potoki_processa.py --iskat $SLUZHBA --sekund ${SEKUND:-10} --out $RABOTA/out_$SLUZHBA.json > /dev/null"
+            ssh -n $OPTS root@"$NL_HOST" "cat $RABOTA/out_$SLUZHBA.json" > /tmp/potoki_"$SLUZHBA".json
+            python3 deploy/checks/potoki_stroka.py /tmp/potoki_"$SLUZHBA".json "$SLUZHBA" || true
+          done
+          ssh -n $OPTS root@"$NL_HOST" "rm -rf $RABOTA"
+          shred -u ~/.ssh/nl_key 2>/dev/null || true
+          mkdir -p data/potoki
+          cp /tmp/potoki_bloom_detector.json data/potoki/bloom_detector.json 2>/dev/null || true
+          cp /tmp/potoki_bloom_seller.json data/potoki/bloom_seller.json 2>/dev/null || true
+
       - name: "blocksubscribe: даёт ли наш план Helius подписку на блоки (только чтение)"
         if: ${{ inputs.zadacha == 'blocksubscribe' }}
         env:
@@ -682,6 +720,7 @@ jobs:
           # СВОДЫ ПО МАШИНАМ -- КАТАЛОГОМ: четыре файла рядом с таблицей, чтобы
           # можно было перепроверить любое число из неё по его машине.
           [ -d data/skorost_sborki ] && git add data/skorost_sborki || true
+          [ -d data/potoki ] && git add data/potoki || true
           git diff --cached --quiet && { echo "нечего коммитить"; exit 0; }
           git commit -m "Krivaya pump.fun: simulyatsiya nashey sborki [automated]"
           for i in 1 2 3 4 5; do
