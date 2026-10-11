@@ -1,31 +1,18 @@
 {
-    "pochemu": "Слово владельца 11.10: в группу nabor добавить вторую пятёрку (K10 из docs/podbivka_nabor.md ветки claude/podbivka, подбор 02-09.10), те же параметры, 0.01. Правка ДО деплоя правок горячего пути, чтобы подписка поднялась одним перезапуском.",
-    "chto_vazhno": "ГРУППУ НЕ СОЗДАЁМ -- она есть с 10:52:37Z. Только перенос пяти адресов, политика nabor не трогается ни одним полем: hold_slots 108, min_target_sol 2.0, slippage 0.4, lane_open_max 6, zabor_s0 false, pool_senders [astralane, helius, jito], lane_sol/lane_size 0.01. Вторая пятёрка получает ТЕ ЖЕ параметры автоматически -- политика у группы одна.\nОТКУДА БЕРУТСЯ АДРЕСА, по каждому: четыре из log_only (lane_trades false, bloom_trades false, subscribe FALSE -- то есть они сейчас даже не подписаны), один (CAPn1yH4oSywsx...) из cand1 (lane_trades false, bloom_trades false, subscribe true). НИ ОДНА ТОРГУЮЩАЯ ГРУППА НЕ ЗАТРОНУТА: у обеих источных групп торговля снята.\nПОЧЕМУ ПОРЯДОК ИМЕННО ТАКОЙ. Четыре адреса из log_only сейчас НЕ подписаны (subscribe=false), а живая подписка строится при подключении и вычитает адреса групп с subscribe=false (analysis/bloom_detector.py:7714 внутри адреса_подписки, вызов на :7793 в цикле слушать). Смена группы сама переподписки НЕ вызывает: поколение поднимает обновить_источники только при смене МНОЖЕСТВА адресов, а множество не меняется -- адреса_всех_групп про subscribe не знает. 11.10 я на этом уже потерял перезапуск. Поэтому правка идёт ДО деплоя, и подписка поднимется его перезапуском.\nПРОВЕРЕНО ПЕРЕД ПРАВКОЙ: все пять -- правильный base58 длиной 44, повторов среди них нет, пересечения с первой пятёркой нет, в двух группах ни один не лежит.",
+    "pochemu": "Слово владельца 11.10 (дополнение, п.3): пауза покупок -- lane_trades=false группам nabor и vol_4vw. Она в силе и применяется ДО деплоя правок круга продаж: это и даёт ноль открытых позиций, которого требует гейт перезапуска.",
+    "chto_vazhno": "ТОЛЬКО ОДНО ПОЛЕ У ДВУХ ГРУПП. Ни адреса, ни прочая политика не трогаются: hold_slots 108, min_target_sol 2.0, slippage 0.4, lane_open_max 6, zabor_s0 false, pool_senders [astralane, helius, jito], lane_sol/lane_size 0.01 остаются как есть. lane_open_max НЕ возвращаю к 3: слово владельца -- 6 до конца замера, а замер не закрыт.\nПОЧЕМУ ЭТО ДАЁТ НОЛЬ ПОЗИЦИЙ, А НЕ ПРОСТО МЕНЬШЕ. Новые покупки прекращаются сразу, а живая позиция набора живёт 26-28 секунд (замер по четырём позициям окна дефекта 11.10: 14:22:17->14:22:44, 14:30:57->14:31:24, 14:33:27->14:33:53, 14:52:23->14:52:51). Значит через минуту после правки открытых не остаётся, и гейт нуля позиций пройдёт сам.\nПОДПИСКА НЕ ТРОГАЕТСЯ: subscribe у обеих групп не меняется, значит детектор продолжает слышать источники и писать решения -- наблюдение (п.3 владельца) не прерывается, прекращаются только покупки.\nЧТО НАДО БУДЕТ ВЕРНУТЬ: lane_trades=true обеим группам по слову владельца, когда пауза кончится. Без этого набор не торгует.",
     "pravki": [
         {
-            "perenesti": "EeXvxkcGqMDZeTaVeawzxm9mbzZwqDUMmfG3bF7uzumH",
-            "v": "nabor",
-            "pometka": "K10 vtoraja pjatjorka, iz log_only, 3.0 sd/sut, +4.51 SOL"
+            "gruppa": "nabor",
+            "pole": "lane_trades",
+            "znachenie": false,
+            "pometka": "pauza pokupok, slovo vladelca 11.10 dopolnenie p.3"
         },
         {
-            "perenesti": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw",
-            "v": "nabor",
-            "pometka": "K10 vtoraja pjatjorka, iz cand1, 4.1 sd/sut, +4.41 SOL"
-        },
-        {
-            "perenesti": "77XV9rBiwk6WAXjzTWiwtCQfmB6CXsw1j7Kp3G5xUyez",
-            "v": "nabor",
-            "pometka": "K10 vtoraja pjatjorka, iz log_only, 1.3 sd/sut, +4.17 SOL"
-        },
-        {
-            "perenesti": "4HSvNQnbMNdLLsbARbRZMvZrwF6o6XP5C76TGqCPVrEi",
-            "v": "nabor",
-            "pometka": "K10 vtoraja pjatjorka, iz log_only, 2.7 sd/sut, +4.03 SOL"
-        },
-        {
-            "perenesti": "68XiYbqQedUbV1EboBhtZDtTTzX4vwUBzKB6rbUGPvHj",
-            "v": "nabor",
-            "pometka": "K10 vtoraja pjatjorka, iz log_only, 0.6 sd/sut, +3.79 SOL"
+            "gruppa": "vol_4vw",
+            "pole": "lane_trades",
+            "znachenie": false,
+            "pometka": "pauza pokupok, slovo vladelca 11.10 dopolnenie p.3"
         }
     ]
 }
