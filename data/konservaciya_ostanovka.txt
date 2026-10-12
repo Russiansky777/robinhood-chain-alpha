@@ -1,11 +1,11 @@
 # Консервация: остановка служб торгового хоста
 
-Прогон 38193150902, 2026-10-12T01:46:13Z.
+Прогон 38193682506, 2026-10-12T01:54:31Z.
 
 ## Снимок состояния ДО остановки
 
 ```
-снимок 2026-10-12T01:46:19Z, журнал /home/bot/bloom_executor_live_data
+снимок 2026-10-12T01:54:38Z, журнал /home/bot/bloom_executor_live_data
 позиций в журнале 70, ОТКРЫТЫХ 0
 по состояниям: {"closed": 70}
 STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisana'; списана входит в открытые: False
@@ -16,20 +16,69 @@ STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisan
 ## Гейт нуля позиций (deploy/checks/pered_perezapuskom_sluzhby.py)
 
 ```
-СТОП: признаку жизни 2189 с при пределе 600
+СТОП: признаку жизни 2691 с при пределе 600
 ```
 
-**ОТКАЗ: службы НЕ остановлены.** Гейт нуля позиций: no,
-открытых по снимку: 0. Глушить продавца при открытой
-позиции значит оставить купленное без выхода.
+Глушить нечего: все три службы уже inactive. Гейт нуля
+позиций не требуется -- он охраняет ОСТАНОВКУ, а её не будет.
+Признак жизни протух (no) именно потому, что детектор
+остановлен раньше.
+
+## Остановка
+
+```
+=== DO: chto aktivno ===
+aktivnyh nashih sluzhb net
+nashih tajmerov net
+--- bloom-detector: stop + disable ---
+--- bloom-seller: stop + disable ---
+--- dbot-sold-guard: stop + disable ---
+--- tajmery: bloom-samoproverka-chas.timer
+bloom-stroka-balansov.timer
+bloom-uborshchik-chas.timer
+bloom-uborshchik-itog-sutki.timer
+bloom-uchet-chas.timer
+bloom-vygruzka-sutki.timer
+bloom-zhivuchest-chas.timer ---
+=== POSLE: chto aktivno ===
+aktivnyh torgovyh sluzhb ostalos: 0
+(zondy glushit sledujushchij shag -- oni ne za gejtom)
+bloom-detector: active=inactive enabled=disabled
+bloom-seller: active=inactive enabled=disabled
+dbot-sold-guard: active=inactive enabled=disabled
+dbot-detect-probe: active=inactive enabled=disabled
+grpc-feed-probe: active=inactive enabled=disabled
+=== chto ESHCHJO bezhit (zondy: ne torgujut, no tratjat kredity) ===
+nashih sluzhb v running net
+aktivnyh tajmerov net
+=== juniti na meste (ne udaleny) ===
+  bloom-detector.service
+  bloom-samoproverka-chas.service
+  bloom-samoproverka-chas.timer
+  bloom-seller.service
+  bloom-stroka-balansov.service
+  bloom-stroka-balansov.timer
+  bloom-uborshchik-chas.service
+  bloom-uborshchik-chas.timer
+  bloom-uborshchik-itog-sutki.service
+  bloom-uborshchik-itog-sutki.timer
+  bloom-uchet-chas.service
+  bloom-uchet-chas.timer
+  bloom-vygruzka-sutki.service
+  bloom-vygruzka-sutki.timer
+  bloom-zhivuchest-chas.service
+  bloom-zhivuchest-chas.timer
+=== kod, sostojanie i env na meste ===
+drwx--x--x 2 root root  4096 Oct 12 01:03 /etc/bloom-executor
+drwxr-xr-x 3 bot  bot   4096 Oct  9 18:59 /home/bot/bloom_executor
+drwxr-x--- 3 bot  bot  12288 Oct 12 03:10 /home/bot/bloom_executor_live_data
+```
 
 ## Зонды: остановка (слово владельца 12.10)
 
 ```
 --- dbot-detect-probe: stop + disable ---
-Removed "/etc/systemd/system/multi-user.target.wants/dbot-detect-probe.service".
 --- grpc-feed-probe: stop + disable ---
-Removed "/etc/systemd/system/multi-user.target.wants/grpc-feed-probe.service".
 === posle ===
 dbot-detect-probe: active=inactive enabled=disabled
 grpc-feed-probe: active=inactive enabled=disabled
@@ -84,13 +133,21 @@ e2scrub_all
 sysstat
 
 === 5. KTO IZ CRON-STROK HODIT V HELIUS ===
-  [?] ne nashel .py v stroke: 51 9 * * * /home/bot/bin/turnover_watch_daily.sh >> /home/bot/robinhood-chain-alpha/logs/t
-  [?] ne nashel .py v stroke: */1 * * * * /home/bot/bin/sleeping_refs_live_divergence_minute.sh >> /home/bot/robinhood-c
-  [?] ne nashel .py v stroke: 3,18,33,48 * * * * /home/bot/bin/trend_collector_snapshot_15min.sh >> /home/bot/robinhood-
-  [?] ne nashel .py v stroke: 10 3 * * * /home/bot/bin/trend_collector_select_pools_daily.sh >> /home/bot/robinhood-chai
-  [?] ne nashel .py v stroke: 2-59/5 * * * * /home/bot/bin/predmarket_collector_snapshot_5min.sh >> /home/bot/robinhood-
-  [?] ne nashel .py v stroke: 20 3 * * * /home/bot/bin/predmarket_collector_select_pairs_daily.sh >> /home/bot/robinhood
-
+  [bez Helius] /home/bot/bin/turnover_watch_daily.sh -> analysis/p5_bot_stock_pools_watch.py
+analysis/subsidy_watch.py
+analysis/turnover_watch.py
+p5_bot_stock_pools_watch.py
+subsidy_watch.py
+turnover_watch.py (prochitano 3)
+  [bez Helius] /home/bot/bin/sleeping_refs_live_divergence_minute.sh -> analysis/sleeping_refs_live_divergence_collector.py (prochitano 1)
+  [bez Helius] /home/bot/bin/trend_collector_snapshot_15min.sh -> analysis/trend_collector_snapshot.py
+trend_collector_snapshot.py (prochitano 1)
+  [bez Helius] /home/bot/bin/trend_collector_select_pools_daily.sh -> analysis/trend_collector_select_pools.py
+trend_collector_select_pools.py (prochitano 1)
+  [bez Helius] /home/bot/bin/predmarket_collector_snapshot_5min.sh -> analysis/predmarket_collector_snapshot.py
+predmarket_collector_snapshot.py (prochitano 1)
+  [bez Helius] /home/bot/bin/predmarket_collector_select_pairs_daily.sh -> analysis/predmarket_collector_select_pairs.py
+predmarket_collector_select_pairs.py (prochitano 1)
 === 6. ZHIVYE SOEDINENIJA nashih processov na 443 ===
 soedinenij nashih processov na 443 NET
 
@@ -104,7 +161,8 @@ total 104
 **ПОДТВЕРЖДЕНО: на торговом хосте не осталось ничего, что ходит
 в Helius.** Замерено по пяти источникам запуска: живых процессов
 наших модулей НЕТ, служб в active НЕТ, служб и таймеров в enabled
-НЕТ, cron-строк, читающих Helius, НЕТ, живых соединений наших
+НЕТ, cron-строк, читающих Helius, НЕТ (и неясных строк НЕТ:
+каждая прочитана до вызываемого .py), живых соединений наших
 процессов на 443 НЕТ.
 
 ## Цепь: баланс и токен-счета кошелька исполнителя
@@ -121,7 +179,7 @@ total 104
  "wsol_accounts": [],
  "failures": [],
  "note": "рента в ПУСТЫХ счетах заперта зря: продажа прошла, счёт не закрыт. Вернуть её можно только закрытием счёта, и это транзакция кошелька -- здесь она НЕ делается. У счёта WSOL рента и завёрнутый SOL разделены: в rent_sol только рента, завёрнутое в wrapped_sol",
- "built_utc": "2026-10-12T01:46:50Z"
+ "built_utc": "2026-10-12T01:55:19Z"
 }
 ПУСТЫЕ (рента заперта):
 С ОСТАТКОМ (пыль или позиция):
