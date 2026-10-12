@@ -214,7 +214,7 @@ jobs:
           # Но охранять нечего, когда обе службы уже inactive: остановка в этом
           # случае -- пустая работа, а не риск.
           AKTIVNYH=0
-          for S in bloom-detector bloom-seller dbot-sold-guard; do
+          for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
             if [ "$(ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active $S" 2>&1)" = "active" ]; then
               AKTIVNYH=$(( AKTIVNYH + 1 ))
             fi
@@ -261,6 +261,10 @@ jobs:
           } >> "$OUT"
           ssh $SSH_OPTS root@"$HOST" 'bash -s' <<'GLUSHIM' 2>&1 | tee -a "$OUT"
             set -e
+            # СПИСОК ОДНИМ МЕСТОМ, А НЕ ЧЕТЫРЬМЯ: он перечислен в прогоне
+            # четыре раза (глушим, печатаем состояние, сверяем), и четыре копии
+            # расходятся -- зонды я и пропустил именно так.
+            NASHI_SLUZHBY="bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe"
             echo "=== DO: chto aktivno ==="
             systemctl list-units --type=service --state=running --no-pager \
               | grep -E 'bloom|shred|dbot|grpc' || echo "aktivnyh nashih sluzhb net"
@@ -274,11 +278,11 @@ jobs:
             # ("службы детектора/продавца/сторожей"). Первый прогон остановки
             # его пропустил: я перечислил только две службы, а он остался
             # running -- увидел это по строке "DO: chto aktivno".
-            # ЗОНДЫ (dbot-detect-probe, grpc-feed-probe) здесь НЕ глушатся:
-            # они не торгуют и сторожами не являются, владелец их не называл.
-            # Они тратят кредиты Helius, и это сказано владельцу отдельно --
-            # одно его слово, и они уйдут тем же прогоном.
-            for S in bloom-detector bloom-seller dbot-sold-guard; do
+            # ЗОНДЫ (dbot-detect-probe, grpc-feed-probe) ДОБАВЛЕНЫ ПО СЛОВУ
+            # ВЛАДЕЛЬЦА 12.10: "зонды остановить и выключить (без удаления)".
+            # Они не торгуют, но ходят в Helius по websocket и тратят кредиты
+            # каждый час, а проект консервируется. Юниты остаются на диске.
+            for S in $NASHI_SLUZHBY; do
               if systemctl list-unit-files "$S.service" --no-legend | grep -q "$S"; then
                 echo "--- $S: stop + disable ---"
                 systemctl stop "$S" || true
@@ -302,7 +306,7 @@ jobs:
             OSTALOS=$(systemctl list-units --type=service --state=running --no-pager \
               | grep -cE 'bloom-detector|bloom-seller' || true)
             echo "aktivnyh torgovyh sluzhb ostalos: $OSTALOS"
-            for S in bloom-detector bloom-seller dbot-sold-guard; do
+            for S in $NASHI_SLUZHBY; do
               printf '%s: active=%s enabled=%s\n' "$S" \
                 "$(systemctl is-active "$S" 2>&1)" "$(systemctl is-enabled "$S" 2>&1)"
             done
@@ -323,7 +327,7 @@ jobs:
           set -e
           set -o pipefail
           BEGUT=0
-          for S in bloom-detector bloom-seller dbot-sold-guard; do
+          for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
             SOST=$(ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active $S" 2>&1 || true)
             echo "$S: $SOST"
             if [ "$SOST" = "active" ]; then
@@ -339,6 +343,115 @@ jobs:
             exit 1
           fi
           echo "torgovye sluzhby ostanovleny"
+
+      - name: "АУДИТ HELIUS: что на хосте ещё может пойти в Helius"
+        # ТОЛЬКО ЧТЕНИЕ, идёт всегда. Владелец просил ПОДТВЕРДИТЬ СТРОКОЙ, что
+        # на торговом хосте не осталось ничего, что ходит в Helius. Утверждать
+        # это по памяти нельзя -- строка должна опираться на замер, поэтому
+        # считаются ЧЕТЫРЕ источника запуска, а не один:
+        #   1. живые процессы (кто ходит СЕЙЧАС);
+        #   2. службы systemd в enabled (пойдут после перезагрузки);
+        #   3. таймеры systemd в enabled (пойдут по расписанию);
+        #   4. crontab root и bot плюс /etc/cron.d (своё расписание, мимо
+        #      systemd) -- по инвентарю хоста там стоят строки коллекторов.
+        # И отдельно -- живые соединения на 443 у наших процессов.
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" 'bash -s' <<'AUDIT' 2>&1 | tee audit_helius.txt
+            set -e
+            echo "=== 1. ZHIVYE PROCESSY nashih modulej ==="
+            pgrep -af 'bloom_detector|bloom_seller|dbot_|shred|grpc_feed|solana_ledger|c1_zapusk|podbivka' \
+              || echo "nashih processov NET"
+            echo
+            echo "=== 2. SLUZHBY: active / enabled ==="
+            for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe \
+                     grpc-feed-probe shred-listener; do
+              if systemctl list-unit-files "$S.service" --no-legend 2>/dev/null | grep -q "$S"; then
+                printf '%-22s active=%-10s enabled=%s\n' "$S" \
+                  "$(systemctl is-active "$S" 2>&1)" "$(systemctl is-enabled "$S" 2>&1)"
+              fi
+            done
+            echo
+            echo "=== 3. TAJMERY: enabled ili net ==="
+            for T in $(systemctl list-unit-files --no-legend 'bloom-*.timer' 'lab-*.timer' 2>/dev/null | awk '{print $1}' | sort -u); do
+              printf '%-34s active=%-10s enabled=%s\n' "$T" \
+                "$(systemctl is-active "$T" 2>&1)" "$(systemctl is-enabled "$T" 2>&1)"
+            done
+            echo "tajmerov v active:"
+            systemctl list-timers --all --no-pager 2>/dev/null | grep -cE 'bloom|lab-' || echo 0
+            echo
+            echo "=== 4. CRON: root, bot, /etc/cron.d ==="
+            echo "--- crontab root ---"
+            crontab -l 2>/dev/null | grep -vE '^\s*#|^\s*$' || echo "pust"
+            echo "--- crontab bot ---"
+            crontab -u bot -l 2>/dev/null | grep -vE '^\s*#|^\s*$' || echo "pust"
+            echo "--- /etc/cron.d ---"
+            ls -1 /etc/cron.d/ 2>/dev/null || echo "pust"
+            echo
+            echo "=== 5. KTO IZ CRON-STROK HODIT V HELIUS ==="
+            # Берём команды из crontab и смотрим, читает ли скрипт ключ Helius.
+            # Имя ключа ищем в САМОМ скрипте, а не угадываем по имени строки.
+            CRON_SROK=$( { crontab -l 2>/dev/null; crontab -u bot -l 2>/dev/null; } \
+              | grep -vE '^\s*#|^\s*$' || true)
+            if [ -z "$CRON_SROK" ]; then
+              echo "cron-strok net vovse -- v Helius iz cron idti nechemu"
+            else
+              echo "$CRON_SROK" | while read -r STROKA; do
+                SKRIPT=$(echo "$STROKA" | grep -oE '/[A-Za-z0-9_/.-]+\.py' | head -1)
+                if [ -z "$SKRIPT" ]; then
+                  echo "  [?] ne nashel .py v stroke: $(echo "$STROKA" | cut -c1-90)"
+                  continue
+                fi
+                if [ ! -f "$SKRIPT" ]; then
+                  echo "  [net fajla] $SKRIPT -- stroka cron mertvaja"
+                elif grep -qE 'HELIUS|helius' "$SKRIPT" 2>/dev/null; then
+                  echo "  [HELIUS!] $SKRIPT chitaet Helius"
+                else
+                  echo "  [bez Helius] $SKRIPT"
+                fi
+              done
+            fi
+            echo
+            echo "=== 6. ZHIVYE SOEDINENIJA nashih processov na 443 ==="
+            ss -tnp 2>/dev/null | grep -E ':443' | grep -E 'python|bloom|dbot|grpc' \
+              || echo "soedinenij nashih processov na 443 NET"
+            echo
+            echo "=== 7. KOGDA POSLEDNIJ RAZ TRATILI KREDITY ==="
+            ls -l --time-style=+%Y-%m-%dT%H:%M:%SZ \
+              /home/bot/bloom_executor_live_data/helius_usage/ 2>/dev/null \
+              || echo "kataloga ucheta kreditov net"
+          AUDIT
+          # ИТОГОВАЯ СТРОКА СЧИТАЕТСЯ, А НЕ ПИШЕТСЯ РУКАМИ.
+          PROC=$(grep -c "nashih processov NET" audit_helius.txt || true)
+          ENABLED=$(grep -cE 'enabled=enabled' audit_helius.txt || true)
+          AKTIV=$(grep -cE 'active=active' audit_helius.txt || true)
+          CRON_H=$(grep -c "\[HELIUS!\]" audit_helius.txt || true)
+          SOED=$(grep -c "soedinenij nashih processov na 443 NET" audit_helius.txt || true)
+          echo "processov net: $PROC, enabled: $ENABLED, active: $AKTIV, cron s Helius: $CRON_H, soedinenij net: $SOED"
+          {
+            echo
+            echo "## Аудит Helius: что на хосте ещё может пойти в Helius"
+            echo
+            echo '```'
+            cat audit_helius.txt
+            echo '```'
+            echo
+            if [ "$PROC" -ge 1 ] && [ "$ENABLED" -eq 0 ] && [ "$AKTIV" -eq 0 ] \
+               && [ "$CRON_H" -eq 0 ] && [ "$SOED" -ge 1 ]; then
+              echo "**ПОДТВЕРЖДЕНО: на торговом хосте не осталось ничего, что ходит"
+              echo "в Helius.** Замерено по пяти источникам запуска: живых процессов"
+              echo "наших модулей НЕТ, служб в active НЕТ, служб и таймеров в enabled"
+              echo "НЕТ, cron-строк, читающих Helius, НЕТ, живых соединений наших"
+              echo "процессов на 443 НЕТ."
+            else
+              echo "**НЕ ПОДТВЕРЖДЕНО.** Числа: процессов-нет=$PROC, в enabled=$ENABLED,"
+              echo "в active=$AKTIV, cron с Helius=$CRON_H, соединений-нет=$SOED."
+              echo "Разбор -- в блоке выше; строку \"ничего не ходит в Helius\" я не"
+              echo "пишу, пока она не следует из замера."
+            fi
+          } >> "$OUT"
 
       - name: "ПУБЛИЧНЫЕ АДРЕСА с хоста: кошельки и nonce-счета, именами и значениями"
         # ТОЛЬКО ЧТЕНИЕ, И ПОТОМУ НЕ ЗА ГЕЙТОМ. Замерено 12.10: гейт нуля
