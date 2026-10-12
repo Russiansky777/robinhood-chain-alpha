@@ -66,7 +66,7 @@ from pathlib import Path
     ("gmgn", "new_pairs", "минута",
      "https://gmgn.ai/defi/quotation/v1/pairs/sol/new_pairs?limit=50", "data"),
     ("pumpfun", "koth", "минута",
-     "https://frontend-api-v3.pump.fun/coins/king-of-the-hill", None),
+     "https://frontend-api-v3.pump.fun/coins/king-of-the-hill?includeNsfw=false", None),
     ("pumpfun", "currently_live", "минута",
      "https://frontend-api-v3.pump.fun/coins/currently-live"
      "?offset=0&limit=50&includeNsfw=false", None),
