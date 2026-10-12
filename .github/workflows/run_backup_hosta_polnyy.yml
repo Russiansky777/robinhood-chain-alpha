@@ -28,6 +28,18 @@ name: "Консервация: ПОЛНЫЙ бэкап торгового хос
 # покупает и не продаёт. Остановка служб -- отдельный прогон
 # run_konservaciya_ostanovka_nl.yml, и запускать его надо ПОСЛЕ этого.
 on:
+  push:
+    # ЗАПУСК ФАЙЛОМ-МЕТКОЙ, А НЕ КНОПКОЙ, И ЭТО НЕ ВКУС. Прогон с
+    # workflow_dispatch GitHub регистрирует ТОЛЬКО когда файл лежит на ветке по
+    # умолчанию (здесь это claude/robinhood-copytrading-hypothesis-awjj0g, где
+    # 440 прогонов из наших 571). Нового прогона там нет, и dispatch отвечает
+    # 404 -- замерено. Событие push берёт файл прогона ИЗ ТОГО КОММИТА, которым
+    # он пришёл, то есть работает с нашей ветки; тем же приёмом живут
+    # run_podbivka2_miami.yml и run_fetch_vps_position_state.yml.
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/backup_hosta_*.json"
   workflow_dispatch:
     inputs:
       vetka_backupa:
@@ -56,6 +68,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  VETKA_BACKUPA: "backup/host-2026-10-12"
+  CHAST_MB: "95"
+  V_VETKU: "yes"
+  PEREZAPISAT_VETKU: "no"
   HOST: 45.59.170.76
   CODE_DIR: /home/bot/bloom_executor
   STATE_DIR: /home/bot/bloom_executor_live_data
@@ -75,6 +91,33 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
           fetch-depth: 0
+
+      - name: "Параметры: вход прогона сильнее метки, метка сильнее умолчания"
+        env:
+          VHODY: ${{ toJSON(inputs) }}
+        run: |
+          set -e
+          # ПОРЯДОК СТАРШИНСТВА НАЗВАН, А НЕ УГАДЫВАЕТСЯ: вход workflow_dispatch
+          # сильнее файла-метки, метка сильнее значения по умолчанию из env
+          # прогона. На событии push входов нет вовсе -- тогда решает метка.
+          # ВСЁ НА jq, А НЕ НА python3 -c: многострочная строка в двойных
+          # кавычках начинается с нулевой колонки и ЗАКРЫВАЕТ блок YAML.
+          # Проверено -- на этом разбор прогона падал дважды.
+          METKA_FAJL=$(ls -1t data/konservaciya/zapusk/backup_hosta_*.json 2>/dev/null | head -1 || true)
+          echo "fajl-metka: ${METKA_FAJL:-net}"
+          for IMJA in VETKA_BACKUPA CHAST_MB V_VETKU PEREZAPISAT_VETKU; do
+            KLJUCH=$(printf '%s' "$IMJA" | tr 'A-Z' 'a-z')
+            NOVO=$(printf '%s' "$VHODY" | jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' 2>/dev/null || true)
+            if [ -z "$NOVO" ] && [ -n "$METKA_FAJL" ]; then
+              NOVO=$(jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' "$METKA_FAJL" 2>/dev/null || true)
+            fi
+            if [ -n "$NOVO" ] && [ "$NOVO" != "null" ]; then
+              echo "$IMJA=$NOVO" >> "$GITHUB_ENV"
+              echo "  $IMJA: bylo '${!IMJA}', stalo '$NOVO'"
+            else
+              echo "  $IMJA: '${!IMJA}' (po umolchaniju)"
+            fi
+          done
 
       - name: "Место на диске и рабочий каталог на /mnt"
         run: |
@@ -335,7 +378,6 @@ jobs:
         run: |
           set -e
           set -o pipefail
-          CHAST_MB="${{ inputs.chast_mb }}"
           cd "$RABOTA"
           SHA_ALL=$(sha256sum host_backup_full.tar.gz | awk '{print $1}')
           RAZMER=$(stat -c %s host_backup_full.tar.gz)
@@ -358,8 +400,8 @@ jobs:
             echo "| размер | $RAZMER байт ($(( RAZMER / 1048576 )) МБ) |"
             echo "| sha256 архива | \`$SHA_ALL\` |"
             echo "| частей по ${CHAST_MB} МБ | $CHASTEJ |"
-            echo "| артефакт | host-backup-full, retention ${{ inputs.retention_days }} дней |"
-            echo "| ветка частей | ${{ inputs.vetka_backupa }} |"
+            echo "| артефакт | host-backup-full, retention 90 дней |"
+            echo "| ветка частей | $VETKA_BACKUPA |"
             echo "| прогон | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
             echo "| коммит ветки на момент снятия | $(cd "$GITHUB_WORKSPACE" && git rev-parse HEAD) |"
             echo
@@ -409,7 +451,7 @@ jobs:
             echo "Из частей в ветке:"
             echo
             echo '```bash'
-            echo "git clone -b ${{ inputs.vetka_backupa }} <origin> backup && cd backup/backup"
+            echo "git clone -b $VETKA_BACKUPA <origin> backup && cd backup/backup"
             echo "sha256sum -c chasti_sha256.txt      # все части целы"
             echo "cat chast_* > host_backup_full.tar.gz"
             echo "echo '$SHA_ALL  host_backup_full.tar.gz' | sha256sum -c -"
@@ -439,16 +481,16 @@ jobs:
             diff_hosta_protiv_vetki.txt
             zamer_do.txt
             arhiv_proverka.txt
-          retention-days: ${{ inputs.retention_days }}
+          retention-days: 90
           compression-level: 0
           if-no-files-found: error
 
       - name: "(б) Части архива в ветку backup"
-        if: ${{ inputs.v_vetku == 'yes' }}
+        if: ${{ env.V_VETKU == 'yes' }}
         run: |
           set -e
           set -o pipefail
-          VETKA="${{ inputs.vetka_backupa }}"
+          VETKA="$VETKA_BACKUPA"
           # МЕТА-ФАЙЛЫ УБИРАЮТСЯ С ДОРОГИ ЗАРАНЕЕ. Ниже рабочее дерево чистится
           # под ветку-сироту, и файлы прогона из него исчезнут -- копировать их
           # надо ДО чистки, а не после.
@@ -462,7 +504,7 @@ jobs:
           # прошлый годный бэкап, и затереть его -- потерять то, ради чего
           # прогон и писался. Поэтому отказ с названной причиной.
           if git ls-remote --exit-code --heads origin "$VETKA" >/dev/null 2>&1; then
-            if [ "${{ inputs.perezapisat_vetku }}" != "yes" ]; then
+            if [ "$PEREZAPISAT_VETKU" != "yes" ]; then
               echo "STOP: vetka $VETKA uzhe est. V nej mozhet lezhat proshlyj bekap."
               echo "Libo vozmi druguju vetku vhodom vetka_backupa, libo postav"
               echo "perezapisat_vetku=yes, esli staryj bekap i pravda ne nuzhen."
@@ -511,5 +553,5 @@ jobs:
         run: |
           set -e
           echo "arhiv $RAZMER bajt, chastej $CHASTEJ, sha256 $SHA_ALL"
-          echo "artefakt: host-backup-full (retention ${{ inputs.retention_days }})"
-          echo "vetka: ${{ inputs.vetka_backupa }}"
+          echo "artefakt: host-backup-full (retention 90)"
+          echo "vetka: $VETKA_BACKUPA"

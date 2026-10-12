@@ -17,6 +17,18 @@ name: "Консервация: остановить службы торгово�
 # оставить купленное без выхода. Если позиции есть -- прогон ОТКАЗЫВАЕТ и
 # называет их, а не останавливает.
 on:
+  push:
+    # ЗАПУСК ФАЙЛОМ-МЕТКОЙ, А НЕ КНОПКОЙ, И ЭТО НЕ ВКУС. Прогон с
+    # workflow_dispatch GitHub регистрирует ТОЛЬКО когда файл лежит на ветке по
+    # умолчанию (здесь это claude/robinhood-copytrading-hypothesis-awjj0g, где
+    # 440 прогонов из наших 571). Нового прогона там нет, и dispatch отвечает
+    # 404 -- замерено. Событие push берёт файл прогона ИЗ ТОГО КОММИТА, которым
+    # он пришёл, то есть работает с нашей ветки; тем же приёмом живут
+    # run_podbivka2_miami.yml и run_fetch_vps_position_state.yml.
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/OSTANOVIT_*.json"
   workflow_dispatch:
     inputs:
       podtverzhdenie:
@@ -37,6 +49,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  PODTVERZHDENIE: ""
+  OSTANOVIT_PRI_OTKRYTYH: "no"
+  CEP: "yes"
   HOST: 45.59.170.76
   CODE_DIR: /home/bot/bloom_executor
   STATE_DIR: /home/bot/bloom_executor_live_data
@@ -54,10 +69,37 @@ jobs:
         with:
           ref: claude/nifty-sagan-r0polg
 
+      - name: "Параметры: вход прогона сильнее метки, метка сильнее умолчания"
+        env:
+          VHODY: ${{ toJSON(inputs) }}
+        run: |
+          set -e
+          # ПОРЯДОК СТАРШИНСТВА НАЗВАН, А НЕ УГАДЫВАЕТСЯ: вход workflow_dispatch
+          # сильнее файла-метки, метка сильнее значения по умолчанию из env
+          # прогона. На событии push входов нет вовсе -- тогда решает метка.
+          # ВСЁ НА jq, А НЕ НА python3 -c: многострочная строка в двойных
+          # кавычках начинается с нулевой колонки и ЗАКРЫВАЕТ блок YAML.
+          # Проверено -- на этом разбор прогона падал дважды.
+          METKA_FAJL=$(ls -1t data/konservaciya/zapusk/OSTANOVIT_*.json 2>/dev/null | head -1 || true)
+          echo "fajl-metka: ${METKA_FAJL:-net}"
+          for IMJA in PODTVERZHDENIE OSTANOVIT_PRI_OTKRYTYH CEP; do
+            KLJUCH=$(printf '%s' "$IMJA" | tr 'A-Z' 'a-z')
+            NOVO=$(printf '%s' "$VHODY" | jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' 2>/dev/null || true)
+            if [ -z "$NOVO" ] && [ -n "$METKA_FAJL" ]; then
+              NOVO=$(jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' "$METKA_FAJL" 2>/dev/null || true)
+            fi
+            if [ -n "$NOVO" ] && [ "$NOVO" != "null" ]; then
+              echo "$IMJA=$NOVO" >> "$GITHUB_ENV"
+              echo "  $IMJA: bylo '${!IMJA}', stalo '$NOVO'"
+            else
+              echo "  $IMJA: '${!IMJA}' (po umolchaniju)"
+            fi
+          done
+
       - name: "ПРЕДОХРАНИТЕЛЬ: подтверждение словом"
         run: |
           set -e
-          if [ "${{ inputs.podtverzhdenie }}" != "OSTANOVIT" ]; then
+          if [ "$PODTVERZHDENIE" != "OSTANOVIT" ]; then
             echo "STOP: vhod podtverzhdenie ne raven OSTANOVIT -- nichego ne delaju."
             exit 1
           fi
@@ -139,7 +181,7 @@ jobs:
           ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/pered_perezapuskom_sluzhby.py"
           echo "gejt: $GEJT_OK, otkrytyh po snimku: $OTKRYTYH"
           if [ "$GEJT_OK" != "yes" ] || [ "$OTKRYTYH" != "0" ]; then
-            if [ "${{ inputs.ostanovit_pri_otkrytyh }}" != "yes" ]; then
+            if [ "$OSTANOVIT_PRI_OTKRYTYH" != "yes" ]; then
               {
                 echo
                 echo "**ОТКАЗ: службы НЕ остановлены.** Гейт нуля позиций: $GEJT_OK,"
@@ -235,7 +277,7 @@ jobs:
           echo "torgovye sluzhby ostanovleny"
 
       - name: "ЦЕПЬ: баланс кошелька и токен-счета (списанные -- по минтам)"
-        if: ${{ inputs.cep == 'yes' }}
+        if: ${{ env.CEP == 'yes' }}
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
         run: |
