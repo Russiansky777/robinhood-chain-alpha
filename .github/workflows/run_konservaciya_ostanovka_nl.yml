@@ -1,0 +1,348 @@
+name: "Консервация: остановить службы торгового хоста, подтвердить нуль и баланс"
+
+# ЗАЧЕМ (пункт 5 владельца 12.10). ПОСЛЕ бэкапа: остановить детектор, продавца и
+# сторожей на торговом хосте, подтвердить, что позиций ноль, снять баланс по
+# ЦЕПИ и получить список токенов в состоянии spisana, оставшихся на кошельке.
+#
+# ЮНИТЫ НЕ УДАЛЯЮТСЯ -- слово владельца "без удаления". Службы и таймеры
+# останавливаются и выключаются (stop + disable); файлы юнитов, код, env и
+# состояние остаются на месте, и обратное включение -- одна команда.
+#
+# ПРЕДОХРАНИТЕЛЬ ОДИН, И ОН НЕ ОБХОДИТСЯ СЛУЧАЙНО: вход podtverzhdenie должен
+# быть ровно словом OSTANOVIT. Прогон, который глушит торговые службы, не
+# должен срабатывать от нажатия "Run workflow" по ошибке.
+#
+# ПОРЯДОК ВАЖЕН И ОН НЕ СЛУЧАЙНЫЙ. Сначала снимок состояния и гейт нуля позиций,
+# и только потом остановка: глушить продавца при открытой позиции значит
+# оставить купленное без выхода. Если позиции есть -- прогон ОТКАЗЫВАЕТ и
+# называет их, а не останавливает.
+on:
+  workflow_dispatch:
+    inputs:
+      podtverzhdenie:
+        description: "введите ровно OSTANOVIT -- иначе прогон откажет"
+        required: true
+        default: ""
+      ostanovit_pri_otkrytyh:
+        description: "'yes' -- глушить даже при открытых позициях (по умолчанию нет)"
+        required: false
+        default: "no"
+      cep:
+        description: "'yes' -- спросить цепь: баланс и токен-счета кошелька"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: konservaciya-ostanovka
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  HOST_PY: /home/bot/robinhood-chain-alpha/venv/bin/python
+  OUT: data/konservaciya_ostanovka.txt
+
+jobs:
+  ostanovka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "ПРЕДОХРАНИТЕЛЬ: подтверждение словом"
+        run: |
+          set -e
+          if [ "${{ inputs.podtverzhdenie }}" != "OSTANOVIT" ]; then
+            echo "STOP: vhod podtverzhdenie ne raven OSTANOVIT -- nichego ne delaju."
+            exit 1
+          fi
+          echo "podtverzhdenie prinjato"
+
+      - name: "Git identity"
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          : > "$OUT"
+          {
+            echo "# Консервация: остановка служб торгового хоста"
+            echo
+            echo "Прогон ${{ github.run_id }}, $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+            echo
+          } >> "$OUT"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOJ: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "СНИМОК ДО: позиции, зависшие, СПИСАННЫЕ"
+        run: |
+          set -e
+          set -o pipefail
+          # Скрипт уезжает файлом, а не heredoc-ом внутри ssh: вложенный
+          # heredoc уходит на хост с отступом и там не закрывается.
+          ssh -n $SSH_OPTS root@"$HOST" "cat > /tmp/konservaciya_sostojanie.py" \
+            < deploy/checks/konservaciya_sostojanie.py
+          {
+            echo "## Снимок состояния ДО остановки"
+            echo
+            echo '```'
+          } >> "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "cd $CODE_DIR && PYTHONPATH=$CODE_DIR BLOOM_STATE_DIR=$STATE_DIR $HOST_PY /tmp/konservaciya_sostojanie.py" \
+            2>&1 | tee -a "$OUT"
+          echo '```' >> "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "cd $CODE_DIR && PYTHONPATH=$CODE_DIR BLOOM_STATE_DIR=$STATE_DIR $HOST_PY /tmp/konservaciya_sostojanie.py --json" \
+            > sostojanie_do.json
+          # ОДНОСТРОЧНИКИ, А НЕ МНОГОСТРОЧНЫЙ python3 -c. Многострочная
+          # строка в двойных кавычках внутри блока YAML начинается с нулевой
+          # колонки и ЗАКРЫВАЕТ блок: проверено, разбор прогона падал на ней.
+          python3 -c "import json;d=json.load(open('sostojanie_do.json'));print('otkrytyh',d['otkrytyh'],'spisannyh',d['spisannyh'])"
+          python3 -c "import json;d=json.load(open('sostojanie_do.json'));open('minty_spisannyh.txt','w').write(''.join(m+chr(10) for m in d['minty_spisannyh']))"
+          wc -l < minty_spisannyh.txt
+          echo "OTKRYTYH=$(python3 -c "import json;print(json.load(open('sostojanie_do.json'))['otkrytyh'])")" >> "$GITHUB_ENV"
+          echo "SPISANNYH=$(python3 -c "import json;print(json.load(open('sostojanie_do.json'))['spisannyh'])")" >> "$GITHUB_ENV"
+
+      - name: "ГЕЙТ НУЛЯ ПОЗИЦИЙ -- тот же, что у деплоя"
+        run: |
+          set -e
+          set -o pipefail
+          # ОХРАНА ТА ЖЕ САМАЯ, а не своя копия: расходятся именно копии.
+          # Она требует нуля открытых и нуля зависших по всем группам и
+          # признака жизни детектора не старше 10 минут.
+          {
+            echo
+            echo "## Гейт нуля позиций (deploy/checks/pered_perezapuskom_sluzhby.py)"
+            echo
+            echo '```'
+          } >> "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "cat > /tmp/pered_perezapuskom_sluzhby.py" \
+            < deploy/checks/pered_perezapuskom_sluzhby.py
+          GEJT_OK=yes
+          ssh -n $SSH_OPTS root@"$HOST" "python3 /tmp/pered_perezapuskom_sluzhby.py" \
+            2>&1 | tee -a "$OUT" || GEJT_OK=no
+          echo '```' >> "$OUT"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/pered_perezapuskom_sluzhby.py"
+          echo "gejt: $GEJT_OK, otkrytyh po snimku: $OTKRYTYH"
+          if [ "$GEJT_OK" != "yes" ] || [ "$OTKRYTYH" != "0" ]; then
+            if [ "${{ inputs.ostanovit_pri_otkrytyh }}" != "yes" ]; then
+              {
+                echo
+                echo "**ОТКАЗ: службы НЕ остановлены.** Гейт нуля позиций: $GEJT_OK,"
+                echo "открытых по снимку: $OTKRYTYH. Глушить продавца при открытой"
+                echo "позиции значит оставить купленное без выхода."
+              } >> "$OUT"
+              echo "STOP: pozicii est ili gejt krasnyj -- sluzhby ne ostanavlivaju"
+              exit 1
+            fi
+            echo "pozicii est, no vhod ostanovit_pri_otkrytyh=yes -- prodolzhaju po slovu vladelca"
+            {
+              echo
+              echo "ВНИМАНИЕ: остановка сделана при открытых ($OTKRYTYH) по явному"
+              echo "входу ostanovit_pri_otkrytyh=yes."
+            } >> "$OUT"
+          fi
+
+      - name: "ОСТАНОВИТЬ службы и таймеры (юниты НЕ удаляются)"
+        run: |
+          set -e
+          set -o pipefail
+          {
+            echo
+            echo "## Остановка"
+            echo
+            echo '```'
+          } >> "$OUT"
+          ssh $SSH_OPTS root@"$HOST" 'bash -s' <<'GLUSHIM' 2>&1 | tee -a "$OUT"
+            set -e
+            echo "=== DO: chto aktivno ==="
+            systemctl list-units --type=service --state=running --no-pager \
+              | grep -E 'bloom|shred|dbot|grpc' || echo "aktivnyh nashih sluzhb net"
+            systemctl list-timers --all --no-pager | grep -E 'bloom|lab-' || echo "nashih tajmerov net"
+
+            # ПОРЯДОК: СНАЧАЛА ДЕТЕКТОР (перестаёт покупать), ПОТОМ ПРОДАВЕЦ.
+            # Наоборот нельзя: детектор успел бы купить, когда продавца уже нет.
+            for S in bloom-detector bloom-seller; do
+              if systemctl list-unit-files "$S.service" --no-legend | grep -q "$S"; then
+                echo "--- $S: stop + disable ---"
+                systemctl stop "$S" || true
+                systemctl disable "$S" 2>&1 | tail -1 || true
+              else
+                echo "$S: junita net"
+              fi
+            done
+
+            # ТАЙМЕРЫ -- ВСЕ НАШИ, СПИСКОМ С МАШИНЫ, а не перечислением в
+            # прогоне: перечисление устареет, а машина знает, что на ней стоит.
+            TAJMERY=$(systemctl list-unit-files --no-legend 'bloom-*.timer' 'lab-*.timer' \
+              | awk '{print $1}' | sort -u)
+            echo "--- tajmery: $TAJMERY ---"
+            for T in $TAJMERY; do
+              systemctl stop "$T" || true
+              systemctl disable "$T" 2>&1 | tail -1 || true
+            done
+
+            echo "=== POSLE: chto aktivno ==="
+            OSTALOS=$(systemctl list-units --type=service --state=running --no-pager \
+              | grep -cE 'bloom-detector|bloom-seller' || true)
+            echo "aktivnyh torgovyh sluzhb ostalos: $OSTALOS"
+            for S in bloom-detector bloom-seller; do
+              printf '%s: active=%s enabled=%s\n' "$S" \
+                "$(systemctl is-active "$S" 2>&1)" "$(systemctl is-enabled "$S" 2>&1)"
+            done
+            systemctl list-timers --all --no-pager | grep -E 'bloom|lab-' || echo "aktivnyh tajmerov net"
+            echo "=== juniti na meste (ne udaleny) ==="
+            ls -1 /etc/systemd/system/ | grep -E '^(bloom|lab)' | sed 's/^/  /'
+            echo "=== kod, sostojanie i env na meste ==="
+            ls -ld /home/bot/bloom_executor /home/bot/bloom_executor_live_data /etc/bloom-executor
+          GLUSHIM
+          echo '```' >> "$OUT"
+
+      - name: "ПРОВЕРКА: торговые службы точно не бегут"
+        run: |
+          set -e
+          set -o pipefail
+          BEGUT=0
+          for S in bloom-detector bloom-seller; do
+            SOST=$(ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active $S" 2>&1 || true)
+            echo "$S: $SOST"
+            if [ "$SOST" = "active" ]; then
+              BEGUT=$(( BEGUT + 1 ))
+            fi
+          done
+          {
+            echo
+            echo "Торговых служб в состоянии active после остановки: **$BEGUT**."
+          } >> "$OUT"
+          if [ "$BEGUT" -ne 0 ]; then
+            echo "SBOJ: posle stop ostalos aktivnyh: $BEGUT"
+            exit 1
+          fi
+          echo "torgovye sluzhby ostanovleny"
+
+      - name: "ЦЕПЬ: баланс кошелька и токен-счета (списанные -- по минтам)"
+        if: ${{ inputs.cep == 'yes' }}
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+        run: |
+          set -e
+          set -o pipefail
+          [ -n "$HELIUS_API_KEY" ] || { echo "SBOJ: HELIUS_API_KEY ne zadan"; exit 1; }
+          python3 -m pip install -q requests solders 2>&1 | tail -1 || true
+          # ТОКЕН-СЧЕТА -- ГОТОВЫМ МОДУЛЕМ, он только читает цепь и ничего не
+          # закрывает: закрытие счёта это транзакция кошелька.
+          python3 analysis/bloom_token_accounts.py --out data/konservaciya_token_accounts.json \
+            2>&1 | tee token_accounts.txt || true
+          {
+            echo
+            echo "## Цепь: баланс и токен-счета кошелька исполнителя"
+            echo
+            echo '```'
+            cat token_accounts.txt
+            echo '```'
+          } >> "$OUT"
+          # БАЛАНС SOL -- ОТДЕЛЬНЫМ ЗАПРОСОМ, по тому же ключу.
+          python3 - <<'BALANS' | tee balans.txt
+          import json, os, urllib.request
+          KOSHELEK = "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N"
+          URL = "https://mainnet.helius-rpc.com/?api-key=" + os.environ["HELIUS_API_KEY"]
+
+          def zov(metod, parametry):
+              telo = json.dumps({"jsonrpc": "2.0", "id": 1,
+                                  "method": metod, "params": parametry}).encode()
+              zapros = urllib.request.Request(
+                  URL, data=telo, headers={"Content-Type": "application/json"})
+              with urllib.request.urlopen(zapros, timeout=30) as otvet:
+                  return json.load(otvet)
+
+          b = zov("getBalance", [KOSHELEK])
+          lamporty = (b.get("result") or {}).get("value")
+          print(f"koshelek ispolnitelja: {KOSHELEK}")
+          print(f"balans: {lamporty} lamportov = {lamporty / 1e9:.9f} SOL"
+                if lamporty is not None else f"balans ne prochitan: {b}")
+          try:
+              minty = [m.strip() for m in open("minty_spisannyh.txt") if m.strip()]
+          except OSError:
+              minty = []
+          print(f"mintov spisannyh pozicij: {len(minty)}")
+          itog = []
+          for m in minty:
+              r = zov("getTokenAccountsByOwner",
+                      [KOSHELEK, {"mint": m}, {"encoding": "jsonParsed"}])
+              scheta = (r.get("result") or {}).get("value") or []
+              for s in scheta:
+                  info = (((s.get("account") or {}).get("data") or {})
+                          .get("parsed") or {}).get("info") or {}
+                  summa = (info.get("tokenAmount") or {})
+                  itog.append({"mint": m, "schet": s.get("pubkey"),
+                                "amount": summa.get("amount"),
+                                "ui": summa.get("uiAmountString"),
+                                "lamportov_renty": (s.get("account") or {}).get("lamports")})
+          print(f"token-schetov po etim mintam na koshelke: {len(itog)}")
+          s_ostatkom = [i for i in itog if str(i.get("amount") or "0") != "0"]
+          print(f"iz nih S NENULEVYM ostatkom: {len(s_ostatkom)}")
+          for i in itog:
+              print(f"  {i['mint']} schet={i['schet']} amount={i['amount']} "
+                    f"ui={i['ui']} renta={i['lamportov_renty']}")
+          json.dump({"koshelek": KOSHELEK, "lamportov": lamporty,
+                      "sol": (lamporty / 1e9 if lamporty is not None else None),
+                      "minty_spisannyh": minty, "scheta_spisannyh": itog,
+                      "s_nenulevym_ostatkom": s_ostatkom},
+                     open("data/konservaciya_cep.json", "w"),
+                     ensure_ascii=False, indent=2)
+          BALANS
+          {
+            echo
+            echo "## Баланс и списанные на кошельке"
+            echo
+            echo '```'
+            cat balans.txt
+            echo '```'
+          } >> "$OUT"
+
+      - name: "Коммит отчёта"
+        if: always()
+        run: |
+          set -e
+          {
+            echo
+            echo "## Что НЕ сделано намеренно"
+            echo
+            echo "Юниты systemd, код в /home/bot/bloom_executor, состояние в"
+            echo "/home/bot/bloom_executor_live_data и /etc/bloom-executor"
+            echo "ОСТАВЛЕНЫ на месте: слово владельца \"без удаления\"."
+            echo "Обратное включение -- systemctl enable --now bloom-detector bloom-seller"
+            echo "и нужные таймеры."
+          } >> "$OUT"
+          git add "$OUT" data/konservaciya_*.json 2>/dev/null || git add "$OUT"
+          git commit -q -m "Konservaciya: ostanovka sluzhb, nul pozicij i balans [automated]" || {
+            echo "nechego kommitit"; exit 0; }
+          for POPYTKA in 1 2 3 4; do
+            if git push origin HEAD:claude/nifty-sagan-r0polg 2>&1 | tail -2; then
+              exit 0
+            fi
+            git fetch -q origin claude/nifty-sagan-r0polg && git rebase -q FETCH_HEAD || true
+            sleep $(( 2 ** POPYTKA ))
+          done
+          exit 1
+
+      - name: "Итог одной строкой"
+        if: always()
+        run: |
+          set -e
+          echo "otkrytyh do ostanovki: $OTKRYTYH, spisannyh v zhurnale: $SPISANNYH"
+          echo "otchjot: $OUT"

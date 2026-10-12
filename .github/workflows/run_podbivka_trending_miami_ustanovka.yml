@@ -1,0 +1,264 @@
+name: "Трендинги Code-2: установка на lab-miami (юниты и таймеры) + первый доклад"
+
+# ЗАЧЕМ (пункт 1 владельца 12.10, консервация): поставить регистратор трендингов
+# Code-2 на ЛАБОРАТОРНЫЙ хост lab-miami по docs/podbivka_trending_ustanovka.md
+# из ветки claude/podbivka. Без BIRDEYE_API_KEY -- слово владельца.
+#
+# НА ТОРГОВЫЙ ХОСТ ЭТО НЕ СТАВИТСЯ И ПОСТАВЛЕНО БЫТЬ НЕ МОЖЕТ. Адрес хоста
+# зашит в env как HOST_LAB (169.128.191.158), торговый 45.59.170.76 здесь не
+# упоминается вовсе, и шаг-предохранитель ниже отказывается работать, если
+# адрес совпал с торговым.
+#
+# КОШЕЛЬКОВЫХ КЛЮЧЕЙ СКРИПТ НЕ ПРОСИТ И НЕ ЧИТАЕТ: все запросы -- публичные GET
+# (проверено: из импортов только стандартная библиотека, urllib.request).
+# Ни одного секрета на машину этот прогон не кладёт -- см. шаг про пуш.
+#
+# ПУШ В ВЕТКУ -- БЕЗ СЕКРЕТА НА МАШИНЕ, И ЭТО РЕШЕНИЕ, А НЕ УПУЩЕНИЕ.
+# В docs/podbivka_trending_ustanovka.md третий таймер (podbivka-trending-push)
+# пушит data/trending в ветку сам с машины. Чтобы он мог пушить, на машину надо
+# положить токен записи в репозиторий -- это НОВЫЙ СЕКРЕТ НА ХОСТЕ, а владелец
+# сказал "ключи и секреты -- никогда". Поэтому юнит и таймер пуша СТАВЯТСЯ (как
+# в документе), но таймер пуша НЕ ВКЛЮЧАЕТСЯ, а последняя миля до ветки едет
+# отдельным прогоном run_podbivka_trending_push_miami.yml: он идёт на бегунке
+# lab-miami, где токен выдаёт сам GitHub на время прогона и на диске не остаётся.
+on:
+  workflow_dispatch:
+    inputs:
+      vetka_podbivki:
+        description: "ветка Code-2 с регистратором"
+        required: false
+        default: "claude/podbivka"
+      koren:
+        description: "куда ставить клон на lab-miami"
+        required: false
+        default: "/opt/robinhood-chain-alpha"
+      probno:
+        description: "'yes' -- сразу прогнать --probno и показать доклад"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: podbivka-trending-miami
+  cancel-in-progress: false
+
+env:
+  HOST_LAB: 169.128.191.158
+  TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
+
+jobs:
+  ustanovka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+
+      - name: "ПРЕДОХРАНИТЕЛЬ: это не торговый хост"
+        run: |
+          set -e
+          if [ "$HOST_LAB" = "$TORGOVYJ_ZAPRESHCHEN" ]; then
+            echo "STOP: adres sovpal s torgovym hostom. Registrator na torgovuju mashinu ne stavitsja."
+            exit 1
+          fi
+          echo "stavim na lab-miami $HOST_LAB; torgovyj $TORGOVYJ_ZAPRESHCHEN ne tragaetsja"
+
+      - name: "SSH key lab-miami"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+        run: |
+          set -e
+          [ -n "$KLJUCH_MIAMI" ] || { echo "SBOJ: sekreta VPS_SSH_KEY_MIAMI net"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_MIAMI" > ~/.ssh/miami_key
+          chmod 600 ~/.ssh/miami_key
+          ssh-keyscan -T 10 "$HOST_LAB" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/miami_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Машина: кто мы, место, python, systemd"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST_LAB" "hostname; nproc; df -h /opt | tail -1; python3 -V; systemctl --version | head -1"
+
+      - name: "Пользователь podbivka и клон ветки Code-2"
+        run: |
+          set -e
+          set -o pipefail
+          VETKA="${{ inputs.vetka_podbivki }}"
+          KOREN="${{ inputs.koren }}"
+          # КЛОН МЕЛКИЙ И ОДНОВЕТОЧНЫЙ. Репозиторий весит 7.13 ГиБ историей
+          # (её делают исследовательские архивы data/podbivka и
+          # data/sprintG1_cache), и полный клон на лабораторную машину тащить
+          # незачем: регистратору нужен рабочий каталог, чтобы ПИСАТЬ снимки,
+          # а историю он не читает. Пуш в ветку идёт прогоном, не с машины.
+          ssh $SSH_OPTS root@"$HOST_LAB" "VETKA='$VETKA' KOREN='$KOREN' bash -s" <<'STAVIM'
+            set -e
+            id podbivka >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin podbivka
+            id podbivka
+            if [ -d "$KOREN/.git" ]; then
+              echo "klon uzhe est, obnovljaju"
+              cd "$KOREN"
+              git remote -v | head -2
+              git fetch -q --depth=1 origin "$VETKA"
+              git checkout -q -B "$VETKA" FETCH_HEAD
+            else
+              echo "kloniruju $VETKA v $KOREN (melkij, odnovetochnyj)"
+              rm -rf "$KOREN"
+              git clone -q --depth 1 --single-branch -b "$VETKA" \
+                https://github.com/Russiansky777/robinhood-chain-alpha.git "$KOREN"
+              cd "$KOREN"
+            fi
+            git rev-parse --abbrev-ref HEAD
+            git log --oneline -1
+            mkdir -p "$KOREN/data/trending"
+            chown -R podbivka:podbivka "$KOREN"
+            test -f "$KOREN/analysis/podbivka_trending.py" \
+              || { echo "SBOJ: v klone net analysis/podbivka_trending.py"; exit 1; }
+            test -x "$KOREN/analysis/podbivka_trending_push.sh" \
+              || chmod +x "$KOREN/analysis/podbivka_trending_push.sh"
+            echo "klon gotov, vladelec podbivka"
+          STAVIM
+
+      - name: "Юниты и таймеры systemd"
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="${{ inputs.koren }}"
+          # ЮНИТЫ ПИШУТСЯ ЗДЕСЬ, НА БЕГУНКЕ, И УЕЗЖАЮТ ФАЙЛАМИ. Соблазн был
+          # сделать их heredoc-ом внутри heredoc-а ssh -- и он не работает:
+          # внутренний ограничитель уходит на хост С ОТСТУПОМ, а systemd-bash
+          # ждёт его в нулевой колонке. Проверено локально: bash на хосте
+          # сказал бы "here-document delimited by end-of-file (wanted UNIT)",
+          # то есть юниты вышли бы пустыми, а прогон -- зелёным.
+          mkdir -p junity
+          OBSHCHEE_SLUZHBY=$(printf '%s\n' \
+            "Type=oneshot" "User=podbivka" "WorkingDirectory=$KOREN" \
+            "Nice=10" "PrivateTmp=yes" "NoNewPrivileges=yes" \
+            "ProtectSystem=strict" "ReadWritePaths=$KOREN")
+
+          # --- минутные списки
+          {
+            printf '%s\n' "[Unit]" "Description=Трендинги: минутные списки" \
+              "After=network-online.target" "" "[Service]"
+            printf '%s\n' "$OBSHCHEE_SLUZHBY"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/podbivka_trending.py --kazhdye минута --pauza 0.4" \
+              "TimeoutStartSec=50"
+          } > junity/podbivka-trending-min.service
+          printf '%s\n' "[Unit]" "Description=Трендинги каждую минуту" "" \
+            "[Timer]" "OnCalendar=*:0/1" "AccuracySec=1s" "Persistent=false" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity/podbivka-trending-min.timer
+
+          # --- пятиминутные списки. BIRDEYE_API_KEY НЕ СТАВИТСЯ (слово
+          # владельца): Environment= и EnvironmentFile= с ним здесь нет.
+          # Birdeye ляжет в снимок строкой "нет ключа BIRDEYE_API_KEY" -- это
+          # снимок с названной причиной, а не пропуск.
+          {
+            printf '%s\n' "[Unit]" "Description=Трендинги: пятиминутные списки" \
+              "After=network-online.target" "" "[Service]"
+            printf '%s\n' "$OBSHCHEE_SLUZHBY"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/podbivka_trending.py --kazhdye пять --pauza 0.6" \
+              "TimeoutStartSec=120"
+          } > junity/podbivka-trending-5min.service
+          printf '%s\n' "[Unit]" "Description=Трендинги каждые пять минут" "" \
+            "[Timer]" "OnCalendar=*:0/5" "AccuracySec=5s" "Persistent=false" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity/podbivka-trending-5min.timer
+
+          # --- суточный пуш: юнит СТАВИТСЯ, таймер НЕ ВКЛЮЧАЕТСЯ (см. голову)
+          printf '%s\n' "[Unit]" "Description=Трендинги: суточный пуш в ветку" "" \
+            "[Service]" "Type=oneshot" "User=podbivka" "WorkingDirectory=$KOREN" \
+            "Environment=PODB_KOREN=$KOREN" "Environment=PODB_VETKA=claude/podbivka" \
+            "ExecStart=$KOREN/analysis/podbivka_trending_push.sh" "TimeoutStartSec=900" \
+            > junity/podbivka-trending-push.service
+          printf '%s\n' "[Unit]" "Description=Трендинги: суточный пуш в 02:17 UTC" "" \
+            "[Timer]" "OnCalendar=*-*-* 02:17:00 UTC" "Persistent=true" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity/podbivka-trending-push.timer
+
+          echo "--- chto napisali ---"
+          for F in junity/*; do
+            echo "=== $F ==="
+            cat "$F"
+          done
+          # ПРОВЕРКА ДО ОТПРАВКИ: ни один юнит не пуст и у каждого есть секция.
+          for F in junity/*; do
+            [ -s "$F" ] || { echo "SBOJ: $F pust"; exit 1; }
+            grep -q '^\[Unit\]' "$F" || { echo "SBOJ: v $F net sekcii [Unit]"; exit 1; }
+          done
+          scp -i ~/.ssh/miami_key -o StrictHostKeyChecking=accept-new \
+            junity/podbivka-trending-min.service junity/podbivka-trending-min.timer \
+            junity/podbivka-trending-5min.service junity/podbivka-trending-5min.timer \
+            junity/podbivka-trending-push.service junity/podbivka-trending-push.timer \
+            root@"$HOST_LAB":/etc/systemd/system/
+          echo "juniti dostavleny"
+
+      - name: "Включить таймеры сбора (таймер пуша -- нет, и это названо)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'VKLJUCHAEM'
+            set -e
+            chmod 644 /etc/systemd/system/podbivka-trending-*.service \
+                      /etc/systemd/system/podbivka-trending-*.timer
+            systemctl daemon-reload
+            systemd-analyze verify /etc/systemd/system/podbivka-trending-min.service 2>&1 | head -5 || true
+            # ВКЛЮЧАЕТСЯ ТОЛЬКО СБОР ДАННЫХ. Таймер пуша поставлен, но НЕ
+            # включён: включить его значит положить на машину токен записи в
+            # репозиторий, то есть новый секрет на хосте.
+            systemctl enable --now podbivka-trending-min.timer podbivka-trending-5min.timer
+            systemctl disable podbivka-trending-push.timer 2>/dev/null || true
+            echo "--- tajmery ---"
+            systemctl list-timers 'podbivka-trending*' --all --no-pager
+            echo "--- sostojanie ---"
+            for T in podbivka-trending-min.timer podbivka-trending-5min.timer podbivka-trending-push.timer; do
+              printf '%s: enabled=%s active=%s\n' "$T" \
+                "$(systemctl is-enabled "$T" 2>&1)" "$(systemctl is-active "$T" 2>&1)"
+            done
+          VKLJUCHAEM
+
+      - name: "ПЕРВЫЙ ДОКЛАД: --probno сразу (сколько из 16 списков отдают данные)"
+        if: ${{ inputs.probno == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="${{ inputs.koren }}"
+          # --probno НИЧЕГО НЕ ПИШЕТ, только печатает по строке на список.
+          # Запускается от того же пользователя, что и таймер: иначе проверили
+          # бы доступ не того, кто ходит в сеть по-настоящему.
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "cd $KOREN && sudo -u podbivka /usr/bin/python3 analysis/podbivka_trending.py --kazhdye все --probno" \
+            2>&1 | tee probno_miami.txt
+          echo "--- itog ---"
+          grep -E 'итого|otdali' probno_miami.txt || tail -3 probno_miami.txt
+
+      - name: "Первый прогон таймеров: убедиться, что снимки ложатся на диск"
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="${{ inputs.koren }}"
+          ssh $SSH_OPTS root@"$HOST_LAB" "KOREN='$KOREN' bash -s" <<'PROBA'
+            set -e
+            systemctl start podbivka-trending-min.service || true
+            sleep 3
+            systemctl status podbivka-trending-min.service --no-pager -n 12 2>&1 | head -20 || true
+            echo "--- chto leglo ---"
+            find "$KOREN/data/trending" -type f -printf '%s %p\n' 2>/dev/null \
+              | sort -rn | head -20 | awk '{printf "%8d B  %s\n", $1, $2}'
+            echo "fajlov: $(find "$KOREN/data/trending" -type f 2>/dev/null | wc -l)"
+            du -sh "$KOREN/data/trending" 2>/dev/null || true
+          PROBA
+
+      - name: "Выложить первый доклад артефактом"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: podbivka-trending-miami-probno
+          path: probno_miami.txt
+          retention-days: 90
+          if-no-files-found: warn

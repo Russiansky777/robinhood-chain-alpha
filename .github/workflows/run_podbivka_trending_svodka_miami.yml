@@ -1,0 +1,131 @@
+name: "Трендинги Code-2: сводка на lab-miami и пуш снимков в ветку (без секрета на хосте)"
+
+# ЗАЧЕМ. Две работы, которые по документу Code-2 делал бы таймер пуша на машине:
+#   1. --svodka: сколько снимков и места по источникам (второй доклад владельцу,
+#      пункт 1: "--svodka через час");
+#   2. последняя миля снимков data/trending до ветки claude/podbivka.
+#
+# ПОЧЕМУ ЭТО ПРОГОН, А НЕ ТАЙМЕР НА МАШИНЕ. Чтобы таймер
+# podbivka-trending-push мог пушить сам, на lab-miami надо положить токен записи
+# в репозиторий -- НОВЫЙ СЕКРЕТ НА ХОСТЕ, а слово владельца: "Ключи и секреты --
+# никогда". Здесь токен выдаёт сам GitHub бегунку на время прогона, на диске он
+# не остаётся, и ни одного секрета на машину не добавляется.
+#
+# ИДЁТ НА САМОЙ lab-miami (runs-on: self-hosted, lab-miami): снимки лежат на её
+# диске, в облачный бегунок их не дотащить.
+#
+# ТОРГОВОГО ХОСТА НЕ КАСАЕТСЯ ВОВСЕ: ни ssh, ни его адреса здесь нет.
+on:
+  workflow_dispatch:
+    inputs:
+      koren:
+        description: "клон регистратора на lab-miami"
+        required: false
+        default: "/opt/robinhood-chain-alpha"
+      pushit:
+        description: "'yes' -- положить снимки в ветку claude/podbivka"
+        required: false
+        default: "yes"
+  schedule:
+    # 02:19Z -- через две минуты после часа, выбранного Code-2 для пуша (02:17Z),
+    # и мимо 07:17Z, где идут тяжёлые проходы архива.
+    - cron: "19 2 * * *"
+
+concurrency:
+  group: podbivka-trending-svodka-miami
+  cancel-in-progress: false
+
+jobs:
+  svodka:
+    runs-on: [self-hosted, lab-miami]
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/podbivka
+          fetch-depth: 1
+
+      - name: "СВОДКА: сколько снимков и места по источникам"
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="${{ inputs.koren }}"
+          [ -n "$KOREN" ] || KOREN=/opt/robinhood-chain-alpha
+          echo "mashina: $(hostname), yader $(nproc)"
+          if [ ! -d "$KOREN/data/trending" ]; then
+            echo "STOP: $KOREN/data/trending net -- registrator ne postavlen"
+            echo "Postav ego progonom run_podbivka_trending_miami_ustanovka.yml"
+            exit 1
+          fi
+          echo "--- tajmery ---"
+          systemctl list-timers 'podbivka-trending*' --all --no-pager || true
+          echo "--- svodka ---"
+          ( cd "$KOREN" && /usr/bin/python3 analysis/podbivka_trending.py --svodka ) \
+            2>&1 | tee "$RUNNER_TEMP/svodka.txt"
+          echo "--- probno: kto dostupen sejchas ---"
+          ( cd "$KOREN" && /usr/bin/python3 analysis/podbivka_trending.py --kazhdye все --probno ) \
+            2>&1 | tee "$RUNNER_TEMP/probno.txt"
+          echo "--- mesto ---"
+          du -sh "$KOREN/data/trending" || true
+          find "$KOREN/data/trending" -type f | wc -l
+
+      - name: "Снимки -- в ветку claude/podbivka (токен от GitHub, не с диска)"
+        if: ${{ inputs.pushit != 'no' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="${{ inputs.koren }}"
+          [ -n "$KOREN" ] || KOREN=/opt/robinhood-chain-alpha
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p data/trending
+          # КЛАДЁТСЯ ТОЛЬКО data/trending. Ни кода, ни чужих каталогов: у
+          # регистратора своя папка, и выйти за неё ему незачем.
+          rsync -a --delete-after "$KOREN/data/trending/" data/trending/ 2>/dev/null \
+            || cp -r "$KOREN/data/trending/." data/trending/
+          git add -- data/trending
+          if git diff --cached --quiet -- data/trending; then
+            echo "nechego pushit: novyh snimkov net"
+            exit 0
+          fi
+          FAJLOV=$(git diff --cached --numstat -- data/trending | wc -l)
+          echo "fajlov k pushu: $FAJLOV"
+          # ТОТ ЖЕ ПРИЁМ, ЧТО У run_podbivka2_miami.yml: ветка догоняется
+          # fetch+reset, а не rebase -- в мелком клоне rebase делать нечем.
+          for POPYTKA in 1 2 3 4 5 6 7 8; do
+            git fetch -q --depth=1 origin claude/podbivka
+            git reset -q FETCH_HEAD
+            git add -- data/trending
+            if git diff --cached --quiet -- data/trending; then
+              echo "uzhe v vetke"
+              exit 0
+            fi
+            git commit -q -m "Trending: sutochnye snimki ($FAJLOV fajlov) [automated]" -- data/trending
+            if git push -q origin HEAD:claude/podbivka; then
+              echo "push gotov s popytki $POPYTKA"
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "SBOJ: push ne proshel posle 8 popytok"
+          exit 1
+
+      - name: "Выложить сводку артефактом"
+        if: always()
+        run: |
+          set -e
+          cp "$RUNNER_TEMP/svodka.txt" svodka_trending.txt 2>/dev/null || true
+          cp "$RUNNER_TEMP/probno.txt" probno_trending.txt 2>/dev/null || true
+          ls -l svodka_trending.txt probno_trending.txt 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: podbivka-trending-svodka
+          path: |
+            svodka_trending.txt
+            probno_trending.txt
+          retention-days: 90
+          if-no-files-found: warn

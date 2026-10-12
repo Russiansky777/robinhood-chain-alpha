@@ -1,0 +1,515 @@
+name: "Консервация: ПОЛНЫЙ бэкап торгового хоста (артефакт + части в ветку)"
+
+# ЗАЧЕМ (пункт 2 владельца 12.10, консервация проекта). Снимок торгового хоста
+# на случай потери машины, в ДВУХ местах сразу:
+#   (а) артефактом прогона host-backup-full, retention-days 90;
+#   (б) тем же архивом ЧАСТЯМИ по <= 95 МБ в ветку backup/host-2026-10-12.
+# Два пути потому, что артефакт истекает, а ветка -- нет; и наоборот, ветку
+# можно потерять вместе с аккаунтом, а артефакт лежит отдельно.
+#
+# ЧАСТИ ИМЕННО 95 МБ, А НЕ 100: GitHub отвергает файл больше 100 МБ, и граница
+# считается по БАЙТАМ, а не по МБ. 95 МБ оставляют запас и на счёт байтов, и на
+# то, что split округляет последнюю часть вверх.
+#
+# КЛЮЧЕЙ И СЕКРЕТОВ В БЭКАПЕ НЕТ И БЫТЬ НЕ МОЖЕТ (слово владельца: "Ключи и
+# секреты -- никогда; env -- только именами"). Защита стоит ТРЕМЯ слоями:
+#   1. tar --exclude по именам: env, env.*, *.key, *.pem, id_*, *wallet*.json,
+#      *secret*, *keypair*;
+#   2. окружение хоста выгружается ТОЛЬКО ИМЕНАМИ переменных (sed по '='),
+#      значение не читается никогда -- кроме короткого списка ПУБЛИЧНЫХ адресов,
+#      и там стоит отдельный предохранитель по длине (32..44 знака base58:
+#      приватный ключ ed25519 в base58 это 87-88 знаков, то есть такой фильтр
+#      его физически не пропустит);
+#   3. ГОТОВЫЙ архив проверяется deploy/checks/arhiv_bez_klyuchey.py -- имена
+#      файлов по образцам И содержимое текстовых на признаки ключей. Нашлось --
+#      прогон ПАДАЕТ, и ни артефакт, ни ветка ничего не получают.
+#
+# ХОСТ ТОЛЬКО ЧИТАЕТСЯ. Прогон не останавливает служб, не правит env, не
+# покупает и не продаёт. Остановка служб -- отдельный прогон
+# run_konservaciya_ostanovka_nl.yml, и запускать его надо ПОСЛЕ этого.
+on:
+  workflow_dispatch:
+    inputs:
+      vetka_backupa:
+        description: "ветка для частей архива"
+        required: false
+        default: "backup/host-2026-10-12"
+      retention_days:
+        description: "сколько дней держать артефакт (владелец просил 90)"
+        required: false
+        default: "90"
+      chast_mb:
+        description: "размер части для ветки, МБ (GitHub режет на 100)"
+        required: false
+        default: "95"
+      v_vetku:
+        description: "'yes' -- положить части в ветку; 'no' -- только артефакт"
+        required: false
+        default: "yes"
+      perezapisat_vetku:
+        description: "'yes' -- затереть ветку, если она уже есть (в ней может лежать прошлый бэкап)"
+        required: false
+        default: "no"
+
+concurrency:
+  group: backup-hosta-polnyy
+  cancel-in-progress: false
+
+env:
+  HOST: 45.59.170.76
+  CODE_DIR: /home/bot/bloom_executor
+  STATE_DIR: /home/bot/bloom_executor_live_data
+  DATA_DIR: /home/bot/data
+  ENV_DIR: /etc/bloom-executor
+  TAJM_DIR: /home/bot/host_tajmery
+  FAJL_GRUPP: /home/bot/data/sources_2026-09-25.json
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 0
+
+      - name: "Место на диске и рабочий каталог на /mnt"
+        run: |
+          set -e
+          df -h / /mnt | sed 's/^/  /'
+          sudo mkdir -p /mnt/hostbackup
+          sudo chown "$(id -u):$(id -g)" /mnt/hostbackup
+          echo "RABOTA=/mnt/hostbackup" >> "$GITHUB_ENV"
+          echo "METKA=$(date -u +%Y-%m-%dT%H%M%SZ)" >> "$GITHUB_ENV"
+
+      - name: "SSH key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$VPS_SSH_KEY" ] || { echo "SBOJ: VPS_SSH_KEY ne zadan"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -T 10 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/vps_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "ЗАМЕР ДО УПАКОВКИ: сколько чего на хосте и сколько места"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ЗАМЕР ПЕРВЫМ ШАГОМ. Хост -- двухъядерный VPS, и место на нём
+          # кончается: на этом уже стоит таймер lab-potolok-diska. Узнать размер
+          # ПОСЛЕ того, как tar заполнил /tmp, значит уронить торговую машину.
+          ssh $SSH_OPTS root@"$HOST" 'bash -s' <<'ZAMER' | tee "$GITHUB_WORKSPACE/zamer_do.txt"
+            set -e
+            echo "=== mesto na diske ==="
+            df -h / /tmp 2>/dev/null
+            echo "=== razmery katalogov ==="
+            du -sh /home/bot/bloom_executor /home/bot/bloom_executor_live_data \
+                   /home/bot/data /home/bot/host_tajmery 2>/dev/null || true
+            echo "=== krupnejshie fajly sostojanija ==="
+            find /home/bot/bloom_executor_live_data -type f -printf '%s %p\n' 2>/dev/null \
+              | sort -rn | head -15 | awk '{printf "%8.1f MB  %s\n", $1/1048576, $2}'
+            echo "=== skolko .bak u fajla grupp ==="
+            ls -1 /home/bot/data/sources_2026-09-25.json.bak-* 2>/dev/null | wc -l
+            echo "=== nashi juniti systemd ==="
+            ls -1 /etc/systemd/system/ | grep -E '^(bloom|lab|shred|dbot|grpc)' || echo "net"
+          ZAMER
+
+      - name: "Собрать на хосте МЕЛКОЕ: юниты, таймеры, crontab, pip, uname, env ИМЕНАМИ"
+        run: |
+          set -e
+          set -o pipefail
+          # Каждый кусок кладётся отдельным файлом в /tmp/backup_meta, и ТОЛЬКО
+          # оттуда попадает в архив. Содержимое env не читается НИКОГДА: берутся
+          # имена переменных слева от '='.
+          ssh $SSH_OPTS root@"$HOST" 'bash -s' <<'META'
+            set -e
+            M=/tmp/backup_meta
+            rm -rf "$M"; mkdir -p "$M/systemd" "$M/konfigi"
+
+            # --- юниты и таймеры: только наши, целиком
+            for F in /etc/systemd/system/bloom-*.service /etc/systemd/system/bloom-*.timer \
+                     /etc/systemd/system/lab-*.service /etc/systemd/system/lab-*.timer \
+                     /etc/systemd/system/shred-*.service /etc/systemd/system/dbot-*.service \
+                     /etc/systemd/system/grpc-*.service; do
+              [ -e "$F" ] && cp -a "$F" "$M/systemd/" || true
+            done
+            systemctl list-timers --all --no-pager > "$M/systemd/list-timers.txt" 2>&1 || true
+            systemctl list-units --type=service --all --no-pager \
+              | grep -E 'bloom|lab-|shred|dbot|grpc' > "$M/systemd/nashi-sluzhby.txt" 2>&1 || true
+            for S in bloom-detector bloom-seller; do
+              systemctl show "$S" --no-pager > "$M/systemd/show-$S.txt" 2>&1 || true
+              systemctl is-enabled "$S" >> "$M/systemd/sostojanie.txt" 2>&1 || true
+              systemctl is-active "$S" >> "$M/systemd/sostojanie.txt" 2>&1 || true
+            done
+
+            # --- crontab: root и служебный пользователь
+            crontab -l > "$M/crontab-root.txt" 2>&1 || echo "crontab root pust" > "$M/crontab-root.txt"
+            crontab -u bot -l > "$M/crontab-bot.txt" 2>&1 || echo "crontab bot pust" > "$M/crontab-bot.txt"
+            ls -l /etc/cron.d/ > "$M/cron.d.txt" 2>&1 || true
+
+            # --- окружение: ТОЛЬКО ИМЕНА. Значение не читается.
+            {
+              echo "# Переменные окружения служб -- ТОЛЬКО ИМЕНА."
+              echo "# Значения не читаются и в бэкапе их нет (слово владельца)."
+              for F in /etc/bloom-executor/env /etc/bloom-executor/env.*; do
+                [ -e "$F" ] || continue
+                echo ""
+                echo "## $F"
+                sed -n 's/^[[:space:]]*\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$F" | sort -u
+              done
+            } > "$M/env_IMENA_tolko.txt"
+            ls -l /etc/bloom-executor/ > "$M/env_katalog.txt" 2>&1 || true
+
+            # --- ПУБЛИЧНЫЕ адреса: ровно те, что владелец просил списком.
+            # ПРЕДОХРАНИТЕЛЬ ПО ДЛИНЕ: берём значение только если оно 32..44
+            # знака base58. Приватный ключ ed25519 в base58 -- 87-88 знаков,
+            # JSON-массив байт ещё длиннее; такой фильтр их не пропустит.
+            {
+              echo "# Публичные адреса из окружения: nonce-счета и кошельки."
+              echo "# Фильтр: имя из списка И значение 32..44 знака base58."
+              echo "# Приватный ключ сюда попасть не может: он 87-88 знаков."
+              for F in /etc/bloom-executor/env /etc/bloom-executor/env.*; do
+                [ -e "$F" ] || continue
+                grep -hoE '^[[:space:]]*(BLOOM_[A-Z0-9_]*(NONCE|WALLET|ADDRESS|PUBKEY|RECIPIENT)[A-Z0-9_]*|EXECUTOR_WALLET|OWN_SEND_WALLET)=[1-9A-HJ-NP-Za-km-z]{32,44}$' "$F" || true
+              done | sort -u
+            } > "$M/publichnye_adresa.txt"
+
+            # --- Telegram: ТОЛЬКО ИМЕНА переменных
+            {
+              echo "# Telegram: имена переменных, значения не приводятся."
+              for F in /etc/bloom-executor/env /etc/bloom-executor/env.*; do
+                [ -e "$F" ] || continue
+                sed -n 's/^[[:space:]]*\(.*TELEGRAM[A-Za-z0-9_]*\)=.*/\1/p;s/^[[:space:]]*\(.*TG_[A-Za-z0-9_]*\)=.*/\1/p' "$F" | sort -u
+              done
+            } > "$M/telegram_IMENA.txt"
+
+            # --- система
+            uname -a > "$M/uname.txt" 2>&1
+            cat /etc/os-release > "$M/os-release.txt" 2>&1 || true
+            nproc > "$M/nproc.txt" 2>&1
+            free -h > "$M/free.txt" 2>&1 || true
+            df -h > "$M/df.txt" 2>&1 || true
+            timedatectl > "$M/timedatectl.txt" 2>&1 || true
+            /home/bot/robinhood-chain-alpha/venv/bin/pip freeze > "$M/pip_freeze_venv.txt" 2>&1 \
+              || pip3 freeze > "$M/pip_freeze_system.txt" 2>&1 || true
+            python3 -V > "$M/python_version.txt" 2>&1 || true
+
+            # --- конфиги служб (без ключей: в senders.json лежат ИМЕНА секретов)
+            for F in /home/bot/data/senders.json /home/bot/bloom_executor/konfig_snapshot.json \
+                     /home/bot/data/clmm_konfigi.json /home/bot/data/dlmm_shag_korziny.json; do
+              [ -e "$F" ] && cp -a "$F" "$M/konfigi/" || true
+            done
+
+            # --- кому что принадлежит: восстановление без прав не поднимется
+            ls -ld /home/bot /home/bot/bloom_executor /home/bot/bloom_executor_live_data \
+                   /home/bot/data /etc/bloom-executor > "$M/prava_katalogov.txt" 2>&1 || true
+
+            echo "--- sobrano v $M ---"
+            find "$M" -type f | sort | sed 's/^/  /'
+            du -sh "$M"
+          META
+
+      - name: "Код хоста: контрольные суммы для diff против ветки"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ. Владелец просил "код на хосте и diff против
+          # ветки". Diff считается ЗДЕСЬ, на бегунке, где есть и ветка, и файлы
+          # хоста: на самом хосте клона ветки нет (он не рабочий клон, см.
+          # deploy/hostovye_tajmery.py), и git diff там делать нечем.
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "cd $CODE_DIR && sha256sum *.py 2>/dev/null | sort -k2" \
+            > "$RABOTA/sha_hosta.txt"
+          wc -l < "$RABOTA/sha_hosta.txt"
+          : > "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt"
+          {
+            echo "# Код хоста против ветки claude/nifty-sagan-r0polg"
+            echo "# Сверено $(date -u +%Y-%m-%dT%H:%M:%SZ), коммит ветки $(git rev-parse --short HEAD)"
+            echo
+          } >> "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt"
+          RASHOZHDENIJ=0
+          NET_V_VETKE=0
+          while read -r SUMMA IMJA; do
+            V_VETKE=""
+            for K in analysis deploy deploy/checks; do
+              if [ -f "$K/$IMJA" ]; then
+                V_VETKE="$K/$IMJA"
+                break
+              fi
+            done
+            if [ -z "$V_VETKE" ]; then
+              echo "ТОЛЬКО НА ХОСТЕ: $IMJA (в ветке такого файла нет)" \
+                >> "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt"
+              NET_V_VETKE=$(( NET_V_VETKE + 1 ))
+              continue
+            fi
+            SUMMA_VETKI=$(sha256sum "$V_VETKE" | awk '{print $1}')
+            if [ "$SUMMA" != "$SUMMA_VETKI" ]; then
+              RASHOZHDENIJ=$(( RASHOZHDENIJ + 1 ))
+              {
+                echo "=== РАСХОЖДЕНИЕ: $IMJA (ветка: $V_VETKE) ==="
+                echo "host  $SUMMA"
+                echo "vetka $SUMMA_VETKI"
+              } >> "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt"
+              ssh -n $SSH_OPTS root@"$HOST" "cat $CODE_DIR/$IMJA" > "$RABOTA/host_file.py" || true
+              diff -u "$V_VETKE" "$RABOTA/host_file.py" \
+                >> "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt" || true
+              echo "" >> "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt"
+            fi
+          done < "$RABOTA/sha_hosta.txt"
+          rm -f "$RABOTA/host_file.py"
+          {
+            echo
+            echo "ИТОГ: файлов на хосте $(wc -l < "$RABOTA/sha_hosta.txt"),"
+            echo "расхождений с веткой $RASHOZHDENIJ, только на хосте $NET_V_VETKE."
+          } >> "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt"
+          echo "rashozhdenij $RASHOZHDENIJ, tolko na hoste $NET_V_VETKE"
+          tail -5 "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt"
+
+      - name: "Упаковка архива на хосте (ключи исключены при упаковке)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST" 'bash -s' <<'PAKOVKA'
+            set -e
+            rm -f /tmp/host_backup_full.tar.gz
+            # ПОЧЕМУ СПИСОК ЯВНЫЙ, А НЕ "ВЕСЬ /home". Явный список -- это то,
+            # что можно прочитать и проверить глазами; "всё" прячет в архив
+            # случайный файл с ключом, положенный кем-то в домашний каталог.
+            PATHS="/home/bot/bloom_executor /home/bot/bloom_executor_live_data"
+            PATHS="$PATHS /home/bot/data /home/bot/host_tajmery /home/bot/bin"
+            PATHS="$PATHS /tmp/backup_meta"
+            for P in /home/bot/shred_probe /home/bot/shred_probe_data \
+                     /home/bot/grpc_feed_probe_data /home/bot/dbot_detect_probe; do
+              [ -e "$P" ] && PATHS="$PATHS $P"
+            done
+            tar czf /tmp/host_backup_full.tar.gz --ignore-failed-read \
+              --exclude='*/env' --exclude='*/env.*' --exclude='*.key' \
+              --exclude='*.pem' --exclude='id_*' --exclude='*wallet*.json' \
+              --exclude='*secret*' --exclude='*keypair*' --exclude='*.sock' \
+              --exclude='__pycache__' --exclude='*/venv/*' --exclude='*.pyc' \
+              $PATHS 2>/dev/null || true
+            ls -l /tmp/host_backup_full.tar.gz
+            echo "--- chto vnutri, verhnie katalogi ---"
+            tar tzf /tmp/host_backup_full.tar.gz \
+              | awk -F/ '{print $1"/"$2"/"$3}' | sort | uniq -c | sort -rn | head -25
+            echo "--- fajlov vsego ---"
+            tar tzf /tmp/host_backup_full.tar.gz | wc -l
+          PAKOVKA
+
+      - name: "Забрать архив на бегунок и убрать с хоста"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST" "cat /tmp/host_backup_full.tar.gz" \
+            > "$RABOTA/host_backup_full.tar.gz"
+          ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/host_backup_full.tar.gz; rm -rf /tmp/backup_meta"
+          ls -l "$RABOTA/host_backup_full.tar.gz"
+          df -h /mnt | sed 's/^/  /'
+
+      - name: "ПРОВЕРКА КРАСНЫМ: ключей в архиве нет (иначе прогон падает)"
+        run: |
+          set -e
+          set -o pipefail
+          # Третий слой защиты. Исключения при упаковке -- только первые два:
+          # файл с ключом мог лежать под другим именем. Нашлось -- падаем, и
+          # ни артефакт, ни ветка ничего не получают.
+          python3 deploy/checks/arhiv_bez_klyuchey.py "$RABOTA/host_backup_full.tar.gz" \
+            | tee arhiv_proverka.txt
+          # И отдельно: что окружение правда ушло ИМЕНАМИ, а не целиком.
+          tar xzOf "$RABOTA/host_backup_full.tar.gz" tmp/backup_meta/env_IMENA_tolko.txt \
+            > env_imena.txt 2>/dev/null || true
+          if grep -qE '=' env_imena.txt 2>/dev/null; then
+            echo "SBOJ: v vygruzke okruzhenija est znak '=' -- eto znachenija, a ne imena"
+            exit 1
+          fi
+          echo "okruzhenie v arhive -- tolko imena, znakov '=' net: $(wc -l < env_imena.txt) imjon"
+
+      - name: "Манифест с sha256"
+        run: |
+          set -e
+          set -o pipefail
+          CHAST_MB="${{ inputs.chast_mb }}"
+          cd "$RABOTA"
+          SHA_ALL=$(sha256sum host_backup_full.tar.gz | awk '{print $1}')
+          RAZMER=$(stat -c %s host_backup_full.tar.gz)
+          # ЧАСТИ ДЕЛАЮТСЯ ВСЕГДА, даже если в ветку их не кладём: их sha256
+          # нужны в манифесте, чтобы восстановление можно было проверить
+          # покусочно, а не только целиком.
+          rm -f chast_*
+          split -b "${CHAST_MB}m" -d -a 3 host_backup_full.tar.gz chast_
+          CHASTEJ=$(ls -1 chast_* | wc -l)
+          sha256sum chast_* > chasti_sha256.txt
+          {
+            echo "# Полный бэкап торгового хоста -- манифест"
+            echo
+            echo "Хост 45.59.170.76, снято прогоном run_backup_hosta_polnyy.yml"
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)."
+            echo
+            echo "| поле | значение |"
+            echo "|---|---|"
+            echo "| архив | \`host_backup_full.tar.gz\` |"
+            echo "| размер | $RAZMER байт ($(( RAZMER / 1048576 )) МБ) |"
+            echo "| sha256 архива | \`$SHA_ALL\` |"
+            echo "| частей по ${CHAST_MB} МБ | $CHASTEJ |"
+            echo "| артефакт | host-backup-full, retention ${{ inputs.retention_days }} дней |"
+            echo "| ветка частей | ${{ inputs.vetka_backupa }} |"
+            echo "| прогон | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
+            echo "| коммит ветки на момент снятия | $(cd "$GITHUB_WORKSPACE" && git rev-parse HEAD) |"
+            echo
+            echo "## Что внутри"
+            echo
+            echo "| путь в архиве | что это |"
+            echo "|---|---|"
+            echo "| \`home/bot/bloom_executor/\` | код на хосте (как он есть, доставленный деплоем) |"
+            echo "| \`home/bot/bloom_executor_live_data/\` | состояние: журнал решений \`decisions.jsonl\`, журнал позиций \`positions.jsonl\`, журнал сторожа продаж \`seller.jsonl\`, тревоги \`trevogi.jsonl\`, признаки жизни \`detector_status.json\` и \`seller_heartbeat.json\`, учёт Helius \`helius_usage/\` |"
+            echo "| \`home/bot/data/\` | файл групп \`sources_2026-09-25.json\` и ВСЕ его \`.bak-*\`, реестр отправителей \`senders.json\` (там ИМЕНА секретов, не значения), IDL, образцы пулов |"
+            echo "| \`home/bot/host_tajmery/\` | результаты хостовых таймеров: учёт, живучесть, суточные выгрузки \`vygruzki/sdelki_polosy_*.json\` |"
+            echo "| \`tmp/backup_meta/systemd/\` | юниты и таймеры systemd целиком, \`list-timers\`, состояние служб |"
+            echo "| \`tmp/backup_meta/crontab-*.txt\` | crontab root и bot |"
+            echo "| \`tmp/backup_meta/env_IMENA_tolko.txt\` | окружение хоста -- ТОЛЬКО ИМЕНА переменных |"
+            echo "| \`tmp/backup_meta/publichnye_adresa.txt\` | nonce-счета и публичные адреса кошельков |"
+            echo "| \`tmp/backup_meta/telegram_IMENA.txt\` | конфиг Telegram -- только имена переменных |"
+            echo "| \`tmp/backup_meta/pip_freeze_*.txt\`, \`uname.txt\`, \`os-release.txt\`, \`nproc.txt\`, \`df.txt\` | система |"
+            echo "| \`tmp/backup_meta/konfigi/\` | конфиги служб |"
+            echo "| \`tmp/backup_meta/prava_katalogov.txt\` | владелец и права каталогов -- без них восстановленный хост не поднимется |"
+            echo
+            echo "Рядом с архивом, отдельными файлами прогона:"
+            echo "\`diff_hosta_protiv_vetki.txt\` (код хоста против ветки),"
+            echo "\`zamer_do.txt\` (размеры и место на хосте до упаковки),"
+            echo "\`arhiv_proverka.txt\` (проверка, что ключей внутри нет)."
+            echo
+            echo "## Чего в архиве НЕТ намеренно"
+            echo
+            echo "Файлов окружения с значениями (\`/etc/bloom-executor/env*\`),"
+            echo "любых \`*.key\`, \`*.pem\`, \`id_*\`, кошельковых json, \`*secret*\`,"
+            echo "\`*keypair*\`. Это слово владельца, а не осторожность:"
+            echo "\"Ключи и секреты -- никогда; env -- только именами\"."
+            echo
+            echo "## Как восстановить"
+            echo
+            echo "Из артефакта:"
+            echo
+            echo '```bash'
+            echo "echo '$SHA_ALL  host_backup_full.tar.gz' | sha256sum -c -"
+            echo "tar xzf host_backup_full.tar.gz -C /"
+            echo "# затем права из tmp/backup_meta/prava_katalogov.txt,"
+            echo "# затем systemctl daemon-reload и enable нужных юнитов,"
+            echo "# затем /etc/bloom-executor/env завести ЗАНОВО по именам из"
+            echo "# tmp/backup_meta/env_IMENA_tolko.txt -- значения в бэкапе"
+            echo "# отсутствуют намеренно, их берут из docs/RAZVERTYVANIE_S_NULYA.md"
+            echo '```'
+            echo
+            echo "Из частей в ветке:"
+            echo
+            echo '```bash'
+            echo "git clone -b ${{ inputs.vetka_backupa }} <origin> backup && cd backup/backup"
+            echo "sha256sum -c chasti_sha256.txt      # все части целы"
+            echo "cat chast_* > host_backup_full.tar.gz"
+            echo "echo '$SHA_ALL  host_backup_full.tar.gz' | sha256sum -c -"
+            echo '```'
+            echo
+            echo "## sha256 частей"
+            echo
+            echo '```'
+            cat chasti_sha256.txt
+            echo '```'
+          } > "$GITHUB_WORKSPACE/host_backup_manifest.md"
+          cp chasti_sha256.txt "$GITHUB_WORKSPACE/chasti_sha256.txt"
+          cat "$GITHUB_WORKSPACE/host_backup_manifest.md"
+          ln -sf "$RABOTA/host_backup_full.tar.gz" "$GITHUB_WORKSPACE/host_backup_full.tar.gz"
+          echo "SHA_ALL=$SHA_ALL" >> "$GITHUB_ENV"
+          echo "CHASTEJ=$CHASTEJ" >> "$GITHUB_ENV"
+          echo "RAZMER=$RAZMER" >> "$GITHUB_ENV"
+
+      - name: "(а) Артефакт host-backup-full"
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-backup-full
+          path: |
+            host_backup_full.tar.gz
+            host_backup_manifest.md
+            chasti_sha256.txt
+            diff_hosta_protiv_vetki.txt
+            zamer_do.txt
+            arhiv_proverka.txt
+          retention-days: ${{ inputs.retention_days }}
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: "(б) Части архива в ветку backup"
+        if: ${{ inputs.v_vetku == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          VETKA="${{ inputs.vetka_backupa }}"
+          # МЕТА-ФАЙЛЫ УБИРАЮТСЯ С ДОРОГИ ЗАРАНЕЕ. Ниже рабочее дерево чистится
+          # под ветку-сироту, и файлы прогона из него исчезнут -- копировать их
+          # надо ДО чистки, а не после.
+          mkdir -p "$RABOTA/meta"
+          cp "$GITHUB_WORKSPACE/host_backup_manifest.md" "$RABOTA/meta/MANIFEST.md"
+          cp "$RABOTA/chasti_sha256.txt" "$RABOTA/meta/chasti_sha256.txt"
+          cp "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt" "$RABOTA/meta/"
+          cp "$GITHUB_WORKSPACE/zamer_do.txt" "$RABOTA/meta/"
+          cp "$GITHUB_WORKSPACE/arhiv_proverka.txt" "$RABOTA/meta/"
+          # ВЕТКА НЕ ЗАТИРАЕТСЯ МОЛЧА. Если она уже есть, в ней может лежать
+          # прошлый годный бэкап, и затереть его -- потерять то, ради чего
+          # прогон и писался. Поэтому отказ с названной причиной.
+          if git ls-remote --exit-code --heads origin "$VETKA" >/dev/null 2>&1; then
+            if [ "${{ inputs.perezapisat_vetku }}" != "yes" ]; then
+              echo "STOP: vetka $VETKA uzhe est. V nej mozhet lezhat proshlyj bekap."
+              echo "Libo vozmi druguju vetku vhodom vetka_backupa, libo postav"
+              echo "perezapisat_vetku=yes, esli staryj bekap i pravda ne nuzhen."
+              exit 1
+            fi
+            echo "vetka $VETKA est, no vhod perezapisat_vetku=yes -- perezapisyvaju"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # ВЕТКА СИРОТОЙ, А НЕ ОТ РАБОЧЕЙ. Бэкап -- не продолжение истории
+          # кода: сирота даёт один маленький коммит без семи гигабайт истории.
+          git checkout --orphan "backup-tmp"
+          git rm -rq --cached . 2>/dev/null || true
+          find . -maxdepth 1 -mindepth 1 ! -name '.git' -exec rm -rf {} + 2>/dev/null || true
+          mkdir -p backup
+          cp -r "$RABOTA/meta/." backup/
+          git add -A backup
+          git commit -q -m "Backup hosta 2026-10-12: manifest, sha256 chastej, diff protiv vetki"
+          # ЧАСТИ -- ПО ОДНОЙ НА КОММИТ И ПУШ. Один пуш на 350 МБ GitHub может
+          # отвергнуть целиком; четыре по 95 МБ доедут и по отдельности видно,
+          # какая не доехала.
+          git push -u --force origin "HEAD:refs/heads/$VETKA" 2>&1 | tail -3
+          N=0
+          for CH in "$RABOTA"/chast_*; do
+            IMJA=$(basename "$CH")
+            cp "$CH" "backup/$IMJA"
+            git add "backup/$IMJA"
+            git commit -q -m "Backup hosta 2026-10-12: $IMJA"
+            for POPYTKA in 1 2 3 4; do
+              if git push origin "HEAD:refs/heads/$VETKA" 2>&1 | tail -2; then
+                break
+              fi
+              sleep $(( 2 ** POPYTKA ))
+            done
+            # ФАЙЛ УБИРАЕТСЯ ИЗ РАБОЧЕГО ДЕРЕВА СРАЗУ: держать все части на
+            # диске бегунка незачем, в истории ветки они уже есть.
+            rm -f "backup/$IMJA"
+            N=$(( N + 1 ))
+            echo "chast $IMJA ulozhena ($N iz $CHASTEJ)"
+          done
+          echo "v vetku $VETKA ulozheno chastej: $N"
+          git log --oneline -n $(( N + 1 )) | sed 's/^/  /'
+
+      - name: "Итог одной строкой"
+        if: always()
+        run: |
+          set -e
+          echo "arhiv $RAZMER bajt, chastej $CHASTEJ, sha256 $SHA_ALL"
+          echo "artefakt: host-backup-full (retention ${{ inputs.retention_days }})"
+          echo "vetka: ${{ inputs.vetka_backupa }}"

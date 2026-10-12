@@ -1,0 +1,218 @@
+name: "Консервация: бэкап репозитория одним bundle + список живых артефактов"
+
+# ЗАЧЕМ (пункт 3 владельца 12.10, консервация проекта): иметь ОДИН файл, из
+# которого репозиторий поднимается целиком -- со всеми ветками, тегами и всей
+# историей -- на новом аккаунте GitHub или вообще без GitHub.
+#
+# ПОЧЕМУ ЗЕРКАЛО, А НЕ checkout. actions/checkout кладёт ОДНУ ветку, и остальные
+# после него лежат под refs/remotes/origin/*, а не под refs/heads/*. В таком
+# рабочем клоне `git bundle --all` соберёт ровно одну ветку, и это выяснилось бы
+# при восстановлении, то есть поздно. Поэтому bundle делается из ЗЕРКАЛА
+# (git clone --mirror): там все ветки и теги лежат как refs/heads/* и
+# refs/tags/*, и клон ИЗ bundle повторяет их один в один.
+#
+# РАЗМЕР ИЗМЕРЕН, А НЕ ПРЕДПОЛОЖЕН: size-pack репозитория 7.13 ГиБ, bundle
+# выходит около 7.2 ГБ. Поэтому вся работа идёт на /mnt (временный диск бегунка,
+# десятки ГБ), а НЕ в рабочем каталоге: на корне у ubuntu-latest свободно около
+# 14 ГБ, и зеркало плюс bundle плюс проверочный клон туда не влезут.
+# Вес даёт НЕ код, а исследовательские архивы в истории: data/podbivka и
+# data/sprintG1_cache, крупнейшие блобы по 55-96 МБ каждый.
+#
+# ТОЛЬКО ЧТЕНИЕ. Прогон ничего не пишет в репозиторий и не касается хоста.
+on:
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: "сколько дней держать артефакт (владелец просил 90)"
+        required: false
+        default: "90"
+      metka:
+        description: "дата в имени артефакта: repo-bundle-<metka>"
+        required: false
+        default: "2026-10-12"
+
+concurrency:
+  group: backup-repo-bundle
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: "Место на диске ДО работы (почему /mnt, а не рабочий каталог)"
+        run: |
+          set -e
+          df -h / /mnt | sed 's/^/  /'
+          sudo mkdir -p /mnt/backup
+          sudo chown "$(id -u):$(id -g)" /mnt/backup
+          echo "RABOTA=/mnt/backup" >> "$GITHUB_ENV"
+
+      - name: "Зеркало репозитория (все ветки и теги)"
+        env:
+          GH_TOKEN_CLONE: ${{ github.token }}
+        run: |
+          set -e
+          set -o pipefail
+          URL="https://x-access-token:$GH_TOKEN_CLONE@github.com/${{ github.repository }}.git"
+          git clone --mirror "$URL" "$RABOTA/repo-mirror.git"
+          cd "$RABOTA/repo-mirror.git"
+          echo "--- vetki v zerkale ---"
+          git for-each-ref --format='%(refname)' refs/heads | sed 's/^/  /'
+          echo "--- tegi v zerkale ---"
+          git for-each-ref --format='%(refname)' refs/tags | sed 's/^/  /' | head -50
+          echo "vetok: $(git for-each-ref refs/heads | wc -l), tegov: $(git for-each-ref refs/tags | wc -l)"
+
+      - name: "git bundle --all"
+        run: |
+          set -e
+          set -o pipefail
+          METKA="${{ inputs.metka }}"
+          IMJA="repo-${METKA}.bundle"
+          cd "$RABOTA/repo-mirror.git"
+          git bundle create "$RABOTA/$IMJA" --all
+          cd "$RABOTA"
+          ls -l "$IMJA"
+          df -h /mnt | sed 's/^/  /'
+          echo "IMJA_BUNDLE=$IMJA" >> "$GITHUB_ENV"
+
+      - name: "ПРОВЕРКА: bundle целый и из него правда клонируется"
+        run: |
+          set -e
+          set -o pipefail
+          # ПОЧЕМУ ПРОВЕРКА НУЖНА. Битый bundle отличается от целого только тем,
+          # что его нельзя клонировать, и узнать это в день потери машины --
+          # ровно то, от чего бэкап и делается. Поэтому клонируем здесь же.
+          cd "$RABOTA"
+          git bundle verify "$IMJA_BUNDLE" | tee "$GITHUB_WORKSPACE/bundle_verify.txt"
+          git clone --mirror "$IMJA_BUNDLE" proverka-mirror.git
+          V_ISH=$(cd repo-mirror.git && git for-each-ref refs/heads | wc -l)
+          V_NOV=$(cd proverka-mirror.git && git for-each-ref refs/heads | wc -l)
+          echo "vetok v zerkale $V_ISH, v klone iz bundle $V_NOV"
+          [ "$V_ISH" = "$V_NOV" ] || { echo "SBOJ: vetok posle klona ne stolko zhe"; exit 1; }
+          # И РАБОЧИЙ КЛОН: из зеркала должно подняться дерево файлов. Берётся
+          # ОДНА ветка (--single-branch), иначе рабочий клон стоит ещё 7 ГБ.
+          git clone --single-branch -b claude/nifty-sagan-r0polg \
+            proverka-mirror.git proverka-rabochij >/dev/null 2>&1
+          test -f proverka-rabochij/analysis/bloom_seller.py \
+            || { echo "SBOJ: v klone net analysis/bloom_seller.py"; exit 1; }
+          echo "klon iz bundle podnjalsja, fajly na meste"
+          rm -rf proverka-mirror.git proverka-rabochij
+          df -h /mnt | sed 's/^/  /'
+
+      - name: "Манифест с sha256 и строкой восстановления"
+        run: |
+          set -e
+          set -o pipefail
+          METKA="${{ inputs.metka }}"
+          cd "$RABOTA"
+          SHA=$(sha256sum "$IMJA_BUNDLE" | awk '{print $1}')
+          RAZMER=$(stat -c %s "$IMJA_BUNDLE")
+          VETOK=$(cd "$RABOTA/repo-mirror.git" && git for-each-ref refs/heads | wc -l)
+          TEGOV=$(cd "$RABOTA/repo-mirror.git" && git for-each-ref refs/tags | wc -l)
+          {
+            echo "# Бэкап репозитория одним bundle"
+            echo
+            echo "Сделан прогоном run_backup_repo_bundle.yml, метка $METKA."
+            echo
+            echo "| поле | значение |"
+            echo "|---|---|"
+            echo "| файл | \`$IMJA_BUNDLE\` |"
+            echo "| размер | $RAZMER байт ($(( RAZMER / 1048576 )) МБ) |"
+            echo "| sha256 | \`$SHA\` |"
+            echo "| ветки | $VETOK |"
+            echo "| теги | $TEGOV |"
+            echo "| прогон | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |"
+            echo
+            echo "## Как восстановить репозиторий из этого файла"
+            echo
+            echo '```bash'
+            echo "echo '$SHA  $IMJA_BUNDLE' | sha256sum -c -        # файл не побился"
+            echo "git clone --mirror $IMJA_BUNDLE repo-mirror.git   # все ветки и теги"
+            echo "git clone repo-mirror.git robinhood-chain-alpha   # рабочий клон"
+            echo "cd robinhood-chain-alpha && git branch -a         # ветки на месте"
+            echo '```'
+            echo
+            echo "Одной строкой, если нужна только рабочая ветка:"
+            echo
+            echo '```bash'
+            echo "git clone -b claude/nifty-sagan-r0polg $IMJA_BUNDLE robinhood-chain-alpha"
+            echo '```'
+            echo
+            echo "Залить в НОВЫЙ пустой репозиторий на новом аккаунте:"
+            echo
+            echo '```bash'
+            echo "cd repo-mirror.git && git push --mirror https://github.com/NOVYJ/REPO.git"
+            echo '```'
+            echo
+            echo "## Ветки в bundle"
+            echo
+            (cd "$RABOTA/repo-mirror.git" && git for-each-ref --format='- `%(refname:short)` -- %(objectname:short), %(committerdate:short)' refs/heads)
+            echo
+            echo "## Чем так много"
+            echo
+            echo "Вес даёт не код, а исследовательские архивы в истории:"
+            echo "data/podbivka и data/sprintG1_cache -- крупнейшие блобы по"
+            echo "55-96 МБ каждый. Сам код -- единицы МБ."
+          } > "$GITHUB_WORKSPACE/repo_bundle_manifest.md"
+          cat "$GITHUB_WORKSPACE/repo_bundle_manifest.md"
+          # ПЕРЕНОС В РАБОЧИЙ КАТАЛОГ -- ЖЁСТКОЙ ССЫЛКОЙ ИЛИ ПЕРЕМЕЩЕНИЕМ, а не
+          # копией: копия стоила бы ещё 7 ГБ. /mnt и рабочий каталог -- разные
+          # устройства, поэтому ln не сработает; upload-artifact читает по
+          # символьной ссылке, и это проверяется ключом -L ниже.
+          ln -sf "$RABOTA/$IMJA_BUNDLE" "$GITHUB_WORKSPACE/$IMJA_BUNDLE"
+          ls -lL "$GITHUB_WORKSPACE/$IMJA_BUNDLE"
+
+      - name: "Живые артефакты Actions с датами истечения"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Артефакты истекают молча, и бэкап, который истёк, -- не бэкап.
+          # Список с датами нужен владельцу, чтобы знать, что и когда пропадёт.
+          cd "$GITHUB_WORKSPACE"
+          {
+            echo "# Живые артефакты Actions"
+            echo
+            echo "Снято прогоном run_backup_repo_bundle.yml $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+            echo "Прогон только ЧИТАЕТ список: ничего не удаляет и не продлевает."
+            echo
+            echo "| артефакт | размер | создан | истекает | прогон |"
+            echo "|---|---|---|---|---|"
+          } > artefakty_zhivye.md
+          PAGE=1
+          while [ "$PAGE" -le 10 ]; do
+            OTVET=$(gh api -X GET \
+              "repos/${{ github.repository }}/actions/artifacts?per_page=100&page=$PAGE")
+            CHISLO=$(echo "$OTVET" | jq '.artifacts | length')
+            if [ "$CHISLO" -eq 0 ]; then
+              break
+            fi
+            echo "$OTVET" | jq -r --arg repo "${{ github.repository }}" '.artifacts[]
+              | select(.expired==false)
+              | "| \(.name) | \((.size_in_bytes/1048576*10|round)/10) МБ | \(.created_at[0:10]) | \(.expires_at[0:10]) | [\(.workflow_run.id)](https://github.com/\($repo)/actions/runs/\(.workflow_run.id)) |"' \
+              >> artefakty_zhivye.md
+            PAGE=$(( PAGE + 1 ))
+          done
+          {
+            echo
+            echo "Истёкших в списке нет: они уже недоступны для скачивания."
+          } >> artefakty_zhivye.md
+          cat artefakty_zhivye.md
+
+      - name: "Выложить артефактом"
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-bundle-${{ inputs.metka }}
+          path: |
+            repo-*.bundle
+            repo_bundle_manifest.md
+            bundle_verify.txt
+            artefakty_zhivye.md
+          retention-days: ${{ inputs.retention_days }}
+          compression-level: 0
+          if-no-files-found: error
