@@ -1,0 +1,297 @@
+name: "Трендинги Code-2: суточный пуш снимков с lab-miami в ветку и уборка старья (без секрета на хосте)"
+
+# ЗАЧЕМ ЭТОТ ПРОГОН ВООБЩЕ ЕСТЬ. Установщик регистратора
+# (run_podbivka_trending_miami_ustanovka.yml) ставит на lab-miami три таймера, и
+# третий -- podbivka-trending-push.timer, OnCalendar=*-*-* 02:17:00 UTC -- он тут
+# же ВЫКЛЮЧАЕТ (строка 273: systemctl disable podbivka-trending-push.timer).
+# Причина названа в самом установщике: чтобы таймер пушил сам, на машину надо
+# положить токен записи в репозиторий, а слово владельца -- "Ключи и секреты --
+# никогда". Этот прогон делает ту же работу в тот же час (02:17Z), но токен ему
+# выдаёт сам GitHub на время прогона: на диск машины не кладётся ничего.
+#
+# ЧТО ДЕЛАЕТ. Снимки регистратора (/opt/robinhood-chain-alpha/data/trending,
+# по файлу на источник в сутки: data/trending/<источник>/<ДАТА>.jsonl.gz)
+# кладёт в ветку claude/podbivka, ДОКАЗЫВАЕТ, что они там, и только после этого
+# убирает с машины то, что старше двух суток.
+#
+# ИДЁТ НА САМОЙ lab-miami: снимки лежат на её диске, в облачный бегунок их не
+# дотащить. Торгового хоста не касается вовсе -- ни его адреса, ни входа на него
+# здесь нет.
+#
+# ЧЕМ ОТЛИЧАЕТСЯ ОТ run_podbivka_trending_svodka_miami.yml. Тот прогон (02:19Z)
+# снимает сводку и тоже кладёт снимки в ветку. Здесь --delete НЕТ НИ В КАКОМ
+# ВИДЕ, и это не вкус: уборка на машине и ЗЕРКАЛЯЩИЙ перенос -- несовместимая
+# пара. Что убрано с машины, --delete убрал бы и из ветки, то есть ровно тот
+# архив, ради которого уборка и затевалась. Из сводки --delete-after по этой же
+# причине убран коммитом 20edfc10 ("svodka bolshe ne zerkalit"); вернётся он
+# туда -- и архив старше двух суток начнёт пропадать на следующем же проходе.
+on:
+  schedule:
+    # 02:17Z -- час, выбранный владельцем и уже зашитый в выключенный таймер
+    # podbivka-trending-push.timer. Расписание GitHub регистрирует ТОЛЬКО с
+    # ветки по умолчанию (claude/robinhood-copytrading-hypothesis-awjj0g,
+    # замерено через API: default_branch репозитория). Этому файлу место там.
+    - cron: "17 2 * * *"
+  # Руками -- чтобы проверить прогон, не дожидаясь ночи.
+  workflow_dispatch:
+    inputs:
+      koren:
+        description: "клон регистратора на lab-miami"
+        required: false
+        default: "/opt/robinhood-chain-alpha"
+      udaljat:
+        description: "'no' -- только пуш, ничего с машины не убирать"
+        required: false
+        default: "yes"
+
+concurrency:
+  # Два таких прогона на одной машине мешали бы друг другу в одном клоне.
+  group: podbivka-trending-push-miami
+  cancel-in-progress: false
+
+env:
+  KOREN_PODBIVKI: "/opt/robinhood-chain-alpha"
+  VETKA_SNIMKOV: "claude/podbivka"
+  UDALJAT: "yes"
+  # 2880 минут = 48 часов. Словами владельца -- "старше 2 суток".
+  STARSHE_MINUT: "2880"
+
+jobs:
+  push_snimkov:
+    runs-on: ${{ fromJSON('["self-hosted","lab-miami"]') }}
+    timeout-minutes: 60
+    permissions:
+      # Единственное право прогона -- запись в репозиторий. Секрета с токеном
+      # здесь нет и быть не должно: токен приносит actions/checkout.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Ветка снимков названа буквой, а не переменной: checkout идёт ДО
+          # первого тела run, и значение ему нужно уже готовым.
+          ref: claude/podbivka
+          fetch-depth: 1
+
+      - name: "Параметры и кто мы на машине"
+        env:
+          VHOD_KOREN: ${{ inputs.koren }}
+          VHOD_UDALJAT: ${{ inputs.udaljat }}
+        run: |
+          set -e
+          set -o pipefail
+          # Вход прогона сильнее значения по умолчанию. Значения берём через
+          # env шага, а не подстановкой внутрь кавычек: подстановка со своей
+          # кавычкой разорвала бы тело шага.
+          KOREN="${VHOD_KOREN:-$KOREN_PODBIVKI}"
+          KOREN="${KOREN%/}"
+          UDAL="${VHOD_UDALJAT:-$UDALJAT}"
+          echo "KOREN_PODBIVKI=$KOREN" >> "$GITHUB_ENV"
+          echo "UDALJAT=$UDAL" >> "$GITHUB_ENV"
+          echo "koren registratora: $KOREN"
+          echo "ubirat staroe: $UDAL"
+          echo "mashina: $(hostname), yader $(nproc)"
+          # ПОД КЕМ МЫ -- НЕ ПРАЗДНЫЙ ВОПРОС. Служба бегунка поставлена как
+          # './svc.sh install ghrunner' (run_lab_bootstrap_nl.yml), а клон
+          # регистратора установщик делает 'chown -R podbivka:podbivka'. Если
+          # бегунку не дано писать в каталоги снимков, уборка упрётся в
+          # Permission denied -- и пусть это будет видно в журнале словами, а
+          # не догадкой.
+          echo "polzovatel progona: $(id -un), gruppy: $(id -Gn)"
+
+      - name: "Снимки с диска машины -- в рабочее дерево ветки (без --delete)"
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PODBIVKI"
+          if [ ! -d "$KOREN/data/trending" ]; then
+            echo "SBOJ: $KOREN/data/trending net -- registrator ne postavlen"
+            echo "Postav ego progonom run_podbivka_trending_miami_ustanovka.yml"
+            exit 1
+          fi
+          mkdir -p data/trending
+          # ПЕРЕНОС -- ТОЛЬКО ДОБАВЛЯЮЩИЙ. Ни --delete, ни --delete-after:
+          # этот прогон убирает старьё с машины, и зеркалящий перенос стёр бы
+          # то же самое из ветки на следующем же проходе. Откат на cp -r --
+          # приём шага пуша в run_podbivka_trending_svodka_miami.yml, он
+          # прошёл с первой попытки на прогоне 38192956775.
+          rsync -a "$KOREN/data/trending/" data/trending/ \
+            || cp -r "$KOREN/data/trending/." data/trending/
+          NA_MASHINE=$(find "$KOREN/data/trending" -type f | wc -l)
+          V_DEREVE=$(find data/trending -type f | wc -l)
+          MESTO_MASHINY=$(du -sh "$KOREN/data/trending" | cut -f1 || echo "?")
+          MESTO_DEREVA=$(du -sh data/trending | cut -f1 || echo "?")
+          echo "--- chto polozheno ---"
+          echo "snimkov na mashine:      $NA_MASHINE"
+          echo "snimkov v dereve vetki:  $V_DEREVE"
+          echo "mesto na mashine:        $MESTO_MASHINY"
+          echo "mesto v dereve:          $MESTO_DEREVA"
+
+      - name: "Пуш в ветку claude/podbivka (токен от GitHub, не с диска)"
+        run: |
+          set -e
+          set -o pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # КЛАДЁТСЯ ТОЛЬКО data/trending: у регистратора своя папка, и выйти
+          # за неё ему незачем. Поэтому все git add и git commit -- по пути.
+          git add -- data/trending
+          if git diff --cached --quiet -- data/trending; then
+            echo "novyh snimkov net: v vetke uzhe to zhe samoe"
+            # Свой коммит всё равно называем: шагу доказательства нужно, что
+            # сверять с вершиной ветки, а уборке -- право работать и в этом
+            # случае (файлы в ветке лежат, просто положены не нами).
+            echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          FAJLOV=$(git diff --cached --numstat -- data/trending | wc -l)
+          echo "fajlov k pushu: $FAJLOV"
+          # Ветку догоняем fetch+reset, а не rebase: клон мелкий (depth=1),
+          # rebase в нём делать нечем. Тот же приём у run_podbivka2_miami.yml
+          # и у шага пуша сводки.
+          for POPYTKA in 1 2 3 4 5 6 7 8; do
+            git fetch -q --depth=1 origin "$VETKA_SNIMKOV"
+            git reset -q FETCH_HEAD
+            git add -- data/trending
+            if git diff --cached --quiet -- data/trending; then
+              echo "uzhe v vetke (popytka $POPYTKA)"
+              echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            git commit -q -m "Trending: sutochnye snimki ($FAJLOV fajlov) [automated]" -- data/trending
+            # git push БЕЗ КОНВЕЙЕРА, и это главное. 'git push | tail' отдаёт
+            # код tail, то есть 0 даже на отказе, и отчёт о пуше врёт. Здесь
+            # код возврата честный -- но и ему мы верим не на слово: ниже
+            # идёт отдельный шаг доказательства.
+            if git push -q origin HEAD:"$VETKA_SNIMKOV"; then
+              echo "push gotov s popytki $POPYTKA"
+              echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "popytka $POPYTKA: push otklonjon, dogonjaju vetku"
+            sleep 4
+          done
+          echo "SBOJ: push ne proshel posle 8 popytok"
+          exit 1
+
+      - name: "ДОКАЗАТЕЛЬСТВО пуша: наш коммит есть в ветке на сервере"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ОТДЕЛЬНЫЙ ШАГ. Код возврата шага пуша -- не доказательство:
+          # на 'set -e без pipefail' плюс 'git push | tail' мы уже получали
+          # зелёный отчёт при непрошедшем пуше. Доказательство только одно:
+          # спросить сервер и увидеть свой коммит в истории его ветки.
+          test -n "$NASH_KOMMIT" \
+            || { echo "SBOJ: shag pusha ne nazval svoego kommita"; exit 1; }
+          # Глубина 50, а не 1: merge-base нужно пройти от вершины вниз до
+          # нашего коммита, а в клоне depth=1 истории нет и предок не
+          # доказывается даже когда он есть.
+          git fetch -q --depth=50 origin "$VETKA_SNIMKOV"
+          VERSHINA=$(git rev-parse FETCH_HEAD)
+          echo "nash kommit:    $NASH_KOMMIT"
+          echo "vershina vetki: $VERSHINA"
+          DOKAZAN=net
+          if [ "$NASH_KOMMIT" = "$VERSHINA" ]; then
+            DOKAZAN=da
+            echo "nash kommit I EST vershina vetki"
+          elif git merge-base --is-ancestor "$NASH_KOMMIT" "$VERSHINA"; then
+            DOKAZAN=da
+            echo "nash kommit -- predok vershiny: poverh nas uzhe pushili"
+          fi
+          if [ "$DOKAZAN" != da ]; then
+            echo "SBOJ: nashego kommita v vetke $VETKA_SNIMKOV net."
+            echo "S MASHINY NE UDALENO NICHEGO -- tak i dolzhno byt."
+            exit 1
+          fi
+          # HEAD ставим на ДОКАЗАННУЮ вершину: список файлов ветки уборка
+          # возьмёт именно с неё, а не с местного коммита, который сервер мог
+          # и не принять.
+          git reset -q "$VERSHINA"
+          echo "PUSH_DOKAZAN=da" >> "$GITHUB_ENV"
+
+      - name: "Уборка: только старше 2 суток и только то, что уже лежит в ветке"
+        # ДВА ЗАМКА НА ОДНОЙ ДВЕРИ. Первый -- порядок шагов: шаг доказательства
+        # падает, и до уборки дело не доходит (if: always() здесь нет
+        # намеренно). Второй -- этот признак: его ставит только доказательство.
+        if: ${{ env.PUSH_DOKAZAN == 'da' && env.UDALJAT != 'no' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PODBIVKI"
+          SPISOK_VETKI="$RUNNER_TEMP/v_vetke.txt"
+          SPISOK_STARYH="$RUNNER_TEMP/staroe.txt"
+          # ЧЕЙ КАТАЛОГ И ЧТО НАМ В НЁМ МОЖНО -- в журнал до первого rm:
+          # клон регистратора отдан пользователю podbivka, а прогон идёт под
+          # ghrunner. Если удалять нельзя, пусть это будет видно замером.
+          ls -ld "$KOREN/data/trending" || true
+          # || true НА КОНВЕЙЕРЕ С head: при pipefail head закрывает трубу
+          # после 20-й строки, find получает SIGPIPE и возвращает не нуль --
+          # и шаг упал бы ровно тогда, когда у регистратора станет больше 20
+          # источников. Сейчас их 8, то есть сегодня это не видно совсем.
+          find "$KOREN/data/trending" -mindepth 1 -maxdepth 1 -type d \
+            -printf '%M %u:%g %p\n' | head -20 || true
+          # Что РЕАЛЬНО лежит в ветке. Берётся с доказанной вершины.
+          git ls-tree -r --name-only HEAD -- data/trending > "$SPISOK_VETKI"
+          echo "fajlov v vetke $VETKA_SNIMKOV: $(wc -l < "$SPISOK_VETKI")"
+          # -mmin +2880, А НЕ -mtime +2. '-mtime +2' для find значит "старше
+          # ТРЁХ суток" (целые сутки, дробь отбрасывается) -- не то, что просил
+          # владелец. Минуты считаются честно: 48 часов и ни часом больше.
+          find "$KOREN/data/trending" -type f -mmin "+$STARSHE_MINUT" \
+            > "$SPISOK_STARYH" || true
+          echo "kandidatov starshe 2 sutok (${STARSHE_MINUT} min): $(wc -l < "$SPISOK_STARYH")"
+          UDALENO=0
+          PROPUSHCHENO=0
+          NE_VYSHLO=0
+          OSVOBOZHDENO=0
+          # Читаем из ФАЙЛА, а не из конвейера: 'find | while' увёл бы счётчики
+          # в подоболочку, и все числа ниже оказались бы нулями. Имена снимков
+          # -- data/trending/<istochnik>/<DATA>.jsonl.gz, без пробелов и
+          # переводов строки (замерено на ветке), поэтому построчного чтения
+          # здесь довольно.
+          while IFS= read -r PUT; do
+            [ -n "$PUT" ] || continue
+            OTN="${PUT#"$KOREN"/}"
+            # СВЕРКА СО СПИСКОМ ВЕТКИ -- ПОФАЙЛОВО. Доказанный пуш говорит,
+            # что наш коммит в ветке, но не говорит, что в ветке именно ЭТОТ
+            # файл: его могли не донести, переименовать или удалить поверх.
+            # Нет в списке -- не удаляем и печатаем почему.
+            if ! grep -Fxq -- "$OTN" "$SPISOK_VETKI"; then
+              PROPUSHCHENO=$((PROPUSHCHENO + 1))
+              echo "NE UDALJAJU $OTN -- etogo puti v vetke $VETKA_SNIMKOV net"
+              continue
+            fi
+            RAZMER=$(stat -c %s -- "$PUT" || echo 0)
+            if rm -f -- "$PUT"; then
+              UDALENO=$((UDALENO + 1))
+              OSVOBOZHDENO=$((OSVOBOZHDENO + RAZMER))
+              echo "udaljon $OTN ($RAZMER bajt)"
+            else
+              NE_VYSHLO=$((NE_VYSHLO + 1))
+              echo "NE VYSHLO udalit $OTN"
+            fi
+          done < "$SPISOK_STARYH"
+          OSTALOS=$(find "$KOREN/data/trending" -type f | wc -l)
+          MESTO=$(du -sh "$KOREN/data/trending" | cut -f1 || echo "?")
+          echo "--- chisla uborki ---"
+          echo "udaleno fajlov:             $UDALENO"
+          echo "propushcheno (net v vetke): $PROPUSHCHENO"
+          echo "ne vyshlo udalit:           $NE_VYSHLO"
+          echo "ostalos fajlov na mashine:  $OSTALOS"
+          echo "osvobozhdeno bajt:          $OSVOBOZHDENO"
+          echo "mesto pod snimkami teper:   $MESTO"
+          if [ "$NE_VYSHLO" != 0 ]; then
+            echo "SBOJ: $NE_VYSHLO fajlov udalit ne poluchilos."
+            echo "Dannye cely -- oni v vetke, no mesto na mashine ne osvobodilos."
+            echo "Pochti navernjaka prava: klon otdan polzovatelju podbivka,"
+            echo "a progon idjot pod $(id -un). Smotri vyvod ls -ld vyshe."
+            exit 1
+          fi
+          echo "uborka proshla"
+
+      - name: "Уборка пропущена -- сказать это словами, а не промолчать"
+        if: ${{ env.PUSH_DOKAZAN == 'da' && env.UDALJAT == 'no' }}
+        run: |
+          set -e
+          set -o pipefail
+          echo "uborka ne delalas: vhod udaljat=no"
+          echo "na mashine fajlov: $(find "$KOREN_PODBIVKI/data/trending" -type f | wc -l)"
