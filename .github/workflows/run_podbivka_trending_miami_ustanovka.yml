@@ -143,6 +143,18 @@ jobs:
             if [ -d "$KOREN/.git" ]; then
               echo "klon uzhe est, obnovljaju"
               cd "$KOREN"
+              # ЧУЖОЙ ВЛАДЕЛЕЦ КАТАЛОГА -- И git ОТКАЗЫВАЕТСЯ РАБОТАТЬ ВООБЩЕ.
+              # Замерено прогоном 38196856917: "fatal: detected dubious
+              # ownership in repository at /opt/robinhood-chain-alpha", код
+              # 128 на первой же команде. Причина: клон отдан пользователю
+              # podbivka (uid 999), чтобы таймер мог ПИСАТЬ снимки, а эта
+              # сессия идёт от root. Первый прогон этого показать не мог --
+              # тогда он делал клон с нуля и владельцем был сам.
+              # Отметка ставится РОВНО ОДИН РАЗ: --add без проверки копит
+              # повторы в ~/.gitconfig при каждой перепостановке.
+              git config --global --get-all safe.directory 2>/dev/null \
+                | grep -qxF "$KOREN" \
+                || git config --global --add safe.directory "$KOREN"
               git remote -v | head -2
               git fetch -q --depth=1 origin "$VETKA"
               # ВЕТКУ ДОГОНЯЕМ reset-ом, А КОД ЗАБИРАЕМ ПО ПУТЯМ, и это не вкус.
