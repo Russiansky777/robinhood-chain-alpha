@@ -264,7 +264,17 @@ jobs:
             # СПИСОК ОДНИМ МЕСТОМ, А НЕ ЧЕТЫРЬМЯ: он перечислен в прогоне
             # четыре раза (глушим, печатаем состояние, сверяем), и четыре копии
             # расходятся -- зонды я и пропустил именно так.
-            NASHI_SLUZHBY="bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe"
+            # ДВА СПИСКА, А НЕ ОДИН, И ЭТО ПРО ТО, ЧТО ОХРАНЯЕТ ГЕЙТ.
+            # Гейт нуля позиций охраняет ровно одно: не заглушить ПРОДАВЦА,
+            # пока жива купленная позиция. Детектор, продавец и сторож DBot
+            # стоят на денежном пути -- они за гейтом. Зонды не покупают, не
+            # продают и позиций не держат: требовать от них свежий признак
+            # жизни ДЕТЕКТОРА -- неверный предохранитель. Нашёл это на своём
+            # прогоне: детектор уже остановлен, признак протух навсегда, и
+            # гейт отказывал, а шаг остановки ЗОНДОВ пропускался вместе с ним.
+            DENEZHNYE="bloom-detector bloom-seller dbot-sold-guard"
+            ZONDY="dbot-detect-probe grpc-feed-probe"
+            NASHI_SLUZHBY="$DENEZHNYE $ZONDY"
             echo "=== DO: chto aktivno ==="
             systemctl list-units --type=service --state=running --no-pager \
               | grep -E 'bloom|shred|dbot|grpc' || echo "aktivnyh nashih sluzhb net"
@@ -278,11 +288,11 @@ jobs:
             # ("службы детектора/продавца/сторожей"). Первый прогон остановки
             # его пропустил: я перечислил только две службы, а он остался
             # running -- увидел это по строке "DO: chto aktivno".
-            # ЗОНДЫ (dbot-detect-probe, grpc-feed-probe) ДОБАВЛЕНЫ ПО СЛОВУ
-            # ВЛАДЕЛЬЦА 12.10: "зонды остановить и выключить (без удаления)".
-            # Они не торгуют, но ходят в Helius по websocket и тратят кредиты
+            # ЗДЕСЬ -- ТОЛЬКО ДЕНЕЖНЫЕ. Зонды глушит отдельный шаг, не за
+            # гейтом: по слову владельца 12.10 "зонды остановить и выключить
+            # (без удаления)". Они ходят в Helius по websocket и тратят кредиты
             # каждый час, а проект консервируется. Юниты остаются на диске.
-            for S in $NASHI_SLUZHBY; do
+            for S in $DENEZHNYE; do
               if systemctl list-unit-files "$S.service" --no-legend | grep -q "$S"; then
                 echo "--- $S: stop + disable ---"
                 systemctl stop "$S" || true
@@ -306,6 +316,7 @@ jobs:
             OSTALOS=$(systemctl list-units --type=service --state=running --no-pager \
               | grep -cE 'bloom-detector|bloom-seller' || true)
             echo "aktivnyh torgovyh sluzhb ostalos: $OSTALOS"
+            echo "(zondy glushit sledujushchij shag -- oni ne za gejtom)"
             for S in $NASHI_SLUZHBY; do
               printf '%s: active=%s enabled=%s\n' "$S" \
                 "$(systemctl is-active "$S" 2>&1)" "$(systemctl is-enabled "$S" 2>&1)"
@@ -321,28 +332,78 @@ jobs:
           GLUSHIM
           echo '```' >> "$OUT"
 
+      - name: "ЗОНДЫ: остановить и выключить (не за гейтом -- позиций не держат)"
+        # НЕ ЗА ГЕЙТОМ, И ЭТО НАЗВАНО. Гейт нуля позиций охраняет продавца при
+        # живой позиции; зонды не покупают, не продают и позиций не держат, а
+        # признак жизни детектора после его остановки протухает НАВСЕГДА -- то
+        # есть гейт запретил бы остановку зондов уже никогда не отпуская.
+        # Предохранитель у шага всё равно есть: слово OSTANOVIT на весь прогон.
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          {
+            echo
+            echo "## Зонды: остановка (слово владельца 12.10)"
+            echo
+            echo '```'
+          } >> "$OUT"
+          ssh $SSH_OPTS root@"$HOST" 'bash -s' <<'ZONDY' 2>&1 | tee -a "$OUT"
+            set -e
+            for S in dbot-detect-probe grpc-feed-probe; do
+              if systemctl list-unit-files "$S.service" --no-legend 2>/dev/null | grep -q "$S"; then
+                echo "--- $S: stop + disable ---"
+                systemctl stop "$S" || true
+                systemctl disable "$S" 2>&1 | tail -1 || true
+              else
+                echo "$S: junita net"
+              fi
+            done
+            echo "=== posle ==="
+            for S in dbot-detect-probe grpc-feed-probe; do
+              printf '%s: active=%s enabled=%s\n' "$S" \
+                "$(systemctl is-active "$S" 2>&1)" "$(systemctl is-enabled "$S" 2>&1)"
+            done
+            echo "=== juniti zondov na meste (ne udaleny) ==="
+            ls -1 /etc/systemd/system/ | grep -E '^(dbot|grpc|shred)' | sed 's/^/  /' \
+              || echo "junitov zondov v /etc/systemd/system net"
+          ZONDY
+          echo '```' >> "$OUT"
+
       - name: "ПРОВЕРКА: торговые службы точно не бегут"
         if: always()
         run: |
           set -e
           set -o pipefail
+          # СЧЁТ РАЗДЕЛЬНЫЙ: денежные службы и зонды -- разные вещи, и валить
+          # прогон за живой зонд, назвав его "торговой службой", значило бы
+          # соврать в собственном отчёте.
           BEGUT=0
-          for S in bloom-detector bloom-seller dbot-sold-guard dbot-detect-probe grpc-feed-probe; do
+          ZONDOV=0
+          for S in bloom-detector bloom-seller dbot-sold-guard; do
             SOST=$(ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active $S" 2>&1 || true)
-            echo "$S: $SOST"
+            echo "denezhnaja $S: $SOST"
             if [ "$SOST" = "active" ]; then
               BEGUT=$(( BEGUT + 1 ))
             fi
           done
+          for S in dbot-detect-probe grpc-feed-probe; do
+            SOST=$(ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active $S" 2>&1 || true)
+            echo "zond $S: $SOST"
+            if [ "$SOST" = "active" ]; then
+              ZONDOV=$(( ZONDOV + 1 ))
+            fi
+          done
           {
             echo
-            echo "Торговых служб в состоянии active после остановки: **$BEGUT**."
+            echo "Денежных служб в active после остановки: **$BEGUT**."
+            echo "Зондов в active после остановки: **$ZONDOV**."
           } >> "$OUT"
-          if [ "$BEGUT" -ne 0 ]; then
-            echo "SBOJ: posle stop ostalos aktivnyh: $BEGUT"
+          if [ "$BEGUT" -ne 0 ] || [ "$ZONDOV" -ne 0 ]; then
+            echo "SBOJ: ostalos aktivnyh -- denezhnyh $BEGUT, zondov $ZONDOV"
             exit 1
           fi
-          echo "torgovye sluzhby ostanovleny"
+          echo "denezhnye sluzhby i zondy ostanovleny"
 
       - name: "АУДИТ HELIUS: что на хосте ещё может пойти в Helius"
         # ТОЛЬКО ЧТЕНИЕ, идёт всегда. Владелец просил ПОДТВЕРДИТЬ СТРОКОЙ, что
