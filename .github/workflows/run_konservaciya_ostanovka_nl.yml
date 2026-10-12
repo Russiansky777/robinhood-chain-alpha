@@ -136,8 +136,23 @@ jobs:
           set -o pipefail
           # Скрипт уезжает файлом, а не heredoc-ом внутри ssh: вложенный
           # heredoc уходит на хост с отступом и там не закрывается.
-          ssh -n $SSH_OPTS root@"$HOST" "cat > /tmp/konservaciya_sostojanie.py" \
+          #
+          # БЕЗ КЛЮЧА -n, И ЭТО НЕ МЕЛОЧЬ. Первый прогон 12.10 стоял с ssh -n,
+          # а -n подменяет stdin на /dev/null: файл уехал ПУСТОЙ, python на нём
+          # напечатал ничего и вышел с нулём, а упал следующий шаг -- на разборе
+          # пустого json. Снимок при этом вышел пустым, и если бы прогон на этом
+          # не упал, он пошёл бы глушить службы, НЕ ПОСМОТРЕВ на позиции.
+          # Деплой кладёт файлы той же строкой и ровно без -n.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/konservaciya_sostojanie.py" \
             < deploy/checks/konservaciya_sostojanie.py
+          # И СРАЗУ ПРОВЕРКА, ЧТО ДОЕХАЛО: пустой файл -- отказ здесь, а не
+          # тишина в снимке.
+          STROK=$(ssh -n $SSH_OPTS root@"$HOST" "wc -l < /tmp/konservaciya_sostojanie.py")
+          echo "skript na hoste: strok $STROK"
+          if [ "$STROK" -lt 50 ]; then
+            echo "SBOJ: skript ne doehal (strok $STROK) -- snimok delat nechem"
+            exit 1
+          fi
           {
             echo "## Снимок состояния ДО остановки"
             echo
@@ -172,8 +187,19 @@ jobs:
             echo
             echo '```'
           } >> "$OUT"
-          ssh -n $SSH_OPTS root@"$HOST" "cat > /tmp/pered_perezapuskom_sluzhby.py" \
+          # ТОТ ЖЕ КЛЮЧ -n, И ЗДЕСЬ ОН БЫЛ БЫ ХУЖЕ ВСЕГО. Пустой файл гейта
+          # python исполняет без ошибки и выходит с НУЛЁМ -- то есть гейт сказал
+          # бы "можно" НЕ ПОСМОТРЕВ НИ НА ОДНУ ПОЗИЦИЮ, и службы заглушились бы
+          # при открытых. Нашёл у себя после первого прогона; проверка доставки
+          # стоит ниже и падает на пустом файле.
+          ssh $SSH_OPTS root@"$HOST" "cat > /tmp/pered_perezapuskom_sluzhby.py" \
             < deploy/checks/pered_perezapuskom_sluzhby.py
+          STROK_G=$(ssh -n $SSH_OPTS root@"$HOST" "wc -l < /tmp/pered_perezapuskom_sluzhby.py")
+          echo "gejt na hoste: strok $STROK_G"
+          if [ "$STROK_G" -lt 50 ]; then
+            echo "SBOJ: gejt ne doehal (strok $STROK_G) -- pustoj gejt skazal by 'mozhno'"
+            exit 1
+          fi
           GEJT_OK=yes
           ssh -n $SSH_OPTS root@"$HOST" "python3 /tmp/pered_perezapuskom_sluzhby.py" \
             2>&1 | tee -a "$OUT" || GEJT_OK=no
