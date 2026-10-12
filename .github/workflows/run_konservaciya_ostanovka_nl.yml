@@ -242,9 +242,19 @@ jobs:
               | grep -E 'bloom|shred|dbot|grpc' || echo "aktivnyh nashih sluzhb net"
             systemctl list-timers --all --no-pager | grep -E 'bloom|lab-' || echo "nashih tajmerov net"
 
-            # ПОРЯДОК: СНАЧАЛА ДЕТЕКТОР (перестаёт покупать), ПОТОМ ПРОДАВЕЦ.
-            # Наоборот нельзя: детектор успел бы купить, когда продавца уже нет.
-            for S in bloom-detector bloom-seller; do
+            # ПОРЯДОК: СНАЧАЛА ДЕТЕКТОР (перестаёт покупать), ПОТОМ ПРОДАВЕЦ,
+            # ПОТОМ СТОРОЖ DBot. Наоборот нельзя: детектор успел бы купить,
+            # когда продавца уже нет.
+            #
+            # dbot-sold-guard -- ЭТО СТОРОЖ, И ОН НАЗВАН СЛОВОМ ВЛАДЕЛЬЦА
+            # ("службы детектора/продавца/сторожей"). Первый прогон остановки
+            # его пропустил: я перечислил только две службы, а он остался
+            # running -- увидел это по строке "DO: chto aktivno".
+            # ЗОНДЫ (dbot-detect-probe, grpc-feed-probe) здесь НЕ глушатся:
+            # они не торгуют и сторожами не являются, владелец их не называл.
+            # Они тратят кредиты Helius, и это сказано владельцу отдельно --
+            # одно его слово, и они уйдут тем же прогоном.
+            for S in bloom-detector bloom-seller dbot-sold-guard; do
               if systemctl list-unit-files "$S.service" --no-legend | grep -q "$S"; then
                 echo "--- $S: stop + disable ---"
                 systemctl stop "$S" || true
@@ -268,10 +278,13 @@ jobs:
             OSTALOS=$(systemctl list-units --type=service --state=running --no-pager \
               | grep -cE 'bloom-detector|bloom-seller' || true)
             echo "aktivnyh torgovyh sluzhb ostalos: $OSTALOS"
-            for S in bloom-detector bloom-seller; do
+            for S in bloom-detector bloom-seller dbot-sold-guard; do
               printf '%s: active=%s enabled=%s\n' "$S" \
                 "$(systemctl is-active "$S" 2>&1)" "$(systemctl is-enabled "$S" 2>&1)"
             done
+            echo "=== chto ESHCHJO bezhit (zondy: ne torgujut, no tratjat kredity) ==="
+            systemctl list-units --type=service --state=running --no-pager \
+              | grep -E 'bloom|shred|dbot|grpc' || echo "nashih sluzhb v running net"
             systemctl list-timers --all --no-pager | grep -E 'bloom|lab-' || echo "aktivnyh tajmerov net"
             echo "=== juniti na meste (ne udaleny) ==="
             ls -1 /etc/systemd/system/ | grep -E '^(bloom|lab)' | sed 's/^/  /'
@@ -285,7 +298,7 @@ jobs:
           set -e
           set -o pipefail
           BEGUT=0
-          for S in bloom-detector bloom-seller; do
+          for S in bloom-detector bloom-seller dbot-sold-guard; do
             SOST=$(ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active $S" 2>&1 || true)
             echo "$S: $SOST"
             if [ "$SOST" = "active" ]; then
@@ -301,6 +314,32 @@ jobs:
             exit 1
           fi
           echo "torgovye sluzhby ostanovleny"
+
+      - name: "ПУБЛИЧНЫЕ АДРЕСА с хоста: кошельки и nonce-счета, именами и значениями"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ОТДЕЛЬНЫМ ШАГОМ. Владелец просил "список nonce-счетов и
+          # ПУБЛИЧНЫЕ АДРЕСА КОШЕЛЬКОВ". Публичный адрес кошелька полосы живёт
+          # ТОЛЬКО в окружении хоста (OWN_SEND_WALLET / BLOOM_LANE_WALLET), в
+          # репозитории его нет: константой лежит лишь EXECUTOR_WALLET
+          # (analysis/bloom_exec_state.py:45).
+          #
+          # ПОЧЕМУ ЗДЕСЬ МОЖНО ТО, ЧЕГО НЕЛЬЗЯ БЫЛО В БЭКАПЕ. В бэкапе я убрал
+          # WALLET из списка имён: 32-байтный СИД в base58 -- ровно 43-44 знака,
+          # то есть по длине от адреса не отличается. Здесь различитель другой и
+          # настоящий: КАЖДОЕ значение сверяется по цепи, и сид на цепи счёта не
+          # имеет. Плюс имя обязано НЕ содержать KEY/SECRET/PRIV/SEED/MNEMONIC.
+          ssh -n $SSH_OPTS root@"$HOST" \
+            "grep -hoE '^[[:space:]]*[A-Z0-9_]*(WALLET|NONCE|ADDRESS|PUBKEY|RECIPIENT)[A-Z0-9_]*=[1-9A-HJ-NP-Za-km-z]{32,44}$' /etc/bloom-executor/env /etc/bloom-executor/env.* 2>/dev/null | grep -vE '(KEY|SECRET|PRIV|SEED|MNEMONIC|TOKEN|PASS)[A-Z0-9_]*=' | sort -u" \
+            > adresa_hosta.txt || true
+          echo "IMJA=ADRES, strok: $(wc -l < adresa_hosta.txt)"
+          cut -d= -f2 adresa_hosta.txt | sort -u > adresa_tolko.txt
+          # КОНСТАНТА КОДА -- ТУДА ЖЕ: кошелёк исполнителя публичен и в репозитории.
+          grep -oE '"[1-9A-HJ-NP-Za-km-z]{32,44}"' analysis/bloom_exec_state.py \
+            | tr -d '"' | head -1 >> adresa_tolko.txt
+          sort -u adresa_tolko.txt -o adresa_tolko.txt
+          wc -l < adresa_tolko.txt
 
       - name: "ЦЕПЬ: баланс кошелька и токен-счета (списанные -- по минтам)"
         if: ${{ env.CEP == 'yes' }}
@@ -377,6 +416,40 @@ jobs:
                      open("data/konservaciya_cep.json", "w"),
                      ensure_ascii=False, indent=2)
           BALANS
+          # БАЛАНС КАЖДОГО ПУБЛИЧНОГО АДРЕСА, А НЕ ОДНОГО. Первый прогон дал
+          # по кошельку исполнителя 0 SOL, и этого мало для ответа "баланс по
+          # цепи": деньги полосы лежат на ЕЁ кошельке, а его адрес -- в
+          # окружении хоста. Здесь сверяются и адреса, и балансы.
+          # СВЕРКА ИДЁТ ДО ЗАПИСИ В ОТЧЁТ, А НЕ ПОСЛЕ. Отчёт коммитится в
+          # ветку, то есть попадает в репозиторий навсегда. Непроверенное
+          # значение туда писать нельзя: если цепь счёта не подтвердила, это не
+          # адрес, и в отчёте его быть не должно вовсе.
+          ADRESA_OK=yes
+          python3 deploy/checks/adresa_sushchestvujut.py adresa_tolko.txt \
+            > adresa_balansy.txt 2>&1 || ADRESA_OK=no
+          cat adresa_balansy.txt
+          {
+            echo
+            echo "## Публичные адреса с хоста и их балансы по цепи"
+            echo
+          } >> "$OUT"
+          if [ "$ADRESA_OK" = "yes" ]; then
+            {
+              echo '```'
+              echo "ИМЯ=АДРЕС из окружения хоста (значения -- публичные адреса):"
+              cat adresa_hosta.txt
+              echo
+              cat adresa_balansy.txt
+              echo '```'
+            } >> "$OUT"
+          else
+            {
+              echo "**Адреса в отчёт НЕ записаны:** цепь подтвердила не все."
+              echo "Непроверенное значение в репозиторий не кладём -- если счёта"
+              echo "на цепи нет, это не адрес. Разбор -- в журнале прогона."
+            } >> "$OUT"
+            echo "SBOJ: ne vse adresa podtverzhdeny cepju -- v otchjot ne pishem"
+          fi
           {
             echo
             echo "## Баланс и списанные на кошельке"
