@@ -206,7 +206,31 @@ jobs:
           echo '```' >> "$OUT"
           ssh -n $SSH_OPTS root@"$HOST" "rm -f /tmp/pered_perezapuskom_sluzhby.py"
           echo "gejt: $GEJT_OK, otkrytyh po snimku: $OTKRYTYH"
-          if [ "$GEJT_OK" != "yes" ] || [ "$OTKRYTYH" != "0" ]; then
+          # ГЛУШИТЬ УЖЕ НЕЧЕГО -- ГЕЙТ НЕ ТРЕБУЕТСЯ, И ЭТО НЕ ПОСЛАБЛЕНИЕ.
+          # Замерено 12.10: после удачной остановки повторный прогон НИКОГДА не
+          # пройдёт гейт -- тот требует признак жизни детектора не старше 600 с,
+          # а детектор остановлен, и признак протухает (вышло 655 с). Гейт при
+          # этом ПРАВ: без свежего признака числам о позициях верить нельзя.
+          # Но охранять нечего, когда обе службы уже inactive: остановка в этом
+          # случае -- пустая работа, а не риск.
+          AKTIVNYH=0
+          for S in bloom-detector bloom-seller dbot-sold-guard; do
+            if [ "$(ssh -n $SSH_OPTS root@"$HOST" "systemctl is-active $S" 2>&1)" = "active" ]; then
+              AKTIVNYH=$(( AKTIVNYH + 1 ))
+            fi
+          done
+          echo "aktivnyh nashih sluzhb sejchas: $AKTIVNYH"
+          echo "AKTIVNYH=$AKTIVNYH" >> "$GITHUB_ENV"
+          if [ "$AKTIVNYH" -eq 0 ]; then
+            {
+              echo
+              echo "Глушить нечего: все три службы уже inactive. Гейт нуля"
+              echo "позиций не требуется -- он охраняет ОСТАНОВКУ, а её не будет."
+              echo "Признак жизни протух ($GEJT_OK) именно потому, что детектор"
+              echo "остановлен раньше."
+            } >> "$OUT"
+            echo "nechego glushit -- shag ostanovki projdjot vpustuju"
+          elif [ "$GEJT_OK" != "yes" ] || [ "$OTKRYTYH" != "0" ]; then
             if [ "$OSTANOVIT_PRI_OTKRYTYH" != "yes" ]; then
               {
                 echo
@@ -294,6 +318,7 @@ jobs:
           echo '```' >> "$OUT"
 
       - name: "ПРОВЕРКА: торговые службы точно не бегут"
+        if: always()
         run: |
           set -e
           set -o pipefail
@@ -316,6 +341,11 @@ jobs:
           echo "torgovye sluzhby ostanovleny"
 
       - name: "ПУБЛИЧНЫЕ АДРЕСА с хоста: кошельки и nonce-счета, именами и значениями"
+        # ТОЛЬКО ЧТЕНИЕ, И ПОТОМУ НЕ ЗА ГЕЙТОМ. Замерено 12.10: гейт нуля
+        # позиций отказал (признак жизни протух после остановки детектора), и
+        # вместе с ним пропустились шаги, которые НИЧЕГО не меняют -- адреса и
+        # баланс. Владелец просил баланс и список; читать их гейт не мешает.
+        if: always()
         run: |
           set -e
           set -o pipefail
@@ -342,7 +372,8 @@ jobs:
           wc -l < adresa_tolko.txt
 
       - name: "ЦЕПЬ: баланс кошелька и токен-счета (списанные -- по минтам)"
-        if: ${{ env.CEP == 'yes' }}
+        # ТОЖЕ ТОЛЬКО ЧТЕНИЕ: идёт и тогда, когда гейт отказал.
+        if: ${{ always() && env.CEP == 'yes' }}
         env:
           # ИМЯ СЕКРЕТА -- HELIUS_API, А НЕ HELIUS_API_KEY, И ЭТО ЗАМЕРЕНО:
           # первый прогон получил HELIUS_API_KEY ПУСТЫМ и честно отказался
