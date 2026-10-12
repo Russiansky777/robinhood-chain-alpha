@@ -90,7 +90,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: claude/nifty-sagan-r0polg
-          fetch-depth: 0
+          # МЕЛКИЙ CHECKOUT. Полная история тут не нужна ни на что: diff кода
+          # хоста считается по ФАЙЛАМ рабочего дерева, а не по коммитам, а
+          # fetch-depth 0 стоил бы 7.13 ГиБ выкачки на каждый прогон.
+          fetch-depth: 1
 
       - name: "Параметры: вход прогона сильнее метки, метка сильнее умолчания"
         env:

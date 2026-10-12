@@ -129,7 +129,12 @@ jobs:
           # что его нельзя клонировать, и узнать это в день потери машины --
           # ровно то, от чего бэкап и делается. Поэтому клонируем здесь же.
           cd "$RABOTA"
-          git bundle verify "$IMJA_BUNDLE" | tee "$GITHUB_WORKSPACE/bundle_verify.txt"
+          # ПРОВЕРКА ИДЁТ ИЗ РЕПОЗИТОРИЯ, А НЕ ИЗ ПУСТОГО КАТАЛОГА. Замерено
+          # первым прогоном: из /mnt/backup git сказал "need a repository to
+          # verify a bundle" -- bundle verify сверяет, есть ли у НАС предки,
+          # которых bundle требует, и без репозитория сверять не с чем.
+          git -C repo-mirror.git bundle verify "$RABOTA/$IMJA_BUNDLE" \
+            | tee "$GITHUB_WORKSPACE/bundle_verify.txt"
           git clone --mirror "$IMJA_BUNDLE" proverka-mirror.git
           V_ISH=$(cd repo-mirror.git && git for-each-ref refs/heads | wc -l)
           V_NOV=$(cd proverka-mirror.git && git for-each-ref refs/heads | wc -l)
