@@ -452,29 +452,62 @@ jobs:
             ls -1 /etc/cron.d/ 2>/dev/null || echo "pust"
             echo
             echo "=== 5. KTO IZ CRON-STROK HODIT V HELIUS ==="
-            # Берём команды из crontab и смотрим, читает ли скрипт ключ Helius.
-            # Имя ключа ищем в САМОМ скрипте, а не угадываем по имени строки.
+            # ИДЁМ ПО .sh И ПО .py, А НЕ ТОЛЬКО ПО .py. Первая версия этого
+            # шага искала в cron-строке файл с расширением .py -- а ВСЕ шесть
+            # живых строк зовут .sh. Шаг напечатал шесть раз "ne nashel .py",
+            # и мой же итог посчитал это за чистоту: вывод "в Helius ничего не
+            # ходит" НЕ БЫЛ ЗАРАБОТАН. Теперь: читается сам .sh, из него
+            # вытаскивается зовомый .py, и грепается ОН ТОЖЕ; а строка, которую
+            # прочитать не удалось, считается НЕЯСНОЙ и ломает подтверждение.
             CRON_SROK=$( { crontab -l 2>/dev/null; crontab -u bot -l 2>/dev/null; } \
               | grep -vE '^\s*#|^\s*$' || true)
             if [ -z "$CRON_SROK" ]; then
               echo "cron-strok net vovse -- v Helius iz cron idti nechemu"
             else
               echo "$CRON_SROK" | while read -r STROKA; do
-                SKRIPT=$(echo "$STROKA" | grep -oE '/[A-Za-z0-9_/.-]+\.py' | head -1)
-                if [ -z "$SKRIPT" ]; then
-                  echo "  [?] ne nashel .py v stroke: $(echo "$STROKA" | cut -c1-90)"
+                KOMANDA=$(echo "$STROKA" | grep -oE '/[A-Za-z0-9_/.-]+\.(sh|py)' | head -1)
+                if [ -z "$KOMANDA" ]; then
+                  echo "  [NEJASNO] ni .sh ni .py v stroke: $(echo "$STROKA" | cut -c1-80)"
                   continue
                 fi
-                if [ ! -f "$SKRIPT" ]; then
-                  echo "  [net fajla] $SKRIPT -- stroka cron mertvaja"
-                elif grep -qE 'HELIUS|helius' "$SKRIPT" 2>/dev/null; then
-                  echo "  [HELIUS!] $SKRIPT chitaet Helius"
+                if [ ! -f "$KOMANDA" ]; then
+                  echo "  [net fajla] $KOMANDA -- stroka cron mertvaja"
+                  continue
+                fi
+                # ЧИТАЕМ САМУ КОМАНДУ
+                if grep -qE 'HELIUS|helius' "$KOMANDA" 2>/dev/null; then
+                  echo "  [HELIUS!] $KOMANDA chitaet Helius naprjamuju"
+                  continue
+                fi
+                # И ТО, ЧТО ОНА ЗОВЁТ: любой .py из её тела
+                ZOVET=$(grep -ohE '[A-Za-z0-9_/.-]+\.py' "$KOMANDA" 2>/dev/null | sort -u)
+                NASHLI=net
+                CHITALI=0
+                for PY in $ZOVET; do
+                  for BAZA in /home/bot/robinhood-chain-alpha /home/bot/bloom_executor /home/bot; do
+                    if [ -f "$BAZA/$PY" ]; then
+                      CHITALI=$(( CHITALI + 1 ))
+                      if grep -qE 'HELIUS|helius' "$BAZA/$PY" 2>/dev/null; then
+                        echo "  [HELIUS!] $KOMANDA -> $BAZA/$PY chitaet Helius"
+                        NASHLI=da
+                      fi
+                      break
+                    fi
+                  done
+                done
+                if [ "$NASHLI" = "da" ]; then
+                  continue
+                fi
+                if [ -z "$ZOVET" ]; then
+                  echo "  [bez Helius] $KOMANDA -- .py ne zovjot vovse"
+                elif [ "$CHITALI" -eq 0 ]; then
+                  echo "  [NEJASNO] $KOMANDA zovjot .py ($ZOVET), no fajlov ne nashel"
                 else
-                  echo "  [bez Helius] $SKRIPT"
+                  echo "  [bez Helius] $KOMANDA -> $ZOVET (prochitano $CHITALI)"
                 fi
               done
             fi
-            echo
+
             echo "=== 6. ZHIVYE SOEDINENIJA nashih processov na 443 ==="
             ss -tnp 2>/dev/null | grep -E ':443' | grep -E 'python|bloom|dbot|grpc' \
               || echo "soedinenij nashih processov na 443 NET"
@@ -489,8 +522,11 @@ jobs:
           ENABLED=$(grep -cE 'enabled=enabled' audit_helius.txt || true)
           AKTIV=$(grep -cE 'active=active' audit_helius.txt || true)
           CRON_H=$(grep -c "\[HELIUS!\]" audit_helius.txt || true)
+          # НЕЯСНОЕ -- НЕ ЧИСТОЕ. Строка, которую не удалось прочитать, ломает
+          # подтверждение: ровно на этом мой прошлый итог соврал.
+          NEJASNO=$(grep -c "\[NEJASNO\]" audit_helius.txt || true)
           SOED=$(grep -c "soedinenij nashih processov na 443 NET" audit_helius.txt || true)
-          echo "processov net: $PROC, enabled: $ENABLED, active: $AKTIV, cron s Helius: $CRON_H, soedinenij net: $SOED"
+          echo "processov net: $PROC, enabled: $ENABLED, active: $AKTIV, cron s Helius: $CRON_H, nejasnyh cron-strok: $NEJASNO, soedinenij net: $SOED"
           {
             echo
             echo "## Аудит Helius: что на хосте ещё может пойти в Helius"
@@ -500,15 +536,17 @@ jobs:
             echo '```'
             echo
             if [ "$PROC" -ge 1 ] && [ "$ENABLED" -eq 0 ] && [ "$AKTIV" -eq 0 ] \
-               && [ "$CRON_H" -eq 0 ] && [ "$SOED" -ge 1 ]; then
+               && [ "$CRON_H" -eq 0 ] && [ "$NEJASNO" -eq 0 ] && [ "$SOED" -ge 1 ]; then
               echo "**ПОДТВЕРЖДЕНО: на торговом хосте не осталось ничего, что ходит"
               echo "в Helius.** Замерено по пяти источникам запуска: живых процессов"
               echo "наших модулей НЕТ, служб в active НЕТ, служб и таймеров в enabled"
-              echo "НЕТ, cron-строк, читающих Helius, НЕТ, живых соединений наших"
+              echo "НЕТ, cron-строк, читающих Helius, НЕТ (и неясных строк НЕТ:"
+              echo "каждая прочитана до вызываемого .py), живых соединений наших"
               echo "процессов на 443 НЕТ."
             else
               echo "**НЕ ПОДТВЕРЖДЕНО.** Числа: процессов-нет=$PROC, в enabled=$ENABLED,"
-              echo "в active=$AKTIV, cron с Helius=$CRON_H, соединений-нет=$SOED."
+              echo "в active=$AKTIV, cron с Helius=$CRON_H, неясных cron-строк=$NEJASNO,"
+              echo "соединений-нет=$SOED."
               echo "Разбор -- в блоке выше; строку \"ничего не ходит в Helius\" я не"
               echo "пишу, пока она не следует из замера."
             fi
