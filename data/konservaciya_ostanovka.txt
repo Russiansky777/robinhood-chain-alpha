@@ -1,11 +1,11 @@
 # Консервация: остановка служб торгового хоста
 
-Прогон 38190817836, 2026-10-12T01:10:14Z.
+Прогон 38191322319, 2026-10-12T01:17:56Z.
 
 ## Снимок состояния ДО остановки
 
 ```
-снимок 2026-10-12T01:10:22Z, журнал /home/bot/bloom_executor_live_data
+снимок 2026-10-12T01:18:04Z, журнал /home/bot/bloom_executor_live_data
 позиций в журнале 70, ОТКРЫТЫХ 0
 по состояниям: {"closed": 70}
 STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisana'; списана входит в открытые: False
@@ -17,7 +17,7 @@ STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisan
 
 ```
 обязательные имена на месте: BLOOM_SOURCE_GROUPS
-признак жизни: 35 с назад; группы ['money', 'speed_only']; открытых 0, зависших 0
+признак жизни: 496 с назад; группы ['money', 'speed_only']; открытых 0, зависших 0
 второе мнение: модуль загружен
 МОЖНО: открытых 0, зависших 0, признак свежий, продажи разрешены, модуль второго мнения загружен
 ```
@@ -26,22 +26,12 @@ STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisan
 
 ```
 === DO: chto aktivno ===
-  bloom-detector.service                                             loaded active running Bloom signal detector (journal only, no buying code present)
-  bloom-seller.service                                               loaded active running Bloom sell guard (dry-run by default)
   dbot-detect-probe.service                                          loaded active running DBot detect probe (Helius websocket, измерение задержки обнаружения)
-  dbot-sold-guard.service                                            loaded active running DBot sold-position guard (expired TP/SL cleanup)
   grpc-feed-probe.service                                            loaded active running Зонд гонки потоков: gRPC против Helius WS (не торгует)
-Mon 2026-10-12 03:14:00 CEST      3min 25s Mon 2026-10-12 02:44:01 CEST    26min ago bloom-stroka-balansov.timer       bloom-stroka-balansov.service
-Mon 2026-10-12 03:23:00 CEST         12min Mon 2026-10-12 02:23:00 CEST    47min ago bloom-uchet-chas.timer            bloom-uchet-chas.service
-Mon 2026-10-12 03:38:00 CEST         27min Mon 2026-10-12 02:38:01 CEST    32min ago bloom-zhivuchest-chas.timer       bloom-zhivuchest-chas.service
-Mon 2026-10-12 03:53:00 CEST         42min Mon 2026-10-12 02:53:01 CEST    17min ago bloom-uborshchik-chas.timer       bloom-uborshchik-chas.service
-Mon 2026-10-12 04:10:00 CEST         59min Mon 2026-10-12 03:10:01 CEST      33s ago bloom-samoproverka-chas.timer     bloom-samoproverka-chas.service
-Mon 2026-10-12 08:00:00 CEST      4h 49min Sun 2026-10-11 08:00:01 CEST      19h ago bloom-vygruzka-sutki.timer        bloom-vygruzka-sutki.service
-Mon 2026-10-12 23:55:00 CEST           20h Sun 2026-10-11 23:55:01 CEST 3h 15min ago bloom-uborshchik-itog-sutki.timer bloom-uborshchik-itog-sutki.service
+nashih tajmerov net
 --- bloom-detector: stop + disable ---
-Removed "/etc/systemd/system/multi-user.target.wants/bloom-detector.service".
 --- bloom-seller: stop + disable ---
-Removed "/etc/systemd/system/multi-user.target.wants/bloom-seller.service".
+--- dbot-sold-guard: stop + disable ---
 --- tajmery: bloom-samoproverka-chas.timer
 bloom-stroka-balansov.timer
 bloom-uborshchik-chas.timer
@@ -49,17 +39,14 @@ bloom-uborshchik-itog-sutki.timer
 bloom-uchet-chas.timer
 bloom-vygruzka-sutki.timer
 bloom-zhivuchest-chas.timer ---
-Removed "/etc/systemd/system/timers.target.wants/bloom-samoproverka-chas.timer".
-Removed "/etc/systemd/system/timers.target.wants/bloom-stroka-balansov.timer".
-Removed "/etc/systemd/system/timers.target.wants/bloom-uborshchik-chas.timer".
-Removed "/etc/systemd/system/timers.target.wants/bloom-uborshchik-itog-sutki.timer".
-Removed "/etc/systemd/system/timers.target.wants/bloom-uchet-chas.timer".
-Removed "/etc/systemd/system/timers.target.wants/bloom-vygruzka-sutki.timer".
-Removed "/etc/systemd/system/timers.target.wants/bloom-zhivuchest-chas.timer".
 === POSLE: chto aktivno ===
 aktivnyh torgovyh sluzhb ostalos: 0
 bloom-detector: active=inactive enabled=disabled
 bloom-seller: active=inactive enabled=disabled
+dbot-sold-guard: active=inactive enabled=disabled
+=== chto ESHCHJO bezhit (zondy: ne torgujut, no tratjat kredity) ===
+  dbot-detect-probe.service                                          loaded active running DBot detect probe (Helius websocket, измерение задержки обнаружения)
+  grpc-feed-probe.service                                            loaded active running Зонд гонки потоков: gRPC против Helius WS (не торгует)
 aktivnyh tajmerov net
 === juniti na meste (ne udaleny) ===
   bloom-detector.service
@@ -100,11 +87,17 @@ drwxr-x--- 3 bot  bot  12288 Oct 12 03:10 /home/bot/bloom_executor_live_data
  "wsol_accounts": [],
  "failures": [],
  "note": "рента в ПУСТЫХ счетах заперта зря: продажа прошла, счёт не закрыт. Вернуть её можно только закрытием счёта, и это транзакция кошелька -- здесь она НЕ делается. У счёта WSOL рента и завёрнутый SOL разделены: в rent_sol только рента, завёрнутое в wrapped_sol",
- "built_utc": "2026-10-12T01:10:42Z"
+ "built_utc": "2026-10-12T01:18:29Z"
 }
 ПУСТЫЕ (рента заперта):
 С ОСТАТКОМ (пыль или позиция):
 ```
+
+## Публичные адреса с хоста и их балансы по цепи
+
+**Адреса в отчёт НЕ записаны:** цепь подтвердила не все.
+Непроверенное значение в репозиторий не кладём -- если счёта
+на цепи нет, это не адрес. Разбор -- в журнале прогона.
 
 ## Баланс и списанные на кошельке
 
