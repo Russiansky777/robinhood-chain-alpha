@@ -213,18 +213,46 @@ jobs:
             ls -l /etc/bloom-executor/ > "$M/env_katalog.txt" 2>&1 || true
 
             # --- ПУБЛИЧНЫЕ адреса: ровно те, что владелец просил списком.
-            # ПРЕДОХРАНИТЕЛЬ ПО ДЛИНЕ: берём значение только если оно 32..44
-            # знака base58. Приватный ключ ed25519 в base58 -- 87-88 знаков,
-            # JSON-массив байт ещё длиннее; такой фильтр их не пропустит.
+            #
+            # НАШЁЛ У СЕБЯ ДО ВЫКЛАДКИ, И ЭТО БЫЛА ДЫРА. Первый вариант брал
+            # значение по длине 32..44 знака base58 и считал, что приватный
+            # ключ так не выглядит: ed25519 в base58 это 87-88 знаков. Но
+            # 32-БАЙТНЫЙ СИД в base58 -- РОВНО 43-44 ЗНАКА, то есть внутри
+            # разрешённого окна. Длина тут не различает, и опираться на неё
+            # было нельзя.
+            #
+            # РАЗЛИЧАЕТ ИМЯ И ЦЕПЬ, А НЕ ДЛИНА:
+            #  1. имя обязано содержать NONCE/ADDRESS/PUBKEY/RECIPIENT -- это
+            #     счёт или адрес получателя, не ключ;
+            #  2. имя НЕ ДОЛЖНО содержать KEY, SECRET, PRIV, SEED, MNEMONIC,
+            #     TOKEN, PASS -- любое такое выбрасывается, даже если подошло
+            #     по первому пункту (BLOOM_LANE_WALLET_KEY подходил!);
+            #  3. WALLET из списка УБРАН вовсе: публичный адрес кошелька
+            #     исполнителя и так лежит в репозитории константой
+            #     EXECUTOR_WALLET (analysis/bloom_exec_state.py), читать его из
+            #     окружения незачем;
+            #  4. каждый отобранный адрес ПРОВЕРЯЕТСЯ ПО ЦЕПИ отдельным шагом:
+            #     счёт обязан СУЩЕСТВОВАТЬ. Сид, принятый за адрес, на цепи не
+            #     существует -- getAccountInfo отдаёт null, и прогон падает.
             {
-              echo "# Публичные адреса из окружения: nonce-счета и кошельки."
-              echo "# Фильтр: имя из списка И значение 32..44 знака base58."
-              echo "# Приватный ключ сюда попасть не может: он 87-88 знаков."
+              echo "# Публичные адреса из окружения: nonce-счета и адреса получателей."
+              echo "# Фильтр: имя содержит NONCE/ADDRESS/PUBKEY/RECIPIENT, НЕ содержит"
+              echo "# KEY/SECRET/PRIV/SEED/MNEMONIC/TOKEN/PASS, значение 32..44 знака"
+              echo "# base58. Каждый адрес сверен по цепи: счёт существует."
               for F in /etc/bloom-executor/env /etc/bloom-executor/env.*; do
                 [ -e "$F" ] || continue
-                grep -hoE '^[[:space:]]*(BLOOM_[A-Z0-9_]*(NONCE|WALLET|ADDRESS|PUBKEY|RECIPIENT)[A-Z0-9_]*|EXECUTOR_WALLET|OWN_SEND_WALLET)=[1-9A-HJ-NP-Za-km-z]{32,44}$' "$F" || true
+                grep -hoE '^[[:space:]]*[A-Z0-9_]*(NONCE|ADDRESS|PUBKEY|RECIPIENT)[A-Z0-9_]*=[1-9A-HJ-NP-Za-km-z]{32,44}$' "$F" \
+                  | grep -vE '(KEY|SECRET|PRIV|SEED|MNEMONIC|TOKEN|PASS)[A-Z0-9_]*=' || true
               done | sort -u
             } > "$M/publichnye_adresa.txt"
+            # ПУБЛИЧНЫЕ АДРЕСА КОШЕЛЬКОВ -- ИЗ КОНСТАНТ КОДА, А НЕ ИЗ env.
+            # В коде они уже лежат открытым текстом, значит это ровно публичное.
+            {
+              echo "# Публичные адреса кошельков -- из констант кода на хосте."
+              grep -hoE '^[A-Z_]*WALLET[A-Z_]* = "[1-9A-HJ-NP-Za-km-z]{32,44}"' \
+                /home/bot/bloom_executor/bloom_exec_state.py \
+                /home/bot/bloom_executor/c2_common.py 2>/dev/null | sort -u || true
+            } > "$M/publichnye_koshelki.txt"
 
             # --- Telegram: ТОЛЬКО ИМЕНА переменных
             {
@@ -377,6 +405,27 @@ jobs:
           fi
           echo "okruzhenie v arhive -- tolko imena, znakov '=' net: $(wc -l < env_imena.txt) imjon"
 
+      - name: "ПРОВЕРКА ЦЕПЬЮ: каждый отобранный адрес -- существующий счёт"
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЭТО И ЕСТЬ НАСТОЯЩИЙ РАЗЛИЧИТЕЛЬ "адрес или ключ". 32-байтный сид,
+          # принятый за адрес, на цепи НЕ СУЩЕСТВУЕТ: getAccountInfo отдаёт
+          # null. Существующий nonce-счёт отдаёт счёт. Не сошлось -- падаем, и
+          # ни артефакт, ни ветка ничего не получают.
+          tar xzOf "$RABOTA/host_backup_full.tar.gz" tmp/backup_meta/publichnye_adresa.txt \
+            > adresa.txt 2>/dev/null || true
+          grep -oE '[1-9A-HJ-NP-Za-km-z]{32,44}$' adresa.txt | sort -u > adresa_tolko.txt || true
+          echo "adresov k proverke: $(wc -l < adresa_tolko.txt)"
+          if [ ! -s adresa_tolko.txt ]; then
+            echo "adresov v vygruzke net -- proverjat nechego, eto ne sboj"
+            exit 0
+          fi
+          [ -n "$HELIUS_API_KEY" ] || { echo "SBOJ: HELIUS_API_KEY ne zadan, a adresa svrjat nechem"; exit 1; }
+          python3 deploy/checks/adresa_sushchestvujut.py adresa_tolko.txt | tee adresa_proverka.txt
+
       - name: "Манифест с sha256"
         run: |
           set -e
@@ -419,7 +468,8 @@ jobs:
             echo "| \`tmp/backup_meta/systemd/\` | юниты и таймеры systemd целиком, \`list-timers\`, состояние служб |"
             echo "| \`tmp/backup_meta/crontab-*.txt\` | crontab root и bot |"
             echo "| \`tmp/backup_meta/env_IMENA_tolko.txt\` | окружение хоста -- ТОЛЬКО ИМЕНА переменных |"
-            echo "| \`tmp/backup_meta/publichnye_adresa.txt\` | nonce-счета и публичные адреса кошельков |"
+            echo "| \`tmp/backup_meta/publichnye_adresa.txt\` | nonce-счета и адреса получателей из окружения (каждый сверен по цепи: счёт существует) |"
+            echo "| \`tmp/backup_meta/publichnye_koshelki.txt\` | публичные адреса кошельков -- из констант кода, а не из окружения |"
             echo "| \`tmp/backup_meta/telegram_IMENA.txt\` | конфиг Telegram -- только имена переменных |"
             echo "| \`tmp/backup_meta/pip_freeze_*.txt\`, \`uname.txt\`, \`os-release.txt\`, \`nproc.txt\`, \`df.txt\` | система |"
             echo "| \`tmp/backup_meta/konfigi/\` | конфиги служб |"
@@ -484,6 +534,7 @@ jobs:
             diff_hosta_protiv_vetki.txt
             zamer_do.txt
             arhiv_proverka.txt
+            adresa_proverka.txt
           retention-days: 90
           compression-level: 0
           if-no-files-found: error
@@ -503,6 +554,7 @@ jobs:
           cp "$GITHUB_WORKSPACE/diff_hosta_protiv_vetki.txt" "$RABOTA/meta/"
           cp "$GITHUB_WORKSPACE/zamer_do.txt" "$RABOTA/meta/"
           cp "$GITHUB_WORKSPACE/arhiv_proverka.txt" "$RABOTA/meta/"
+          cp "$GITHUB_WORKSPACE/adresa_proverka.txt" "$RABOTA/meta/" 2>/dev/null || true
           # ВЕТКА НЕ ЗАТИРАЕТСЯ МОЛЧА. Если она уже есть, в ней может лежать
           # прошлый годный бэкап, и затереть его -- потерять то, ради чего
           # прогон и писался. Поэтому отказ с названной причиной.
