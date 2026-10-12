@@ -1,11 +1,11 @@
 # Консервация: остановка служб торгового хоста
 
-Прогон 38191490484, 2026-10-12T01:20:34Z.
+Прогон 38191632583, 2026-10-12T01:22:48Z.
 
 ## Снимок состояния ДО остановки
 
 ```
-снимок 2026-10-12T01:20:42Z, журнал /home/bot/bloom_executor_live_data
+снимок 2026-10-12T01:22:56Z, журнал /home/bot/bloom_executor_live_data
 позиций в журнале 70, ОТКРЫТЫХ 0
 по состояниям: {"closed": 70}
 STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisana'; списана входит в открытые: False
@@ -16,12 +16,107 @@ STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisan
 ## Гейт нуля позиций (deploy/checks/pered_perezapuskom_sluzhby.py)
 
 ```
-СТОП: признаку жизни 655 с при пределе 600
+СТОП: признаку жизни 789 с при пределе 600
 ```
 
-**ОТКАЗ: службы НЕ остановлены.** Гейт нуля позиций: no,
-открытых по снимку: 0. Глушить продавца при открытой
-позиции значит оставить купленное без выхода.
+Глушить нечего: все три службы уже inactive. Гейт нуля
+позиций не требуется -- он охраняет ОСТАНОВКУ, а её не будет.
+Признак жизни протух (no) именно потому, что детектор
+остановлен раньше.
+
+## Остановка
+
+```
+=== DO: chto aktivno ===
+  dbot-detect-probe.service                                          loaded active running DBot detect probe (Helius websocket, измерение задержки обнаружения)
+  grpc-feed-probe.service                                            loaded active running Зонд гонки потоков: gRPC против Helius WS (не торгует)
+nashih tajmerov net
+--- bloom-detector: stop + disable ---
+--- bloom-seller: stop + disable ---
+--- dbot-sold-guard: stop + disable ---
+--- tajmery: bloom-samoproverka-chas.timer
+bloom-stroka-balansov.timer
+bloom-uborshchik-chas.timer
+bloom-uborshchik-itog-sutki.timer
+bloom-uchet-chas.timer
+bloom-vygruzka-sutki.timer
+bloom-zhivuchest-chas.timer ---
+=== POSLE: chto aktivno ===
+aktivnyh torgovyh sluzhb ostalos: 0
+bloom-detector: active=inactive enabled=disabled
+bloom-seller: active=inactive enabled=disabled
+dbot-sold-guard: active=inactive enabled=disabled
+=== chto ESHCHJO bezhit (zondy: ne torgujut, no tratjat kredity) ===
+  dbot-detect-probe.service                                          loaded active running DBot detect probe (Helius websocket, измерение задержки обнаружения)
+  grpc-feed-probe.service                                            loaded active running Зонд гонки потоков: gRPC против Helius WS (не торгует)
+aktivnyh tajmerov net
+=== juniti na meste (ne udaleny) ===
+  bloom-detector.service
+  bloom-samoproverka-chas.service
+  bloom-samoproverka-chas.timer
+  bloom-seller.service
+  bloom-stroka-balansov.service
+  bloom-stroka-balansov.timer
+  bloom-uborshchik-chas.service
+  bloom-uborshchik-chas.timer
+  bloom-uborshchik-itog-sutki.service
+  bloom-uborshchik-itog-sutki.timer
+  bloom-uchet-chas.service
+  bloom-uchet-chas.timer
+  bloom-vygruzka-sutki.service
+  bloom-vygruzka-sutki.timer
+  bloom-zhivuchest-chas.service
+  bloom-zhivuchest-chas.timer
+=== kod, sostojanie i env na meste ===
+drwx--x--x 2 root root  4096 Oct 12 01:03 /etc/bloom-executor
+drwxr-xr-x 3 bot  bot   4096 Oct  9 18:59 /home/bot/bloom_executor
+drwxr-x--- 3 bot  bot  12288 Oct 12 03:10 /home/bot/bloom_executor_live_data
+```
+
+Торговых служб в состоянии active после остановки: **0**.
+
+## Цепь: баланс и токен-счета кошелька исполнителя
+
+```
+{
+ "wallet": "4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N",
+ "count": 0,
+ "empty_count": 0,
+ "with_balance_count": 0,
+ "rent_locked_sol": 0,
+ "rent_locked_in_empty_sol": 0,
+ "wrapped_sol": 0,
+ "wsol_accounts": [],
+ "failures": [],
+ "note": "рента в ПУСТЫХ счетах заперта зря: продажа прошла, счёт не закрыт. Вернуть её можно только закрытием счёта, и это транзакция кошелька -- здесь она НЕ делается. У счёта WSOL рента и завёрнутый SOL разделены: в rent_sol только рента, завёрнутое в wrapped_sol",
+ "built_utc": "2026-10-12T01:23:28Z"
+}
+ПУСТЫЕ (рента заперта):
+С ОСТАТКОМ (пыль или позиция):
+```
+
+## Публичные адреса с хоста и их балансы по цепи
+
+```
+ИМЯ=АДРЕС из окружения хоста (значения -- публичные адреса):
+BLOOM_LANE_NONCE=7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz
+OWN_SEND_WALLET=4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x
+
+  [ok  ] 4dPZMbReSobZVxfrzGLcD7xJN33pZhuUZix5HkTBTh4x счёт есть, nonce/системный, лампортов 4331442837 (4.331442837 SOL)
+  [ok  ] 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N счёта нет (баланс 0), но ИСТОРИЯ есть (последняя подпись blockTime=1790881868) -- адрес поживший
+  [ok  ] 7WaDcygGdkbo1ZY7QgHea94LokyVZTNyUA39ASxhxSkz счёт есть, nonce/системный, лампортов 1056640 (0.001056640 SOL)
+адресов 3, не подтвердилось 0
+```
+
+## Баланс и списанные на кошельке
+
+```
+koshelek ispolnitelja: 4s87RRC2V2XAJD6R8U2dP8kQH99Z2wA6fg88ZVfV4j4N
+balans: 0 lamportov = 0.000000000 SOL
+mintov spisannyh pozicij: 0
+token-schetov po etim mintam na koshelke: 0
+iz nih S NENULEVYM ostatkom: 0
+```
 
 ## Что НЕ сделано намеренно
 
