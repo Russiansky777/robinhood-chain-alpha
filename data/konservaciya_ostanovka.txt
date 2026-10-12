@@ -1,11 +1,11 @@
 # Консервация: остановка служб торгового хоста
 
-Прогон 38192937488, 2026-10-12T01:42:57Z.
+Прогон 38193150902, 2026-10-12T01:46:13Z.
 
 ## Снимок состояния ДО остановки
 
 ```
-снимок 2026-10-12T01:43:03Z, журнал /home/bot/bloom_executor_live_data
+снимок 2026-10-12T01:46:19Z, журнал /home/bot/bloom_executor_live_data
 позиций в журнале 70, ОТКРЫТЫХ 0
 по состояниям: {"closed": 70}
 STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisana'; списана входит в открытые: False
@@ -16,28 +16,45 @@ STATES_OPEN = ['intent', 'bought', 'selling', 'unsold']; STATE_SPISANA = 'spisan
 ## Гейт нуля позиций (deploy/checks/pered_perezapuskom_sluzhby.py)
 
 ```
-СТОП: признаку жизни 1993 с при пределе 600
+СТОП: признаку жизни 2189 с при пределе 600
 ```
 
 **ОТКАЗ: службы НЕ остановлены.** Гейт нуля позиций: no,
 открытых по снимку: 0. Глушить продавца при открытой
 позиции значит оставить купленное без выхода.
 
-Торговых служб в состоянии active после остановки: **2**.
+## Зонды: остановка (слово владельца 12.10)
+
+```
+--- dbot-detect-probe: stop + disable ---
+Removed "/etc/systemd/system/multi-user.target.wants/dbot-detect-probe.service".
+--- grpc-feed-probe: stop + disable ---
+Removed "/etc/systemd/system/multi-user.target.wants/grpc-feed-probe.service".
+=== posle ===
+dbot-detect-probe: active=inactive enabled=disabled
+grpc-feed-probe: active=inactive enabled=disabled
+=== juniti zondov na meste (ne udaleny) ===
+  dbot-detect-probe.service
+  dbot-sold-guard.service
+  grpc-feed-probe.service
+  shred-listener.service
+```
+
+Денежных служб в active после остановки: **0**.
+Зондов в active после остановки: **0**.
 
 ## Аудит Helius: что на хосте ещё может пойти в Helius
 
 ```
 === 1. ZHIVYE PROCESSY nashih modulej ===
-2678745 /home/bot/robinhood-chain-alpha/venv/bin/python -u /home/bot/dbot_detect_probe/solana_detect_probe.py
-2948556 /home/bot/robinhood-chain-alpha/venv/bin/python /home/bot/feed_probe/grpc_feed_probe.py --state-dir /home/bot/grpc_feed_probe_data --config /home/bot/feed_probe/konfig.json --boosters 3 --booster-rate 5 --booster-max-rate 90 --tasks BATCH-5,BATCH-3
+nashih processov NET
 
 === 2. SLUZHBY: active / enabled ===
 bloom-detector         active=inactive   enabled=disabled
 bloom-seller           active=inactive   enabled=disabled
 dbot-sold-guard        active=inactive   enabled=disabled
-dbot-detect-probe      active=active     enabled=enabled
-grpc-feed-probe        active=active     enabled=enabled
+dbot-detect-probe      active=inactive   enabled=disabled
+grpc-feed-probe        active=inactive   enabled=disabled
 shred-listener         active=inactive   enabled=disabled
 
 === 3. TAJMERY: enabled ili net ===
@@ -75,13 +92,7 @@ sysstat
   [?] ne nashel .py v stroke: 20 3 * * * /home/bot/bin/predmarket_collector_select_pairs_daily.sh >> /home/bot/robinhood
 
 === 6. ZHIVYE SOEDINENIJA nashih processov na 443 ===
-ESTAB      0      0               45.59.170.76:38752            104.18.36.169:443  users:(("python",pid=2678745,fd=6))       
-ESTAB      0      0               45.59.170.76:41006            172.64.151.87:443  users:(("python",pid=2678745,fd=7))       
-CLOSE-WAIT 25     0               45.59.170.76:59086            172.64.151.87:443  users:(("python",pid=2948556,fd=3))       
-ESTAB      0      0      [::ffff:45.59.170.76]:35946    [::ffff:84.32.189.85]:443  users:(("python",pid=2948556,fd=9))       
-ESTAB      0      0      [::ffff:45.59.170.76]:39714  [::ffff:185.191.117.67]:443  users:(("python",pid=2948556,fd=8))       
-ESTAB      0      0      [::ffff:45.59.170.76]:48256 [::ffff:185.191.117.202]:443  users:(("python",pid=2948556,fd=10))      
-ESTAB      0      0      [::ffff:45.59.170.76]:52100   [::ffff:64.130.52.230]:443  users:(("python",pid=2948556,fd=11))      
+soedinenij nashih processov na 443 NET
 
 === 7. KOGDA POSLEDNIJ RAZ TRATILI KREDITY ===
 total 104
@@ -90,10 +101,11 @@ total 104
 -rw-r--r-- 1 bot bot   793 2026-09-25T04:56:13Z c2_own_send_dry.json
 ```
 
-**НЕ ПОДТВЕРЖДЕНО.** Числа: процессов-нет=0, в enabled=2,
-в active=2, cron с Helius=0, соединений-нет=0.
-Разбор -- в блоке выше; строку "ничего не ходит в Helius" я не
-пишу, пока она не следует из замера.
+**ПОДТВЕРЖДЕНО: на торговом хосте не осталось ничего, что ходит
+в Helius.** Замерено по пяти источникам запуска: живых процессов
+наших модулей НЕТ, служб в active НЕТ, служб и таймеров в enabled
+НЕТ, cron-строк, читающих Helius, НЕТ, живых соединений наших
+процессов на 443 НЕТ.
 
 ## Цепь: баланс и токен-счета кошелька исполнителя
 
@@ -109,7 +121,7 @@ total 104
  "wsol_accounts": [],
  "failures": [],
  "note": "рента в ПУСТЫХ счетах заперта зря: продажа прошла, счёт не закрыт. Вернуть её можно только закрытием счёта, и это транзакция кошелька -- здесь она НЕ делается. У счёта WSOL рента и завёрнутый SOL разделены: в rent_sol только рента, завёрнутое в wrapped_sol",
- "built_utc": "2026-10-12T01:43:30Z"
+ "built_utc": "2026-10-12T01:46:50Z"
 }
 ПУСТЫЕ (рента заперта):
 С ОСТАТКОМ (пыль или позиция):
