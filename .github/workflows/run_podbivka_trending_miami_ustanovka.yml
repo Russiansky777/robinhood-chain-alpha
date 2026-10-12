@@ -145,7 +145,23 @@ jobs:
               cd "$KOREN"
               git remote -v | head -2
               git fetch -q --depth=1 origin "$VETKA"
-              git checkout -q -B "$VETKA" FETCH_HEAD
+              # ВЕТКУ ДОГОНЯЕМ reset-ом, А КОД ЗАБИРАЕМ ПО ПУТЯМ, и это не вкус.
+              # Прежний checkout -B FETCH_HEAD отказывал бы начиная с первого
+              # суточного пуша: пуш положил data/trending/*/ДАТА.jsonl.gz В
+              # ВЕТКУ, а на машине те же самые файлы дописываются каждую минуту
+              # таймером. Для git это "локальные изменения отслеживаемых
+              # файлов", и checkout отказывается их затирать -- шаг упал бы с
+              # set -e, перепостановка не прошла бы, а снимки за день мог бы
+              # затереть. reset двигает вершину ветки и НЕ трогает рабочее
+              # дерево; код из ветки доносит checkout по каталогу analysis,
+              # где и живёт регистратор. Тот же приём у шага пуша в
+              # run_podbivka_trending_svodka_miami.yml.
+              git reset -q FETCH_HEAD
+              git checkout -q -- analysis
+              echo "snimkov s mestnymi izmenenijami (tak i dolzhno byt):"
+              git status --porcelain -- data/trending | wc -l
+              echo "raznica v kode posle obnovlenija (dolzhno byt 0 strok):"
+              git status --porcelain -- analysis | head -5
             else
               echo "kloniruju $VETKA v $KOREN (melkij, odnovetochnyj)"
               rm -rf "$KOREN"
@@ -263,6 +279,59 @@ jobs:
                 "$(systemctl is-enabled "$T" 2>&1)" "$(systemctl is-active "$T" 2>&1)"
             done
           VKLJUCHAEM
+
+      - name: "ПРОБА КАНДИДАТОВ KOTH: какой путь pump.fun ещё жив (только чтение)"
+        # ЗАЧЕМ ОТДЕЛЬНЫЙ ШАГ, А НЕ ПРАВКА ПО ДОГАДКЕ. Замерено 12.10 с этой же
+        # машины: /coins/king-of-the-hill отдал 404 (157 байт), а
+        # /coins/currently-live на том же хосте -- 200 и 50 элементов. То есть
+        # хост жив, а путь KOTH изменился или убран. Угадывать новый путь
+        # нельзя: спросить pump.fun из контейнера агента НЕЧЕМ -- сетевая
+        # политика окружения отказывает CONNECT к *.pump.fun с кодом 403
+        # (замерено), и любой "404" оттуда ничего бы не доказал. Единственная
+        # машина, которая в pump.fun ходит по-настоящему, -- эта.
+        #
+        # Кандидаты взяты из СПИСКА ЭНДПОИНТОВ, а не из головы: сообщество
+        # описывает /coins/king-of-the-hill с ОБЯЗАТЕЛЬНЫМ параметром
+        # includeNsfw (у нас он не передаётся вовсе -- вот первый кандидат), а
+        # рядом живут /coins/featured на advanced-api-v2 и те же самые
+        # параметры, с какими у нас уже работает currently-live.
+        # ПЕРВЫЙ И ПОСЛЕДНИЙ КАНДИДАТЫ -- КОНТРОЛЬНЫЕ: один обязан дать 200
+        # (иначе машина в pump.fun не ходит вовсе, и отказы ничего не значат),
+        # второй обязан дать 404 (иначе сравнивать не с чем).
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'KOTHPROBA' 2>&1 | tee koth_proba.txt
+            set -e
+            command -v curl >/dev/null 2>&1 || { echo "curl na mashine net -- probu propuskaju"; exit 0; }
+            AGENT='podbivka-trending/1.0 (+chain analytics, read-only)'
+            KANDIDATY='https://frontend-api-v3.pump.fun/coins/currently-live?offset=0&limit=50&includeNsfw=false
+          https://frontend-api-v3.pump.fun/coins/king-of-the-hill?includeNsfw=false
+          https://frontend-api-v3.pump.fun/coins/king-of-the-hill?includeNsfw=true
+          https://frontend-api-v3.pump.fun/coins?sort=market_cap&order=DESC&limit=50&includeNsfw=false
+          https://advanced-api-v2.pump.fun/coins/featured?offset=0&limit=50&keywordSearchActive=false
+          https://frontend-api-v3.pump.fun/coins/king-of-the-hill'
+            echo "$KANDIDATY" | while read -r U; do
+              [ -n "$U" ] || continue
+              # ТЕЛО ОБНУЛЯЕТСЯ ПЕРЕД КАЖДЫМ КАНДИДАТОМ: иначе отказ
+              # соединения оставил бы тело ПРЕДЫДУЩЕГО, и проба показала бы
+              # чужие минты как свои.
+              : > /tmp/koth_proba.json
+              OTVET=$(curl -sS -m 25 -o /tmp/koth_proba.json                 -w '%{http_code} %{size_download}'                 -H 'accept: application/json' -A "$AGENT" "$U" 2>/dev/null || true)
+              [ -n "$OTVET" ] || OTVET='000 0 (curl ne otvetil vovse)'
+              MINTOV=$(grep -o '"mint"' /tmp/koth_proba.json 2>/dev/null | wc -l)
+              NACHALO=$(head -c 140 /tmp/koth_proba.json 2>/dev/null | tr -d '\n' | tr -d '\r')
+              echo "KANDIDAT $U"
+              echo "   kod_i_bajt: $OTVET   mintov_v_tele: $MINTOV"
+              echo "   nachalo_tela: $NACHALO"
+            done
+          KOTHPROBA
+          echo "--- itog proby ---"
+          # || true НА ОБОИХ ГРЕПАХ, И ЭТО НЕ ПЕРЕСТРАХОВКА: при set -e плюс
+          # pipefail грep без находок возвращает 1 и валит ШАГ, то есть пустая
+          # проба выглядела бы сбоем прогона, а не пустой пробой.
+          grep -c 'KANDIDAT' koth_proba.txt || true
+          grep -A1 'KANDIDAT' koth_proba.txt | grep 'kod_i_bajt' | sort | uniq -c | head || true
 
       - name: "ПЕРВЫЙ ДОКЛАД: --probno сразу (сколько из 16 списков отдают данные)"
         if: ${{ env.PROBNO == 'yes' }}

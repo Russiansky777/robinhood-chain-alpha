@@ -124,7 +124,13 @@ jobs:
           mkdir -p data/trending
           # КЛАДЁТСЯ ТОЛЬКО data/trending. Ни кода, ни чужих каталогов: у
           # регистратора своя папка, и выйти за неё ему незачем.
-          rsync -a --delete-after "$KOREN/data/trending/" data/trending/ 2>/dev/null \
+          # --delete-after УБРАН, И ЭТО ЗАЩИТА ОТ ПОТЕРИ АРХИВА. С 12.10 на
+          # машине работает уборка (run_podbivka_trending_push_miami.yml
+          # удаляет снимки старше двух суток ПОСЛЕ доказанного пуша).
+          # Зеркалящий перенос стёр бы из ветки ровно то, что уборка убрала с
+          # машины, то есть весь архив старше двух суток -- и как раз то, ради
+          # чего уборку и затевали. Перенос теперь только ДОБАВЛЯЮЩИЙ.
+          rsync -a "$KOREN/data/trending/" data/trending/ 2>/dev/null \
             || cp -r "$KOREN/data/trending/." data/trending/
           git add -- data/trending
           if git diff --cached --quiet -- data/trending; then
