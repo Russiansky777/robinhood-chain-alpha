@@ -16,7 +16,8 @@ URL, код ответа, время ответа, сколько элемент
 
 Частоты (флаг --kazhdye): «минута» -- Jupiter (toptrending и toptraded, 5m и 1h),
 GeckoTerminal (trending_pools, new_pools), DexScreener (token-boosts latest и top,
-token-profiles latest), GMGN (trending, new pairs), pump.fun (KOTH, currently-live);
+token-profiles latest), GMGN (trending, new pairs), pump.fun (верх по капитализации,
+currently-live);
 «пять» -- CoinGecko search/trending, CoinMarketCap spotlight, Birdeye trending.
 
 Запускается таймером systemd на lab-miami (установка -- docs/podbivka_trending_ustanovka.md).
@@ -65,8 +66,19 @@ from pathlib import Path
      "?orderby=swaps&direction=desc", "data"),
     ("gmgn", "new_pairs", "минута",
      "https://gmgn.ai/defi/quotation/v1/pairs/sol/new_pairs?limit=50", "data"),
-    ("pumpfun", "koth", "минута",
-     "https://frontend-api-v3.pump.fun/coins/king-of-the-hill?includeNsfw=false", None),
+    # БЫЛО "koth" -> https://frontend-api-v3.pump.fun/coins/king-of-the-hill.
+    # Маршрут СНЯТ СО СЛУЖБЫ: замерено с lab-miami 12.10 02:45Z по трём
+    # вариантам -- голый 404 (157 Б), ?includeNsfw=false 404 (193 Б),
+    # ?includeNsfw=true 404 (191 Б), тело говорит "Cannot GET
+    # /coins/king-of-the-hill". Контроль тем же прогоном: currently-live
+    # на том же хосте 200 и 50 элементов, то есть хост жив.
+    # Живой ближайший аналог "холма" -- верх кривой по капитализации,
+    # замерено 200 и 50 монет. Имя списка СМЕНЕНО с koth на top_mcap
+    # намеренно: писать верх по капитализации под именем koth значило бы
+    # врать в архиве, а KOTH -- это ОДНА монета (верх списка), не список.
+    ("pumpfun", "top_mcap", "минута",
+     "https://frontend-api-v3.pump.fun/coins"
+     "?sort=market_cap&order=DESC&limit=50&includeNsfw=false", None),
     ("pumpfun", "currently_live", "минута",
      "https://frontend-api-v3.pump.fun/coins/currently-live"
      "?offset=0&limit=50&includeNsfw=false", None),
