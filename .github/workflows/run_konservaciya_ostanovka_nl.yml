@@ -473,17 +473,41 @@ jobs:
             echo "Обратное включение -- systemctl enable --now bloom-detector bloom-seller"
             echo "и нужные таймеры."
           } >> "$OUT"
+          # ПУШ НЕ ЧЕРЕЗ КОНВЕЙЕР, И ЭТО НЕ СТИЛЬ. Было
+          # `if git push ... | tail -2`, а в этом шаге стоит set -e БЕЗ
+          # pipefail: статус конвейера -- это статус tail, то есть НОЛЬ даже
+          # когда пуш отвергнут. Прогон 12.10 так и сказал "success", а отчёта
+          # в ветке не появилось: пуш отвергли (пока он шёл, в ветку лёг чужой
+          # коммит), tail это скрыл, и шаг вышел с нулём. Теперь pipefail стоит,
+          # пуш идёт БЕЗ конвейера, а в конце СВЕРКА: коммит правда на ветке.
+          set -o pipefail
           git add "$OUT" data/konservaciya_*.json 2>/dev/null || git add "$OUT"
           git commit -q -m "Konservaciya: ostanovka sluzhb, nul pozicij i balans [automated]" || {
             echo "nechego kommitit"; exit 0; }
-          for POPYTKA in 1 2 3 4; do
-            if git push origin HEAD:claude/nifty-sagan-r0polg 2>&1 | tail -2; then
-              exit 0
+          NASH=$(git rev-parse HEAD)
+          ULOZHEN=no
+          for POPYTKA in 1 2 3 4 5; do
+            if git push origin "HEAD:claude/nifty-sagan-r0polg"; then
+              ULOZHEN=yes
+              break
             fi
-            git fetch -q origin claude/nifty-sagan-r0polg && git rebase -q FETCH_HEAD || true
+            echo "push otvergnut, popytka $POPYTKA -- dogonjaju vetku"
+            git fetch -q origin claude/nifty-sagan-r0polg
+            git rebase FETCH_HEAD || { git rebase --abort || true; }
+            NASH=$(git rev-parse HEAD)
             sleep $(( 2 ** POPYTKA ))
           done
-          exit 1
+          if [ "$ULOZHEN" != "yes" ]; then
+            echo "SBOJ: otchjot ne ulozhen v vetku posle 5 popytok"
+            exit 1
+          fi
+          # СВЕРКА: наш коммит правда на ветке, а не "push сказал ок".
+          git fetch -q origin claude/nifty-sagan-r0polg
+          if ! git merge-base --is-ancestor "$NASH" FETCH_HEAD; then
+            echo "SBOJ: push proshel, no kommita $NASH na vetke net"
+            exit 1
+          fi
+          echo "otchjot na vetke: $NASH"
 
       - name: "Итог одной строкой"
         if: always()
