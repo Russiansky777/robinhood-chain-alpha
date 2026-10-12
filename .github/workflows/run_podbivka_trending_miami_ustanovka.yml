@@ -185,6 +185,40 @@ jobs:
             git log --oneline -1
             mkdir -p "$KOREN/data/trending"
             chown -R podbivka:podbivka "$KOREN"
+            # КАТАЛОГ СНИМКОВ ДОЛЖЕН БЫТЬ ПИСАБЕЛЕН БЕГУНКУ, И ЭТО НЕ
+            # ПЕРЕСТРАХОВКА. Суточный пуш (run_podbivka_trending_push_miami.yml)
+            # убирает снимки старше двух суток ПОСЛЕ доказанного пуша, и идёт
+            # он под пользователем бегунка, а клон отдан пользователю podbivka.
+            # Удаление файла требует права записи НА КАТАЛОГ, а не на файл, --
+            # поэтому группой каталогов ставим группу бегунка и даём ей запись.
+            # Бит setgid на каталогах нужен отдельно: без него завтрашний
+            # файл, созданный таймером от podbivka, лёг бы с группой podbivka,
+            # и уборка через сутки опять упёрлась бы в права.
+            # Воспроизведено на теле шага под не-root: без этого выходит
+            # "rm: cannot remove ...: Permission denied", шаг краснеет, данные
+            # при этом целы -- отказ в безопасную сторону, но работа не идёт.
+            # Имя пользователя бегунка НЕ УГАДЫВАЕТСЯ: берём владельца его
+            # рабочего каталога, и только если не нашли -- ghrunner, какой
+            # замерен в журнале прогона 38192956775.
+            RAB_BEGUNKA=$(ls -d /home/*/actions-runner/_work 2>/dev/null | head -1)
+            if [ -n "$RAB_BEGUNKA" ]; then
+              BEGUNOK=$(stat -c %U "$RAB_BEGUNKA")
+            else
+              BEGUNOK=ghrunner
+            fi
+            echo "polzovatel begunka: $BEGUNOK (po $RAB_BEGUNKA)"
+            if id "$BEGUNOK" >/dev/null 2>&1; then
+              chgrp -R "$BEGUNOK" "$KOREN/data/trending"
+              find "$KOREN/data/trending" -type d -exec chmod 2775 {} +
+              find "$KOREN/data/trending" -type f -exec chmod 664 {} + 2>/dev/null || true
+              echo "prava na katalogi snimkov:"
+              ls -ld "$KOREN/data/trending"
+              find "$KOREN/data/trending" -mindepth 1 -maxdepth 1 -type d \
+                -printf '  %M %u:%g %p\n' | head -20 || true
+            else
+              echo "VNIMANIE: polzovatelja $BEGUNOK na mashine net -- prava snimkov"
+              echo "ne mennjalis, i sutochnaja uborka upadet na Permission denied."
+            fi
             test -f "$KOREN/analysis/podbivka_trending.py" \
               || { echo "SBOJ: v klone net analysis/podbivka_trending.py"; exit 1; }
             test -x "$KOREN/analysis/podbivka_trending_push.sh" \
