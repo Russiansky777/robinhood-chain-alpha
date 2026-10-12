@@ -55,9 +55,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
-      contents: read
+      contents: write
       actions: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 1
+
       - name: "Параметры: вход прогона сильнее метки, метка сильнее умолчания"
         env:
           VHODY: ${{ toJSON(inputs) }}
@@ -251,6 +256,41 @@ jobs:
           } >> artefakty_zhivye.md
           cat artefakty_zhivye.md
 
+      - name: "Манифест и список артефактов -- В ВЕТКУ, а не только в артефакт"
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ В ВЕТКУ. sha256 bundla и строка восстановления нужны ДО того,
+          # как качать 7.2 ГБ: лежа только внутри артефакта, они требуют
+          # скачать весь артефакт, чтобы прочитать одну строку. Поэтому два
+          # текстовых файла едут в ветку, а тяжёлый bundle остаётся артефактом.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p data/konservaciya
+          cp repo_bundle_manifest.md data/konservaciya/repo_bundle_manifest.md
+          cp artefakty_zhivye.md data/konservaciya/artefakty_zhivye.md
+          cp bundle_verify.txt data/konservaciya/repo_bundle_verify.txt
+          git add data/konservaciya
+          if git diff --cached --quiet; then
+            echo "manifest ne izmenilsja -- kommitit nechego"
+            exit 0
+          fi
+          git commit -q -m "Konservaciya: manifest bundla repo i spisok artefaktov [automated]"
+          for POPYTKA in 1 2 3 4; do
+            if git push origin "HEAD:claude/nifty-sagan-r0polg" 2>&1 | tail -2; then
+              exit 0
+            fi
+            git fetch -q origin claude/nifty-sagan-r0polg && git reset -q --hard FETCH_HEAD
+            mkdir -p data/konservaciya
+            cp repo_bundle_manifest.md data/konservaciya/repo_bundle_manifest.md
+            cp artefakty_zhivye.md data/konservaciya/artefakty_zhivye.md
+            cp bundle_verify.txt data/konservaciya/repo_bundle_verify.txt
+            git add data/konservaciya
+            git commit -q -m "Konservaciya: manifest bundla repo i spisok artefaktov [automated]"
+            sleep $(( 2 ** POPYTKA ))
+          done
+          exit 1
+
       - name: "Выложить артефактом"
         uses: actions/upload-artifact@v4
         with:
@@ -262,4 +302,7 @@ jobs:
             artefakty_zhivye.md
           retention-days: 90
           compression-level: 0
+          # ПЕРЕЗАПИСЬ, А НЕ ВТОРАЯ КОПИЯ: bundle весит 7.2 ГБ, и держать две
+          # копии одного и того же в хранилище Actions незачем.
+          overwrite: true
           if-no-files-found: error

@@ -430,7 +430,11 @@ jobs:
 
       - name: "ПРОВЕРКА ЦЕПЬЮ: каждый отобранный адрес -- существующий счёт"
         env:
-          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+          # ИМЯ СЕКРЕТА -- HELIUS_API, А НЕ HELIUS_API_KEY, И ЭТО ЗАМЕРЕНО:
+          # первый прогон получил HELIUS_API_KEY ПУСТЫМ и честно отказался
+          # сверять адрес непроверенным. По репозиторию secrets.HELIUS_API
+          # стоит в 116 местах, secrets.HELIUS_API_KEY -- в 7.
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
         run: |
           set -e
           set -o pipefail
