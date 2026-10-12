@@ -356,6 +356,13 @@ jobs:
             # ПОЧЕМУ СПИСОК ЯВНЫЙ, А НЕ "ВЕСЬ /home". Явный список -- это то,
             # что можно прочитать и проверить глазами; "всё" прячет в архив
             # случайный файл с ключом, положенный кем-то в домашний каталог.
+            #
+            # .git ИСКЛЮЧЁН, И ЭТО ПРО СЕКРЕТ, А НЕ ПРО РАЗМЕР. В
+            # /home/bot/host_tajmery/uchet лежит РАБОЧАЯ КОПИЯ репозитория
+            # (её держит таймер учёта), а в .git/config рабочей копии умеет
+            # лежать https://x-access-token:ТОКЕН@github.com. Бэкапу git-данные
+            # хоста не нужны вовсе: код есть в репозитории, а расхождение с
+            # веткой считается отдельным шагом по контрольным суммам.
             PATHS="/home/bot/bloom_executor /home/bot/bloom_executor_live_data"
             PATHS="$PATHS /home/bot/data /home/bot/host_tajmery /home/bot/bin"
             PATHS="$PATHS /tmp/backup_meta"
@@ -368,6 +375,8 @@ jobs:
               --exclude='*.pem' --exclude='id_*' --exclude='*wallet*.json' \
               --exclude='*secret*' --exclude='*keypair*' --exclude='*.sock' \
               --exclude='__pycache__' --exclude='*/venv/*' --exclude='*.pyc' \
+              --exclude='.git' --exclude='*/.git' --exclude='*/.git/*' \
+              --exclude='.git-credentials' --exclude='.netrc' \
               $PATHS 2>/dev/null || true
             ls -l /tmp/host_backup_full.tar.gz
             echo "--- chto vnutri, verhnie katalogi ---"
@@ -394,6 +403,12 @@ jobs:
           # Третий слой защиты. Исключения при упаковке -- только первые два:
           # файл с ключом мог лежать под другим именем. Нашлось -- падаем, и
           # ни артефакт, ни ветка ничего не получают.
+          # СТОРОЖ ПРОВЕРЯЕТСЯ САМ, ПЕРЕД РАБОТОЙ. 12.10 он дал ЛОЖНЫЙ отказ
+          # на строке кода `api_key = os.environ.get("DBOT_API_KEY", "")` --
+          # "значением" ему вышел текст os.environ.get. Такой отказ хуже
+          # пропуска: он приучает не верить проверке. Теперь у сторожа есть
+          # самопроверка на обе половины, и она идёт здесь же.
+          python3 deploy/checks/arhiv_bez_klyuchey.py --self-test | tail -2
           python3 deploy/checks/arhiv_bez_klyuchey.py "$RABOTA/host_backup_full.tar.gz" \
             | tee arhiv_proverka.txt
           # И отдельно: что окружение правда ушло ИМЕНАМИ, а не целиком.
@@ -403,7 +418,15 @@ jobs:
             echo "SBOJ: v vygruzke okruzhenija est znak '=' -- eto znachenija, a ne imena"
             exit 1
           fi
-          echo "okruzhenie v arhive -- tolko imena, znakov '=' net: $(wc -l < env_imena.txt) imjon"
+          # ПУСТОЙ ФАЙЛ -- ТОЖЕ ОТКАЗ. Без этой строки проверка проходила бы
+          # МОЛЧА, если выгрузка окружения вообще не попала в архив: grep по
+          # пустому файлу не находит '=' и говорит "чисто".
+          IMJON=$(grep -cE '^[A-Z_][A-Z0-9_]*$' env_imena.txt 2>/dev/null || echo 0)
+          if [ "$IMJON" -lt 1 ]; then
+            echo "SBOJ: vygruzki imjon okruzhenija v arhive net ili ona pusta"
+            exit 1
+          fi
+          echo "okruzhenie v arhive -- tolko imena, znakov '=' net, imjon $IMJON"
 
       - name: "ПРОВЕРКА ЦЕПЬЮ: каждый отобранный адрес -- существующий счёт"
         env:
