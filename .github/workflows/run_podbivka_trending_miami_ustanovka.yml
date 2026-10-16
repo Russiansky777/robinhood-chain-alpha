@@ -658,7 +658,7 @@ jobs:
             junity_storozh/podbivka-storozh-diska.service \
             junity_storozh/podbivka-storozh-diska.timer \
             root@"$HOST_LAB":/etc/systemd/system/
-          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'STOROZH'
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'STOROZH' 2>&1 | tee storozh_miami.txt
             set -e
             chmod 755 /usr/local/sbin/lab_miami_storozh_diska.sh
             chmod 644 /etc/systemd/system/podbivka-storozh-diska.service \
@@ -824,7 +824,14 @@ jobs:
           else
             echo "(shag ne shjol)"
           fi
-          echo "=== 4. PROBA ENDPOINTOV (--probno) ==="
+          echo "=== 4. STOROZH DISKA ==="
+          if [ -f storozh_miami.txt ]; then
+            grep -E '^(tajmer:|storozh diska:|MALO MESTA|marker polozhen|markera net)' storozh_miami.txt || true
+            grep -E 'podbivka-storozh-diska' storozh_miami.txt | head -3 || true
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 5. PROBA ENDPOINTOV (--probno) ==="
           if [ -f probno_miami.txt ]; then
             grep -E 'итого' probno_miami.txt || tail -2 probno_miami.txt
           else
@@ -841,5 +848,6 @@ jobs:
             samoproverka_miami.txt
             celost_miami.txt
             pervye_miami.txt
+            storozh_miami.txt
           retention-days: 90
           if-no-files-found: warn

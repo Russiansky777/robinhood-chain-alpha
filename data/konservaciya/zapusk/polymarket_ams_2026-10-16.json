@@ -1,0 +1,21 @@
+{
+  "zachem": "punkt 5 vladelca 16.10: postavit registrator Polymarket na lab-ams po docs/polymarket_ustanovka.md -- juniti minutnyj, pjatiminutnyj, proizvodnye 03:23Z, rotacija 05:11Z; posle ustanovki --probno i --svodka",
+  "vetka_koda": "claude/stroiteli",
+  "koren_pm": "/opt/polymarket-put",
+  "tolko_diagnoz": "no",
+  "versija_koda": "vladelec nazval b371d350 -- eto golova CHERNOVOJ vetki claude/stroiteli-draft. Na samoj claude/stroiteli lezhit pozdnejshij 57653e0d (Code-4): retention 30, samoproverka 35/35 progana, ruff zeljonyj. Stavim s claude/stroiteli",
+  "retention_artefakta": "30, ne 90 -- v versii vetki eto uzhe zapisano tak",
+  "kljuchej_net": "skript ne chitaet ni odnoj peremennoj okruzhenija -- eto dokazyvaet ego zhe samoproverka",
+  "tokena_zapisi_na_mashine_net": "stroka ExecStartPost s --push iz dokumenta NE stavitsja: push s mashiny treboval by tokena na diske. Dokument sam predlagaet etot put i sovetuet ego; proverka v shage otkazyvaet, esli stroka pusha vsjo zhe popala v junit",
+  "syroe_v_vetku_ne_idjot": "v vetku edut tolko data/polymarket/proizvodnye i artefakty",
+  "nikakih_zajavok": "tolko chtenie knig: GET i POST na chtenie, ni odnogo ordera",
+  "torgovyj_host": "ne tragaem",
+  "proverki_u_sebja": {
+    "samoproverka": "proshla: 'proverok 35, zhdali 35, ne proshlo 0', kod 0",
+    "ruff": "chisto posle vosstanovlenija bita vypolnenija: v vetke fajl 100755, u moej kopii bit propal i ruff 0.16.8 dal EXE001; s bitom -- 'All checks passed'",
+    "juniti": "vse chetyre sobrany i proshli systemd-analyze verify bez zamechanij",
+    "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
+  },
+  "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
+  "popytka": 1
+}

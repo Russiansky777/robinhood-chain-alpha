@@ -1,0 +1,473 @@
+name: "Polymarket Code-3: установка на lab-ams (юниты и таймеры) + первый доклад"
+
+# ЗАЧЕМ (пункт 5 владельца 16.10): поставить регистратор Polymarket на
+# ЛАБОРАТОРНЫЙ хост lab-ams по docs/polymarket_ustanovka.md из ветки Code-3.
+# Единицы: минутный, пятиминутный, производные 03:23Z, ротация 05:11Z.
+# Retention суточного артефакта сырого -- 30, не 90 (слово владельца; в версии
+# ветки claude/stroiteli это уже так и записано).
+#
+# НА ТОРГОВЫЙ ХОСТ ЭТО НЕ СТАВИТСЯ: адрес лаборатории зашит как HOST_LAB
+# (216.73.157.61), и шаг-предохранитель отказывается работать при совпадении с
+# торговым 45.59.170.76.
+#
+# КЛЮЧЕЙ НЕ НУЖНО НИ ОДНОГО, и это проверяется, а не обещается: самопроверка
+# скрипта Code-3 среди прочего доказывает, что он не читает ни одной переменной
+# окружения. Значит EnvironmentFile юнитам не нужен и секретов на машину не
+# ложится.
+#
+# СТРОКА ExecStartPost ИЗ ДОКУМЕНТА НЕ СТАВИТСЯ, И ЭТО НАЗВАНО. В документе
+# юнит производных сразу пушит в ветку (--push), а для пуша с машины нужен
+# токен записи -- новый секрет на хосте, а слово владельца -- "ключи и секреты
+# никогда". Документ сам предлагает два пути и советует этот: производные
+# считаются на машине, а последняя миля до ветки едет прогоном на бегунке, где
+# токен выдаёт сам GitHub на время прогона и на диске не остаётся. Ровно так
+# сделано с трендингами на lab-miami.
+#
+# ВЕРСИЯ КОДА. Владелец назвал b371d350 -- это голова ЧЕРНОВОЙ ветки
+# claude/stroiteli-draft. На самой claude/stroiteli лежит более поздний
+# коммит 57653e0d (Code-4): retention 30, самопроверка 35/35 прогнана, ruff
+# зелёный. Ставим с claude/stroiteli -- ветки, которую владелец назвал в
+# первом поручении.
+on:
+  push:
+    # ЗАПУСК ФАЙЛОМ-МЕТКОЙ, А НЕ КНОПКОЙ: workflow_dispatch GitHub
+    # регистрирует только для файлов на ветке по умолчанию, а этого прогона
+    # там нет -- dispatch ответил бы 404. Событие push берёт файл прогона из
+    # того коммита, которым он пришёл.
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/polymarket_ams_*.json"
+  workflow_dispatch:
+    inputs:
+      vetka_koda:
+        description: "ветка Code-3 с регистратором"
+        required: false
+        default: "claude/stroiteli"
+      koren_pm:
+        description: "куда ставить клон на lab-ams"
+        required: false
+        default: "/opt/polymarket-put"
+      tolko_diagnoz:
+        description: "'yes' -- только читающие шаги, ничего не ставить"
+        required: false
+        default: "no"
+
+concurrency:
+  group: polymarket-ams
+  cancel-in-progress: false
+
+env:
+  TOLKO_DIAGNOZ: "no"
+  VETKA_KODA: "claude/stroiteli"
+  KOREN_PM: "/opt/polymarket-put"
+  RYNKOV: "100"
+  SUTOK_SYROGO: "30"
+  HOST_LAB: 216.73.157.61
+  TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
+
+jobs:
+  ustanovka:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 1
+
+      - name: "ПРЕДОХРАНИТЕЛЬ: это не торговый хост"
+        run: |
+          set -e
+          if [ "$HOST_LAB" = "$TORGOVYJ_ZAPRESHCHEN" ]; then
+            echo "STOP: adres sovpal s torgovym hostom. Registrator na torgovuju mashinu ne stavitsja."
+            exit 1
+          fi
+          echo "stavim na lab-ams $HOST_LAB; torgovyj $TORGOVYJ_ZAPRESHCHEN ne tragaetsja"
+
+      - name: "SSH key lab-ams"
+        env:
+          KLJUCH_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
+        run: |
+          set -e
+          [ -n "$KLJUCH_AMS" ] || { echo "SBOJ: sekreta VPS_SSH_KEY_AMS net"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_AMS" > ~/.ssh/ams_key
+          chmod 600 ~/.ssh/ams_key
+          ssh-keyscan -T 10 "$HOST_LAB" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/ams_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "Параметры: вход прогона сильнее метки, метка сильнее умолчания"
+        env:
+          VHODY: ${{ toJSON(inputs) }}
+        run: |
+          set -e
+          # СВЕЖЕСТЬ МЕТКИ -- ПО ИМЕНИ, А НЕ ПО ВРЕМЕНИ ФАЙЛА: в свежем
+          # чекауте время правки у всех файлов одно (момент выкладки), и
+          # 'ls -1t' выбрал бы не самую позднюю метку, а первую по алфавиту.
+          METKA_FAJL=$(ls -1 data/konservaciya/zapusk/polymarket_ams_*.json 2>/dev/null | sort | tail -1 || true)
+          echo "fajl-metka: ${METKA_FAJL:-net}"
+          for IMJA in VETKA_KODA KOREN_PM TOLKO_DIAGNOZ; do
+            KLJUCH=$(printf '%s' "$IMJA" | tr 'A-Z' 'a-z')
+            NOVO=$(printf '%s' "$VHODY" | jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' 2>/dev/null || true)
+            if [ -z "$NOVO" ] && [ -n "$METKA_FAJL" ]; then
+              NOVO=$(jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' "$METKA_FAJL" 2>/dev/null || true)
+            fi
+            if [ -n "$NOVO" ] && [ "$NOVO" != "null" ]; then
+              echo "$IMJA=$NOVO" >> "$GITHUB_ENV"
+              echo "  $IMJA: bylo '${!IMJA}', stalo '$NOVO'"
+            else
+              echo "  $IMJA: '${!IMJA}' (po umolchaniju)"
+            fi
+          done
+
+      - name: "ДИАГНОЗ МАШИНЫ lab-ams (только чтение, до любых правок)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'DIAGNOZ' 2>&1 | tee diagnoz_ams.txt
+            echo "--- kto my ---"
+            hostname; echo "jader: $(nproc)"
+            echo "--- mesto ---"
+            df -h / | tail -1
+            echo "--- pamjat ---"
+            free -h | head -2
+            echo "--- python i systemd ---"
+            python3 -V 2>&1
+            systemctl --version 2>/dev/null | head -1
+            echo "ruff: $(command -v ruff 2>/dev/null || echo net)"
+            echo "--- EST LI BEGUNOK GitHub NA ETOJ MASHINE ---"
+            # ЭТО НЕ ЛЮБОПЫТСТВО: пуш производных и суточный артефакт идут
+            # ПРОГОНОМ НА БЕГУНКЕ (иначе на машину пришлось бы положить токен).
+            # Если бегунка на lab-ams нет -- это и есть ответ, почему последняя
+            # миля пока не поставлена, и его надо сказать вслух, а не умолчать.
+            systemctl list-units 'actions.runner.*' --all --no-legend --plain 2>/dev/null | head -5 \
+              || echo "sluzhb actions.runner.* net"
+            BEG=$(systemctl list-units 'actions.runner.*' --all --no-legend --plain 2>/dev/null | wc -l)
+            echo "BEGUNKOV=$BEG"
+            echo "--- uzhe stojashchie juniti polymarket ---"
+            systemctl list-timers 'polymarket*' --all --no-pager 2>/dev/null | head -8 || true
+            ls -l /etc/systemd/system/polymarket-* 2>/dev/null || echo "junitov polymarket poka net"
+          DIAGNOZ
+
+      - name: "Пользователь polymarket и клон ветки Code-3"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" "VETKA='$VETKA_KODA' KOREN='$KOREN_PM' bash -s" <<'STAVIM'
+            set -e
+            id polymarket >/dev/null 2>&1 \
+              || useradd -r -s /usr/sbin/nologin -m polymarket
+            id polymarket
+            if [ -d "$KOREN/.git" ]; then
+              echo "klon uzhe est, obnovljaju"
+              cd "$KOREN"
+              # Отметка safe.directory ставится РОВНО ОДИН РАЗ: --add без
+              # проверки копит повторы при каждой перепостановке. Нужна она
+              # потому, что клон отдан пользователю polymarket, а сессия -- root.
+              git config --global --get-all safe.directory 2>/dev/null \
+                | grep -qxF "$KOREN" \
+                || git config --global --add safe.directory "$KOREN"
+              git fetch -q --depth=1 origin "$VETKA"
+              # ВЕТКУ ДОГОНЯЕМ reset-ом, А КОД БЕРЁМ checkout-ом ПО ПУТЯМ:
+              # прямой checkout -B отказал бы, как только таймер начнёт
+              # дописывать data/polymarket -- для git это локальные изменения
+              # отслеживаемых файлов, и шаг упал бы, а снимки мог бы затереть.
+              git reset -q FETCH_HEAD
+              git checkout -q -- analysis docs
+            else
+              echo "kloniruju $VETKA v $KOREN (melkij, odnovetochnyj)"
+              rm -rf "$KOREN"
+              git clone -q --depth 1 --single-branch -b "$VETKA" \
+                https://github.com/Russiansky777/robinhood-chain-alpha.git "$KOREN"
+              cd "$KOREN"
+            fi
+            git rev-parse --abbrev-ref HEAD
+            git log --oneline -1
+            mkdir -p "$KOREN/data/polymarket"
+            chown -R polymarket:polymarket "$KOREN"
+            test -f "$KOREN/analysis/polymarket_put.py" \
+              || { echo "SBOJ: v klone net analysis/polymarket_put.py"; exit 1; }
+            # БИТ ВЫПОЛНЕНИЯ ПРОВЕРЯЕМ ОТДЕЛЬНО: в ветке файл лежит как 100755,
+            # и ruff опирается на это -- при 644 он даёт EXE001 "shebang is
+            # present but file is not executable". Замерено у себя: копия без
+            # бита -- 1 замечание, с битом -- "All checks passed".
+            ls -l "$KOREN/analysis/polymarket_put.py"
+            test -x "$KOREN/analysis/polymarket_put.py" \
+              || chmod +x "$KOREN/analysis/polymarket_put.py"
+            echo "klon gotov, vladelec polymarket"
+          STAVIM
+
+      - name: "САМОПРОВЕРКА 35/35 и ruff ДО УСТАНОВКИ: красное -- не ставим"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          # СЛОВО ВЛАДЕЛЬЦА: "самопроверка 35/35 -- пройти заново на месте,
+          # ruff". На месте, а не на слово: у ящика своя версия Python и свой
+          # набор правил ruff. Сети самопроверка не просит.
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "cd $KOREN && sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --self-test" \
+            2>&1 | tee samoproverka_ams.txt
+          # ЧИСЛО ПРОВЕРОК СВЕРЯЕТСЯ, А НЕ ПРОСМАТРИВАЕТСЯ: ждём ровно 35 и
+          # ровно 0 упавших. Код возврата ssh -- это код самопроверки
+          # (pipefail включён), так что красная валит шаг и сама.
+          grep -q 'проверок 35, ждали 35, не прошло 0' samoproverka_ams.txt \
+            || { echo "SBOJ: ne 35 iz 35 -- tajmery ne stavlju, vyvod vyshe"; exit 1; }
+          echo "--- ruff ---"
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "cd $KOREN && if command -v ruff >/dev/null 2>&1; then ruff check analysis/polymarket_put.py; else echo 'ruff na jashchike NET -- proverka propushchena, i eto skazano vsluh'; fi" \
+            2>&1 | tee ruff_ams.txt
+          if grep -qE '^(error|[A-Z][0-9]{3})' ruff_ams.txt; then
+            echo "SBOJ: ruff nashjol zamechanija -- tajmery ne stavlju"
+            exit 1
+          fi
+          tail -2 samoproverka_ams.txt
+
+      - name: "Четыре юнита systemd (без строки пуша с машины)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          mkdir -p junity_pm
+          # ЮНИТЫ ПИШУТСЯ ЗДЕСЬ И УЕЗЖАЮТ ФАЙЛАМИ, а не heredoc-ом внутри
+          # heredoc-а ssh: внутренний ограничитель ушёл бы на хост С ОТСТУПОМ,
+          # bash ждёт его в нулевой колонке, и юниты вышли бы пустыми при
+          # зелёном прогоне.
+          # UMask=0002 -- из-за часового раскроя: каждые сутки таймер создаёт
+          # новый каталог <список>/<дата>/, и при umask 022 он вышел бы 2755,
+          # то есть уборка и упаковка под другим пользователем упёрлись бы в
+          # Permission denied (ровно это уже ловили на трендингах).
+          OBSHCHEE=$(printf '%s\n' \
+            "Type=oneshot" "User=polymarket" "WorkingDirectory=$KOREN" \
+            "Nice=10" "UMask=0002" "PrivateTmp=yes" "NoNewPrivileges=yes" \
+            "ProtectSystem=strict" "ReadWritePaths=$KOREN")
+
+          {
+            printf '%s\n' "[Unit]" \
+              "Description=Polymarket: minutnye spiski (knigi, ceny, spredy, sdelki)" \
+              "After=network-online.target" "" "[Service]"
+            printf '%s\n' "$OBSHCHEE"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --kazhdye минута --rynkov $RYNKOV --pauza 0.4" \
+              "TimeoutStartSec=50"
+          } > junity_pm/polymarket-min.service
+          printf '%s\n' "[Unit]" "Description=Polymarket kazhduju minutu" "" \
+            "[Timer]" "OnCalendar=*:0/1" "AccuracySec=1s" "Persistent=false" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_pm/polymarket-min.timer
+
+          {
+            printf '%s\n' "[Unit]" \
+              "Description=Polymarket: pjatiminutnye spiski (sobytija, nagrady, derzhateli)" \
+              "After=network-online.target" "" "[Service]"
+            printf '%s\n' "$OBSHCHEE"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --kazhdye пять --rynkov $RYNKOV --pauza 0.6" \
+              "TimeoutStartSec=120"
+          } > junity_pm/polymarket-5min.service
+          printf '%s\n' "[Unit]" "Description=Polymarket kazhdye pjat minut" "" \
+            "[Timer]" "OnCalendar=*:0/5" "AccuracySec=5s" "Persistent=false" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_pm/polymarket-5min.timer
+
+          # ПРОИЗВОДНЫЕ БЕЗ ExecStartPost: пуш с машины требует токена на
+          # диске. Документ Code-3 сам предлагает этот путь и советует его.
+          {
+            printf '%s\n' "[Unit]" \
+              "Description=Polymarket: proizvodnye minutnye rjady (push -- progonom na begunke)" \
+              "" "[Service]"
+            printf '%s\n' "$OBSHCHEE"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --proizvodnye" \
+              "TimeoutStartSec=1800"
+          } > junity_pm/polymarket-proizvodnye.service
+          printf '%s\n' "[Unit]" "Description=Polymarket: proizvodnye v 03:23 UTC" "" \
+            "[Timer]" "OnCalendar=*-*-* 03:23:00 UTC" "Persistent=true" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_pm/polymarket-proizvodnye.timer
+
+          # РОТАЦИЯ БЕЗОПАСНА И БЕЗ АРТЕФАКТОВ: скрипт удаляет сырое ТОЛЬКО
+          # там, где стоит отметка об артефакте, а отметок пока нет -- значит
+          # он не удалит ничего и назовёт сутки вслух ("ЖДУТ АРТЕФАКТА").
+          {
+            printf '%s\n' "[Unit]" \
+              "Description=Polymarket: chistka syrogo starshe $SUTOK_SYROGO sutok (tolko posle artefakta)" \
+              "" "[Service]"
+            printf '%s\n' "$OBSHCHEE"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --rotacija --dnej $SUTOK_SYROGO" \
+              "TimeoutStartSec=600"
+          } > junity_pm/polymarket-rotacija.service
+          printf '%s\n' "[Unit]" "Description=Polymarket: rotacija v 05:11 UTC" "" \
+            "[Timer]" "OnCalendar=*-*-* 05:11:00 UTC" "Persistent=true" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_pm/polymarket-rotacija.timer
+
+          echo "--- chto napisali ---"
+          for F in junity_pm/*; do
+            echo "=== $F ==="; cat "$F"
+            [ -s "$F" ] || { echo "SBOJ: $F pust"; exit 1; }
+            grep -q '^\[Unit\]' "$F" || { echo "SBOJ: v $F net sekcii [Unit]"; exit 1; }
+          done
+          # СТРОКИ ПУША В ЮНИТАХ БЫТЬ НЕ ДОЛЖНО -- проверяем, а не надеемся.
+          if grep -l -- '--push' junity_pm/* 2>/dev/null; then
+            echo "SBOJ: v junite ostalas stroka pusha s mashiny -- eto token na hoste"
+            exit 1
+          fi
+          echo "stroki pusha s mashiny net ni v odnom junite"
+          scp -i ~/.ssh/ams_key -o StrictHostKeyChecking=accept-new \
+            junity_pm/polymarket-min.service junity_pm/polymarket-min.timer \
+            junity_pm/polymarket-5min.service junity_pm/polymarket-5min.timer \
+            junity_pm/polymarket-proizvodnye.service junity_pm/polymarket-proizvodnye.timer \
+            junity_pm/polymarket-rotacija.service junity_pm/polymarket-rotacija.timer \
+            root@"$HOST_LAB":/etc/systemd/system/
+          echo "juniti dostavleny"
+
+      - name: "Включить таймеры (все четыре)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'VKLJUCHAEM' 2>&1 | tee tajmery_ams.txt
+            set -e
+            chmod 644 /etc/systemd/system/polymarket-*.service \
+                      /etc/systemd/system/polymarket-*.timer
+            systemctl daemon-reload
+            # VERIFY ПО ВСЕМ ЧЕТЫРЁМ СЛУЖБАМ, и смотрим на слова "fatal error",
+            # а не на код возврата: verify ворчит и на безвредное.
+            PLOHIH=0
+            for U in min 5min proizvodnye rotacija; do
+              F="/etc/systemd/system/polymarket-$U.service"
+              echo "--- verify $U ---"
+              VYVOD=$(systemd-analyze verify "$F" 2>&1 || true)
+              printf '%s\n' "${VYVOD:-(bez zamechanij)}" | head -6
+              case "$VYVOD" in
+                *"fatal error"*) echo "SBOJ: $F ne razbiraetsja"; PLOHIH=$((PLOHIH + 1)) ;;
+              esac
+            done
+            [ "$PLOHIH" -eq 0 ] || { echo "SBOJ: plohih junitov $PLOHIH -- tajmery ne vkljuchaju"; exit 1; }
+            systemctl enable --now polymarket-min.timer polymarket-5min.timer \
+                                   polymarket-proizvodnye.timer polymarket-rotacija.timer
+            echo "--- tajmery ---"
+            systemctl list-timers 'polymarket*' --all --no-pager
+            echo "--- sostojanie ---"
+            for T in polymarket-min.timer polymarket-5min.timer \
+                     polymarket-proizvodnye.timer polymarket-rotacija.timer; do
+              printf '%s: enabled=%s active=%s\n' "$T" \
+                "$(systemctl is-enabled "$T" 2>&1)" "$(systemctl is-active "$T" 2>&1)"
+            done
+          VKLJUCHAEM
+
+      - name: "ПЕРВЫЙ ДОКЛАД: --probno (кто отвечает с ящика)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          # Запуск от того же пользователя, что и таймер: иначе проверили бы
+          # доступ не того, кто ходит в сеть по-настоящему.
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "cd $KOREN && sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --kazhdye все --rynkov $RYNKOV --probno" \
+            2>&1 | tee probno_ams.txt
+          echo "--- itog proby ---"
+          tail -3 probno_ams.txt
+
+      - name: "Первый прогон таймеров и --svodka (снимки на диске)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" "KOREN='$KOREN_PM' bash -s" <<'PROBA' 2>&1 | tee svodka_ams.txt
+            set -e
+            systemctl start polymarket-5min.service || true
+            systemctl start polymarket-min.service || true
+            sleep 3
+            echo "--- sostojanie sluzhb posle pervogo zapuska ---"
+            for U in polymarket-min polymarket-5min; do
+              printf '%s: %s\n' "$U" "$(systemctl show "$U" -p ExecMainStatus --value 2>&1)"
+              journalctl -u "$U" --no-pager -n 4 2>/dev/null | tail -3 || true
+            done
+            echo "--- chto leglo na disk ---"
+            find "$KOREN/data/polymarket" -type f -printf '%10s B  %p\n' 2>/dev/null \
+              | sort -k3 | head -20
+            echo "fajlov: $(find "$KOREN/data/polymarket" -type f 2>/dev/null | wc -l)"
+            du -sh "$KOREN/data/polymarket" 2>/dev/null || true
+            echo "--- vybor rynkov ---"
+            # ВНУТРИ heredoc-а ssh ВЛОЖЕННОГО heredoc-а БЫТЬ НЕ МОЖЕТ, и это
+            # не придирка: тело уезжает на хост С ОТСТУПОМ, а bash ждёт
+            # ограничитель в нулевой колонке -- поймано своей же проверкой
+            # разбора ("here-document delimited by end-of-file (wanted PY)").
+            # Поэтому питон одной строкой через -c, без heredoc.
+            if [ -f "$KOREN/data/polymarket/vybor.json" ]; then
+              python3 -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print('rynkov:', len(d.get('markets') or []), 'tokenov:', len(d.get('tokens') or []))" \
+                "$KOREN/data/polymarket/vybor.json"
+            else
+              echo "vybor.json ne polozhen -- znachit zapros /events ne udalsja"
+            fi
+            echo "--- svodka ---"
+            cd "$KOREN"
+            sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --svodka || true
+          PROBA
+
+      - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
+        # Архив журналов и артефакты из этого контейнера недоступны (прокси
+        # отвечает Forbidden и на results-receiver, и на хранилище артефактов),
+        # читается ТОЛЬКО ХВОСТ журнала задания -- значит главное должно лежать
+        # в хвосте, иначе замеры середины прогона нечем прочесть.
+        if: ${{ always() }}
+        run: |
+          set -e
+          echo "=== 1. MASHINA I BEGUNOK ==="
+          if [ -f diagnoz_ams.txt ]; then
+            grep -E '^(BEGUNKOV=|ruff:|Python|/dev/)' diagnoz_ams.txt || true
+            head -2 diagnoz_ams.txt
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 2. SAMOPROVERKA I RUFF ==="
+          if [ -f samoproverka_ams.txt ]; then
+            grep -E 'проверок .*ждали' samoproverka_ams.txt || tail -1 samoproverka_ams.txt
+          else
+            echo "(shag ne shjol)"
+          fi
+          if [ -f ruff_ams.txt ]; then tail -2 ruff_ams.txt; fi
+          echo "=== 3. TAJMERY ==="
+          if [ -f tajmery_ams.txt ]; then
+            grep -E 'enabled=' tajmery_ams.txt || true
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 4. PROBA ENDPOINTOV ==="
+          if [ -f probno_ams.txt ]; then
+            tail -4 probno_ams.txt
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 5. SNIMKI I SVODKA ==="
+          if [ -f svodka_ams.txt ]; then
+            grep -E '^(rynkov:|fajlov:|vybor.json)' svodka_ams.txt || true
+            sed -n '/--- svodka ---/,$p' svodka_ams.txt | tail -14
+          else
+            echo "(shag ne shjol)"
+          fi
+
+      - name: "Выложить первый доклад артефактом"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: polymarket-ams-pervyj-doklad
+          path: |
+            diagnoz_ams.txt
+            samoproverka_ams.txt
+            ruff_ams.txt
+            tajmery_ams.txt
+            probno_ams.txt
+            svodka_ams.txt
+          retention-days: 30
+          if-no-files-found: warn

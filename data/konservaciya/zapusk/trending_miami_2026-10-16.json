@@ -8,18 +8,20 @@
   "torgovyj_host": "ne tragaem",
   "tokena_zapisi_na_mashine_net": "tajmer podbivka-trending-push STAVITSJA, no NE VKLJUCHAETSJA; posledniaia milia -- progon run_podbivka_trending_push_miami.yml v 02:17Z",
   "novoe_v_etoj_popytke": {
-    "storozh": "lab_miami_storozh_diska.sh v /usr/local/sbin, junit podbivka-storozh-diska.service/.timer, OnCalendar *:47:00 UTC, porog 10 GB; proba srazu posle ustanovki. Vse tri puti skripta progany u sebja s podstavnym systemctl: mnogo mesta -- tolko pechat; malo -- ostanov i marker (validnyj JSON); mesto vernulos -- marker snjat i tajmery vkljucheny",
-    "marker_v_vetke": "sutochnyj push (run_podbivka_trending_push_miami.yml) teper nesjot i DISK_STOP: put dobavlen v sparse-checkout i v puti kommita, a kogda markera na mashine net -- push SNIMAET ego iz vetki, chtoby vetka ne vrala",
-    "svodka_v_hvoste": "posledniy shag pechataet vsjo glavnoe: arhiv zhurnalov i artefakty iz kontejnera nedostupny (proksi otvechaet Forbidden), chitaetsja tolko hvost zhurnala zadanija",
-    "daty": "tablicu schitaem za vse pjat sutok 12-16.10 i pechataem objom po dnjam: zamer oproverg ozhidanie 'za 14-16.10 dannyh net' -- sutochnye fajly tam EST (8, 6 i 8 shtuk), prosto krohi",
-    "bityj_gzip": "13.10 ne schitaetsja: zlib.error 'invalid distance too far back'. Shag celostnosti teper pechataet i skolko strok chitaetsja u bitogo fajla do obryva -- chtoby bylo vidno, est li smysl spasat sutki. Nichego ne udaljaem i skript Code-2 ne pravim"
+    "storozh_v_svodke": "vyvod shaga storozha teper idjot v fajl i v hvostovuju svodku: sostojanie tajmera i proba pri zhivom diske dolzhny byt vidny v zhurnale, a chitaetsja tolko hvost"
   },
-  "popytka": 9,
+  "popytka": 10,
   "zamereno_progonom_38930238689": {
     "samoproverka": "proshla na mashine, junity postavleny posle nejo",
     "tablica_12_10": "30807 strok, 2441310 B (2.44 MB), spiskov 17, snimkov 1404 na minutnyj spisok",
     "tablica_13_10": "otkaz: bityj gzip",
     "pervyj_chasovoj_jupiter": "data/trending/jupiter/2026-10-16/16.jsonl.gz, 332989 B, 4 stroki (chas tolko nachalsja)",
     "fajly_po_sutkam": "14.10: 8 sutochnyh, 15.10: 6, 16.10: 8 sutochnyh i 8 chasovyh"
+  },
+  "zamereno_progonom_38931145825": {
+    "celostnost": "bityh 9 iz 47 fajlov: 13.10 chetyre (coingecko 117 strok chitaetsja, gmgn 1189, jupiter 2310, pumpfun 1171), 14.10 dva, 15.10 dva (odin 0 bajt), 16.10 odin",
+    "tablicy": "tolko 12.10 schitaetsja (30807 strok); 13-16.10 padajut na bitom gzip",
+    "objom_po_sutkam": "12.10 598 MB, 13.10 255 MB, 14.10 4 MB, 15.10 0 MB, 16.10 19 MB",
+    "probno": "otdali spisok 12 iz 16"
   }
 }
