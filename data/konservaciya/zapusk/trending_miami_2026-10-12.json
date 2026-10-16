@@ -1,11 +1,11 @@
 {
-  "zachem": "DIAGNOZ DISKA lab-miami: sutochnyj push upal tri nochi -- 13.10 'No space left on device', 14 i 15.10 begunok ne otvechal serveru. Shag diagnoza tolko chitaet i stoit DO ljubyh pravok",
+  "zachem": "TOLKO DIAGNOZ: disk lab-miami zanjat na 100 % (145G iz 145G), klon otkazyvaet na shallow.lock 'No space left on device'. Stavit nechego, merit nuzhno. Proshlyj zamer dal /home 126G, no 103G iz nih bez imeni -- etot progon razbiraet /home po polzovateljam i po vtoromu urovnju",
   "vetka_podbivki": "claude/podbivka",
   "koren_podbivki": "/opt/robinhood-chain-alpha",
   "probno": "no",
   "birdeye": "NE stavim -- slovo vladelca",
   "torgovyj_host": "ne tragaem",
-  "popytka": 5,
+  "popytka": 6,
   "koth": {
     "pravka": "odna stroka 69: ?includeNsfw=false, kommit 6782009a na claude/podbivka",
     "pochemu": "parametr includeNsfw u etogo endpointa OBJAZATELNYJ po spec-repo, i vse chetyre zhivyh klienta zovut ego tolko s nim; nash zov byl bez nego",
@@ -13,5 +13,14 @@
     "proba": "shest kandidatov, pervyj i poslednij kontrolnye (200 i 404)"
   },
   "klon": "vetka dogonjaetsja reset-om, kod -- checkout-om po analysis: prezhnij checkout -B zatiral by snimki, kotorye tajmer dopisyvaet kazhduju minutu",
-  "pravka_etoj_popytki": "dobavlen shag diagnoza (df, du po korniu, rabochie katalogi begunka, klon v /opt, snimki po dnjam, zhiv li begunok). --probno vykljuchen: mesta na mashine mozhet ne byt vovse"
+  "pravka_etoj_popytki": "dobavlen shag diagnoza (df, du po korniu, rabochie katalogi begunka, klon v /opt, snimki po dnjam, zhiv li begunok). --probno vykljuchen: mesta na mashine mozhet ne byt vovse",
+  "tolko_diagnoz": "yes",
+  "zamereno_15_10": {
+    "disk": "145G iz 145G, 100 %",
+    "home": "126G, iz nih rabochij katalog begunka 23G",
+    "opt_klon": "17G, iz nih data 9.5G, data/trending 860M, analysis 18M",
+    "snimki_za_sutki_12_10": "626 MB (jupiter 469M, pumpfun 82M, dexscreener 31M, geckoterminal 28M, coingecko 8M, gmgn 7M, cmc 1M, birdeye 85K)",
+    "sbor_umer": "13.10 nepolnyj (268M), 14.10 ~5M, 15.10 ~0.9M i tri fajla po 0 bajt",
+    "begunok": "sluzhba active running, no na polnom diske teriaet svjaz s serverom"
+  }
 }

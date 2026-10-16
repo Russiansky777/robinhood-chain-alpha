@@ -54,6 +54,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # ТОЛЬКО ДИАГНОЗ, И ЭТО НЕ УДОБСТВО. 16.10 диск lab-miami занят на 100 %,
+  # и шаг клона отказывает на 'failed to write .git/shallow.lock: No space
+  # left on device'. Ставить что-либо на полный диск нельзя, а мерить --
+  # нужно. С 'yes' прогон делает ТОЛЬКО читающие шаги и выходит зелёным.
+  TOLKO_DIAGNOZ: "no"
   VETKA_PODBIVKI: "claude/podbivka"
   KOREN_PODBIVKI: "/opt/robinhood-chain-alpha"
   PROBNO: "yes"
@@ -110,6 +115,23 @@ jobs:
             echo "=== 2. CHEM ZANJAT KOREN: verhnij uroven ==="
             du -sh /* 2>/dev/null | sort -rh | head -12
             echo
+            echo "=== 2a. /home PO POLZOVATELJAM ==="
+            # БЕЗ ЭТОГО РАЗБОРА ПРОШЛЫЙ ЗАМЕР НИЧЕГО НЕ ОБЪЯСНИЛ: /home дал
+            # 126 ГБ, рабочий каталог бегунка -- 23 ГБ, и сто гигабайт
+            # остались безымянными. Чьё место -- вопрос к владельцу, и
+            # отвечать на него надо именами, а не догадкой.
+            du -sh /home/* 2>/dev/null | sort -rh | head -10
+            echo "--- vtoroj uroven /home ---"
+            du -sh /home/*/* 2>/dev/null | sort -rh | head -20
+            echo "--- samye tjazhelye katalogi mashiny (do 3 urovnej, bez chuzhih FS) ---"
+            du -x -d3 / 2>/dev/null | sort -rn | head -25
+            echo "--- samye krupnye OTDELNYE fajly ---"
+            find / -xdev -type f -size +500M -printf '%10s %p\n' 2>/dev/null \
+              | sort -rn | head -15
+            echo "--- zhurnal systemd i kesh apt ---"
+            journalctl --disk-usage 2>/dev/null
+            du -sh /var/cache/apt /var/lib/docker 2>/dev/null
+            echo
             echo "=== 3. RABOCHIE KATALOGI BEGUNKA (po progonu) ==="
             ls -d /home/*/actions-runner/_work/*/ 2>/dev/null
             du -sh /home/*/actions-runner/_work/* 2>/dev/null | sort -rh | head -12
@@ -148,7 +170,7 @@ jobs:
           # Проверено -- на этом разбор прогона падал дважды.
           METKA_FAJL=$(ls -1t data/konservaciya/zapusk/trending_miami_*.json 2>/dev/null | head -1 || true)
           echo "fajl-metka: ${METKA_FAJL:-net}"
-          for IMJA in VETKA_PODBIVKI KOREN_PODBIVKI PROBNO; do
+          for IMJA in VETKA_PODBIVKI KOREN_PODBIVKI PROBNO TOLKO_DIAGNOZ; do
             KLJUCH=$(printf '%s' "$IMJA" | tr 'A-Z' 'a-z')
             NOVO=$(printf '%s' "$VHODY" | jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' 2>/dev/null || true)
             if [ -z "$NOVO" ] && [ -n "$METKA_FAJL" ]; then
@@ -169,6 +191,7 @@ jobs:
           ssh -n $SSH_OPTS root@"$HOST_LAB" "hostname; nproc; df -h /opt | tail -1; python3 -V; systemctl --version | head -1"
 
       - name: "Пользователь podbivka и клон ветки Code-2"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
           set -o pipefail
@@ -270,6 +293,7 @@ jobs:
           STAVIM
 
       - name: "Юниты и таймеры systemd"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
           set -o pipefail
@@ -346,6 +370,7 @@ jobs:
           echo "juniti dostavleny"
 
       - name: "Включить таймеры сбора (таймер пуша -- нет, и это названо)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
           set -o pipefail
@@ -370,6 +395,7 @@ jobs:
           VKLJUCHAEM
 
       - name: "ПРОБА КАНДИДАТОВ KOTH: какой путь pump.fun ещё жив (только чтение)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         # ЗАЧЕМ ОТДЕЛЬНЫЙ ШАГ, А НЕ ПРАВКА ПО ДОГАДКЕ. Замерено 12.10 с этой же
         # машины: /coins/king-of-the-hill отдал 404 (157 байт), а
         # /coins/currently-live на том же хосте -- 200 и 50 элементов. То есть
@@ -423,7 +449,10 @@ jobs:
           grep -A1 'KANDIDAT' koth_proba.txt | grep 'kod_i_bajt' | sort | uniq -c | head || true
 
       - name: "ПЕРВЫЙ ДОКЛАД: --probno сразу (сколько из 16 списков отдают данные)"
-        if: ${{ env.PROBNO == 'yes' }}
+        # ДВА УСЛОВИЯ СЛИТЫ В ОДНО: два ключа if у одного шага -- это
+        # дубль ключа в YAML, второй молча затирает первый, и выключатель
+        # диагноза не сработал бы вовсе. Поймано своей же проверкой разбора.
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' && env.PROBNO == 'yes' }}
         run: |
           set -e
           set -o pipefail
@@ -438,6 +467,7 @@ jobs:
           grep -E 'итого|otdali' probno_miami.txt || tail -3 probno_miami.txt
 
       - name: "Первый прогон таймеров: убедиться, что снимки ложатся на диск"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
           set -o pipefail
