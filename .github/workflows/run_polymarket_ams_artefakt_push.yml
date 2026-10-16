@@ -99,6 +99,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: "ПРЕДОХРАНИТЕЛЬ: это не торговый хост"
+        id: predohranitel
         run: |
           set -e
           # Прогон идёт НА МАШИНЕ, поэтому адрес проверяем у самой машины, а
@@ -123,6 +124,7 @@ jobs:
           echo "torgovyj $TORGOVYJ_ZAPRESHCHEN sredi adresov ne najden -- prodolzhaem"
 
       - name: "Параметры: вход прогона сильнее умолчания"
+        id: parametry
         env:
           VHOD_KOREN: ${{ inputs.koren }}
           VHOD_SUTKI: ${{ inputs.sutki }}
@@ -237,7 +239,17 @@ jobs:
 
       - name: "Производные и отметки -- в рабочее дерево ветки (без --delete)"
         id: perenos
-        if: ${{ always() && job.status != 'cancelled' }}
+        # ПЕРЕНОС НЕ ИМЕЕТ ПРАВА ИДТИ ПОВЕРХ КРАСНОГО ПРЕДОХРАНИТЕЛЯ. Голый
+        # always() здесь был дырой ровно того же вида, какую я закрыл на шаг
+        # ниже: если предохранитель отказал (адрес совпал с торговым либо
+        # hostname -I ничего не выдал) или параметры не разобрались, перенос
+        # всё равно шёл, выходил зелёным -- и ОТКРЫВАЛ пуш, потому что пуш
+        # опирается на исход переноса. Теперь перенос требует зелёных
+        # предохранителя и параметров, но по-прежнему НЕ зависит от упаковки и
+        # загрузки артефакта: производные к ним отношения не имеют.
+        if: ${{ always() && job.status != 'cancelled'
+                && steps.predohranitel.outcome == 'success'
+                && steps.parametry.outcome == 'success' }}
         run: |
           set -e
           set -o pipefail
@@ -274,6 +286,28 @@ jobs:
             exit 1
           fi
           echo "fajlov krupnee 95 MB net"
+          # СЫРОЕ ЕСТЬ, А ПРОИЗВОДНЫХ НЕТ -- ЭТО НЕ ПОВОД ВЫЙТИ ЗЕЛЁНЫМ.
+          # Упаковка выше доказала, что за эти сутки сырьё на ящике ЕСТЬ.
+          # Значит таймер polymarket-proizvodnye обязан был их посчитать
+          # (юнит зовёт --proizvodnye без --sutki, то есть пересчитывает все
+          # сутки). Если производных за эти сутки нет -- таймер не шёл либо
+          # упал, и ночь прошла бы впустую при зелёном прогоне. Молчаливая
+          # потеря -- худший исход, её и ловим.
+          # На плановом прогоне это ОТКАЗ; на ручном запуске (dispatch)
+          # громкое предупреждение: вручную мы часто целимся в сегодняшние
+          # сутки, которых таймер ещё не считал.
+          ZA_SUTKI=$(find "$PUT_PROIZVODNYH" -type f -path "*/$SUTKI/*" 2>/dev/null | wc -l)
+          if [ "$ZA_SUTKI" -eq 0 ]; then
+            echo "VNIMANIE: za $SUTKI syroe upakovano, a proizvodnyh NET ni odnoj."
+            echo "Znachit tajmer polymarket-proizvodnye za eti sutki ne schital."
+            if [ "${GITHUB_EVENT_NAME:-}" = "schedule" ]; then
+              echo "SBOJ: planovyj progon -- eto otkaz, a ne zamechanie."
+              exit 1
+            fi
+            echo "(ruchnoj zapusk -- prodolzhaju, no chislo nazvano)"
+          else
+            echo "proizvodnyh za $SUTKI: $ZA_SUTKI"
+          fi
 
       - name: "Пуш производных в ветку claude/stroiteli (токен от GitHub)"
         # ЗАВИСИМОСТЬ ОТ ПЕРЕНОСА -- НЕ ФОРМАЛЬНОСТЬ. При одном always()
