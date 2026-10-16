@@ -1,6 +1,12 @@
 #!/bin/sh
-# СТОРОЖ ДИСКА lab-miami. Раз в час: мало места -- остановить таймеры
-# регистратора и положить маркер, чтобы это было видно из ветки.
+# СТОРОЖ ДИСКА ЛАБОРАТОРНОГО ЯЩИКА. Раз в час: мало места -- остановить
+# таймеры регистратора и положить маркер, чтобы это было видно из ветки.
+#
+# ОДИН СКРИПТ НА ОБА ЯЩИКА, И ЭТО СЛОВО ВЛАДЕЛЬЦА ("тот же скрипт, что на
+# miami"). Разное у них только три вещи, и все три приходят переменными
+# окружения: корень клона, список таймеров и путь маркера. Умолчания --
+# миамские, чтобы прежняя установка на lab-miami не поменяла поведения ни на
+# букву; lab-ams передаёт свои значения в юните.
 #
 # ЗАЧЕМ. 13-16.10 диск был занят на 100 %, и регистратор при ЖИВЫХ таймерах
 # молча терял снимки: 12.10 -- 598 МБ, 13.10 -- 256, 14.10 -- 4.7, 15.10 --
@@ -19,8 +25,11 @@ set -eu
 
 POROG_GB="${STOROZH_POROG_GB:-10}"
 KOREN="${PODB_KOREN:-/opt/robinhood-chain-alpha}"
-METKA="$KOREN/data/trending/DISK_STOP"
-TAJMERY="podbivka-trending-min.timer podbivka-trending-5min.timer podbivka-trending-pervye.timer"
+METKA="${STOROZH_METKA:-$KOREN/data/trending/DISK_STOP}"
+TAJMERY="${STOROZH_TAJMERY:-podbivka-trending-min.timer podbivka-trending-5min.timer podbivka-trending-pervye.timer}"
+echo "koren: $KOREN"
+echo "marker: $METKA"
+echo "tajmery: $TAJMERY"
 
 # df -Pk, А НЕ df -h: -P даёт одну строку на файловую систему (без переноса
 # при длинном имени устройства), -k -- килобайты, то есть число, а не "116G",
@@ -55,12 +64,12 @@ mkdir -p "$(dirname "$METKA")"
 # должен сразу знать когда, сколько было места и что именно остановлено.
 {
   echo "{"
-  echo "  \"chto\": \"storozh diska lab-miami ostanovil registrator\","
+  echo "  \"chto\": \"storozh diska ostanovil registrator\","
   echo "  \"kogda\": \"$SEJCHAS\","
   echo "  \"svobodno_gb\": $SVOB_GB,"
   echo "  \"porog_gb\": $POROG_GB,"
   echo "  \"ostanovleno\": \"$TAJMERY\","
-  echo "  \"pochemu\": \"bez mesta registrator molcha terjaet snimki -- eto uzhe bylo 13-16.10\","
+  echo "  \"pochemu\": \"bez mesta registrator molcha terjaet snimki -- eto uzhe bylo na lab-miami 13-16.10\","
   echo "  \"chto_delat\": \"osvobodit mesto; marker snimetsja sam na sledujushchej chasovoj proverke, i tajmery vkljuchatsja obratno\""
   echo "}"
 } > "$METKA"

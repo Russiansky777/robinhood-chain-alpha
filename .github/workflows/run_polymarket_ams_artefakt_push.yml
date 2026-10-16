@@ -54,6 +54,11 @@ env:
   VETKA_KODA: "claude/stroiteli"
   PUT_PROIZVODNYH: "data/polymarket/proizvodnye"
   PUT_OTMETOK: "data/polymarket/artefakty"
+  # МАРКЕР СТОРОЖА ДИСКА lab-ams (пункт 2 владельца 17.10): "кладёт маркер,
+  # который уезжает твоим пушем". Чтобы уезжал, он должен быть И в выборке
+  # sparse-checkout, И в путях коммита. Тот же приём, что у трендингов на
+  # lab-miami, включая СНЯТИЕ маркера из ветки, когда место вернулось.
+  PUT_MARKERA: "data/polymarket/DISK_STOP"
   OTMECHAT: "yes"
   TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
 
@@ -96,6 +101,7 @@ jobs:
           sparse-checkout: |
             /data/polymarket/proizvodnye/
             /data/polymarket/artefakty/
+            /data/polymarket/DISK_STOP
           sparse-checkout-cone-mode: false
 
       - name: "ПРЕДОХРАНИТЕЛЬ: это не торговый хост"
@@ -308,6 +314,21 @@ jobs:
           if [ -f "$KOREN/$PUT_OTMETOK/$SUTKI.json" ]; then
             cp -f "$KOREN/$PUT_OTMETOK/$SUTKI.json" "$PUT_OTMETOK/$SUTKI.json"
           fi
+          # МАРКЕР СТОРОЖА ЕЗДИТ В ОБЕ СТОРОНЫ. Пока он есть на ящике --
+          # лежит и в ветке: это единственный способ увидеть из ветки, что
+          # регистратор остановлен и снимков за это время не будет. Как только
+          # место вернулось, сторож снимает маркер на ящике, и тогда его надо
+          # снять И из ветки -- иначе в ветке навсегда останется STOP,
+          # которого на машине уже нет, и ветка будет врать.
+          if [ -f "$KOREN/$PUT_MARKERA" ]; then
+            cp -f "$KOREN/$PUT_MARKERA" "$PUT_MARKERA"
+            echo "MARKER_EST=yes" >> "$GITHUB_ENV"
+            echo "--- marker storozha diska EST na jashchike, edet v vetku ---"
+            cat "$PUT_MARKERA"
+          else
+            echo "MARKER_EST=no" >> "$GITHUB_ENV"
+            echo "markera storozha na jashchike net -- mesta hvataet"
+          fi
           echo "--- chto polozheno ---"
           echo "proizvodnyh na mashine za $SUTKI: $(find "$KOREN/$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
           echo "proizvodnyh na mashine vsego:     $(find "$KOREN/$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
@@ -378,7 +399,7 @@ jobs:
           # заново (см. причину в шаге переноса), а сообщение коммита при
           # этом врало бы: оно называет $SUTKI.
           SOBRAT_PUTI() {
-            for P in "$PUT_PROIZVODNYH/$SUTKI" "$PUT_OTMETOK/$SUTKI.json"; do
+            for P in "$PUT_PROIZVODNYH/$SUTKI" "$PUT_OTMETOK/$SUTKI.json" "$PUT_MARKERA"; do
               if [ -n "$(find "$P" -type f -print -quit 2>/dev/null)" ] \
                  || [ -f "$P" ] \
                  || git ls-files --error-unmatch -- "$P" >/dev/null 2>&1; then
@@ -395,6 +416,14 @@ jobs:
           STAVIM() {
             # shellcheck disable=SC2086
             git add --ignore-removal -- $1
+            # СНЯТИЕ МАРКЕРА -- ЕДИНСТВЕННОЕ УДАЛЕНИЕ, КОТОРОЕ МЫ ЗАНОСИМ
+            # ЯВНО. --ignore-removal выше нарочно не даёт заносить удаления
+            # (иначе чужой файл, легший в ветку между нашим checkout и пушем,
+            # уехал бы удалённым), поэтому маркер снимаем отдельной командой.
+            if [ "${MARKER_EST:-no}" != "yes" ]; then
+              git rm -q --cached --ignore-unmatch -- "$PUT_MARKERA" >/dev/null 2>&1 || true
+              rm -f "$PUT_MARKERA"
+            fi
           }
           PUTI_TEK=$(SOBRAT_PUTI)
           if [ -z "$PUTI_TEK" ]; then
@@ -411,7 +440,7 @@ jobs:
           # ПРОВЕРЯЕМ ВЕСЬ ИНДЕКС, А НЕ ТОЛЬКО data/polymarket: ниже коммит
           # идёт БЕЗ путей, из индекса, и этот замок должен покрывать всё.
           LISHNEE=$(git diff --cached --name-only \
-                    | grep -vE "^($PUT_PROIZVODNYH/$SUTKI/|$PUT_OTMETOK/$SUTKI[.]json$)" || true)
+                    | grep -vE "^($PUT_PROIZVODNYH/$SUTKI/|$PUT_OTMETOK/$SUTKI[.]json$|$PUT_MARKERA$)" || true)
           if [ -n "$LISHNEE" ]; then
             echo "OTKAZ: v indekse puti vne proizvodnyh i otmetok:"
             printf '%s\n' "$LISHNEE" | sed -n '1,10p' | sed 's/^/  /'
@@ -498,5 +527,6 @@ jobs:
           echo "otmetku stavili:       ${OTMECHAT:-yes}"
           echo "proizvodnyh za sutki:  $(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
           echo "otmetka za sutki:      $([ -f "$PUT_OTMETOK/$SUTKI.json" ] && echo est || echo net)"
+          echo "marker storozha:       ${MARKER_EST:-?}"
           echo "nash kommit:           ${NASH_KOMMIT:-net}"
           echo "rotacija zdes NE delaetsja -- ona otdelnym tajmerom na mashine v 05:11Z"

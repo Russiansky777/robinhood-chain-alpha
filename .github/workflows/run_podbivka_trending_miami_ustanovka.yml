@@ -634,14 +634,14 @@ jobs:
           # ОТ root, А НЕ ОТ podbivka: остановка таймеров -- право root. В сеть
           # сторож не ходит, ключей не просит, торгового хоста не касается.
           scp -i ~/.ssh/miami_key -o StrictHostKeyChecking=accept-new \
-            deploy/lab_miami_storozh_diska.sh \
-            root@"$HOST_LAB":/usr/local/sbin/lab_miami_storozh_diska.sh
+            deploy/lab_storozh_diska.sh \
+            root@"$HOST_LAB":/usr/local/sbin/lab_storozh_diska.sh
           mkdir -p junity_storozh
           printf '%s\n' "[Unit]" \
             "Description=Сторож диска: мало места -- остановить регистратор" "" \
             "[Service]" "Type=oneshot" \
             "Environment=PODB_KOREN=$KOREN" "Environment=STOROZH_POROG_GB=10" \
-            "ExecStart=/usr/local/sbin/lab_miami_storozh_diska.sh" \
+            "ExecStart=/usr/local/sbin/lab_storozh_diska.sh" \
             "TimeoutStartSec=120" "Nice=10" \
             > junity_storozh/podbivka-storozh-diska.service
           # :47, А НЕ :00 -- чтобы не толкаться с минутным таймером и часовыми
@@ -660,7 +660,7 @@ jobs:
             root@"$HOST_LAB":/etc/systemd/system/
           ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'STOROZH' 2>&1 | tee storozh_miami.txt
             set -e
-            chmod 755 /usr/local/sbin/lab_miami_storozh_diska.sh
+            chmod 755 /usr/local/sbin/lab_storozh_diska.sh
             chmod 644 /etc/systemd/system/podbivka-storozh-diska.service \
                       /etc/systemd/system/podbivka-storozh-diska.timer
             systemctl daemon-reload

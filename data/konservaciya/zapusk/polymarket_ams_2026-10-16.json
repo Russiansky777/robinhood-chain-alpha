@@ -1,5 +1,5 @@
 {
-  "zachem": "punkt 5 vladelca 16.10: postavit registrator Polymarket na lab-ams po docs/polymarket_ustanovka.md -- juniti minutnyj, pjatiminutnyj, proizvodnye 03:23Z, rotacija 05:11Z; posle ustanovki --probno i --svodka",
+  "zachem": "punkty 1 i 2 vladelca 17.10: postavit 1b9c8b0e (Code-4) -- pjatyj junit otbora sostava, otbor rukami do vkljuchenija tajmerov, ExecStartPre --sbory; plus storozh diska na lab-ams",
   "vetka_koda": "claude/stroiteli",
   "koren_pm": "/opt/polymarket-put",
   "tolko_diagnoz": "no",
@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 12,
+  "popytka": 13,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -27,9 +27,11 @@
     "glavnaja_bela": "data/polymarket/vybor.json NE LOZHITSJA -- zapros /events ne udalsja, poetomu minutnomu krugu nechego chitat: 9 fajlov, vsego 0.08 MB, iz nih data_trades 0.08"
   },
   "novoe_v_etoj_popytke": {
-    "junit_proizvodnyh": "ExecStart teper '--proizvodnye --sutki \"$(date -u -d yesterday +%%F)\"' -- slovo vladelca. Bez --sutki skript obhodit VSE sutki i pritom ot samyh staryh (sorted), a junit ogranichen TimeoutStartSec=1800: pri tridcati sutkah syrogo systemd ubil by prohod DO poslednih sutok. Plus polnyj pereschjot delal vse chasovye fajly pobajtovo novymi (gzip shtampuet vremja v zagolovok)",
-    "novye_chisla": "v doklade kolec teper: tokenov, u skolkih kniga nepusta, mediany urovnej bid/ask i mediana spreda V TIKAH",
-    "pustoe_syroe": "otmetka artefakta ne stavitsja, esli syroe za sutki pustoe (zamechanie Code-4)"
+    "pjatyj_junit": "polymarket-otbor: --otbor --rynkov 100 --pauza 0.4, TimeoutStartSec=600, tajmer 00:02Z",
+    "otbor_rukami": "progonjaetsja odin raz DO vkljuchenija tajmerov; pustoj sostav -- otkaz, menshe sta -- rezultat, a ne otkaz",
+    "sbory": "ExecStartPre --sbory iz junita dokumenta perenesjon; ExecStartPost s --push NE perenosim (token na mashine)",
+    "procent": "v ini-bloke dokumenta stoit odinochnyj +%F -- systemd ego ne primet. U menja %%F, i eto zamereno otricatelnym kontrolem: odinochnyj dajot 'Failed to resolve unit specifiers'",
+    "storozh": "odin skript na dva jashchika (deploy/lab_storozh_diska.sh): korn, spisok tajmerov i put markera prihodjat peremennymi, umolchanija miamskie. Na ams porog 10 GB, tajmer *:37, marker data/polymarket/DISK_STOP uezzhaet moim pushem i snimaetsja pri vozvrate mesta"
   },
   "zamereno_progonom_38933292283": {
     "koren_molchanija": "gamma_events otdajot 422, telo {'type': 'validation error', 'error': 'order fields are not valid'} -- server otvergaet IMJA POLJA sortirovki (order=volume_24hr) iz dokumenta Code-3",

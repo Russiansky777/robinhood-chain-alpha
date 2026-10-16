@@ -294,7 +294,7 @@ jobs:
           fi
           tail -2 samoproverka_ams.txt
 
-      - name: "Четыре юнита systemd (без строки пуша с машины)"
+      - name: "Пять юнитов systemd (без строки пуша с машины)"
         if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
@@ -313,6 +313,30 @@ jobs:
             "Type=oneshot" "User=polymarket" "WorkingDirectory=$KOREN" \
             "Nice=10" "UMask=0002" "PrivateTmp=yes" "NoNewPrivileges=yes" \
             "ProtectSystem=strict" "ReadWritePaths=$KOREN")
+
+          # --- СУТОЧНЫЙ ОТБОР СОСТАВА (пятый юнит, добавлен 16.10 коммитом
+          # 1b9c8b0e). БЕЗ НЕГО МИНУТНОМУ КРУГУ НЕ НА ЧЕМ РАБОТАТЬ: состав
+          # лежит в data/polymarket/vybor.json, и раньше его писал
+          # пятиминутный снимок /events -- он разворачивал сто самых объёмных
+          # СОБЫТИЙ в 4086 рынков и брал первые сто токенов, то есть хвост
+          # многоисходных событий. Замер с ящика: запрошено 200 токенов, книг
+          # пришло 10, и ВСЕ пустые. Теперь состав -- свой суточный отбор:
+          # 100 рынков по volume24hr среди тех, У КОГО КНИГА НЕ ПУСТА.
+          # 00:02Z, а не 00:00Z: суточные файлы режутся по метке снимка, и
+          # отбор должен лечь в новые сутки, а не в стык.
+          {
+            printf '%s\n' "[Unit]" \
+              "Description=Polymarket: sutochnyj otbor 100 rynkov po volume24hr s nepustoj knigoj" \
+              "After=network-online.target" "" "[Service]"
+            printf '%s\n' "$OBSHCHEE"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --otbor --rynkov $RYNKOV --pauza 0.4" \
+              "TimeoutStartSec=600"
+          } > junity_pm/polymarket-otbor.service
+          printf '%s\n' "[Unit]" "Description=Polymarket: otbor sostava v 00:02 UTC" "" \
+            "[Timer]" "OnCalendar=*-*-* 00:02:00 UTC" "Persistent=true" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_pm/polymarket-otbor.timer
 
           {
             printf '%s\n' "[Unit]" \
@@ -362,10 +386,26 @@ jobs:
           [Service]
           PROIZV_GOLOVA
           printf '%s\n' "$OBSHCHEE" >> junity_pm/polymarket-proizvodnye.service
+          # ExecStartPre -- СУТОЧНЫЙ ОБХОД СТАВОК СБОРА по каждому токену
+          # выбора (/fee-rate, пакетной формы у эндпоинта нет). Он стоит в
+          # юните документа, и я его переношу; ExecStartPost с --push из того
+          # же юнита НЕ переношу -- он требует токена записи на машине.
+          #
+          # ПРОЦЕНТ УДВОЕН, И ЗДЕСЬ Я РАСХОЖУСЬ С ini-БЛОКОМ ДОКУМЕНТА.
+          # В документе строка написана с одиночным +%F. systemd читает
+          # процент как свой спецификатор: замерено отрицательным контролем --
+          # одиночный даёт "Failed to resolve unit specifiers ... Invalid
+          # slot" и fatal error, удвоенный проходит verify чисто и
+          # разворачивается в +%F для /bin/sh. /bin/sh -c обязателен: systemd
+          # сам подстановку $(...) не делает -- это в документе сказано верно.
           cat >> junity_pm/polymarket-proizvodnye.service <<'PROIZV_HVOST'
+          ExecStartPre=/usr/bin/python3 analysis/polymarket_put.py --sbory --rynkov RYNKOV_PODSTANOVKA --pauza 0.4
           ExecStart=/bin/sh -c '/usr/bin/python3 analysis/polymarket_put.py --proizvodnye --sutki "$(date -u -d yesterday +%%F)"'
           TimeoutStartSec=1800
           PROIZV_HVOST
+          # Подстановка числа рынков -- отдельной строкой: внутри закрытого
+          # heredoc переменные нарочно не раскрываются (там живёт $(date)).
+          sed -i "s/RYNKOV_PODSTANOVKA/$RYNKOV/" junity_pm/polymarket-proizvodnye.service
           printf '%s\n' "[Unit]" "Description=Polymarket: proizvodnye v 03:23 UTC" "" \
             "[Timer]" "OnCalendar=*-*-* 03:23:00 UTC" "Persistent=true" "" \
             "[Install]" "WantedBy=timers.target" \
@@ -401,6 +441,7 @@ jobs:
           fi
           echo "stroki pusha s mashiny net ni v odnom junite"
           scp -i ~/.ssh/ams_key -o StrictHostKeyChecking=accept-new \
+            junity_pm/polymarket-otbor.service junity_pm/polymarket-otbor.timer \
             junity_pm/polymarket-min.service junity_pm/polymarket-min.timer \
             junity_pm/polymarket-5min.service junity_pm/polymarket-5min.timer \
             junity_pm/polymarket-proizvodnye.service junity_pm/polymarket-proizvodnye.timer \
@@ -408,7 +449,38 @@ jobs:
             root@"$HOST_LAB":/etc/systemd/system/
           echo "juniti dostavleny"
 
-      - name: "Включить таймеры (все четыре)"
+      - name: "ОТБОР СОСТАВА РУКАМИ -- один раз ДО включения таймеров"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          # СЛОВО ВЛАДЕЛЬЦА И ДОКУМЕНТА: отбор прогнать руками один раз ДО
+          # включения таймеров -- без него data/polymarket/vybor.json пуст, и
+          # минутный круг запрашивает нечего. Таймер отбора стоит на 00:02Z,
+          # то есть сам он сработает только в полночь.
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "cd $KOREN && if command -v sudo >/dev/null 2>&1; then sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --otbor --rynkov $RYNKOV --pauza 0.4; else runuser -u polymarket -- /usr/bin/python3 analysis/polymarket_put.py --otbor --rynkov $RYNKOV --pauza 0.4; fi" \
+            2>&1 | tee otbor_ams.txt
+          echo "--- glavnye stroki otbora ---"
+          grep -E '^(отбор за|выбрано рынков|суточный список|НЕ НАБРАЛОСЬ)' otbor_ams.txt || true
+          # ПУСТОЙ СОСТАВ -- ОТКАЗ. Скрипт возвращает ненулевой код только
+          # если не выбрал ВООБЩЕ ничего, но ноль в составе ловим и сами:
+          # включать таймеры на пустом выборе значит писать час отказов.
+          # Меньше ста рынков отказом НЕ считаем -- документ прямо говорит,
+          # что это сам по себе результат, и он уедет в доклад числом.
+          VYBRANO=$(grep -oE '^выбрано рынков [0-9]+' otbor_ams.txt | tail -1 | grep -oE '[0-9]+' || true)
+          echo "VYBRANO_RYNKOV=${VYBRANO:-net}"
+          if [ -z "$VYBRANO" ] || [ "$VYBRANO" -eq 0 ]; then
+            echo "SBOJ: otbor ne vybral ni odnogo rynka -- tajmery ne vkljuchaju."
+            exit 1
+          fi
+          echo "--- vybor.json na mashine ---"
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "python3 -c \"import json,sys; d=json.load(open('$KOREN/data/polymarket/vybor.json',encoding='utf-8')); print('rynkov', len(d.get('markets') or []), 'tokenov', len(d.get('tokens') or []))\"" \
+            2>&1 | tee -a otbor_ams.txt
+
+      - name: "Включить таймеры (все пять)"
         if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
@@ -421,7 +493,7 @@ jobs:
             # VERIFY ПО ВСЕМ ЧЕТЫРЁМ СЛУЖБАМ, и смотрим на слова "fatal error",
             # а не на код возврата: verify ворчит и на безвредное.
             PLOHIH=0
-            for U in min 5min proizvodnye rotacija; do
+            for U in otbor min 5min proizvodnye rotacija; do
               F="/etc/systemd/system/polymarket-$U.service"
               echo "--- verify $U ---"
               VYVOD=$(systemd-analyze verify "$F" 2>&1 || true)
@@ -431,12 +503,13 @@ jobs:
               esac
             done
             [ "$PLOHIH" -eq 0 ] || { echo "SBOJ: plohih junitov $PLOHIH -- tajmery ne vkljuchaju"; exit 1; }
-            systemctl enable --now polymarket-min.timer polymarket-5min.timer \
-                                   polymarket-proizvodnye.timer polymarket-rotacija.timer
+            systemctl enable --now polymarket-otbor.timer polymarket-min.timer \
+                                   polymarket-5min.timer polymarket-proizvodnye.timer \
+                                   polymarket-rotacija.timer
             echo "--- tajmery ---"
             systemctl list-timers 'polymarket*' --all --no-pager
             echo "--- sostojanie ---"
-            for T in polymarket-min.timer polymarket-5min.timer \
+            for T in polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer \
                      polymarket-proizvodnye.timer polymarket-rotacija.timer; do
               printf '%s: enabled=%s active=%s\n' "$T" \
                 "$(systemctl is-enabled "$T" 2>&1)" "$(systemctl is-active "$T" 2>&1)"
@@ -497,6 +570,75 @@ jobs:
               runuser -u polymarket -- /usr/bin/python3 analysis/polymarket_put.py --svodka || true
             fi
           PROBA
+
+      - name: "СТОРОЖ ДИСКА lab-ams: тот же скрипт, что на miami (пункт 2)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          # СЛОВО ВЛАДЕЛЬЦА: тот же скрипт, что на miami, порог 10 ГБ, раз в
+          # час. Повод назван замером: сырое Polymarket идёт 26.8 МБ/час
+          # (643 МБ/сутки, из них 74 % -- снимок событий), диск ящика 43 ГБ,
+          # хранение сырого 30 суток. Без места регистратор молча теряет
+          # снимки -- ровно тот отказ, за который уже заплатили на miami.
+          #
+          # СКРИПТ ОДИН НА ДВА ЯЩИКА: разное у них только корень клона,
+          # список таймеров и путь маркера -- всё три приходят переменными
+          # окружения, а умолчания остались миамскими, чтобы прежняя
+          # установка не поменялась ни на букву.
+          scp -i ~/.ssh/ams_key -o StrictHostKeyChecking=accept-new \
+            deploy/lab_storozh_diska.sh \
+            root@"$HOST_LAB":/usr/local/sbin/lab_storozh_diska.sh
+          mkdir -p junity_st
+          printf '%s\n' "[Unit]" \
+            "Description=Storozh diska: malo mesta -- ostanovit registrator Polymarket" "" \
+            "[Service]" "Type=oneshot" \
+            "Environment=PODB_KOREN=$KOREN" \
+            "Environment=STOROZH_POROG_GB=10" \
+            "Environment=STOROZH_METKA=$KOREN/data/polymarket/DISK_STOP" \
+            "Environment=STOROZH_TAJMERY=polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer polymarket-proizvodnye.timer polymarket-rotacija.timer" \
+            "ExecStart=/usr/local/sbin/lab_storozh_diska.sh" \
+            "TimeoutStartSec=120" "Nice=10" \
+            > junity_st/polymarket-storozh-diska.service
+          # :37, А НЕ :47 -- на :47 стоит сторож на miami; разводим минуты,
+          # чтобы два ящика не ходили в один и тот же момент (им это ничем не
+          # мешает, но в журналах так разборчивее).
+          printf '%s\n' "[Unit]" "Description=Storozh diska Polymarket raz v chas" "" \
+            "[Timer]" "OnCalendar=*-*-* *:37:00 UTC" "AccuracySec=30s" "Persistent=true" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_st/polymarket-storozh-diska.timer
+          for F in junity_st/*; do
+            echo "=== $F ==="; cat "$F"
+            [ -s "$F" ] || { echo "SBOJ: $F pust"; exit 1; }
+          done
+          scp -i ~/.ssh/ams_key -o StrictHostKeyChecking=accept-new \
+            junity_st/polymarket-storozh-diska.service \
+            junity_st/polymarket-storozh-diska.timer \
+            root@"$HOST_LAB":/etc/systemd/system/
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'STOROZH' 2>&1 | tee storozh_ams.txt
+            set -e
+            chmod 755 /usr/local/sbin/lab_storozh_diska.sh
+            chmod 644 /etc/systemd/system/polymarket-storozh-diska.service \
+                      /etc/systemd/system/polymarket-storozh-diska.timer
+            systemctl daemon-reload
+            VYVOD=$(systemd-analyze verify /etc/systemd/system/polymarket-storozh-diska.service 2>&1 || true)
+            printf '%s\n' "${VYVOD:-(bez zamechanij)}" | head -6
+            case "$VYVOD" in
+              *"fatal error"*) echo "SBOJ: junit storozha ne razbiraetsja"; exit 1 ;;
+            esac
+            systemctl enable --now polymarket-storozh-diska.timer
+            echo "--- proba storozha pri zhivom diske (dolzhen tolko napechatat svobodu) ---"
+            systemctl start polymarket-storozh-diska.service
+            journalctl -u polymarket-storozh-diska.service --no-pager -n 12 | tail -8
+            printf 'tajmer: enabled=%s active=%s\n' \
+              "$(systemctl is-enabled polymarket-storozh-diska.timer 2>&1)" \
+              "$(systemctl is-active polymarket-storozh-diska.timer 2>&1)"
+            echo "--- svobodno sejchas ---"
+            df -h / | tail -1
+            echo "--- marker (dolzhen otsutstvovat pri svobodnom diske) ---"
+            ls -l /opt/polymarket-put/data/polymarket/DISK_STOP 2>&1 || echo "markera net -- tak i dolzhno byt"
+          STOROZH
 
       - name: "ПОЧЕМУ НЕ ЛЁГ ВЫБОР РЫНКОВ: код и причина из самого снимка"
         if: ${{ always() && env.TOLKO_DIAGNOZ != 'yes' }}
@@ -661,6 +803,8 @@ jobs:
             prichina_ams.txt
             order_ams.txt
             krugi_ams.txt
+            otbor_ams.txt
+            storozh_ams.txt
           retention-days: 30
           if-no-files-found: warn
 
@@ -687,6 +831,12 @@ jobs:
             echo "(shag ne shjol)"
           fi
           if [ -f ruff_ams.txt ]; then tail -2 ruff_ams.txt; fi
+          echo "=== 2a. OTBOR SOSTAVA ==="
+          if [ -f otbor_ams.txt ]; then
+            grep -E '^(отбор за|выбрано рынков|суточный список|НЕ НАБРАЛОСЬ|VYBRANO_RYNKOV=|rynkov )' otbor_ams.txt || tail -3 otbor_ams.txt
+          else
+            echo "(shag ne shjol)"
+          fi
           echo "=== 3. TAJMERY ==="
           if [ -f tajmery_ams.txt ]; then
             grep -E 'enabled=' tajmery_ams.txt || true
@@ -738,8 +888,18 @@ jobs:
           echo "=== 8. DVA MINUTNYH KRUGA I GLUBINA KNIG ==="
           if [ -f krugi_ams.txt ]; then
             grep -E '^(RYNKOV=|GLUBINA|  [a-z_]+ +[0-9])' krugi_ams.txt || tail -6 krugi_ams.txt
+            # clob_books ОТДЕЛЬНОЙ СТРОКОЙ -- слово владельца: по нему видно,
+            # наполнились ли книги, а в общем списке он теряется.
+            echo "-- clob_books otdelno --"
+            grep -E '^  clob_books ' krugi_ams.txt || echo "   (stroki clob_books net)"
           else
             echo "(shag ne shjol -- KRUGI=${KRUGI:-no})"
+          fi
+          echo "=== 8a. STOROZH DISKA lab-ams ==="
+          if [ -f storozh_ams.txt ]; then
+            grep -E '^(tajmer:|storozh diska:|MALO MESTA|marker polozhen|markera net|/dev/)' storozh_ams.txt || tail -5 storozh_ams.txt
+          else
+            echo "(shag ne shjol)"
           fi
           echo "=== 9. METKA BEGUNKA (poslednej strokoj) ==="
           if [ -f diagnoz_ams.txt ]; then
