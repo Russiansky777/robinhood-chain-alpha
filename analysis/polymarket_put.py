@@ -566,11 +566,16 @@ def читать_снимки(список_: str, сутки: str):
     if not п.is_dir():
         return
     for ф in sorted(п.glob("*.jsonl.gz")):
-        for стрка in gzip.open(ф, "rt", encoding="utf-8"):
-            try:
-                yield json.loads(стрка)
-            except ValueError:
-                continue
+        # Через `with`, а не голым gzip.open: это ГЕНЕРАТОР, и читающий может
+        # оборвать обход на половине файла. Без `with` открытый поток дожил бы
+        # до сборки мусора, а на суточном обходе это 24 файла на список и
+        # девять списков -- две сотни дескрипторов разом.
+        with gzip.open(ф, "rt", encoding="utf-8") as поток:
+            for стрка in поток:
+                try:
+                    yield json.loads(стрка)
+                except ValueError:
+                    continue
 
 
 def proizvodnye_za_sutki(сутки: str) -> dict:
@@ -603,29 +608,30 @@ def proizvodnye_za_sutki(сутки: str) -> dict:
     часы = sorted(час_папка.glob("*.jsonl.gz")) if час_папка.is_dir() else []
     for чф in часы:
         накопили = []
-        for стрка in gzip.open(чф, "rt", encoding="utf-8"):
-            try:
-                стр = json.loads(стрка)
-            except ValueError:
-                continue
-            if стр.get("код") != 200:
-                continue
-            книги = стр.get("тело")
-            if not isinstance(книги, list):
-                continue
-            мин = стр["utc"][:17] + "00Z"
-            for к in книги:
-                if not isinstance(к, dict):
+        with gzip.open(чф, "rt", encoding="utf-8") as поток:
+            for стрка in поток:
+                try:
+                    стр = json.loads(стрка)
+                except ValueError:
                     continue
-                ряд = ряд_из_книги(к)
-                ряд["utc"] = мин
-                ряд["snimok_utc"] = стр["utc"]
-                т = str(ряд.get("token_id") or "")
-                ряд.update(награды.get(т) or {"nagrada_forma": None})
-                тр = торговля.get((мин, т)) or {"sdelok": 0, "objom": 0.0}
-                ряд["sdelok_za_minutu"] = тр["sdelok"]
-                ряд["objom_za_minutu"] = round(тр["objom"], 6)
-                накопили.append(ряд)
+                if стр.get("код") != 200:
+                    continue
+                книги = стр.get("тело")
+                if not isinstance(книги, list):
+                    continue
+                мин = стр["utc"][:17] + "00Z"
+                for к in книги:
+                    if not isinstance(к, dict):
+                        continue
+                    ряд = ряд_из_книги(к)
+                    ряд["utc"] = мин
+                    ряд["snimok_utc"] = стр["utc"]
+                    т = str(ряд.get("token_id") or "")
+                    ряд.update(награды.get(т) or {"nagrada_forma": None})
+                    тр = торговля.get((мин, т)) or {"sdelok": 0, "objom": 0.0}
+                    ряд["sdelok_za_minutu"] = тр["sdelok"]
+                    ряд["objom_za_minutu"] = round(тр["objom"], 6)
+                    накопили.append(ряд)
         if not накопили:
             continue
         ф = ПАПКА / "proizvodnye" / сутки / чф.name
@@ -843,15 +849,16 @@ def свод() -> int:
         уровней = книг = 0
         for ф in sorted(п.rglob("*.jsonl.gz")):
             байт += ф.stat().st_size
-            for стрка in gzip.open(ф, "rt", encoding="utf-8"):
-                снимков += 1
-                try:
-                    с = json.loads(стрка)
-                except ValueError:
-                    continue
-                р = с.get("разбор") or {}
-                уровней += int(р.get("urovnej") or 0)
-                книг += int(р.get("knig") or 0)
+            with gzip.open(ф, "rt", encoding="utf-8") as поток:
+                for стрка in поток:
+                    снимков += 1
+                    try:
+                        с = json.loads(стрка)
+                    except ValueError:
+                        continue
+                    р = с.get("разбор") or {}
+                    уровней += int(р.get("urovnej") or 0)
+                    книг += int(р.get("knig") or 0)
         всего += байт
         хвост = (f" книг {книг} уровней {уровней} "
                  f"(в среднем {уровней / книг:.1f} на книгу)"
@@ -1040,7 +1047,7 @@ def self_test() -> int:
         "требует сторону -- четыре записи на рынок. Заказ 50-100 рынков "
         "внутри потолка",
         predel_rynkov() == 125 and 100 <= predel_rynkov(), predel_rynkov())
-    _х, т_предел, _п = тело_запроса(
+    _, т_предел, _ = тело_запроса(
         "tokens_sides", {"tokens": [f"t{и}" for и in range(400)],
                          "markets": []}, predel_rynkov())
     chk(f"И ЭТО НЕ НА СЛОВАХ: при {predel_rynkov()} рынках тело /prices "
@@ -1050,22 +1057,22 @@ def self_test() -> int:
 
     # ----- 6. ТЕЛА ЗАПРОСОВ
     выбор_проб = {"tokens": ["t1", "t2"], "markets": ["0xm1"], "slugs": []}
-    _х, т_книг, п_книг = тело_запроса("tokens", выбор_проб, 50)
+    _, т_книг, п_книг = тело_запроса("tokens", выбор_проб, 50)
     chk("ТЕЛО /books -- список {token_id}, по токену на запись: "
         f"{т_книг}", т_книг == [{"token_id": "t1"}, {"token_id": "t2"}]
         and п_книг["tokenov"] == 2, т_книг)
-    _х, т_цен, п_цен = тело_запроса("tokens_sides", выбор_проб, 50)
+    _, т_цен, п_цен = тело_запроса("tokens_sides", выбор_проб, 50)
     chk("ТЕЛО /prices ТРЕБУЕТ СТОРОНУ: на каждый токен ДВЕ записи, BUY и "
         f"SELL -- иначе вернулась бы половина цены ({п_цен})",
         len(т_цен) == 4
         and {з["side"] for з in т_цен} == {"BUY", "SELL"}
         and п_цен["zapisej"] == 4, т_цен)
-    х_ev, т_ev, _п = тело_запроса("events", выбор_проб, 100)
+    х_ev, т_ev, _ = тело_запроса("events", выбор_проб, 100)
     chk("ЗАПРОС events: active=true, closed=false, сортировка по суточному "
         f"объёму, limit=100 -- и это GET без тела: {х_ev}",
         т_ev is None and "active=true" in х_ev and "closed=false" in х_ev
         and "order=volume_24hr" in х_ev and "limit=100" in х_ev, х_ev)
-    х_пусто, _т, п_пусто = тело_запроса(
+    х_пусто, _, п_пусто = тело_запроса(
         "token_odin", {"tokens": [], "markets": []}, 50)
     chk("ДОКАЗАННЫЙ КРАСНЫЙ: выбора рынков нет -- запрос НЕ собирается, и "
         "причина называется («нет выбора рынков»), а не уходит пустой "
@@ -1232,7 +1239,10 @@ def self_test() -> int:
         and награда_рынка({})["nagrada_forma"] is None)
 
     # ----- 14. РОТАЦИЯ: БЕЗ ПОДТВЕРЖДЁННОГО АРТЕФАКТА НЕ УДАЛЯЕТ НИЧЕГО
-    global ПАПКА, ПАПКА_ОТМЕТОК                       # noqa: PLW0603
+    # global нарочно: проверка ротации работает в tempfile, а не в рабочей
+    # папке, и возвращает обе на место в finally. (Директивы noqa тут не
+    # стоит: при наборе правил без PLW0603 она сама стала бы замечанием.)
+    global ПАПКА, ПАПКА_ОТМЕТОК
     было_п, было_о = ПАПКА, ПАПКА_ОТМЕТОК
     try:
         врем = Path(tempfile.mkdtemp(prefix="pmput-"))
