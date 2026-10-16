@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 13,
+  "popytka": 14,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -55,5 +55,22 @@
     "telo_knigi": "kod 200, 3507 bajt, knig v otvete 10, i kazhdaja PUSTA: bids [], asks [], last_trade_price '' -- pri etom CLOB otdajot polnyj objekt knigi (market, asset_id, hash, timestamp, tick_size 0.001, min_order_size 5). Znachit token_id VERNYE, a rynki prosto nikogda ne torgovalis",
     "vsego": "17.16 MB; gamma_events 8.72 MB/chas, data_trades 5.07 MB/chas",
     "glubina": "GLUBINA strok 200, mediana bid i ask 0.0"
+  },
+  "otbor": "no",
+  "zamereno_progonom_38973828932": {
+    "samoproverka": "na meste 'proverok 55, zhdali 55, ne proshlo 0'",
+    "otbor_rukami": "stranic 10, rynkov prosmotreno 1000, kandidatov 987, knig sprosheno 500; VYBRANO RYNKOV 100 (tokenov 200), s pustoj knigoj otbrosheno 16, ne oprosheno 0",
+    "knigi": "NAPOLNILIS: clob_books kod 200, knig 200, urovnej 18286, knig s dvumja storonami 200 iz 200",
+    "tajmery": "vse pjat enabled=enabled active=active",
+    "endpointy": "otvetili 9 iz 9",
+    "krugi": "RYNKOV=100 TOKENOV=200; MB za chas: gamma_events 6.44, clob_books 0.58, data_trades 1.06, gamma_markets 1.21, clob_prices/spreads/midpoints po 0.05, prochie 0.00-0.04",
+    "glubina": "GLUBINA strok 3710 tokenov 210 knig_nepustyh 1000 mediana_bid 0.0 mediana_ask 0.0 mediana_spreda_v_tikah 1.0 -- mediany urovnej lgut: 2710 strok iz 3710 lezhat ot DOPRAVOCHNOGO sbora (10 tokenov, knigi pustye), i oni v bolshinstve",
+    "storozh": "tajmer enabled=enabled active=active, svobodno 39G iz 43G (11% zanjato), markera net",
+    "metka_begunka": "lab-ams"
+  },
+  "chto_pravim_v_popytke_14": {
+    "storozh_environment": "ZNACHENIE S PROBELAMI V Environment= OBJAZANO BYT V KAVYCHKAH. Bez kavychek systemd pishet \"Invalid environment assignment, ignoring: b.timer\" i ostavljaet peremennoj TOLKO PERVOE SLOVO, a systemd-analyze verify pri etom vsjo ravno dajot kod 0. Znachit na jashchike sejchas storozh ostanovil by odin tajmer iz pjati. Zamereno obomi variantami; dobavleno utverzhdenie po zhurnalu sluzhby na vse pjat imjon",
+    "mediany_po_nepustym": "vtoraja stroka GLUBINA_NEPUSTYE -- mediany tolko po knigam s urovnjami, inache doklad pokazyvaet dopravochnoe proshloe",
+    "otbor_vykljuchen": "otbor: no -- sostav uzhe otobran rukami v 38973828932, a tajmer otbora stoit na 00:02Z. Povtornyj otbor v seredine sutok dobavil by v sutochnye proizvodnye TRETIJ nabor tokenov i isportil by imenno to chislo, za kotorym progon perezapuskajut"
   }
 }

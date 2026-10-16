@@ -68,6 +68,12 @@ env:
   # /events отдаёт 422, и семь списков стоят с причиной "нет выбора рынков".
   # Включается меткой запуска (krugi: yes) или входом прогона.
   KRUGI: "no"
+  # ОТБОР СОСТАВА РУКАМИ -- ВЫКЛЮЧАЕМЫЙ, и это не удобство. Отбор уже прошёл
+  # руками в прогоне 38973828932 (выбрано 100 рынков), а таймер отбора стоит
+  # на 00:02Z. Повторный отбор в середине суток переписал бы суточный состав
+  # и добавил в суточные производные ТРЕТИЙ набор токенов -- то есть испортил
+  # бы ровно то число, за которым прогон и перезапускают. Метка: otbor: no.
+  OTBOR: "yes"
   SUTOK_SYROGO: "30"
   HOST_LAB: 216.73.157.61
   TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
@@ -115,7 +121,7 @@ jobs:
           # 'ls -1t' выбрал бы не самую позднюю метку, а первую по алфавиту.
           METKA_FAJL=$(ls -1 data/konservaciya/zapusk/polymarket_ams_*.json 2>/dev/null | sort | tail -1 || true)
           echo "fajl-metka: ${METKA_FAJL:-net}"
-          for IMJA in VETKA_KODA KOREN_PM TOLKO_DIAGNOZ KRUGI; do
+          for IMJA in VETKA_KODA KOREN_PM TOLKO_DIAGNOZ KRUGI OTBOR; do
             KLJUCH=$(printf '%s' "$IMJA" | tr 'A-Z' 'a-z')
             NOVO=$(printf '%s' "$VHODY" | jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' 2>/dev/null || true)
             if [ -z "$NOVO" ] && [ -n "$METKA_FAJL" ]; then
@@ -450,7 +456,7 @@ jobs:
           echo "juniti dostavleny"
 
       - name: "ОТБОР СОСТАВА РУКАМИ -- один раз ДО включения таймеров"
-        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' && env.OTBOR != 'no' }}
         run: |
           set -e
           set -o pipefail
@@ -591,13 +597,20 @@ jobs:
             deploy/lab_storozh_diska.sh \
             root@"$HOST_LAB":/usr/local/sbin/lab_storozh_diska.sh
           mkdir -p junity_st
+          # ЗНАЧЕНИЕ С ПРОБЕЛАМИ В Environment= ОБЯЗАНО БЫТЬ В КАВЫЧКАХ, и это
+          # замер, а не вкус. Без кавычек systemd разбивает строку по пробелам
+          # и ругается "Invalid environment assignment, ignoring: b.timer",
+          # оставляя переменной ТОЛЬКО первое слово -- то есть сторож
+          # остановил бы один таймер из пяти и ушёл молча, потому что
+          # systemd-analyze verify при этом всё равно отдаёт код 0. Проверено
+          # обоими вариантами на этой же машине.
           printf '%s\n' "[Unit]" \
             "Description=Storozh diska: malo mesta -- ostanovit registrator Polymarket" "" \
             "[Service]" "Type=oneshot" \
             "Environment=PODB_KOREN=$KOREN" \
             "Environment=STOROZH_POROG_GB=10" \
             "Environment=STOROZH_METKA=$KOREN/data/polymarket/DISK_STOP" \
-            "Environment=STOROZH_TAJMERY=polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer polymarket-proizvodnye.timer polymarket-rotacija.timer" \
+            'Environment="STOROZH_TAJMERY=polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer polymarket-proizvodnye.timer polymarket-rotacija.timer"' \
             "ExecStart=/usr/local/sbin/lab_storozh_diska.sh" \
             "TimeoutStartSec=120" "Nice=10" \
             > junity_st/polymarket-storozh-diska.service
@@ -634,6 +647,25 @@ jobs:
             printf 'tajmer: enabled=%s active=%s\n' \
               "$(systemctl is-enabled polymarket-storozh-diska.timer 2>&1)" \
               "$(systemctl is-active polymarket-storozh-diska.timer 2>&1)"
+            # ПЕРЕМЕННАЯ ДОШЛА ЦЕЛИКОМ -- ПРОВЕРЯЕМ, А НЕ НАДЕЕМСЯ. Скрипт
+            # печатает свой список таймеров первой же строкой; если Environment
+            # разобрался неверно, в журнале будет один таймер вместо пяти.
+            SPISOK=$(journalctl -u polymarket-storozh-diska.service --no-pager -n 40 2>/dev/null \
+                     | grep -m1 'tajmery:' || true)
+            echo "chto uvidel skript -> ${SPISOK:-stroki tajmerov v zhurnale net}"
+            NET=0
+            for T in polymarket-otbor polymarket-min polymarket-5min \
+                     polymarket-proizvodnye polymarket-rotacija; do
+              case "$SPISOK" in
+                *"$T.timer"*) : ;;
+                *) echo "SBOJ: v spiske storozha net $T.timer"; NET=$((NET + 1)) ;;
+              esac
+            done
+            [ "$NET" -eq 0 ] || { echo "SBOJ: storozh poluchil ne vse tajmery ($NET ne hvataet)"; exit 1; }
+            echo "storozh vidit vse pjat tajmerov"
+            echo "--- zhalovalsja li systemd na razbor Environment ---"
+            journalctl -u polymarket-storozh-diska.service --no-pager -n 40 2>/dev/null \
+              | grep -i 'Invalid environment assignment' && { echo "SBOJ: systemd razbil Environment"; exit 1; } || echo "zhalob na Environment net"
             echo "--- svobodno sejchas ---"
             df -h / | tail -1
             echo "--- marker (dolzhen otsutstvovat pri svobodnom diske) ---"
@@ -781,8 +813,16 @@ jobs:
               # Тики, а не центы: максимальный спред награды считается от
               # середины и у рынков разный tick_size, так что спред в тиках --
               # единственная сравнимая мера.
+              #
+              # ВТОРАЯ СТРОКА, ПО НЕПУСТЫМ КНИГАМ -- НЕ УКРАШЕНИЕ. Прогон
+              # 38973828932 отдал медианы 0.0 при 1000 непустых книгах из
+              # 3710 строк: в суточных производных лежат И строки ДО правки
+              # Code-4 (10 токенов, книги пустые, уровней ноль), и они в
+              # большинстве, поэтому медиана по всем строкам показывает
+              # прошлое, а не нынешний сбор. Считаем оба числа и печатаем
+              # оба -- иначе доклад соврёт в обе стороны сразу.
               find "$PR" -type f -name '*.jsonl.gz' -exec zcat {} + 2>/dev/null \
-                | python3 -c "import json,sys,statistics as st; r=[json.loads(l) for l in sys.stdin if l.strip()]; b=[x.get('urovnej_bid') for x in r if isinstance(x.get('urovnej_bid'), (int, float))]; a=[x.get('urovnej_ask') for x in r if isinstance(x.get('urovnej_ask'), (int, float))]; nz=[x for x in r if (x.get('urovnej_bid') or 0) + (x.get('urovnej_ask') or 0) > 0]; tk=[x['spred'] / x['tick_size'] for x in r if isinstance(x.get('spred'), (int, float)) and isinstance(x.get('tick_size'), (int, float)) and x['tick_size'] > 0]; print('GLUBINA strok', len(r), 'tokenov', len({x.get('token_id') for x in r}), 'knig_nepustyh', len(nz), 'mediana_bid', (st.median(b) if b else 'net'), 'mediana_ask', (st.median(a) if a else 'net'), 'mediana_spreda_v_tikah', (round(st.median(tk), 2) if tk else 'net'))"
+                | python3 -c "import json,sys,statistics as st; r=[json.loads(l) for l in sys.stdin if l.strip()]; chis=lambda v: isinstance(v, (int, float)) and not isinstance(v, bool); nz=[x for x in r if (x.get('urovnej_bid') or 0) + (x.get('urovnej_ask') or 0) > 0]; med=lambda s: (round(st.median(s), 2) if s else 'net'); ur=lambda s, k: med([x.get(k) for x in s if chis(x.get(k))]); tiki=lambda s: [x['spred'] / x['tick_size'] for x in s if chis(x.get('spred')) and chis(x.get('tick_size')) and x['tick_size'] > 0]; print('GLUBINA strok', len(r), 'tokenov', len({x.get('token_id') for x in r}), 'knig_nepustyh', len(nz), 'knig_pustyh', len(r) - len(nz), 'mediana_bid', ur(r, 'urovnej_bid'), 'mediana_ask', ur(r, 'urovnej_ask'), 'mediana_spreda_v_tikah', med(tiki(r))); print('GLUBINA_NEPUSTYE strok', len(nz), 'tokenov', len({x.get('token_id') for x in nz}), 'mediana_bid', ur(nz, 'urovnej_bid'), 'mediana_ask', ur(nz, 'urovnej_ask'), 'mediana_spreda_v_tikah', med(tiki(nz)))"
             else
               echo "GLUBINA: proizvodnyh za $SEGODNJA net -- schitat ne iz chego"
             fi
@@ -835,7 +875,7 @@ jobs:
           if [ -f otbor_ams.txt ]; then
             grep -E '^(отбор за|выбрано рынков|суточный список|НЕ НАБРАЛОСЬ|VYBRANO_RYNKOV=|rynkov )' otbor_ams.txt || tail -3 otbor_ams.txt
           else
-            echo "(shag ne shjol)"
+            echo "(otbor ne gonjali namerenno: OTBOR=${OTBOR:-yes}; sostav -- v razdele 8)"
           fi
           echo "=== 3. TAJMERY ==="
           if [ -f tajmery_ams.txt ]; then
