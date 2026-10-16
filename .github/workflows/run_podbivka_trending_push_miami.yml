@@ -342,7 +342,14 @@ jobs:
           echo "porog uborki syrogo: $STARSHE_SUTOK_SYROE sutok = $STARSHE_MINUT minut"
           # -mmin, А НЕ -mtime: '-mtime +60' у find значит "старше 61 суток"
           # (целые сутки, дробь отбрасывается) -- не то, что просил владелец.
-          find "$KOREN/data/trending" -mindepth 2 -maxdepth 2 -type f \
+          #
+          # ДВА РАСКРОЯ, А НЕ ОДИН, и это замер по документу Code-2 (cb9614425):
+          # с 16.10 сырое лежит <источник>/<ДАТА>/<ЧЧ>.jsonl.gz -- на уровень
+          # ГЛУБЖЕ прежнего <источник>/<ДАТА>.jsonl.gz, плюс перелив
+          # <ЧЧ>.part2.jsonl.gz при подходе часа к 95 МБ. Суточные файлы 12.10
+          # остаются как есть. Прежнее '-mindepth 2 -maxdepth 2' видело ТОЛЬКО
+          # старый раскрой, то есть часовые файлы уборка не тронула бы вовсе.
+          find "$KOREN/data/trending" -mindepth 2 -maxdepth 3 -type f \
             -name '*.jsonl.gz' -not -path "$KOREN/$PUT_PERVYH/*" \
             -mmin "+$STARSHE_MINUT" > "$SPISOK_STARYH" || true
           echo "kandidatov starshe $STARSHE_SUTOK_SYROE sutok: $(wc -l < "$SPISOK_STARYH")"
@@ -358,6 +365,13 @@ jobs:
             # ПОСЛЕДНЯЯ ПРОВЕРКА ПЕРЕД rm -- НА САМОМ ПУТИ. Если find когда-то
             # расширят или образец изменят, этот замок всё равно не пустит
             # удалять таблицу первых появлений и что-либо вне каталога сырого.
+            # ОБРАЗЕЦ В case ПЕРЕСЕКАЕТ '/', И ЭТО ЛЕГКО ПРИНЯТЬ ЗА ЗАЩИТУ,
+            # КОТОРОЙ НЕТ. Проверено: 'data/trending/*/*.jsonl.gz' совпадает и
+            # с 'data/trending/pervye/2026-10-13.jsonl.gz', потому что '*' в
+            # case не останавливается на косой черте. То есть один этот образец
+            # таблицу НЕ защищает -- её спасает только первая ветвь, идущая
+            # раньше. Поэтому имя источника проверяется ОТДЕЛЬНО и явно.
+            ISTOCHNIK=$(printf '%s' "$OTN" | cut -d/ -f3)
             case "$OTN" in
               "$PUT_PERVYH"/*)
                 PROPUSHCHENO=$((PROPUSHCHENO + 1))
@@ -369,6 +383,11 @@ jobs:
                 echo "NE UDALJAJU $OTN -- put ne pohozh na syroj snimok"
                 continue ;;
             esac
+            if [ "$ISTOCHNIK" = "pervye" ] || [ -z "$ISTOCHNIK" ]; then
+              PROPUSHCHENO=$((PROPUSHCHENO + 1))
+              echo "NE UDALJAJU $OTN -- istochnik '$ISTOCHNIK' ne syroj"
+              continue
+            fi
             RAZMER=$(stat -c %s -- "$PUT" || echo 0)
             if rm -f -- "$PUT"; then
               UDALENO=$((UDALENO + 1))
