@@ -239,15 +239,15 @@ jobs:
             echo "klon gotov, vladelec polymarket"
           STAVIM
 
-      - name: "САМОПРОВЕРКА 35/35 и ruff ДО УСТАНОВКИ: красное -- не ставим"
+      - name: "САМОПРОВЕРКА и ruff ДО УСТАНОВКИ: красное -- не ставим"
         if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
           set -o pipefail
           KOREN="$KOREN_PM"
-          # СЛОВО ВЛАДЕЛЬЦА: "самопроверка 35/35 -- пройти заново на месте,
-          # ruff". На месте, а не на слово: у ящика своя версия Python и свой
-          # набор правил ruff. Сети самопроверка не просит.
+          # СЛОВО ВЛАДЕЛЬЦА: "самопроверка -- пройти заново на месте, ruff".
+          # На месте, а не на слово: у ящика своя версия Python и свой набор
+          # правил ruff. Сети самопроверка не просит.
           # ОТ ПОЛЬЗОВАТЕЛЯ polymarket, НО НЕ ЧЕРЕЗ ОДИН ТОЛЬКО sudo: на
           # лабораторной машине sudo может не стоять вовсе, и шаг упал бы на
           # "sudo: command not found", ничего не поставив и ничего не измерив.
@@ -255,11 +255,35 @@ jobs:
           ssh -n $SSH_OPTS root@"$HOST_LAB" \
             "cd $KOREN && if command -v sudo >/dev/null 2>&1; then sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --self-test; else runuser -u polymarket -- /usr/bin/python3 analysis/polymarket_put.py --self-test; fi" \
             2>&1 | tee samoproverka_ams.txt
-          # ЧИСЛО ПРОВЕРОК СВЕРЯЕТСЯ, А НЕ ПРОСМАТРИВАЕТСЯ: ждём ровно 35 и
-          # ровно 0 упавших. Код возврата ssh -- это код самопроверки
-          # (pipefail включён), так что красная валит шаг и сама.
-          grep -q 'проверок 35, ждали 35, не прошло 0' samoproverka_ams.txt \
-            || { echo "SBOJ: ne 35 iz 35 -- tajmery ne stavlju, vyvod vyshe"; exit 1; }
+          # ЧИСЛО ПРОВЕРОК НЕ ЗАШИТО, И ЭТО ИСПРАВЛЕНИЕ ПО ЗАМЕРУ. Было
+          # зашито "проверок 35, ждали 35": владелец назвал 35, и столько
+          # объявлял скрипт на коммите 57653e0d. Code-4 коммитом 93997cdd
+          # поднял объявленное число до 42 -- он нашёл, что прежняя
+          # самопроверка сверяла запрос С ТЕМ ЖЕ неверным именем поля
+          # (order=volume_24hr), то есть была зелёной, ничего не проверяя, и
+          # добавил проверки на неверные написания. Зашитое 35 после этого
+          # отбивало установку при ЗЕЛЁНОЙ самопроверке -- прогон 38941978050
+          # так и упал.
+          #
+          # Теперь ворота строже и не зависят от версии: берём итоговую строку
+          # самопроверки, требуем, чтобы СДЕЛАННЫХ проверок было ровно столько,
+          # сколько ОБЪЯВЛЕНО, упавших -- ноль, и чтобы в выводе не было ни
+          # "ПЛОХО", ни "СБОЙ". Число печатаем в доклад, а не прячем.
+          STROKA=$(grep -oE 'проверок [0-9]+, ждали [0-9]+, не прошло [0-9]+' \
+                   samoproverka_ams.txt | tail -1)
+          [ -n "$STROKA" ] || { echo "SBOJ: v vyvode net itogovoj stroki samoproverki"; exit 1; }
+          echo "itog samoproverki: $STROKA"
+          BYLO=$(printf '%s' "$STROKA" | sed -E 's/^проверок ([0-9]+).*/\1/')
+          ZHDALI=$(printf '%s' "$STROKA" | sed -E 's/.*ждали ([0-9]+).*/\1/')
+          PLOHO=$(printf '%s' "$STROKA" | sed -E 's/.*не прошло ([0-9]+).*/\1/')
+          echo "SAMOPROVERKA=$BYLO/$ZHDALI ne_proshlo=$PLOHO"
+          [ "$BYLO" = "$ZHDALI" ] \
+            || { echo "SBOJ: sdelano proverok $BYLO, a objavleno $ZHDALI"; exit 1; }
+          [ "$PLOHO" = "0" ] || { echo "SBOJ: ne proshlo $PLOHO proverok"; exit 1; }
+          if grep -qE 'ПЛОХО|СБОЙ' samoproverka_ams.txt; then
+            echo "SBOJ: v vyvode samoproverki est ПЛОХО libo СБОЙ"
+            exit 1
+          fi
           echo "--- ruff ---"
           ssh -n $SSH_OPTS root@"$HOST_LAB" \
             "cd $KOREN && if command -v ruff >/dev/null 2>&1; then ruff check analysis/polymarket_put.py; else echo 'ruff na jashchike NET -- proverka propushchena, i eto skazano vsluh'; fi" \
@@ -626,6 +650,7 @@ jobs:
           echo "=== 2. SAMOPROVERKA I RUFF ==="
           if [ -f samoproverka_ams.txt ]; then
             grep -E 'проверок .*ждали' samoproverka_ams.txt || tail -1 samoproverka_ams.txt
+            grep -E '^SAMOPROVERKA=' samoproverka_ams.txt || true
           else
             echo "(shag ne shjol)"
           fi

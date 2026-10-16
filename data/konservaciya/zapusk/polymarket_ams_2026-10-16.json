@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 7,
+  "popytka": 8,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -27,12 +27,15 @@
     "glavnaja_bela": "data/polymarket/vybor.json NE LOZHITSJA -- zapros /events ne udalsja, poetomu minutnomu krugu nechego chitat: 9 fajlov, vsego 0.08 MB, iz nih data_trades 0.08"
   },
   "novoe_v_etoj_popytke": {
-    "chasovoj_svod": "chas posle ustanovki proshjol -- snjat svod po faktu: snimkov i MB po spiskam, ljog li vybor.json, kakoj kandidat polja sortirovki otvetil 200. KRUGI ostajotsja no: pravki order=volume24hr ot Code-4 poka net, i krugi merit nechego"
+    "pravka_code_4": "na claude/stroiteli uzhe lezhit 93997cdd (Code-4): order=volume24hr vmesto volume_24hr. Vzjato NAPRJAMUJU iz vetki, a ne po pereslannomu heshu -- vetka pervichnyj istochnik, i kommit nazvan zdes, chtoby vladelec mog sverit",
+    "vorota_samoproverki": "chislo proverok bolshe ne zashito: Code-4 podnjal objavlennoe s 35 do 42 (prezhnjaja samoproverka sverjala zapros s tem zhe nevernym imenem polja i byla zeljonoj, nichego ne proverjaja). Zashitoe 35 otbilo ustanovku pri ZELJONOJ samoproverke -- progon 38941978050. Teper trebuem: sdelano = objavleno, ne proshlo 0, i ni PLOHO ni SBOJ v vyvode",
+    "krugi": "vkljucheny: dva minutnyh kruga, zatem rynki, tokeny, MB za chas po spiskam i mediana urovnej bid/ask"
   },
   "zamereno_progonom_38933292283": {
     "koren_molchanija": "gamma_events otdajot 422, telo {'type': 'validation error', 'error': 'order fields are not valid'} -- server otvergaet IMJA POLJA sortirovki (order=volume_24hr) iz dokumenta Code-3",
     "sledstvie": "vybor.json ne lozhitsja -> sem spiskov clob/data stojat s prichinoj 'net vybora rynkov'",
     "chto_rabotaet": "data_trades kod 200 (500 sdelok, 396821 bajt na snimok), clob_time kod 200",
     "nakoplenie": "za 8 minut 9 fajlov, 0.86 MB, iz nih data_trades 0.85"
-  }
+  },
+  "krugi": "yes"
 }
