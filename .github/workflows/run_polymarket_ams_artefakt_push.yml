@@ -177,6 +177,34 @@ jobs:
           fi
           echo "--- chto upakovyvaem ---"
           printf '%s\n' "$KATALOGI" | sed 's/^/  /'
+          # ПУСТОЕ СЫРОЕ -- НЕ ПОВОД СТАВИТЬ ОТМЕТКУ (замечание Code-4).
+          # Каталоги суток могут СУЩЕСТВОВАТЬ и быть пустыми: таймер создал
+          # их и не записал ни байта (ровно так вышло 15.10, когда диск был
+          # полон). Отметка означает "сырое за эти сутки уехало в артефакт" и
+          # ОТКРЫВАЕТ ротации удаление; поставить её на пустые сутки значит
+          # разрешить удалить то, чего и не было, и записать в историю ложь.
+          # Поэтому считаем ФАЙЛЫ и БАЙТЫ, а не каталоги, и при нуле
+          # отказываемся ДО загрузки -- тогда и шаг отметки не пойдёт.
+          FAJLOV_SYROGO=0
+          BAJT_SYROGO=0
+          while IFS= read -r K; do
+            [ -n "$K" ] || continue
+            N=$(find "$KOREN/$K" -type f -name '*.jsonl.gz' 2>/dev/null | wc -l)
+            B=$(find "$KOREN/$K" -type f -name '*.jsonl.gz' -printf '%s\n' 2>/dev/null \
+                | awk '{s += $1} END {printf "%d", s + 0}')
+            FAJLOV_SYROGO=$((FAJLOV_SYROGO + N))
+            BAJT_SYROGO=$((BAJT_SYROGO + B))
+          done <<SPISOK
+          $KATALOGI
+          SPISOK
+          echo "syryh fajlov za $SUTKI: $FAJLOV_SYROGO, bajt: $BAJT_SYROGO"
+          if [ "$FAJLOV_SYROGO" -eq 0 ] || [ "$BAJT_SYROGO" -eq 0 ]; then
+            echo "SBOJ: katalogi za $SUTKI est, a syrogo v nih NET (fajlov"
+            echo "$FAJLOV_SYROGO, bajt $BAJT_SYROGO). Artefakt ne gruzim i otmetku NE"
+            echo "stavim: otmetka otkryvaet rotacii udalenie, i na pustyh sutkah ona"
+            echo "razreshila by udalit to, chego ne bylo."
+            exit 1
+          fi
           # gzip -1: тела снимков УЖЕ в gzip, второй проход почти ничего не
           # жмёт, а на двухъядерном ящике стоит времени.
           printf '%s\n' "$KATALOGI" \
@@ -186,6 +214,7 @@ jobs:
           echo "arhiv=$ARHIV" >> "$GITHUB_OUTPUT"
           echo "sutki=$SUTKI" >> "$GITHUB_OUTPUT"
           echo "razmer=$RAZMER" >> "$GITHUB_OUTPUT"
+          echo "syryh_fajlov=$FAJLOV_SYROGO" >> "$GITHUB_OUTPUT"
           # ОПИСЬ АРХИВА -- В ФАЙЛ, А НЕ В КОНВЕЙЕР С head, И ЭТО ЗАМЕР, А НЕ
           # ОСТОРОЖНОСТЬ. Прогон 38940276494 упал ровно здесь: было
           # 'tar -tzf "$ARHIV" | head -5', head закрыл конвейер после пятой
@@ -464,6 +493,7 @@ jobs:
           set -e
           echo "sutki:                 ${SUTKI:-?}"
           echo "arhiv syrogo:          ${{ steps.pack.outputs.razmer }} B"
+          echo "syryh fajlov za sutki: ${{ steps.pack.outputs.syryh_fajlov }}"
           echo "artefakt id:           ${{ steps.up.outputs.artifact-id }}"
           echo "otmetku stavili:       ${OTMECHAT:-yes}"
           echo "proizvodnyh za sutki:  $(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
