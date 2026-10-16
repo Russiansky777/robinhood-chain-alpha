@@ -25,9 +25,13 @@ Polymarket отдаёт без подписи — разбор по уровня
 
 ---
 
-## 0. Сначала самопроверка — ПРОГНАНА 16.10, 35 из 35
+## 0. Сначала самопроверка — ПРОГНАНА 16.10, 42 из 42
 
-Прогнал CODE-4 в свежей сессии: **«проверок 35, ждали 35, не прошло 0»**, и
+**Проверок стало 42, было 35** — семь добавлено 16.10 после живой ошибки на
+lab-ams (см. врезку ниже): одна на имя поля сортировки и шесть на суточный
+обход сборов. Если Code-1 увидит «ждали 35» — значит файл на ящике старый.
+
+Прогнал CODE-4 в свежей сессии: **«проверок 42, ждали 42, не прошло 0»**, и
 `ruff check analysis/polymarket_put.py` — **чисто** (при первом прогоне было 8
 замечаний, исправлены в коде; разбор — `docs/polymarket_put.md`, отметка
 сверху). В сессии CODE-3 предохранитель облачного окружения блокировал запуск
@@ -38,12 +42,30 @@ Python и, возможно, другой набор правил ruff:
 
 ```bash
 cd /opt/polymarket-put
-python3 analysis/polymarket_put.py --self-test   # ждём «проверок 35, ждали 35, не прошло 0»
+python3 analysis/polymarket_put.py --self-test   # ждём «проверок 42, ждали 42, не прошло 0»
 ruff check analysis/polymarket_put.py            # если ruff есть на ящике
 ```
 
 **Таймеры до зелёной самопроверки не включать.** Если число проверок или число
 упавших разойдётся — пришли вывод, поправлю.
+
+### Что было сломано 16.10 и почему самопроверка этого не поймала
+
+Code-1 поставил `57653e0`: самопроверка зелёная, четыре таймера идут, а
+**рынков 0**. Причина: Gamma отвечает **422 «order fields are not valid»** на
+`order=volume_24hr` — выбор рынков остаётся пустым, и весь минутный круг пишет
+отказы. Верное имя — **`volume24hr`**, оно замерено пробой Code-1 с ящика:
+`volume_24hr` → 422, `volume24hr` → **200** (1 370 904 Б), `volume` → 200,
+`liquidity` → 200, `volume24Hr` → 422, без `order` → 200.
+
+**Самопроверка была зелёная потому, что сверяла запрос с тем же неверным
+именем** — она проверяла, что в URL стоит `order=volume_24hr`, и он там стоял.
+Это ровно тот случай, против которого в этом файле заведены «доказанные
+красные»: проверка, повторяющая предположение кода, не проверяет ничего.
+Теперь она ищет неверные написания по **всей рабочей части файла**, а не
+сверяет одно место само с собой. Откуда взялось неверное имя (их собственный
+гайд перенёс значения `sort` у `/public-search` на `order` у `/events`) —
+разобрано в `docs/polymarket_put.md`, п. 2.
 
 ## 1. Что пишется
 
@@ -51,7 +73,7 @@ ruff check analysis/polymarket_put.py            # если ruff есть на �
 
 | список | каждые | метод | запрос |
 |---|---|---|---|
-| `gamma_events` | 5 мин | GET | `gamma-api.polymarket.com/events?active=true&closed=false&order=volume_24hr&ascending=false&limit=100` |
+| `gamma_events` | 5 мин | GET | `gamma-api.polymarket.com/events?active=true&closed=false&order=volume24hr&ascending=false&limit=100` |
 | `clob_books` | 1 мин | POST | `clob.polymarket.com/books`, тело `[{token_id}]` |
 | `clob_prices` | 1 мин | POST | `/prices`, тело `[{token_id, side}]` — по две записи на токен |
 | `clob_midpoints` | 1 мин | POST | `/midpoints` |
@@ -169,10 +191,28 @@ Description=Polymarket: proizvodnye minutnye rjady i push v vetku
 Type=oneshot
 User=polymarket
 WorkingDirectory=/opt/polymarket-put
+ExecStartPre=/usr/bin/python3 analysis/polymarket_put.py --sbory --rynkov 100 --pauza 0.4
 ExecStart=/usr/bin/python3 analysis/polymarket_put.py --proizvodnye
 ExecStartPost=/usr/bin/python3 analysis/polymarket_put.py --push --vetka claude/stroiteli
 TimeoutStartSec=1800
 ```
+
+**`ExecStartPre` с `--sbory` — это суточный обход ставок сбора по КАЖДОМУ
+токену выбора** (`/fee-rate`, запрос на токен — пакетной формы у этого
+эндпоинта нет, см. `docs/polymarket_put.md`, п. 4). Пятиминутный список
+спрашивает только **первый** токен, и для проверки (а) из п. 10 того документа
+этого мало: там нужна ставка каждой ноги полного набора. При 100 рынках это
+**200 запросов один раз в сутки**, с паузой 0.4 с — около **80 секунд**;
+`TimeoutStartSec=1800` это покрывает с запасом. Строки идут в тот же список
+`clob_fee_rate`, у каждой в разборе есть `token_id`.
+
+**Почему `ExecStartPre`, а не внутри `--proizvodnye`:** `--proizvodnye`
+считает ряды из уже лежащего сырого и **не ходит в сеть вовсе** — его можно
+прогнать повторно, в любой момент, без интернета, и он не удвоит строк.
+Смешав туда запросы, мы потеряли бы это свойство. Обход сборов возвращает 0
+даже когда сеть закрыта (он называет причину и останавливается после пяти
+подряд ответов «вовсе ничего»), поэтому `ExecStartPre` не срывает прогон
+производных.
 
 Таймер — `OnCalendar=*-*-* 03:23:00 UTC`, `Persistent=true`.
 **03:23Z выбран нарочно:** не 02:17Z (там суточный пуш трендингов на
@@ -325,6 +365,11 @@ python3 analysis/polymarket_put.py --ocenka
 python3 analysis/polymarket_put.py --svodka
 python3 analysis/polymarket_put.py --proizvodnye --sutki $(date -u +%F)
 python3 analysis/polymarket_put.py --rotacija --dnej 30 --probno   # dolzhno byt pusto
+
+# 4. Sbory po KAZHDOMU tokenu -- 200 zaprosov, okolo 80 s pri pauze 0.4.
+# Snachala s --probno (nichego ne pishet), potom nabojo.
+python3 analysis/polymarket_put.py --sbory --rynkov 100 --pauza 0.4 --probno
+python3 analysis/polymarket_put.py --sbory --rynkov 100 --pauza 0.4
 ```
 
 `--probno` ничего не пишет, только печатает по строке на список:
@@ -333,16 +378,20 @@ python3 analysis/polymarket_put.py --rotacija --dnej 30 --probno   # dolzhno byt
 **Что прислать в докладе** — именно эти числа, их я из контейнера получить не
 могу:
 
-1. вывод `--self-test` (ждём 35 из 35);
-2. вывод `--probno`: кто ответил и с каким кодом;
+1. вывод `--self-test` (ждём **42 из 42**);
+2. вывод `--probno`: кто ответил и с каким кодом. Теперь особенно
+   **`gamma_events`: код 200 и `rynkov` больше нуля** — именно здесь стояла
+   ошибка 16.10 (422 и ноль рынков);
 3. **глубину книги** из `--svodka` (`clob_books … уровней N (в среднем M на
    книгу)`) — единственное неизвестное в расчёте объёма;
 4. **заголовки лимитов** из любого снимка `clob_books`
    (`x-ratelimit-limit`/`-remaining`) — настоящие лимиты вместо пересказа
    официальной страницы;
-5. **`base_fee`** из снимка `clob_fee_rate` и объект `feeSchedule` из записи
-   рынка в `gamma_events` — настоящая комиссия вместо девяти расходящихся
-   гайдов;
+5. **`base_fee`** — и теперь не одно число, а две строки вывода `--sbory`:
+   `спрошено N из N, ответили N` и **`разных ставок: K [значения]`**. Это то,
+   на чём стоит проверка (а): одна ставка на все рынки или у каждого своя.
+   Плюс объект `feeSchedule` из записи рынка в `gamma_events` — настоящая
+   комиссия вместо девяти расходящихся гайдов;
 6. **`nagrada_forma`** из производных: Gamma кладёт параметры награды то
    плоско, то внутрь `rewards` — скрипт читает обе формы и пишет, какая
    встретилась. Из доклада станет ясно, какая настоящая;
