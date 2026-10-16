@@ -521,6 +521,23 @@ jobs:
         run: |
           set -e
           set -o pipefail
+          KOREN="$KOREN_PM"
+          # СОСТАВ ПРОВЕРЯЕМ ПЕРЕД ВКЛЮЧЕНИЕМ, И ПРИ ЛЮБОМ OTBOR. Отбить
+          # включение на пустом выборе умел только шаг ручного отбора, а с
+          # OTBOR=no он пропускается -- и тогда слово владельца "прогнать
+          # отбор ДО включения таймеров" держалось бы лишь памятью о прошлом
+          # прогоне. Пустой либо отсутствующий vybor.json означает сутки
+          # отказов "нет выбора рынков" до 00:02Z, поэтому это отказ, а не
+          # предупреждение. Проверка только читает файл на машине.
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "python3 -c \"import json,sys,os; p='$KOREN/data/polymarket/vybor.json'; d=(json.load(open(p,encoding='utf-8')) if os.path.exists(p) else {}); print('SOSTAV rynkov', len(d.get('markets') or []), 'tokenov', len(d.get('tokens') or []))\"" \
+            2>&1 | tee sostav_ams.txt
+          SOSTAV=$(grep -oE '^SOSTAV rynkov [0-9]+' sostav_ams.txt | grep -oE '[0-9]+' || true)
+          if [ -z "$SOSTAV" ] || [ "$SOSTAV" -eq 0 ]; then
+            echo "SBOJ: vybor.json pust libo nechitaem (rynkov ${SOSTAV:-net}) -- tajmery ne vkljuchaju"
+            exit 1
+          fi
+          echo "sostav na mashine: rynkov $SOSTAV -- vkljuchaju tajmery"
           ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'VKLJUCHAEM' 2>&1 | tee tajmery_ams.txt
             set -e
             chmod 644 /etc/systemd/system/polymarket-*.service \
@@ -965,8 +982,9 @@ jobs:
           if [ -f otbor_ams.txt ]; then
             grep -E '^(отбор за|выбрано рынков|суточный список|НЕ НАБРАЛОСЬ|VYBRANO_RYNKOV=|rynkov )' otbor_ams.txt || tail -3 otbor_ams.txt
           else
-            echo "(otbor ne gonjali namerenno: OTBOR=${OTBOR:-yes}; sostav -- v razdele 8)"
+            echo "(otbor ne gonjali namerenno: OTBOR=${OTBOR:-yes})"
           fi
+          if [ -f sostav_ams.txt ]; then grep -E '^SOSTAV ' sostav_ams.txt || true; fi
           echo "=== 3. TAJMERY ==="
           if [ -f tajmery_ams.txt ]; then
             grep -E 'enabled=' tajmery_ams.txt || true
