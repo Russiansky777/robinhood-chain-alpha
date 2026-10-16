@@ -270,7 +270,9 @@ jobs:
           }
           # Снятие маркера из ветки: на машине его нет, значит место вернулось.
           STAVIM() {
-            git add -- "$PUT_PERVYH"
+            # --ignore-removal: добавляющий перенос. Обычный 'git add <путь>'
+            # с git 2.0 заносит и удаления -- проверено ('D d/b.txt').
+            git add --ignore-removal -- "$PUT_PERVYH"
             if [ "${MARKER_EST:-no}" = "yes" ]; then
               git add -- "$PUT_MARKERA"
             else
@@ -281,6 +283,15 @@ jobs:
           PUTI_TEK=$(SOBRAT_PUTI)
           echo "puti kommita: $PUTI_TEK"
           STAVIM
+          # ЗАМОК ПО ВСЕМУ ИНДЕКСУ: коммит ниже идёт БЕЗ путей, из индекса,
+          # поэтому проверять надо всё, что в нём оказалось.
+          LISHNEE=$(git diff --cached --name-only \
+                    | grep -vE "^($PUT_PERVYH/|$PUT_MARKERA$)" || true)
+          if [ -n "$LISHNEE" ]; then
+            echo "OTKAZ: v indekse puti vne tablic i markera:"
+            printf '%s\n' "$LISHNEE" | sed -n '1,10p' | sed 's/^/  /'
+            exit 1
+          fi
           # shellcheck disable=SC2086
           if git diff --cached --quiet -- $PUTI_TEK; then
             echo "novyh tablic net: v vetke uzhe to zhe samoe"
@@ -304,15 +315,31 @@ jobs:
             # можно снять. После STAVIM он уже не виден, и считать поздно.
             PUTI_TEK=$(SOBRAT_PUTI)
             STAVIM
+            LISHNEE=$(git diff --cached --name-only \
+                      | grep -vE "^($PUT_PERVYH/|$PUT_MARKERA$)" || true)
+            if [ -n "$LISHNEE" ]; then
+              echo "OTKAZ: v indekse puti vne tablic i markera:"
+              printf '%s\n' "$LISHNEE" | sed -n '1,10p' | sed 's/^/  /'
+              exit 1
+            fi
             # shellcheck disable=SC2086
             if git diff --cached --quiet -- $PUTI_TEK; then
               echo "uzhe v vetke (popytka $POPYTKA)"
               echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
               exit 0
             fi
-            # shellcheck disable=SC2086
-            git commit -q -m "Trending: pervye pojavlenija za sutki ($FAJLOV fajlov) [automated]" \
-              -- $PUTI_TEK
+            # КОММИТ ИЗ ИНДЕКСА, БЕЗ ПУТЕЙ, И ЭТО ИСПРАВЛЕНИЕ ПО ЗАМЕРУ.
+            # 'git commit -- <путь>' -- ЧАСТИЧНЫЙ коммит: он берёт состояние
+            # РАБОЧЕГО ДЕРЕВА по этому пути, а не индекс. После
+            # 'git reset FETCH_HEAD' в HEAD уже лежит то, что кто-то запушил
+            # между нашим checkout и пушем, а в дереве этого файла нет -- и
+            # частичный коммит записал бы его УДАЛЁННЫМ. Проверено на
+            # настоящем origin у братского прогона Polymarket: чужой файл
+            # исчезал из ветки. Индекс после reset плюс наш add -- это
+            # "вершина ветки плюс наше", а замок выше следит, чтобы в индексе
+            # не было ничего лишнего. Снятие маркера по-прежнему работает:
+            # его удаление заносит явный 'git rm --cached'.
+            git commit -q -m "Trending: pervye pojavlenija za sutki ($FAJLOV fajlov) [automated]"
             # git push БЕЗ КОНВЕЙЕРА, и это главное. 'git push | tail' отдаёт
             # код tail, то есть 0 даже на отказе, и отчёт о пуше врёт. Здесь
             # код возврата честный -- но и ему мы верим не на слово: ниже
