@@ -76,6 +76,16 @@ jobs:
         with:
           ref: claude/stroiteli
           fetch-depth: 1
+          # ТОКЕН НА ДИСКЕ ЯЩИКА: СКАЗАНО ТОЧНО, А НЕ УМОЛЧАНО. При умолчании
+          # persist-credentials действие кладёт токен прогона в .git/config
+          # чекаута как http.extraheader И САМО УБИРАЕТ ЕГО в post-шаге --
+          # это видно в журнале прогона 38940966546 строкой
+          # 'git config --local --unset-all http.https://github.com/.extraheader'.
+          # То есть секрета после прогона на диске не остаётся, но ВНУТРИ
+          # прогона он там лежит. Альтернатива (persist-credentials: false и
+          # токен в URL пуша) хуже: он попал бы в аргументы процесса, видимые
+          # в ps. Тем же путём живёт суточный пуш трендингов на lab-miami.
+          persist-credentials: true
           # ВЫБОРКА ТОЛЬКО ПРОИЗВОДНЫХ И ОТМЕТОК. По исходнику действия
           # (src/git-source-provider.ts): если filter не задан, но задан
           # sparseCheckout, fetchOptions.filter становится 'blob:none', то
@@ -95,6 +105,14 @@ jobs:
           # не у переменной: сверяем все её адреса с торговым.
           SVOI=$(hostname -I 2>/dev/null || echo "")
           echo "adresa mashiny: ${SVOI:-neizvestny}"
+          # ПРЕДОХРАНИТЕЛЬ НЕ ИМЕЕТ ПРАВА ОТКАЗЫВАТЬ "В ПОЛЬЗУ ПРОДОЛЖЕНИЯ".
+          # Прежде при пустом выводе hostname -I цикл не выполнялся ни разу, и
+          # шаг печатал "торгового среди адресов не найден" -- не проверив
+          # ничего. Нет адресов -- нет и проверки, значит стоп.
+          if [ -z "$SVOI" ]; then
+            echo "STOP: adresa mashiny ne prochitalis, proverit nechem."
+            exit 1
+          fi
           for A in $SVOI; do
             if [ "$A" = "$TORGOVYJ_ZAPRESHCHEN" ]; then
               echo "STOP: eto torgovyj host. Nichego zdes ne delaem."
@@ -218,6 +236,7 @@ jobs:
           ls -l "$KOREN/$PUT_OTMETOK" | tail -5
 
       - name: "Производные и отметки -- в рабочее дерево ветки (без --delete)"
+        id: perenos
         if: ${{ always() && job.status != 'cancelled' }}
         run: |
           set -e
@@ -257,42 +276,104 @@ jobs:
           echo "fajlov krupnee 95 MB net"
 
       - name: "Пуш производных в ветку claude/stroiteli (токен от GitHub)"
-        if: ${{ always() && job.status != 'cancelled' }}
+        # ЗАВИСИМОСТЬ ОТ ПЕРЕНОСА -- НЕ ФОРМАЛЬНОСТЬ. При одном always()
+        # проверка предела 95 МБ внутри переноса НИЧЕГО не останавливала:
+        # перенос краснел, а пуш всё равно шёл и уносил в ветку то, что
+        # проверка забраковала. Теперь пуш идёт только после зелёного
+        # переноса, но по-прежнему не зависит от упаковки и загрузки
+        # артефакта -- производные к ним отношения не имеют.
+        if: ${{ always() && job.status != 'cancelled' && steps.perenos.outcome == 'success' }}
         run: |
           set -e
           set -o pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
+          # ПУТИ КОММИТА СОБИРАЮТСЯ ИЗ ТОГО, ЧТО РЕАЛЬНО ЕСТЬ, И ЭТО ЗАМЕР:
+          # 'git commit -- data/polymarket/artefakty' по пути, под которым нет
+          # ни одного файла, отказывает с "pathspec did not match any file(s)
+          # known to git" -- проверено у себя, код 1. А на ветке
+          # claude/stroiteli каталога data/polymarket нет ВОВСЕ, то есть
+          # первый же прогон с производными и без отметки (otmechat: no) упал
+          # бы ровно здесь. Путь попадает в список, только если под ним есть
+          # файлы на диске либо он уже отслеживается в ветке.
+          #
+          # И СОБИРАЮТСЯ ДО ПРАВКИ ИНДЕКСА -- тот же урок, что у суточного
+          # пуша трендингов: посчитать после правки значит потерять путь,
+          # который правка только что опустошила.
+          SOBRAT_PUTI() {
+            for P in "$PUT_PROIZVODNYH" "$PUT_OTMETOK"; do
+              if [ -n "$(find "$P" -type f -print -quit 2>/dev/null)" ] \
+                 || git ls-files --error-unmatch -- "$P" >/dev/null 2>&1; then
+                printf '%s ' "$P"
+              fi
+            done
+          }
+          # --ignore-removal: ЧТОБЫ ПЕРЕНОС ОСТАЛСЯ ДОБАВЛЯЮЩИМ. С git 2.0
+          # обычный 'git add <путь>' заносит И УДАЛЕНИЯ -- проверено у себя
+          # ('D d/b.txt'), а с --ignore-removal индекс чист. Внутри цикла
+          # повторов мы делаем reset на НОВУЮ вершину ветки, и файл, который
+          # кто-то положил туда между нашим checkout и пушем, оказался бы
+          # удалён нашим же коммитом.
+          STAVIM() {
+            # shellcheck disable=SC2086
+            git add --ignore-removal -- $1
+          }
+          PUTI_TEK=$(SOBRAT_PUTI)
+          if [ -z "$PUTI_TEK" ]; then
+            echo "nechego pushit: ni proizvodnyh, ni otmetok -- ni na mashine, ni v vetke"
+            echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "puti kommita: $PUTI_TEK"
+          STAVIM "$PUTI_TEK"
           # СЫРОЕ В ИНДЕКСЕ -- ОТКАЗ, И ЭТО ПРОВЕРКА, А НЕ ОБЕЩАНИЕ. В ветку
           # едут только производные и отметки; всё прочее под data/polymarket
           # (книги, цены, сделки) -- сырое, 340 МБ в сутки, ему в истории git
           # места нет.
-          LISHNEE=$(git diff --cached --name-only -- data/polymarket \
+          # ПРОВЕРЯЕМ ВЕСЬ ИНДЕКС, А НЕ ТОЛЬКО data/polymarket: ниже коммит
+          # идёт БЕЗ путей, из индекса, и этот замок должен покрывать всё.
+          LISHNEE=$(git diff --cached --name-only \
                     | grep -vE "^($PUT_PROIZVODNYH|$PUT_OTMETOK)/" || true)
           if [ -n "$LISHNEE" ]; then
             echo "OTKAZ: v indekse puti vne proizvodnyh i otmetok:"
             printf '%s\n' "$LISHNEE" | sed -n '1,10p' | sed 's/^/  /'
             exit 1
           fi
-          if git diff --cached --quiet -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"; then
+          # shellcheck disable=SC2086
+          if git diff --cached --quiet -- $PUTI_TEK; then
             echo "novogo net: v vetke uzhe to zhe samoe"
             echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
             exit 0
           fi
-          FAJLOV=$(git diff --cached --numstat -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK" | wc -l)
+          # shellcheck disable=SC2086
+          FAJLOV=$(git diff --cached --numstat -- $PUTI_TEK | wc -l)
           echo "fajlov k pushu: $FAJLOV"
           for POPYTKA in 1 2 3 4 5 6 7 8; do
             git fetch -q --depth=1 origin "$VETKA_KODA"
             git reset -q FETCH_HEAD
-            git add -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
-            if git diff --cached --quiet -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"; then
+            # ПЕРЕСЧЁТ СРАЗУ ПОСЛЕ reset: индекс теперь равен новой вершине
+            # ветки, и путь, который там появился, снова виден.
+            PUTI_TEK=$(SOBRAT_PUTI)
+            STAVIM "$PUTI_TEK"
+            # shellcheck disable=SC2086
+            if git diff --cached --quiet -- $PUTI_TEK; then
               echo "uzhe v vetke (popytka $POPYTKA)"
               echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
               exit 0
             fi
-            git commit -q -m "Polymarket: proizvodnye i otmetki za $SUTKI ($FAJLOV fajlov) [automated]" \
-              -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
+            # КОММИТ ИЗ ИНДЕКСА, БЕЗ ПУТЕЙ, И ЭТО ИСПРАВЛЕНИЕ ПО ЗАМЕРУ.
+            # 'git commit -- <путь>' -- это ЧАСТИЧНЫЙ коммит: он берёт
+            # состояние РАБОЧЕГО ДЕРЕВА по этому пути, а не индекс. После
+            # 'git reset FETCH_HEAD' в HEAD уже лежит то, что кто-то запушил
+            # между нашим checkout и пушем, но в дереве этого файла нет -- и
+            # частичный коммит записывает его УДАЛЁННЫМ. Проверено у себя на
+            # настоящем origin: чужой файл data/polymarket/proizvodnye/
+            # 2026-10-15/09.jsonl.gz исчез из ветки после нашего пуша.
+            # --ignore-removal у git add от этого не спасает: он про индекс, а
+            # дело было в частичном коммите. Индекс же после reset плюс наш
+            # add равен "вершина ветки плюс наши файлы" -- ровно то, что нужно,
+            # а замок выше гарантирует, что в индексе нет ничего лишнего.
+            git commit -q -m "Polymarket: proizvodnye i otmetki za $SUTKI ($FAJLOV fajlov) [automated]"
             # git push БЕЗ КОНВЕЙЕРА: 'git push | tail' отдаёт код tail, то
             # есть 0 даже на отказе, и отчёт о пуше врал бы.
             if git push -q origin HEAD:"$VETKA_KODA"; then
@@ -307,7 +388,7 @@ jobs:
           exit 1
 
       - name: "ДОКАЗАТЕЛЬСТВО ПУША: наш коммит виден в ветке"
-        if: ${{ always() && job.status != 'cancelled' }}
+        if: ${{ always() && job.status != 'cancelled' && steps.perenos.outcome == 'success' }}
         run: |
           set -e
           set -o pipefail
