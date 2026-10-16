@@ -54,6 +54,8 @@ env:
   CHAS_PROBY: "2026/09/22/12"
   # Единственные сутки с проверенным зеркалом в ветке (24 файла .json).
   SUTKI_S_ZERKALOM: "2026/09/25"
+  # Оживление бегунка -- пункт 2 владельца; "no" его пропускает.
+  OZHIVIT: "yes"
 
 jobs:
   osvobodit:
@@ -253,6 +255,59 @@ jobs:
             du -sh "$REPO/.git" 2>/dev/null
             ls -1 "$REPO/.git/objects/pack/"*.pack 2>/dev/null | wc -l
           GC
+
+      - name: "ОЖИВИТЬ БЕГУНОК: перезапуск и слушатель держится больше 2 минут"
+        # ЗАЧЕМ ОТДЕЛЬНО ОТ ОСВОБОЖДЕНИЯ. Слушатель падал на старте, не сумев
+        # создать свой журнал, и runsvc.sh перезапускал его каждые 5 секунд.
+        # Место теперь есть, но сама служба всё это время считалась "active
+        # running" -- жива была обёртка, а не слушатель. Поэтому перезапуск
+        # нужен, и проверять надо именно слушателя, а не состояние юнита.
+        if: ${{ env.OZHIVIT != 'no' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'OZHIVLJAEM' 2>&1 | tee begunok.txt
+            set -e
+            SL=$(systemctl list-units 'actions.runner.*' --all --no-legend --plain 2>/dev/null | awk '{print $1}' | head -1)
+            [ -n "$SL" ] || { echo "SBOJ: sluzhby begunka net"; exit 1; }
+            echo "sluzhba: $SL"
+            echo "--- svobodno pered perezapuskom ---"
+            df -h / | tail -1
+            systemctl restart "$SL"
+            # 130 s, А НЕ 120: слово владельца -- "держится > 2 мин", и
+            # проверять надо ПОСЛЕ порога, а не на нём.
+            echo "zhdu 130 s..."
+            sleep 130
+            echo "--- sostojanie posle 130 s ---"
+            systemctl show "$SL" -p ActiveState -p SubState -p NRestarts -p ExecMainStartTimestamp
+            echo "--- zhurnal sluzhby za 3 minuty ---"
+            journalctl -u "$SL" --since '-3 min' --no-pager 2>/dev/null | tail -12
+            echo "--- padenij slushatelja za 3 minuty ---"
+            PADENIJ=$(journalctl -u "$SL" --since '-3 min' --no-pager 2>/dev/null \
+              | grep -c 'Runner listener exit' || true)
+            echo "PADENIJ=$PADENIJ"
+            echo "--- svezhij zhurnal slushatelja ---"
+            SVEZH=$(ls -1t /home/*/actions-runner/_diag/Runner_*.log 2>/dev/null | head -1)
+            echo "fajl: ${SVEZH:-net}"
+            [ -n "$SVEZH" ] && tail -n 6 "$SVEZH" || true
+            echo "--- slushaet li zadanija ---"
+            SLUSHAET=$(grep -c 'Listening for Jobs' "${SVEZH:-/dev/null}" 2>/dev/null || true)
+            echo "SLUSHAET=${SLUSHAET:-0}"
+          OZHIVLJAEM
+          PADENIJ=$(grep -oE '^PADENIJ=[0-9]+' begunok.txt | tail -1 | cut -d= -f2)
+          SLUSHAET=$(grep -oE '^SLUSHAET=[0-9]+' begunok.txt | tail -1 | cut -d= -f2)
+          echo "--- itog ---"
+          echo "padenij slushatelja za 3 min: ${PADENIJ:-?}"
+          echo "strok 'Listening for Jobs':    ${SLUSHAET:-?}"
+          if [ "${PADENIJ:-1}" != "0" ]; then
+            echo "SBOJ: slushatel vsjo eshchjo padaet -- mesta malo libo prichina drugaja"
+            exit 1
+          fi
+          if [ "${SLUSHAET:-0}" = "0" ]; then
+            echo "SBOJ: v zhurnale slushatelja net 'Listening for Jobs'"
+            exit 1
+          fi
+          echo "begunok derzhitsja bolshe 2 minut i slushaet zadanija"
 
       - name: "МЕСТО ПОСЛЕ и итог"
         if: always()
