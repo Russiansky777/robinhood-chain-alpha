@@ -263,6 +263,44 @@ jobs:
             ls -1 "$REPO/.git/objects/pack/"*.pack 2>/dev/null | wc -l
           GC
 
+      - name: "ВЕРНУТЬ ПРАВА рабочему каталогу бегунка после gc от root"
+        # ЭТО ПОЧИНКА МОЕГО ЖЕ СЛЕДА. git gc я запускал от root, и он оставил
+        # .git/objects/pack во владении root внутри дерева, принадлежащего
+        # бегунку. Замерено прогоном описи Code-2 (job 117061429582, попытка
+        # 2): actions/checkout упал с "EACCES: permission denied, rmdir
+        # .../.git/objects/pack", а за ним "--local can only be used inside a
+        # git repository". То есть мой gc сломал чекаут ДЛЯ ВСЕХ прогонов на
+        # этой машине, а не только для своих.
+        #
+        # chown, А НЕ rm -rf: прав достаточно, чтобы checkout сам убрал битый
+        # огрызок и сделал свежий клон -- он это и делает, когда репозиторий
+        # не разбирается. Удалять самому значит решать за checkout то, что он
+        # умеет лучше.
+        if: ${{ always() }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'PRAVA' 2>&1 | tee prava.txt
+            set -e
+            RAB=$(ls -d /home/*/actions-runner/_work 2>/dev/null | head -1)
+            [ -n "$RAB" ] || { echo "rabochego kataloga begunka net"; exit 0; }
+            BEGUNOK=$(stat -c %U "$RAB")
+            echo "rabochij katalog: $RAB, vladelec: $BEGUNOK"
+            echo "--- chuzhih po vladelcu DO ---"
+            find "$RAB" -not -user "$BEGUNOK" -printf '%u %p\n' 2>/dev/null | head -10
+            CHUZHIH=$(find "$RAB" -not -user "$BEGUNOK" 2>/dev/null | wc -l)
+            echo "chuzhih putej: $CHUZHIH"
+            if [ "$CHUZHIH" -eq 0 ]; then
+              echo "prava v porjadke -- menjat nechego"
+              exit 0
+            fi
+            chown -R "$BEGUNOK":"$BEGUNOK" "$RAB"
+            POSLE=$(find "$RAB" -not -user "$BEGUNOK" 2>/dev/null | wc -l)
+            echo "chuzhih putej posle chown: $POSLE"
+            [ "$POSLE" -eq 0 ] || { echo "SBOJ: chuzhie prava ostalis"; exit 1; }
+            echo "prava vozvrashcheny begunku"
+          PRAVA
+
       - name: "ОЖИВИТЬ БЕГУНОК: перезапуск и слушатель держится больше 2 минут"
         # ЗАЧЕМ ОТДЕЛЬНО ОТ ОСВОБОЖДЕНИЯ. Слушатель падал на старте, не сумев
         # создать свой журнал, и runsvc.sh перезапускал его каждые 5 секунд.
@@ -283,6 +321,14 @@ jobs:
             echo "sluzhba: $SL"
             echo "--- svobodno pered perezapuskom ---"
             df -h / | tail -1
+            # МОМЕНТ ПЕРЕЗАПУСКА ЗАПОМИНАЕТСЯ, И ЭТО НЕ МЕЛОЧЬ. Прежняя
+            # проверка считала падения за '-3 min' и захватывала падения ДО
+            # перезапуска -- то есть ровно тот цикл, который перезапуск и
+            # лечит. Прогон 38926572073 из-за этого объявил сбой при ЖИВОМ
+            # слушателе: в журнале стояло "Listening for Jobs", а падений
+            # насчиталось 2 -- оба старые. Берём секунды эпохи: journalctl
+            # понимает "@<секунды>", и часовой пояс тут ни при чём.
+            NACHALO=$(date +%s)
             systemctl restart "$SL"
             # 130 s, А НЕ 120: слово владельца -- "держится > 2 мин", и
             # проверять надо ПОСЛЕ порога, а не на нём.
@@ -290,10 +336,10 @@ jobs:
             sleep 130
             echo "--- sostojanie posle 130 s ---"
             systemctl show "$SL" -p ActiveState -p SubState -p NRestarts -p ExecMainStartTimestamp
-            echo "--- zhurnal sluzhby za 3 minuty ---"
-            journalctl -u "$SL" --since '-3 min' --no-pager 2>/dev/null | tail -12
-            echo "--- padenij slushatelja za 3 minuty ---"
-            PADENIJ=$(journalctl -u "$SL" --since '-3 min' --no-pager 2>/dev/null \
+            echo "--- zhurnal sluzhby POSLE perezapuska ---"
+            journalctl -u "$SL" --since "@$NACHALO" --no-pager 2>/dev/null | tail -12
+            echo "--- padenij slushatelja POSLE perezapuska ---"
+            PADENIJ=$(journalctl -u "$SL" --since "@$NACHALO" --no-pager 2>/dev/null \
               | grep -c 'Runner listener exit' || true)
             echo "PADENIJ=$PADENIJ"
             echo "--- svezhij zhurnal slushatelja ---"
