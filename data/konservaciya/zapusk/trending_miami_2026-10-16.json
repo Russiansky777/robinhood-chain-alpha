@@ -1,5 +1,5 @@
 {
-  "zachem": "punkt 3 vladelca 16.10: perestavit registrator po docs/podbivka_trending_ustanovka.md (Code-2, kommit cb9614425) -- samoproverka DO ustanovki, chasovoj raskroj <istochnik>/<data>/<CHCH>.jsonl.gz, tajmer podbivka-trending-pervye 02:05Z; schitat --pervye zadnim chislom za 12.10 i 13.10",
+  "zachem": "punkt 4 vladelca 16.10: storozh diska (chasovoj tajmer, porog 10 GB, ostanov tajmerov registratora i marker data/trending/DISK_STOP) -- plus povtornyj zamer punkta 3 so svodkoj v hvoste",
   "vetka_podbivki": "claude/podbivka",
   "koren_podbivki": "/opt/robinhood-chain-alpha",
   "probno": "yes",
@@ -8,13 +8,18 @@
   "torgovyj_host": "ne tragaem",
   "tokena_zapisi_na_mashine_net": "tajmer podbivka-trending-push STAVITSJA, no NE VKLJUCHAETSJA; posledniaia milia -- progon run_podbivka_trending_push_miami.yml v 02:17Z",
   "novoe_v_etoj_popytke": {
-    "samoproverka": "shag --samoproverka POSLE klona i DO junitov: krasnaja -- junitov ne stavim (u sebja proshla, kod 0, 'samoproverka proshla', posle nejo 0 lishnih fajlov)",
-    "pervye_junit": "podbivka-trending-pervye.service/.timer, OnCalendar 02:05:00 UTC, Persistent=true, ExecStart schitaet za VCHERA cherez $(date -u -d yesterday +%%F) -- procent udvojen, provereno systemd-analyze s otricatelnym kontrolem",
-    "umask": "UMask=0002 vo vseh sluzhbah: chasovoj raskroj kazhdye sutki sozdajot novyj katalog, i bez etogo sutochnaja uborka starshe 60 sutok upjorlas by v Permission denied",
-    "verify": "systemd-analyze verify po vsem chetyrem sluzhbam, otkaz pri slovah 'fatal error'",
-    "celostnost": "shag gzip -t po vsem .jsonl.gz: opis Code-2 38825166870 upala na 'zlib.error: invalid distance too far back' -- oborvannyj snimok s polnogo diska. Tolko zamer, nichego ne udaljaem",
-    "pervye_zadnim_chislom": "12.10 i 13.10 po otdelnosti; za 14-16.10 shag SCHITAET fajly i pishet fakt, a ne domyslivaet",
-    "metka_po_imeni": "vybor metki perevedjon s 'ls -1t' na sortirovku po imeni: v svezhem chekaute vremja pravki u vseh fajlov odno, i vybralas by staraja metka 12.10 s tolko_diagnoz=yes"
+    "storozh": "lab_miami_storozh_diska.sh v /usr/local/sbin, junit podbivka-storozh-diska.service/.timer, OnCalendar *:47:00 UTC, porog 10 GB; proba srazu posle ustanovki. Vse tri puti skripta progany u sebja s podstavnym systemctl: mnogo mesta -- tolko pechat; malo -- ostanov i marker (validnyj JSON); mesto vernulos -- marker snjat i tajmery vkljucheny",
+    "marker_v_vetke": "sutochnyj push (run_podbivka_trending_push_miami.yml) teper nesjot i DISK_STOP: put dobavlen v sparse-checkout i v puti kommita, a kogda markera na mashine net -- push SNIMAET ego iz vetki, chtoby vetka ne vrala",
+    "svodka_v_hvoste": "posledniy shag pechataet vsjo glavnoe: arhiv zhurnalov i artefakty iz kontejnera nedostupny (proksi otvechaet Forbidden), chitaetsja tolko hvost zhurnala zadanija",
+    "daty": "tablicu schitaem za vse pjat sutok 12-16.10 i pechataem objom po dnjam: zamer oproverg ozhidanie 'za 14-16.10 dannyh net' -- sutochnye fajly tam EST (8, 6 i 8 shtuk), prosto krohi",
+    "bityj_gzip": "13.10 ne schitaetsja: zlib.error 'invalid distance too far back'. Shag celostnosti teper pechataet i skolko strok chitaetsja u bitogo fajla do obryva -- chtoby bylo vidno, est li smysl spasat sutki. Nichego ne udaljaem i skript Code-2 ne pravim"
   },
-  "popytka": 8
+  "popytka": 9,
+  "zamereno_progonom_38930238689": {
+    "samoproverka": "proshla na mashine, junity postavleny posle nejo",
+    "tablica_12_10": "30807 strok, 2441310 B (2.44 MB), spiskov 17, snimkov 1404 na minutnyj spisok",
+    "tablica_13_10": "otkaz: bityj gzip",
+    "pervyj_chasovoj_jupiter": "data/trending/jupiter/2026-10-16/16.jsonl.gz, 332989 B, 4 stroki (chas tolko nachalsja)",
+    "fajly_po_sutkam": "14.10: 8 sutochnyh, 15.10: 6, 16.10: 8 sutochnyh i 8 chasovyh"
+  }
 }

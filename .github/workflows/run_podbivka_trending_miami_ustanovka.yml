@@ -62,11 +62,14 @@ env:
   VETKA_PODBIVKI: "claude/podbivka"
   KOREN_PODBIVKI: "/opt/robinhood-chain-alpha"
   PROBNO: "yes"
-  # ЗАДНИМ ЧИСЛОМ СЧИТАЕМ РОВНО ТО, ЧТО ПРОСИЛ ВЛАДЕЛЕЦ: 12.10 и 13.10.
-  # За 14-16.10 снимков нет (диск был занят на 100 %), и шаг это не
-  # домысливает, а проверяет файлами и так и пишет.
-  DATY_PERVYH: "2026-10-12 2026-10-13"
-  DATY_BEZ_DANNYH: "2026-10-14 2026-10-15 2026-10-16"
+  # ВЛАДЕЛЕЦ ПРОСИЛ 12.10 И 13.10, "за 14-16.10 данных нет -- так и
+  # записать". ЗАМЕР ЭТО ПОПРАВИЛ, и записываем замер, а не ожидание:
+  # прогон 38930238689 нашёл на диске суточные файлы и за 14.10 (8 штук),
+  # и за 15.10 (6), и за 16.10 (8) -- данные ЕСТЬ, просто их крохи
+  # (14.10 ~4.7 МБ, 15.10 ~0.8 МБ и три файла по 0 байт против 598 МБ за
+  # 12.10). Поэтому таблицу считаем за все пять суток и печатаем объём по
+  # дням: пусть в записи будет число, а не слово "нет".
+  DATY_PERVYH: "2026-10-12 2026-10-13 2026-10-14 2026-10-15 2026-10-16"
   HOST_LAB: 169.128.191.158
   TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
 
@@ -616,6 +619,69 @@ jobs:
             du -sh "$KOREN/data/trending" 2>/dev/null || true
           PROBA
 
+      - name: "СТОРОЖ ДИСКА: скрипт на машину и часовой таймер (пункт 4)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PODBIVKI"
+          # ЗАЧЕМ (пункт 4 владельца): без свободного места регистратор молча
+          # терял снимки -- 12.10 598 МБ, 13.10 256, 14.10 4.7, 15.10 0.8 и три
+          # файла по 0 байт, при ЖИВЫХ таймерах и успешных юнитах. Сторож раз в
+          # час смотрит df и при свободе меньше порога ОСТАНАВЛИВАЕТ таймеры
+          # регистратора и кладёт маркер data/trending/DISK_STOP -- его
+          # подхватывает суточный пуш, то есть потеря становится видна из ветки.
+          # ОТ root, А НЕ ОТ podbivka: остановка таймеров -- право root. В сеть
+          # сторож не ходит, ключей не просит, торгового хоста не касается.
+          scp -i ~/.ssh/miami_key -o StrictHostKeyChecking=accept-new \
+            deploy/lab_miami_storozh_diska.sh \
+            root@"$HOST_LAB":/usr/local/sbin/lab_miami_storozh_diska.sh
+          mkdir -p junity_storozh
+          printf '%s\n' "[Unit]" \
+            "Description=Сторож диска: мало места -- остановить регистратор" "" \
+            "[Service]" "Type=oneshot" \
+            "Environment=PODB_KOREN=$KOREN" "Environment=STOROZH_POROG_GB=10" \
+            "ExecStart=/usr/local/sbin/lab_miami_storozh_diska.sh" \
+            "TimeoutStartSec=120" "Nice=10" \
+            > junity_storozh/podbivka-storozh-diska.service
+          # :47, А НЕ :00 -- чтобы не толкаться с минутным таймером и часовыми
+          # проходами на :09/:17/:39, которые на этой машине уже стоят.
+          printf '%s\n' "[Unit]" "Description=Сторож диска раз в час" "" \
+            "[Timer]" "OnCalendar=*-*-* *:47:00 UTC" "AccuracySec=30s" "Persistent=true" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_storozh/podbivka-storozh-diska.timer
+          for F in junity_storozh/*; do
+            echo "=== $F ==="; cat "$F"
+            [ -s "$F" ] || { echo "SBOJ: $F pust"; exit 1; }
+          done
+          scp -i ~/.ssh/miami_key -o StrictHostKeyChecking=accept-new \
+            junity_storozh/podbivka-storozh-diska.service \
+            junity_storozh/podbivka-storozh-diska.timer \
+            root@"$HOST_LAB":/etc/systemd/system/
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'STOROZH'
+            set -e
+            chmod 755 /usr/local/sbin/lab_miami_storozh_diska.sh
+            chmod 644 /etc/systemd/system/podbivka-storozh-diska.service \
+                      /etc/systemd/system/podbivka-storozh-diska.timer
+            systemctl daemon-reload
+            VYVOD=$(systemd-analyze verify /etc/systemd/system/podbivka-storozh-diska.service 2>&1 || true)
+            printf '%s\n' "${VYVOD:-(bez zamechanij)}" | head -6
+            case "$VYVOD" in
+              *"fatal error"*) echo "SBOJ: junit storozha ne razbiraetsja"; exit 1 ;;
+            esac
+            systemctl enable --now podbivka-storozh-diska.timer
+            echo "--- proba storozha pri zhivom diske (dolzhen tolko napechatat svobodu) ---"
+            systemctl start podbivka-storozh-diska.service
+            journalctl -u podbivka-storozh-diska.service --no-pager -n 10 | tail -6
+            echo "--- sostojanie ---"
+            printf 'tajmer: enabled=%s active=%s\n' \
+              "$(systemctl is-enabled podbivka-storozh-diska.timer 2>&1)" \
+              "$(systemctl is-active podbivka-storozh-diska.timer 2>&1)"
+            systemctl list-timers 'podbivka-*' --all --no-pager | head -8
+            echo "--- marker (dolzhen otsutstvovat pri svobodnom diske) ---"
+            ls -l /opt/robinhood-chain-alpha/data/trending/DISK_STOP 2>&1 || echo "markera net -- tak i dolzhno byt"
+          STOROZH
+
       - name: "ЦЕЛОСТНОСТЬ СНИМКОВ: какие .jsonl.gz побились на полном диске"
         if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
@@ -641,9 +707,14 @@ jobs:
             done < "$VR/vse.txt"
             echo "bityh: $(wc -l < "$VR/bityye.txt")"
             if [ -s "$VR/bityye.txt" ]; then
-              echo "--- bityye fajly (razmer i put) ---"
+              echo "--- bityye fajly: razmer, chitaemyh strok do obryva, put ---"
+              # ЧИТАЕМЫХ СТРОК -- ЭТО НЕ ЛЮБОПЫТСТВО: от этого числа зависит,
+              # есть ли смысл спасать сутки. Обрыв в конце gzip означает, что
+              # начало файла цело; zcat отдаёт его и падает на обрыве, поэтому
+              # ошибку глушим, а строки считаем.
               while IFS= read -r F; do
-                printf '%10s B  %s\n' "$(stat -c %s "$F")" "$F"
+                printf '%10s B  strok %7s  %s\n' "$(stat -c %s "$F")" \
+                  "$(zcat "$F" 2>/dev/null | wc -l)" "$F"
               done < "$VR/bityye.txt"
               echo "--- bityh po sutkam ---"
               sed -E 's#.*/([0-9]{4}-[0-9]{2}-[0-9]{2})(/.*)?[.]jsonl[.]gz#\1#; s#.*/([0-9]{4}-[0-9]{2}-[0-9]{2})/.*#\1#' \
@@ -666,7 +737,7 @@ jobs:
           # должно скрывать другую, поэтому запуск стоит в условии if, где
           # errexit не действует.
           ssh $SSH_OPTS root@"$HOST_LAB" \
-            "KOREN='$KOREN' DATY='$DATY_PERVYH' PUSTYE='$DATY_BEZ_DANNYH' bash -s" \
+            "KOREN='$KOREN' DATY='$DATY_PERVYH' bash -s" \
             <<'PERVYE' 2>&1 | tee pervye_miami.txt
             set -e
             cd "$KOREN"
@@ -675,7 +746,12 @@ jobs:
               CHAS=$(find "$KOREN/data/trending" -mindepth 3 -path "*/$D/*" -name '*.jsonl.gz' 2>/dev/null | wc -l)
               SUT=$(find "$KOREN/data/trending" -mindepth 2 -maxdepth 2 -name "$D.jsonl.gz" \
                     -not -path "*/pervye/*" 2>/dev/null | wc -l)
-              echo "snimochnyh fajlov: chasovyh $CHAS, sutochnyh $SUT"
+              # ОБЪЁМ ПО ДНЯМ -- ЧИСЛОМ: именно он отличает полные сутки от
+              # суток, которые регистратор "писал" на кончившийся диск.
+              BAJT=$(find "$KOREN/data/trending" \( -path "*/$D/*" -o -name "$D.jsonl.gz" \) \
+                     -type f -name '*.jsonl.gz' -not -path "*/pervye/*" -printf '%s\n' 2>/dev/null \
+                     | awk '{s += $1} END {printf "%d", s + 0}')
+              echo "snimochnyh fajlov: chasovyh $CHAS, sutochnyh $SUT, vsego $(( BAJT / 1048576 )) MB"
               if [ "$((CHAS + SUT))" -eq 0 ]; then
                 echo "ITOG $D: snimkov net, tablicu schitat ne iz chego"
                 continue
@@ -690,12 +766,6 @@ jobs:
               else
                 echo "ITOG $D: --pervye upal, prichina vyshe (sm. traceback)"
               fi
-            done
-            for D in $PUSTYE; do
-              CHAS=$(find "$KOREN/data/trending" -mindepth 3 -path "*/$D/*" -name '*.jsonl.gz' 2>/dev/null | wc -l)
-              SUT=$(find "$KOREN/data/trending" -mindepth 2 -maxdepth 2 -name "$D.jsonl.gz" \
-                    -not -path "*/pervye/*" 2>/dev/null | wc -l)
-              echo "PROVERKA $D: chasovyh $CHAS, sutochnyh $SUT (zhdjom 0 i 0 -- disk byl polon)"
             done
             echo "--- chasovoj raskroj jupiter: pervyj i poslednij fajl ---"
             # ВРЕМЕННОЕ -- ЧЕРЕЗ mktemp С trap, А НЕ ФАЙЛОМ В /tmp НАУГАД:
@@ -720,6 +790,46 @@ jobs:
           PERVYE
           echo "--- itogovye stroki ---"
           grep -E '^(ITOG|PROVERKA)' pervye_miami.txt || true
+
+      - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
+        # ЗАЧЕМ ОТДЕЛЬНЫЙ ШАГ В КОНЦЕ. Архив журналов прогона из этого
+        # контейнера недоступен: прокси отвечает Forbidden и на
+        # results-receiver.actions.githubusercontent.com (gh run view --log), и
+        # на хранилище артефактов (gh run download). Читается ТОЛЬКО ХВОСТ
+        # журнала через API заданий -- значит главное должно лежать в хвосте,
+        # иначе замеры середины прогона просто нечем прочесть.
+        if: ${{ always() }}
+        run: |
+          set -e
+          echo "=== 1. SAMOPROVERKA DO USTANOVKI ==="
+          if [ -f samoproverka_miami.txt ]; then
+            grep -cE '^  ОК' samoproverka_miami.txt | sed 's/^/strok OK: /'
+            grep -E '^  СБОЙ' samoproverka_miami.txt || echo "strok SBOJ: 0"
+            tail -1 samoproverka_miami.txt
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 2. CELOSTNOST SNIMKOV (gzip -t) ==="
+          if [ -f celost_miami.txt ]; then
+            grep -E '^(fajlov vsego|bityh|vse snimki)' celost_miami.txt || true
+            grep -E '^ *[0-9]+ B  strok' celost_miami.txt || true
+            sed -n '/bityh po sutkam/,$p' celost_miami.txt | tail -8
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 3. TABLICY PERVYH POJAVLENIJ ==="
+          if [ -f pervye_miami.txt ]; then
+            grep -E '^(=== 20|snimochnyh fajlov|ITOG |    [0-9]+ B  strok|chasovyh fajlov jupiter)' \
+              pervye_miami.txt || true
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 4. PROBA ENDPOINTOV (--probno) ==="
+          if [ -f probno_miami.txt ]; then
+            grep -E 'итого' probno_miami.txt || tail -2 probno_miami.txt
+          else
+            echo "(shag ne shjol)"
+          fi
 
       - name: "Выложить первый доклад артефактом"
         if: always()
