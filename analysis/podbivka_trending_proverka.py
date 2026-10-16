@@ -26,6 +26,7 @@ import gzip
 import json
 import statistics as st
 import time
+import zlib
 from pathlib import Path
 
 КОРЕНЬ = Path(__file__).resolve().parent.parent
@@ -33,6 +34,7 @@ from pathlib import Path
 СЛИМ = П / "trending_slim"
 СЫРЬЁ = КОРЕНЬ / "data" / "trending"
 КОРЗИНЫ = (30, 60, 120, 300, 900, 3600)
+СЧЁТ = collections.Counter()
 # Адрес у GeckoTerminal -- это пул ("solana_<пул>"), у остальных -- минт либо пара;
 # в заказ архива идут только похожие на адрес Solana (base58, 32-44 знака).
 B58 = set("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
@@ -76,14 +78,28 @@ def снимки(дни: tuple):
         путь = str(ф)
         if дни and not any(д in путь for д in дни):
             continue
-        with gzip.open(ф, "rt", encoding="utf-8") as о:
-            for ln in о:
-                try:
-                    с = json.loads(ln)
-                except ValueError:
-                    continue
-                yield (с.get("источник"), с.get("список"), с.get("utc"),
-                       с.get("строки") or [], с.get("код"))
+        # ТЕРПИМО К ОБРЫВУ: 9 файлов из 47 на lab-miami обрезаны кончившимся диском.
+        # Прочитанное до обрыва идёт в счёт, обрыв печатается строкой и считается в СЧЁТ.
+        прочитано = 0
+        try:
+            if Path(ф).stat().st_size == 0:
+                raise EOFError("файл нулевой длины")
+            with gzip.open(ф, "rt", encoding="utf-8") as о:
+                for ln in о:
+                    прочитано += 1
+                    try:
+                        с = json.loads(ln)
+                    except ValueError:
+                        continue
+                    if с.get("вид_строки"):       # сводка файлов -- не снимок
+                        continue
+                    yield (с.get("источник"), с.get("список"), с.get("utc"),
+                           с.get("строки") or [], с.get("код"))
+        except (zlib.error, EOFError, OSError) as e:
+            СЧЁТ["оборванных_файлов"] += 1
+            СЧЁТ["строк_до_обрыва"] += прочитано
+            print(f"  ОБРЫВ {ф}: прочитано строк {прочитано}, "
+                  f"{type(e).__name__}: {str(e)[:100]}", flush=True)
 
 
 def главное(а) -> int:
@@ -167,6 +183,8 @@ def главное(а) -> int:
             "источник_снимков": ("тонкая выгрузка" if glob.glob(str(СЛИМ / "*.jsonl.gz"))
                                  else "сырые файлы ветки"),
             "дни": list(дни), "снимков_прочитано": строк_всего,
+            "оборванных_файлов": СЧЁТ["оборванных_файлов"],
+            "строк_до_обрыва": СЧЁТ["строк_до_обрыва"],
             "адресов_впервые_всего": len({а_ for _, а_ in первое}),
             "в_заказ_архива": len(заказ),
             "по_спискам": dict(sorted(сводка.items()))}

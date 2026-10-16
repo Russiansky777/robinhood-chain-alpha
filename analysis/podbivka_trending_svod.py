@@ -28,6 +28,7 @@ import os
 import shutil
 import socket
 import subprocess
+import zlib
 import time
 from pathlib import Path
 
@@ -125,7 +126,11 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
             строк = 0
             сл_ф = СЛИМ / f"{папка.name}_{дата}.jsonl.gz" if слим else None
             о_сл = gzip.open(сл_ф, "wt", encoding="utf-8") if слим else None
+            оборван = None
+            причина = None
             try:
+                if ф.stat().st_size == 0:
+                    raise EOFError("файл нулевой длины")
                 with gzip.open(ф, "rt", encoding="utf-8") as о:
                     for ln in о:
                         try:
@@ -151,6 +156,13 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
                                 "строки": [{п_: р.get(п_) for п_ in ПОЛЯ_СТРОКИ}
                                            for р in (с.get("строки") or [])],
                             }, ensure_ascii=False) + "\n")
+            except (zlib.error, EOFError, OSError) as e:
+                # ОБРЫВ GZIP -- не повод потерять сутки. Диск на lab-miami кончился
+                # 14-16.10, и 9 файлов из 47 остались с обрезанным хвостом: начало цело.
+                # Прочитанное до обрыва идёт в счёт, обрыв записывается числом строк.
+                оборван = строк
+                причина = f"{type(e).__name__}: {str(e)[:120]}"
+                print(f"  ОБРЫВ {ф}: прочитано строк {строк}, {причина}", flush=True)
             finally:
                 if о_сл is not None:
                     о_сл.close()
@@ -178,10 +190,13 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
                     "пропуски": пропуски[:40]}
             из_[f"{папка.name}/{дата}/{ф.name}"] = {
                 "файл_байт": ф.stat().st_size,
+                "файл_оборван": оборван, "причина_обрыва": причина,
                 "изменён": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                          time.gmtime(ф.stat().st_mtime)),
                 "строк": строк, "по_списку": для_суток}
-    return {"по_файлам": из_, "слим_файлов": len(записанные),
+    оборванных = sum(1 for v in из_.values() if v.get("файл_оборван") is not None)
+    return {"по_файлам": из_, "файлов": len(из_), "оборванных_файлов": оборванных,
+            "слим_файлов": len(записанные),
             "слим": [str(p.relative_to(КОРЕНЬ)) for p in записанные]}
 
 
