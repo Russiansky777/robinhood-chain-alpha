@@ -393,6 +393,31 @@ jobs:
           set -o pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # ПОВТОРЫ У fetch -- ЗАМЕР, А НЕ ОСТОРОЖНОСТЬ. На этом же ящике
+          # замерен обрыв исходящего HTTPS: прогон 38975558290, "Failed to
+          # connect to github.com port 443 after 133597 ms". У push отказ
+          # обработан, а у fetch не был -- и при set -e единственный обрыв на
+          # ПЕРВОЙ итерации завершал шаг кодом 128, так что восемь попыток,
+          # построенные ради гонки за вершину ветки, не срабатывали ни разу:
+          # производные за сутки и маркер в ветку не уезжали, а доказательство
+          # следом падало на "shag pusha ne nazval svoj kommit".
+          # СЧЁТЧИК НАЗВАН PF, А НЕ P, НАРОЧНО: имя P занято перебором путей
+          # в SOBRAT_PUTI, и в оболочке у функций нет своей области видимости.
+          # Сейчас вызовы не вложены, но стоить это может целой ночи, а
+          # переименование не стоит ничего.
+          FETCH_S_POVTORAMI() {
+            PF=1
+            while :; do
+              if git fetch -q "$@"; then return 0; fi
+              if [ "$PF" -ge 3 ]; then
+                echo "fetch ne proshjol s treh popytok: git fetch $*"
+                return 1
+              fi
+              echo "fetch ne proshjol (popytka $PF) -- zhdu 10 s i probuju snova"
+              PF=$((PF + 1))
+              sleep 10
+            done
+          }
           # ПУТИ КОММИТА СОБИРАЮТСЯ ИЗ ТОГО, ЧТО РЕАЛЬНО ЕСТЬ, И ЭТО ЗАМЕР:
           # 'git commit -- data/polymarket/artefakty' по пути, под которым нет
           # ни одного файла, отказывает с "pathspec did not match any file(s)
@@ -467,7 +492,13 @@ jobs:
           FAJLOV=$(git diff --cached --numstat -- $PUTI_TEK | wc -l)
           echo "fajlov k pushu: $FAJLOV"
           for POPYTKA in 1 2 3 4 5 6 7 8; do
-            git fetch -q --depth=1 origin "$VETKA_KODA"
+            # ОБРЫВ СЕТИ НЕ ДОЛЖЕН СЪЕДАТЬ ВСЕ ПОПЫТКИ: не вышло прочитать
+            # вершину -- ждём и идём на следующий круг, а не валим шаг.
+            if ! FETCH_S_POVTORAMI --depth=1 origin "$VETKA_KODA"; then
+              echo "popytka $POPYTKA: set nedostupna, idu na sledujushchij krug"
+              sleep $((POPYTKA * 2))
+              continue
+            fi
             git reset -q FETCH_HEAD
             # ПЕРЕСЧЁТ СРАЗУ ПОСЛЕ reset: индекс теперь равен новой вершине
             # ветки, и путь, который там появился, снова виден.
@@ -513,7 +544,33 @@ jobs:
           # КОДУ git push ВЕРИМ НЕ НА СЛОВО. Сверяем с вершиной ветки, какой
           # её отдаёт сервер: либо наш коммит и есть вершина, либо он её предок.
           [ -n "${NASH_KOMMIT:-}" ] || { echo "SBOJ: shag pusha ne nazval svoj kommit"; exit 1; }
-          git fetch -q --depth=50 origin "$VETKA_KODA"
+          # ПОВТОРЫ У fetch -- ЗАМЕР, А НЕ ОСТОРОЖНОСТЬ. На этом же ящике
+          # замерен обрыв исходящего HTTPS: прогон 38975558290, "Failed to
+          # connect to github.com port 443 after 133597 ms". У push отказ
+          # обработан, а у fetch не был -- и при set -e единственный обрыв на
+          # ПЕРВОЙ итерации завершал шаг кодом 128, так что восемь попыток,
+          # построенные ради гонки за вершину ветки, не срабатывали ни разу:
+          # производные за сутки и маркер в ветку не уезжали, а доказательство
+          # следом падало на "shag pusha ne nazval svoj kommit".
+          # СЧЁТЧИК НАЗВАН PF, А НЕ P, НАРОЧНО: имя P занято перебором путей
+          # в SOBRAT_PUTI, и в оболочке у функций нет своей области видимости.
+          # Сейчас вызовы не вложены, но стоить это может целой ночи, а
+          # переименование не стоит ничего.
+          FETCH_S_POVTORAMI() {
+            PF=1
+            while :; do
+              if git fetch -q "$@"; then return 0; fi
+              if [ "$PF" -ge 3 ]; then
+                echo "fetch ne proshjol s treh popytok: git fetch $*"
+                return 1
+              fi
+              echo "fetch ne proshjol (popytka $PF) -- zhdu 10 s i probuju snova"
+              PF=$((PF + 1))
+              sleep 10
+            done
+          }
+          FETCH_S_POVTORAMI --depth=50 origin "$VETKA_KODA" \
+            || { echo "SBOJ: vershinu vetki ne prochitat -- set s jashchika nedostupna"; exit 1; }
           VERSHINA=$(git rev-parse FETCH_HEAD)
           echo "nash kommit: $NASH_KOMMIT"
           echo "vershina vetki: $VERSHINA"

@@ -729,17 +729,30 @@ jobs:
             # ругался на уже исправленный юнит. InvocationID однозначно
             # указывает на ТОТ запуск, который мы только что сделали.
             INV=$(systemctl show -p InvocationID --value polymarket-storozh-diska.service 2>/dev/null || true)
+            ZHURNAL=""
             if [ -n "$INV" ]; then
               echo "invocation: $INV"
               ZHURNAL=$(journalctl _SYSTEMD_INVOCATION_ID="$INV" --no-pager 2>/dev/null || true)
-            else
-              echo "invocation: net -- chitaju po vremeni s $TOCHKA"
+            fi
+            # ПУСТОЙ ЖУРНАЛ ПО InvocationID -- ТОЖЕ ПОВОД К ЗАПАСНОМУ ПУТИ, и
+            # замечание не моё: разбор указал, что у завершившейся службы
+            # Type=oneshot show -p InvocationID может отдать не пустую строку,
+            # а нули. Тогда [ -n "$INV" ] истинно, журнал по такому ID пуст,
+            # список таймеров пуст -- и утверждение ниже дало бы ЛОЖНЫЙ отказ
+            # на исправном юните, то есть ровно ту беду, от которой чинили.
+            # Проверяем не вид строки, а результат: нет строк -- читаем по
+            # времени.
+            if [ -z "$ZHURNAL" ]; then
+              echo "zhurnal po invocation pust -- chitaju po vremeni s $TOCHKA"
               ZHURNAL=$(journalctl -u polymarket-storozh-diska.service --since "$TOCHKA" --no-pager 2>/dev/null || true)
             fi
             # ПЕРЕМЕННАЯ ДОШЛА ЦЕЛИКОМ -- ПРОВЕРЯЕМ, А НЕ НАДЕЕМСЯ. Скрипт
             # печатает свой список таймеров первой же строкой; если Environment
             # разобрался неверно, в журнале будет один таймер вместо пяти.
-            SPISOK=$(printf '%s\n' "$ZHURNAL" | grep -m1 'tajmery:' || true)
+            # tail -1, А НЕ grep -m1: окно уже сужено до одного запуска, но
+            # последняя строка верна и в том случае, если в окно всё же
+            # попало больше одного -- а первая была бы самой старой.
+            SPISOK=$(printf '%s\n' "$ZHURNAL" | grep 'tajmery:' | tail -1 || true)
             echo "chto uvidel skript -> ${SPISOK:-stroki tajmerov v zhurnale net}"
             NET=0
             for T in polymarket-otbor polymarket-min polymarket-5min; do
