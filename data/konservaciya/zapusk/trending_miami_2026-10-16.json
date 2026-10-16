@@ -1,0 +1,20 @@
+{
+  "zachem": "punkt 3 vladelca 16.10: perestavit registrator po docs/podbivka_trending_ustanovka.md (Code-2, kommit cb9614425) -- samoproverka DO ustanovki, chasovoj raskroj <istochnik>/<data>/<CHCH>.jsonl.gz, tajmer podbivka-trending-pervye 02:05Z; schitat --pervye zadnim chislom za 12.10 i 13.10",
+  "vetka_podbivki": "claude/podbivka",
+  "koren_podbivki": "/opt/robinhood-chain-alpha",
+  "probno": "yes",
+  "tolko_diagnoz": "no",
+  "birdeye": "NE stavim -- slovo vladelca; Birdeye lozhitsja snimkom s prichinoj 'net kljucha'",
+  "torgovyj_host": "ne tragaem",
+  "tokena_zapisi_na_mashine_net": "tajmer podbivka-trending-push STAVITSJA, no NE VKLJUCHAETSJA; posledniaia milia -- progon run_podbivka_trending_push_miami.yml v 02:17Z",
+  "novoe_v_etoj_popytke": {
+    "samoproverka": "shag --samoproverka POSLE klona i DO junitov: krasnaja -- junitov ne stavim (u sebja proshla, kod 0, 'samoproverka proshla', posle nejo 0 lishnih fajlov)",
+    "pervye_junit": "podbivka-trending-pervye.service/.timer, OnCalendar 02:05:00 UTC, Persistent=true, ExecStart schitaet za VCHERA cherez $(date -u -d yesterday +%%F) -- procent udvojen, provereno systemd-analyze s otricatelnym kontrolem",
+    "umask": "UMask=0002 vo vseh sluzhbah: chasovoj raskroj kazhdye sutki sozdajot novyj katalog, i bez etogo sutochnaja uborka starshe 60 sutok upjorlas by v Permission denied",
+    "verify": "systemd-analyze verify po vsem chetyrem sluzhbam, otkaz pri slovah 'fatal error'",
+    "celostnost": "shag gzip -t po vsem .jsonl.gz: opis Code-2 38825166870 upala na 'zlib.error: invalid distance too far back' -- oborvannyj snimok s polnogo diska. Tolko zamer, nichego ne udaljaem",
+    "pervye_zadnim_chislom": "12.10 i 13.10 po otdelnosti; za 14-16.10 shag SCHITAET fajly i pishet fakt, a ne domyslivaet",
+    "metka_po_imeni": "vybor metki perevedjon s 'ls -1t' na sortirovku po imeni: v svezhem chekaute vremja pravki u vseh fajlov odno, i vybralas by staraja metka 12.10 s tolko_diagnoz=yes"
+  },
+  "popytka": 8
+}
