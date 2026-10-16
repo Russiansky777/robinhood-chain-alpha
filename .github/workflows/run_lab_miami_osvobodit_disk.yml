@@ -1,0 +1,269 @@
+name: "lab-miami: освободить диск (кэш часов PumpApi, пробой провайдера)"
+
+# ЗАЧЕМ. 16.10 диск lab-miami занят на 100 % (145 ГБ из 145, свободно 0), и
+# слушатель бегунка падает на старте, не сумев создать свой же файл журнала:
+# "No space left on device : _diag/Runner_...log", после чего runsvc.sh
+# перезапускает его каждые 5 секунд. Регистратор при живых таймерах молча
+# теряет снимки: 12.10 -- 598 МБ, 13.10 -- 256, 14.10 -- 4.7, 15.10 -- 0.8.
+#
+# ЧТО УДАЛЯЕТСЯ И НА КАКОМ ОСНОВАНИИ. Кэш часов PumpApi ($PODB_ARHIV_KESH),
+# 209 часов и 117.67 ГБ по описи Code-2 (data/podbivka/miami_inventar.json,
+# 2026-10-12T00:22:42Z), сутки 22.09-01.10. В ветке этих часов НЕТ: формат
+# .jsonl.zst не встречается ни в одной ветке репозитория, а под
+# data/podbivka/pumpapi/arhiv лежат 27 файлов .json за 25-27.09. Опись Code-2
+# сама это и пишет: "кэш часов архива живёт на диске бегунка и в ветку не
+# кладётся (часы по 0.47 ГБ -- в git им места нет)".
+#
+# ПОЭТОМУ ОСНОВАНИЕ НЕ "КОПИЯ В ВЕТКЕ", А ПЕРЕКАЧИВАЕМОСТЬ. Замер Code-2
+# (data/podbivka/arhiv_glubina_dno.json, 2026-10-12T00:21:59Z) прошёл по
+# replay.pumpapi.io с шагом 5 суток назад от 24.05 и получил 200 вплоть до
+# 19.04.2026, а 404 -- с 14.04 и глубже; самая старая доступная дата
+# 2026/04/19. Окно НЕ скользящее, и 22.09-01.10 лежит внутри него с запасом.
+# Ключей провайдер не спрашивает: Code-2 зовёт
+# https://replay.pumpapi.io/<дата>/<час>.jsonl.zst без заголовков.
+#
+# НО ЗАМЕР ЧЕТЫРЁХДНЕВНОЙ ДАВНОСТИ -- НЕ ДОКАЗАТЕЛЬСТВО НА СЕГОДНЯ, и удалять
+# 117 ГБ по нему нельзя. Поэтому воротами стоит СВЕЖАЯ проба РОВНО того часа,
+# который мы собираемся удалить первым: 2026/09/22/12. Отдаёт 200 -- кэш
+# удаляется целиком; не 200 -- удаляются ТОЛЬКО сутки 25.09, единственные,
+# чьё зеркало в ветке проверено час к часу (24 файла), и прогон говорит
+# остановиться. Это слово владельца 16.10, дословно.
+on:
+  push:
+    # Запуск файлом-меткой: workflow_dispatch GitHub регистрирует только для
+    # файлов на ветке по умолчанию, а этого прогона там нет.
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/MIAMI_DISK_*.json"
+  workflow_dispatch:
+    inputs:
+      podtverzhdenie:
+        description: "введите ровно OSVOBODIT -- иначе прогон откажет"
+        required: true
+        default: ""
+
+concurrency:
+  group: lab-miami-disk
+  cancel-in-progress: false
+
+env:
+  HOST_LAB: 169.128.191.158
+  TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
+  # ЧАС ПРОБЫ -- ТОТ ЖЕ, ЧТО НАЗВАЛ ВЛАДЕЛЕЦ, и он же первый на удаление.
+  CHAS_PROBY: "2026/09/22/12"
+  # Единственные сутки с проверенным зеркалом в ветке (24 файла .json).
+  SUTKI_S_ZERKALOM: "2026/09/25"
+
+jobs:
+  osvobodit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 1
+          sparse-checkout: |
+            /data/konservaciya/
+          sparse-checkout-cone-mode: false
+
+      - name: "ПРЕДОХРАНИТЕЛЬ: это не торговый хост"
+        run: |
+          set -e
+          if [ "$HOST_LAB" = "$TORGOVYJ_ZAPRESHCHEN" ]; then
+            echo "STOP: adres sovpal s torgovym hostom."
+            exit 1
+          fi
+          echo "rabotaem na lab-miami $HOST_LAB; torgovyj $TORGOVYJ_ZAPRESHCHEN ne tragaem"
+
+      - name: "ПРЕДОХРАНИТЕЛЬ: подтверждение словом"
+        env:
+          VHOD: ${{ inputs.podtverzhdenie }}
+        run: |
+          set -e
+          set -o pipefail
+          SLOVO="$VHOD"
+          if [ -z "$SLOVO" ]; then
+            METKA=$(ls -1t data/konservaciya/zapusk/MIAMI_DISK_*.json 2>/dev/null | head -1 || true)
+            [ -n "$METKA" ] || { echo "SBOJ: ni vhoda, ni fajla-metki"; exit 1; }
+            echo "fajl-metka: $METKA"
+            SLOVO=$(jq -r '.podtverzhdenie // ""' "$METKA")
+          fi
+          if [ "$SLOVO" != "OSVOBODIT" ]; then
+            echo "OTKAZ: podtverzhdenie ne ravno OSVOBODIT. Nichego ne udaleno."
+            exit 1
+          fi
+          echo "podtverzhdenie prinjato"
+
+      - name: "SSH key lab-miami"
+        env:
+          KLJUCH_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+        run: |
+          set -e
+          [ -n "$KLJUCH_MIAMI" ] || { echo "SBOJ: sekreta VPS_SSH_KEY_MIAMI net"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KLJUCH_MIAMI" > ~/.ssh/miami_key
+          chmod 600 ~/.ssh/miami_key
+          ssh-keyscan -T 10 "$HOST_LAB" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_OPTS=-i $HOME/.ssh/miami_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+
+      - name: "МЕСТО ДО"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST_LAB" 'df -h /; echo "---"; du -sh /home/*/arhiv_pumpapi 2>/dev/null || true' \
+            2>&1 | tee mesto_do.txt
+
+      - name: "ВОРОТА: свежая проба провайдера ровно на том часе, что удаляем первым"
+        run: |
+          set -e
+          set -o pipefail
+          # ПРОБА ИДЁТ С lab-miami, А НЕ ИЗ КОНТЕЙНЕРА, и это не формальность:
+          # сетевая политика контейнера агента режет посторонние хосты, а
+          # перекачивать часы будет именно машина. Спрашиваем того, кто будет
+          # качать.
+          ssh $SSH_OPTS root@"$HOST_LAB" "CHAS='$CHAS_PROBY' bash -s" <<'PROBA' 2>&1 | tee proba.txt
+            set -e
+            URL="https://replay.pumpapi.io/${CHAS}.jsonl.zst"
+            echo "sprashivaju: $URL"
+            command -v curl >/dev/null 2>&1 || { echo "KOD=000 curl-net"; exit 0; }
+            # -I (HEAD) i -r 0-1023 oba godjatsja; berjom HEAD, kak prosil
+            # vladelec. Otkat na Range -- esli server HEAD ne ljubit.
+            KOD=$(curl -sS -I -m 30 -o /dev/null -w '%{http_code}' "$URL" 2>/dev/null || echo 000)
+            DLINA=$(curl -sS -I -m 30 "$URL" 2>/dev/null | tr -d '\r' | awk -F': ' 'tolower($1)=="content-length"{print $2}')
+            if [ "$KOD" != "200" ]; then
+              echo "HEAD otdal $KOD, probuju Range 0-1023"
+              KOD2=$(curl -sS -m 30 -r 0-1023 -o /dev/null -w '%{http_code}' "$URL" 2>/dev/null || echo 000)
+              echo "Range otdal $KOD2"
+              case "$KOD2" in 200|206) KOD=200 ;; esac
+            fi
+            echo "KOD=$KOD"
+            echo "DLINA=${DLINA:-neizvestna}"
+          PROBA
+          KOD=$(grep -oE '^KOD=[0-9]+' proba.txt | tail -1 | cut -d= -f2)
+          DLINA=$(grep -oE '^DLINA=.*' proba.txt | tail -1 | cut -d= -f2)
+          echo "OTVET_PROVAJDERA=${KOD:-000}" >> "$GITHUB_ENV"
+          echo "DLINA_CHASA=${DLINA:-neizvestna}" >> "$GITHUB_ENV"
+          echo "--- vorota ---"
+          echo "kod provajdera na $CHAS_PROBY: ${KOD:-000}, dlina: ${DLINA:-neizvestna}"
+          if [ "${KOD:-000}" = "200" ]; then
+            echo "200 -- kesh perekachivaem, udaljaem celikom"
+          else
+            echo "NE 200 -- udaljaem TOLKO $SUTKI_S_ZERKALOM i ostanavlivaemsja"
+          fi
+
+      - name: "УДАЛИТЬ КЭШ ЦЕЛИКОМ (только при 200)"
+        if: ${{ env.OTVET_PROVAJDERA == '200' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'CHISTIM' 2>&1 | tee udalenie.txt
+            set -e
+            # ПУТЬ РАЗРЕШАЕТСЯ ТАК ЖЕ, КАК ЕГО СЧИТАЕТ Code-2, а не угадывается:
+            # os.environ PODB_ARHIV_KESH, иначе ~/arhiv_pumpapi. Домашний
+            # каталог берём у владельца рабочего каталога бегунка.
+            KESH="${PODB_ARHIV_KESH:-}"
+            if [ -z "$KESH" ]; then
+              RAB=$(ls -d /home/*/actions-runner/_work 2>/dev/null | head -1)
+              DOM=$(dirname "$(dirname "$RAB")")
+              KESH="$DOM/arhiv_pumpapi"
+            fi
+            echo "kesh: $KESH"
+            # ТРИ ЗАМКА ПЕРЕД rm -rf, и каждый нужен: пустая переменная дала бы
+            # rm -rf /, а опечатка в пути -- удаление чужого каталога.
+            case "$KESH" in
+              /home/*/arhiv_pumpapi) : ;;
+              *) echo "OTKAZ: put $KESH ne pohozh na kesh arhiva"; exit 1 ;;
+            esac
+            [ -d "$KESH" ] || { echo "OTKAZ: $KESH ne katalog"; exit 1; }
+            CHASOV=$(find "$KESH" -type f -name '*.jsonl.zst' | wc -l)
+            BAJT=$(du -sb "$KESH" | cut -f1)
+            echo "chasov v keshe: $CHASOV, bajt: $BAJT"
+            echo "sutki v keshe:"
+            find "$KESH" -mindepth 3 -maxdepth 3 -type d -printf '  %p\n' | sort
+            [ "$CHASOV" -gt 0 ] || { echo "kesh pust -- udaljat nechego"; exit 0; }
+            rm -rf -- "$KESH"
+            if [ -e "$KESH" ]; then
+              echo "SBOJ: $KESH vsjo eshchjo na meste"
+              exit 1
+            fi
+            echo "udaleno: $CHASOV chasov, $BAJT bajt"
+            echo "UDALENO_CHASOV=$CHASOV"
+            echo "UDALENO_BAJT=$BAJT"
+          CHISTIM
+
+      - name: "УДАЛИТЬ ТОЛЬКО 25.09 (если провайдер ответил не 200)"
+        if: ${{ env.OTVET_PROVAJDERA != '200' }}
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" "SUTKI='$SUTKI_S_ZERKALOM' bash -s" <<'CHASTICHNO' 2>&1 | tee udalenie.txt
+            set -e
+            KESH="${PODB_ARHIV_KESH:-}"
+            if [ -z "$KESH" ]; then
+              RAB=$(ls -d /home/*/actions-runner/_work 2>/dev/null | head -1)
+              DOM=$(dirname "$(dirname "$RAB")")
+              KESH="$DOM/arhiv_pumpapi"
+            fi
+            case "$KESH" in
+              /home/*/arhiv_pumpapi) : ;;
+              *) echo "OTKAZ: put $KESH ne pohozh na kesh arhiva"; exit 1 ;;
+            esac
+            CEL="$KESH/$SUTKI"
+            echo "udaljaju TOLKO: $CEL"
+            [ -d "$CEL" ] || { echo "OTKAZ: $CEL ne katalog -- nichego ne udaleno"; exit 1; }
+            CHASOV=$(find "$CEL" -type f -name '*.jsonl.zst' | wc -l)
+            BAJT=$(du -sb "$CEL" | cut -f1)
+            rm -rf -- "$CEL"
+            echo "udaleno: $CHASOV chasov, $BAJT bajt (tolko $SUTKI)"
+            echo "OSTALOS v keshe chasov: $(find "$KESH" -type f -name '*.jsonl.zst' | wc -l)"
+          CHASTICHNO
+          echo "VNIMANIE: provajder otdal ${OTVET_PROVAJDERA}, a ne 200."
+          echo "Po slovu vladelca ostalnoe NE nachinaetsja."
+
+      - name: "УСТАРЕВШИЕ pack-файлы в рабочем каталоге бегунка"
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'GC' 2>&1 | tee gc.txt
+            set -e
+            RAB=$(ls -d /home/*/actions-runner/_work/*/*/.git 2>/dev/null | head -1)
+            if [ -z "$RAB" ]; then
+              echo "chekauta begunka ne nashel -- nechego szhimat"
+              exit 0
+            fi
+            REPO=$(dirname "$RAB")
+            echo "chekaut: $REPO"
+            echo "do:"
+            du -sh "$REPO/.git" 2>/dev/null
+            ls -1 "$REPO/.git/objects/pack/"*.pack 2>/dev/null | wc -l
+            # git gc, А НЕ УДАЛЕНИЕ ЧЕКАУТА, и это выбор: удаление заставило бы
+            # прогоны Code-2 на этом бегунке выкачать полные блобы заново (по
+            # 7.1 ГБ на fetch), то есть снова набило бы диск. gc сжимает на
+            # месте и оставляет кэш рабочим.
+            # safe.directory -- каталог принадлежит бегунку, а мы root.
+            git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$REPO" \
+              || git config --global --add safe.directory "$REPO"
+            git -C "$REPO" gc --prune=now --quiet 2>&1 | tail -5 || echo "gc vernul ne nol"
+            echo "posle:"
+            du -sh "$REPO/.git" 2>/dev/null
+            ls -1 "$REPO/.git/objects/pack/"*.pack 2>/dev/null | wc -l
+          GC
+
+      - name: "МЕСТО ПОСЛЕ и итог"
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n $SSH_OPTS root@"$HOST_LAB" 'df -h /; echo "---"; du -sh /home/* /opt/* 2>/dev/null | sort -rh | head -8' \
+            2>&1 | tee mesto_posle.txt
+          echo "=== DO ==="
+          grep -E '^/dev/' mesto_do.txt || cat mesto_do.txt
+          echo "=== POSLE ==="
+          grep -E '^/dev/' mesto_posle.txt || cat mesto_posle.txt
+          echo "=== VOROTA ==="
+          echo "kod provajdera na $CHAS_PROBY: $OTVET_PROVAJDERA (dlina chasa: $DLINA_CHASA)"
