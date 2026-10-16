@@ -791,6 +791,20 @@ jobs:
           echo "--- itogovye stroki ---"
           grep -E '^(ITOG|PROVERKA)' pervye_miami.txt || true
 
+      - name: "Выложить первый доклад артефактом"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: podbivka-trending-miami-probno
+          path: |
+            probno_miami.txt
+            samoproverka_miami.txt
+            celost_miami.txt
+            pervye_miami.txt
+            storozh_miami.txt
+          retention-days: 90
+          if-no-files-found: warn
+
       - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
         # ЗАЧЕМ ОТДЕЛЬНЫЙ ШАГ В КОНЦЕ. Архив журналов прогона из этого
         # контейнера недоступен: прокси отвечает Forbidden и на
@@ -837,17 +851,3 @@ jobs:
           else
             echo "(shag ne shjol)"
           fi
-
-      - name: "Выложить первый доклад артефактом"
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: podbivka-trending-miami-probno
-          path: |
-            probno_miami.txt
-            samoproverka_miami.txt
-            celost_miami.txt
-            pervye_miami.txt
-            storozh_miami.txt
-          retention-days: 90
-          if-no-files-found: warn

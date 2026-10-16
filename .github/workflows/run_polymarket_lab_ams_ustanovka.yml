@@ -529,6 +529,23 @@ jobs:
           echo "--- kto otvetil 200 ---"
           grep -E 'KANDIDAT .* 200 ' order_ams.txt || echo "ni odin kandidat ne otdal 200"
 
+      - name: "Выложить первый доклад артефактом"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: polymarket-ams-pervyj-doklad
+          path: |
+            diagnoz_ams.txt
+            samoproverka_ams.txt
+            ruff_ams.txt
+            tajmery_ams.txt
+            probno_ams.txt
+            svodka_ams.txt
+            prichina_ams.txt
+            order_ams.txt
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
         # Архив журналов и артефакты из этого контейнера недоступны (прокси
         # отвечает Forbidden и на results-receiver, и на хранилище артефактов),
@@ -602,20 +619,3 @@ jobs:
           else
             echo "METKA_BEGUNKA=shag diagnoza ne shjol"
           fi
-
-      - name: "Выложить первый доклад артефактом"
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: polymarket-ams-pervyj-doklad
-          path: |
-            diagnoz_ams.txt
-            samoproverka_ams.txt
-            ruff_ams.txt
-            tajmery_ams.txt
-            probno_ams.txt
-            svodka_ams.txt
-            prichina_ams.txt
-            order_ams.txt
-          retention-days: 30
-          if-no-files-found: warn
