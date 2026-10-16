@@ -254,31 +254,41 @@ jobs:
           set -e
           set -o pipefail
           KOREN="$KOREN_PM"
-          mkdir -p "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
-          # ПЕРЕНОС ТОЛЬКО ДОБАВЛЯЮЩИЙ: ни --delete, ни --delete-after. На
-          # машине работает ротация сырого, а зеркалящий перенос стёр бы из
-          # ветки то, чего на машине уже нет.
-          if [ -d "$KOREN/$PUT_PROIZVODNYH" ]; then
-            rsync -a "$KOREN/$PUT_PROIZVODNYH/" "$PUT_PROIZVODNYH/" \
-              || cp -r "$KOREN/$PUT_PROIZVODNYH/." "$PUT_PROIZVODNYH/"
+          mkdir -p "$PUT_PROIZVODNYH/$SUTKI" "$PUT_OTMETOK"
+          # ПЕРЕНОСИМ ТОЛЬКО НАЗВАННЫЕ СУТКИ, И ЭТО НЕ АККУРАТНОСТЬ, А
+          # ИСПРАВЛЕНИЕ ПОДТВЕРЖДЁННОЙ НАХОДКИ. Прежде перенос забирал ВЕСЬ
+          # каталог производных, и каждая ночь уносила в ветку заново все
+          # часовые файлы всех суток, какие ещё есть в сыром. Почему: юнит на
+          # ящике зовёт --proizvodnye БЕЗ --sutki, то есть пересчитывает все
+          # сутки, а питоновский gzip-писатель штампует в заголовок MTIME
+          # текущее время -- замерено: два пересчёта ОДНИХ И ТЕХ ЖЕ данных
+          # дают разные sha256. Значит для git это новые блобы: при 30 сутках
+          # сырого выходило около 720 файлов за ночь, и так каждую ночь, в
+          # дерево, которое и без того 8.77 ГБ. Проверка предела 95 МБ этого
+          # не ловила -- она смотрит размер ОДНОГО файла.
+          # Старые сутки от этого не теряются: каждые сутки уехали своей
+          # ночью, а пропущенные догоняются ручным запуском с sutki=<дата>.
+          if [ -d "$KOREN/$PUT_PROIZVODNYH/$SUTKI" ]; then
+            rsync -a "$KOREN/$PUT_PROIZVODNYH/$SUTKI/" "$PUT_PROIZVODNYH/$SUTKI/" \
+              || cp -r "$KOREN/$PUT_PROIZVODNYH/$SUTKI/." "$PUT_PROIZVODNYH/$SUTKI/"
           else
-            echo "VNIMANIE: na mashine net $PUT_PROIZVODNYH -- tajmer"
+            echo "VNIMANIE: na mashine net $PUT_PROIZVODNYH/$SUTKI -- tajmer"
             echo "polymarket-proizvodnye v 03:23Z libo ne shjol, libo nechego bylo schitat."
           fi
-          if [ -d "$KOREN/$PUT_OTMETOK" ]; then
-            rsync -a "$KOREN/$PUT_OTMETOK/" "$PUT_OTMETOK/" \
-              || cp -r "$KOREN/$PUT_OTMETOK/." "$PUT_OTMETOK/"
+          # Отметка -- один файл за эти сутки, а не весь каталог отметок.
+          if [ -f "$KOREN/$PUT_OTMETOK/$SUTKI.json" ]; then
+            cp -f "$KOREN/$PUT_OTMETOK/$SUTKI.json" "$PUT_OTMETOK/$SUTKI.json"
           fi
           echo "--- chto polozheno ---"
-          echo "proizvodnyh na mashine: $(find "$KOREN/$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
-          echo "proizvodnyh v dereve:   $(find "$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
-          echo "otmetok v dereve:       $(find "$PUT_OTMETOK" -type f 2>/dev/null | wc -l)"
-          echo "za $SUTKI v dereve:     $(find "$PUT_PROIZVODNYH" -type f -path "*/$SUTKI/*" 2>/dev/null | wc -l)"
+          echo "proizvodnyh na mashine za $SUTKI: $(find "$KOREN/$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
+          echo "proizvodnyh na mashine vsego:     $(find "$KOREN/$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
+          echo "za $SUTKI v dereve:               $(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
+          echo "otmetka za $SUTKI v dereve:       $([ -f "$PUT_OTMETOK/$SUTKI.json" ] && echo est || echo net)"
           # ПРЕДЕЛ GITHUB ПРОВЕРЯЕТСЯ ДО ПУША: файл крупнее 100 МБ сервер
           # отвергает наотрез, и узнать об этом из отказа пуша хуже, чем из
           # своей же проверки с названным размером.
           PREDEL=$((95 * 1024 * 1024))
-          KRUPNYE=$(find "$PUT_PROIZVODNYH" "$PUT_OTMETOK" -type f \
+          KRUPNYE=$(find "$PUT_PROIZVODNYH/$SUTKI" "$PUT_OTMETOK" -type f \
                     -size +$((PREDEL / 1024))k -printf '%s %p\n' 2>/dev/null || true)
           if [ -n "$KRUPNYE" ]; then
             echo "OTKAZ: est fajly krupnee 95 MB -- GitHub ih ne primet:"
@@ -296,7 +306,7 @@ jobs:
           # На плановом прогоне это ОТКАЗ; на ручном запуске (dispatch)
           # громкое предупреждение: вручную мы часто целимся в сегодняшние
           # сутки, которых таймер ещё не считал.
-          ZA_SUTKI=$(find "$PUT_PROIZVODNYH" -type f -path "*/$SUTKI/*" 2>/dev/null | wc -l)
+          ZA_SUTKI=$(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)
           if [ "$ZA_SUTKI" -eq 0 ]; then
             echo "VNIMANIE: za $SUTKI syroe upakovano, a proizvodnyh NET ni odnoj."
             echo "Znachit tajmer polymarket-proizvodnye za eti sutki ne schital."
@@ -334,9 +344,14 @@ jobs:
           # И СОБИРАЮТСЯ ДО ПРАВКИ ИНДЕКСА -- тот же урок, что у суточного
           # пуша трендингов: посчитать после правки значит потерять путь,
           # который правка только что опустошила.
+          # ПУТИ -- ТОЛЬКО ЗА НАЗВАННЫЕ СУТКИ: каталог производных этих
+          # суток и один файл отметки. Иначе коммит уносил бы все сутки
+          # заново (см. причину в шаге переноса), а сообщение коммита при
+          # этом врало бы: оно называет $SUTKI.
           SOBRAT_PUTI() {
-            for P in "$PUT_PROIZVODNYH" "$PUT_OTMETOK"; do
+            for P in "$PUT_PROIZVODNYH/$SUTKI" "$PUT_OTMETOK/$SUTKI.json"; do
               if [ -n "$(find "$P" -type f -print -quit 2>/dev/null)" ] \
+                 || [ -f "$P" ] \
                  || git ls-files --error-unmatch -- "$P" >/dev/null 2>&1; then
                 printf '%s ' "$P"
               fi
@@ -354,7 +369,7 @@ jobs:
           }
           PUTI_TEK=$(SOBRAT_PUTI)
           if [ -z "$PUTI_TEK" ]; then
-            echo "nechego pushit: ni proizvodnyh, ni otmetok -- ni na mashine, ni v vetke"
+            echo "nechego pushit za $SUTKI: ni proizvodnyh, ni otmetki -- ni na mashine, ni v vetke"
             echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -367,7 +382,7 @@ jobs:
           # ПРОВЕРЯЕМ ВЕСЬ ИНДЕКС, А НЕ ТОЛЬКО data/polymarket: ниже коммит
           # идёт БЕЗ путей, из индекса, и этот замок должен покрывать всё.
           LISHNEE=$(git diff --cached --name-only \
-                    | grep -vE "^($PUT_PROIZVODNYH|$PUT_OTMETOK)/" || true)
+                    | grep -vE "^($PUT_PROIZVODNYH/$SUTKI/|$PUT_OTMETOK/$SUTKI[.]json$)" || true)
           if [ -n "$LISHNEE" ]; then
             echo "OTKAZ: v indekse puti vne proizvodnyh i otmetok:"
             printf '%s\n' "$LISHNEE" | sed -n '1,10p' | sed 's/^/  /'
@@ -451,7 +466,7 @@ jobs:
           echo "arhiv syrogo:          ${{ steps.pack.outputs.razmer }} B"
           echo "artefakt id:           ${{ steps.up.outputs.artifact-id }}"
           echo "otmetku stavili:       ${OTMECHAT:-yes}"
-          echo "proizvodnyh v dereve:  $(find "$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
-          echo "otmetok v dereve:      $(find "$PUT_OTMETOK" -type f 2>/dev/null | wc -l)"
+          echo "proizvodnyh za sutki:  $(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
+          echo "otmetka za sutki:      $([ -f "$PUT_OTMETOK/$SUTKI.json" ] && echo est || echo net)"
           echo "nash kommit:           ${NASH_KOMMIT:-net}"
           echo "rotacija zdes NE delaetsja -- ona otdelnym tajmerom na mashine v 05:11Z"
