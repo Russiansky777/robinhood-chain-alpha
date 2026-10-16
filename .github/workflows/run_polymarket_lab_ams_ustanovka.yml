@@ -344,15 +344,28 @@ jobs:
 
           # ПРОИЗВОДНЫЕ БЕЗ ExecStartPost: пуш с машины требует токена на
           # диске. Документ Code-3 сам предлагает этот путь и советует его.
-          {
-            printf '%s\n' "[Unit]" \
-              "Description=Polymarket: proizvodnye minutnye rjady (push -- progonom na begunke)" \
-              "" "[Service]"
-            printf '%s\n' "$OBSHCHEE"
-            printf '%s\n' \
-              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --proizvodnye" \
-              "TimeoutStartSec=1800"
-          } > junity_pm/polymarket-proizvodnye.service
+          #
+          # --sutki ВЧЕРА, А НЕ ВСЕ СУТКИ -- СЛОВО ВЛАДЕЛЬЦА И ЗАМЕР. Без
+          # --sutki скрипт обходит ВСЕ сутки, какие есть в сыром, и притом
+          # от самых старых (sorted), а юнит ограничен TimeoutStartSec=1800:
+          # когда сырого накопится к тридцати суткам, systemd убьёт проход ДО
+          # последних суток -- ровно тех, за которыми ночная цепочка и
+          # затевается. Второе: питоновский gzip-писатель штампует в заголовок
+          # текущее время, поэтому полный пересчёт делал ВСЕ часовые файлы
+          # побайтово новыми (замерено: два пересчёта одних данных дают разные
+          # sha256) -- и каждая ночь уносила бы в ветку весь архив заново.
+          # Процент удвоен: systemd читает одиночный как свой спецификатор.
+          cat > junity_pm/polymarket-proizvodnye.service <<'PROIZV_GOLOVA'
+          [Unit]
+          Description=Polymarket: proizvodnye minutnye rjady za VCHERA (push -- progonom na begunke)
+
+          [Service]
+          PROIZV_GOLOVA
+          printf '%s\n' "$OBSHCHEE" >> junity_pm/polymarket-proizvodnye.service
+          cat >> junity_pm/polymarket-proizvodnye.service <<'PROIZV_HVOST'
+          ExecStart=/bin/sh -c '/usr/bin/python3 analysis/polymarket_put.py --proizvodnye --sutki "$(date -u -d yesterday +%%F)"'
+          TimeoutStartSec=1800
+          PROIZV_HVOST
           printf '%s\n' "[Unit]" "Description=Polymarket: proizvodnye v 03:23 UTC" "" \
             "[Timer]" "OnCalendar=*-*-* 03:23:00 UTC" "Persistent=true" "" \
             "[Install]" "WantedBy=timers.target" \
