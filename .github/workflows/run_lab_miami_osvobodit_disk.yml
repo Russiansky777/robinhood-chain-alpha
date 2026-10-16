@@ -328,6 +328,14 @@ jobs:
             # слушателе: в журнале стояло "Listening for Jobs", а падений
             # насчиталось 2 -- оба старые. Берём секунды эпохи: journalctl
             # понимает "@<секунды>", и часовой пояс тут ни при чём.
+            #
+            # И ВТОРАЯ ОШИБКА, УЖЕ В ОБРАЗЦЕ, А НЕ В ОКНЕ. Прогон 38927417672
+            # с правильным окном всё равно насчитал 2 падения при живом
+            # слушателе: "Runner listener exit" пишется и при КОРРЕКТНОМ
+            # останове -- "exit with 0 return code, stop the service, no
+            # retry needed", а это ровно то, что делает наш же systemctl
+            # restart в первую же секунду окна. Падением считаем только
+            # выход с кодом НЕ 0; плюс требуем active/running через 130 s.
             NACHALO=$(date +%s)
             systemctl restart "$SL"
             # 130 s, А НЕ 120: слово владельца -- "держится > 2 мин", и
@@ -336,12 +344,18 @@ jobs:
             sleep 130
             echo "--- sostojanie posle 130 s ---"
             systemctl show "$SL" -p ActiveState -p SubState -p NRestarts -p ExecMainStartTimestamp
-            echo "--- zhurnal sluzhby POSLE perezapuska ---"
-            journalctl -u "$SL" --since "@$NACHALO" --no-pager 2>/dev/null | tail -12
+            SOST=$(systemctl show "$SL" -p ActiveState --value)
+            PODSOST=$(systemctl show "$SL" -p SubState --value)
+            echo "SOSTOJANIE=${SOST}/${PODSOST}"
+            echo "--- zhurnal sluzhby POSLE perezapuska (celikom) ---"
+            journalctl -u "$SL" --since "@$NACHALO" --no-pager 2>/dev/null
+            echo "--- vse vyhody slushatelja v okne ---"
+            journalctl -u "$SL" --since "@$NACHALO" --no-pager 2>/dev/null \
+              | grep 'Runner listener exit' || echo "(ni odnogo)"
             echo "--- padenij slushatelja POSLE perezapuska ---"
             PADENIJ=$(journalctl -u "$SL" --since "@$NACHALO" --no-pager 2>/dev/null \
-              | grep -c 'Runner listener exit' || true)
-            echo "PADENIJ=$PADENIJ"
+              | grep 'Runner listener exit' | grep -vc 'with 0 return code' || true)
+            echo "PADENIJ=${PADENIJ:-0}"
             echo "--- svezhij zhurnal slushatelja ---"
             SVEZH=$(ls -1t /home/*/actions-runner/_diag/Runner_*.log 2>/dev/null | head -1)
             echo "fajl: ${SVEZH:-net}"
@@ -352,11 +366,17 @@ jobs:
           OZHIVLJAEM
           PADENIJ=$(grep -oE '^PADENIJ=[0-9]+' begunok.txt | tail -1 | cut -d= -f2)
           SLUSHAET=$(grep -oE '^SLUSHAET=[0-9]+' begunok.txt | tail -1 | cut -d= -f2)
+          SOST=$(grep -oE '^SOSTOJANIE=[a-z]+/[a-z]+' begunok.txt | tail -1 | cut -d= -f2)
           echo "--- itog ---"
-          echo "padenij slushatelja za 3 min: ${PADENIJ:-?}"
+          echo "padenij slushatelja posle perezapuska (korrektnyj ostanov ne schitaem): ${PADENIJ:-?}"
           echo "strok 'Listening for Jobs':    ${SLUSHAET:-?}"
+          echo "sostojanie sluzhby cherez 130 s: ${SOST:-?}"
           if [ "${PADENIJ:-1}" != "0" ]; then
             echo "SBOJ: slushatel vsjo eshchjo padaet -- mesta malo libo prichina drugaja"
+            exit 1
+          fi
+          if [ "${SOST:-net}" != "active/running" ]; then
+            echo "SBOJ: sluzhba ne active/running cherez 130 s"
             exit 1
           fi
           if [ "${SLUSHAET:-0}" = "0" ]; then
