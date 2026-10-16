@@ -60,6 +60,10 @@ env:
   # обречён независимо от места на диске. Первый пуш 12.10 прошёл только
   # потому, что в файлах было два часа сбора (55 МБ), а не сутки (598 МБ).
   PUT_PERVYH: "data/trending/pervye"
+  # МАРКЕР СТОРОЖА ДИСКА (пункт 4 владельца): "напишет маркер
+  # data/trending/DISK_STOP (пуш подхватит)". Чтобы подхватывал, он
+  # должен быть И в выборке sparse-checkout, И в путях коммита.
+  PUT_MARKERA: "data/trending/DISK_STOP"
   # 60 суток = 86400 минут. Словами владельца -- "уборка сырого не раньше
   # 60 суток". Регистратор начал 12.10, значит первое удаление возможно
   # не раньше 11.12 -- до тех пор шаг уборки честно печатает ноль.
@@ -112,6 +116,7 @@ jobs:
           # больше не едет, и тянуть его в рабочее дерево незачем.
           sparse-checkout: |
             /data/trending/pervye/
+            /data/trending/DISK_STOP
           sparse-checkout-cone-mode: false
 
       - name: "Параметры и кто мы на машине"
@@ -214,6 +219,21 @@ jobs:
             exit 1
           fi
           echo "fajlov krupnee 95 MB net -- predel GitHub soblyudjon"
+          # МАРКЕР СТОРОЖА ЕЗДИТ В ОБЕ СТОРОНЫ. Пока он есть на машине --
+          # лежит и в ветке: это единственный способ увидеть из ветки, что
+          # регистратор остановлен и снимков за это время не будет. Как только
+          # место вернулось, сторож снимает маркер на машине, и тогда его надо
+          # снять И из ветки -- иначе в ветке навсегда останется "STOP",
+          # которого на машине уже нет, и ветка будет врать.
+          if [ -f "$KOREN/$PUT_MARKERA" ]; then
+            cp -f "$KOREN/$PUT_MARKERA" "$PUT_MARKERA"
+            echo "MARKER_EST=yes" >> "$GITHUB_ENV"
+            echo "--- marker storozha diska EST na mashine, edet v vetku ---"
+            cat "$PUT_MARKERA"
+          else
+            echo "MARKER_EST=no" >> "$GITHUB_ENV"
+            echo "markera storozha na mashine net -- mesta hvataet"
+          fi
 
       - name: "Пуш в ветку claude/podbivka (токен от GitHub, не с диска)"
         run: |
@@ -224,8 +244,32 @@ jobs:
           # КЛАДЁТСЯ ТОЛЬКО таблица первых появлений: сырое в git не идёт вовсе
           # (предел 100 МБ). Все git add и git commit -- строго по этому пути,
           # поэтому остальные 6393 файла ветки остаются нетронутыми.
-          git add -- "$PUT_PERVYH"
-          if git diff --cached --quiet -- "$PUT_PERVYH"; then
+          # ПУТИ КОММИТА СОБИРАЮТСЯ, А НЕ ПИШУТСЯ СПИСКОМ, и причина точная:
+          # 'git commit -- data/trending/DISK_STOP' на пути, которого нет ни в
+          # индексе, ни в дереве, отказывает с "pathspec did not match any
+          # file(s) known to git" -- то есть обычный пуш БЕЗ маркера падал бы.
+          # Поэтому маркер попадает в пути только когда он есть на диске либо
+          # уже лежит в ветке (второе -- чтобы его можно было СНЯТЬ).
+          PUTI() {
+            printf '%s' "$PUT_PERVYH"
+            if [ -f "$PUT_MARKERA" ] \
+               || git ls-files --error-unmatch -- "$PUT_MARKERA" >/dev/null 2>&1; then
+              printf ' %s' "$PUT_MARKERA"
+            fi
+          }
+          # Снятие маркера из ветки: на машине его нет, значит место вернулось.
+          STAVIM() {
+            git add -- "$PUT_PERVYH"
+            if [ "${MARKER_EST:-no}" = "yes" ]; then
+              git add -- "$PUT_MARKERA"
+            else
+              git rm -q --cached --ignore-unmatch -- "$PUT_MARKERA" >/dev/null 2>&1 || true
+              rm -f "$PUT_MARKERA"
+            fi
+          }
+          STAVIM
+          # shellcheck disable=SC2046
+          if git diff --cached --quiet -- $(PUTI); then
             echo "novyh tablic net: v vetke uzhe to zhe samoe"
             # Свой коммит всё равно называем: шагу доказательства нужно, что
             # сверять с вершиной ветки, а уборке -- право работать и в этом
@@ -233,7 +277,8 @@ jobs:
             echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
             exit 0
           fi
-          FAJLOV=$(git diff --cached --numstat -- "$PUT_PERVYH" | wc -l)
+          # shellcheck disable=SC2046
+          FAJLOV=$(git diff --cached --numstat -- $(PUTI) | wc -l)
           echo "fajlov k pushu: $FAJLOV"
           # Ветку догоняем fetch+reset, а не rebase: клон мелкий (depth=1),
           # rebase в нём делать нечем. Тот же приём у run_podbivka2_miami.yml
@@ -241,13 +286,16 @@ jobs:
           for POPYTKA in 1 2 3 4 5 6 7 8; do
             git fetch -q --depth=1 origin "$VETKA_SNIMKOV"
             git reset -q FETCH_HEAD
-            git add -- "$PUT_PERVYH"
-            if git diff --cached --quiet -- "$PUT_PERVYH"; then
+            STAVIM
+            # shellcheck disable=SC2046
+            if git diff --cached --quiet -- $(PUTI); then
               echo "uzhe v vetke (popytka $POPYTKA)"
               echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
               exit 0
             fi
-            git commit -q -m "Trending: pervye pojavlenija za sutki ($FAJLOV fajlov) [automated]" -- "$PUT_PERVYH"
+            # shellcheck disable=SC2046
+            git commit -q -m "Trending: pervye pojavlenija za sutki ($FAJLOV fajlov) [automated]" \
+              -- $(PUTI)
             # git push БЕЗ КОНВЕЙЕРА, и это главное. 'git push | tail' отдаёт
             # код tail, то есть 0 даже на отказе, и отчёт о пуше врёт. Здесь
             # код возврата честный -- но и ему мы верим не на слово: ниже
