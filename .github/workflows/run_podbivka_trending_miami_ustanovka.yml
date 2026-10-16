@@ -92,6 +92,49 @@ jobs:
           ssh-keyscan -T 10 "$HOST_LAB" >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH_OPTS=-i $HOME/.ssh/miami_key -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
+      - name: "ДИАГНОЗ ДИСКА lab-miami (только чтение, до любых правок)"
+        # ЗАЧЕМ. 13.10 суточный пуш упал с "No space left on device" на
+        # /home/ghrunner/actions-runner/_diag, 14 и 15.10 бегунок уже не
+        # отвечал серверу -- признак забитого диска. Чем занято, по
+        # репозиторию видно только наполовину, поэтому меряем на машине и ДО
+        # того, как этот же прогон начнёт писать. Только чтение: df, du, ls.
+        if: always()
+        run: |
+          set -e
+          set -o pipefail
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'DIAGNOZ' 2>&1 | tee diagnoz_miami.txt
+            set +e
+            echo "=== 1. MESTO NA DISKAH ==="
+            df -h | head -12
+            echo
+            echo "=== 2. CHEM ZANJAT KOREN: verhnij uroven ==="
+            du -sh /* 2>/dev/null | sort -rh | head -12
+            echo
+            echo "=== 3. RABOCHIE KATALOGI BEGUNKA (po progonu) ==="
+            ls -d /home/*/actions-runner/_work/*/ 2>/dev/null
+            du -sh /home/*/actions-runner/_work/* 2>/dev/null | sort -rh | head -12
+            echo "--- _diag begunka (tuda i ne hvatilo mesta) ---"
+            du -sh /home/*/actions-runner/_diag 2>/dev/null
+            echo
+            echo "=== 4. KLON REGISTRATORA v /opt ==="
+            du -sh /opt/robinhood-chain-alpha 2>/dev/null
+            du -sh /opt/robinhood-chain-alpha/* 2>/dev/null | sort -rh | head -8
+            echo "--- iz nego nuzhen tolko analysis i data/trending ---"
+            du -sh /opt/robinhood-chain-alpha/analysis /opt/robinhood-chain-alpha/data/trending 2>/dev/null
+            echo
+            echo "=== 5. SNIMKI REGISTRATORA: skolko i za kakie dni ==="
+            find /opt/robinhood-chain-alpha/data/trending -type f -printf '%TY-%Tm-%Td %10s %p\n' 2>/dev/null | sort | head -40
+            echo "fajlov: $(find /opt/robinhood-chain-alpha/data/trending -type f 2>/dev/null | wc -l)"
+            echo
+            echo "=== 6. ZHIV LI BEGUNOK ==="
+            systemctl list-units 'actions.runner.*' --all --no-pager 2>/dev/null | head -5
+            echo
+            echo "=== 7. TAJMERY REGISTRATORA ==="
+            systemctl list-timers 'podbivka-trending*' --all --no-pager 2>/dev/null | head -6
+          DIAGNOZ
+          echo "--- stroka s mestom ---"
+          grep -E '/$|/home|/opt' diagnoz_miami.txt | head -6 || true
+
       - name: "Параметры: вход прогона сильнее метки, метка сильнее умолчания"
         env:
           VHODY: ${{ toJSON(inputs) }}
