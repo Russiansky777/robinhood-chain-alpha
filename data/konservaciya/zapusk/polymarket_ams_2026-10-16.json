@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 14,
+  "popytka": 15,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -72,5 +72,13 @@
     "storozh_environment": "ZNACHENIE S PROBELAMI V Environment= OBJAZANO BYT V KAVYCHKAH. Bez kavychek systemd pishet \"Invalid environment assignment, ignoring: b.timer\" i ostavljaet peremennoj TOLKO PERVOE SLOVO, a systemd-analyze verify pri etom vsjo ravno dajot kod 0. Znachit na jashchike sejchas storozh ostanovil by odin tajmer iz pjati. Zamereno obomi variantami; dobavleno utverzhdenie po zhurnalu sluzhby na vse pjat imjon",
     "mediany_po_nepustym": "vtoraja stroka GLUBINA_NEPUSTYE -- mediany tolko po knigam s urovnjami, inache doklad pokazyvaet dopravochnoe proshloe",
     "otbor_vykljuchen": "otbor: no -- sostav uzhe otobran rukami v 38973828932, a tajmer otbora stoit na 00:02Z. Povtornyj otbor v seredine sutok dobavil by v sutochnye proizvodnye TRETIJ nabor tokenov i isportil by imenno to chislo, za kotorym progon perezapuskajut"
+  },
+  "zamereno_progonom_38974890550": {
+    "itog": "KRASNYJ, i upal MOJ ZHE novyj kontrol, a ne junit",
+    "prichina": "journalctl -u ... -n 40 otdajot poslednie sorok strok ZHURNALA SLUZHBY, a ne tekushchego zapuska: v okne lezhal i zapusk 22:08 so starym, nezakavychennym junitom. 'grep -m1' beret SAMUJU RANNJUJU strochku okna -- to est proshluju, s odnim tajmerom -- a poisk 'Invalid environment assignment' nahodil proshluju zhalobu. Kontrol rugalsja na uzhe ispravlennyj junit",
+    "cena": "shag krugov stojal POSLE storozha i byl propushchen -- glavnye chisla punkta 1 iz-za postoronnego shaga v doklad ne popali",
+    "pravka": "zhurnal chitaetsja po InvocationID (zapasnoj put -- --since s tochkoj do zapuska); krugi privjazany k shagu vkljuchenija tajmerov, a ne k storozhu; v junit dobavlena pechat samoj stroki Environment=, i svodka teper pokazyvaet, na chjom kontrol upal",
+    "proverka_zaplaty": "na stende s podlozhennym zhurnalom: STAROE telo dajot rovno tu zhe oshibku (4 tajmera ne najdeno), NOVOE prohodit i po InvocationID, i po vremeni; zuby na meste -- slomannyj tekushchij zapusk i odinochnaja zhaloba oba dajut kod 1",
+    "chto_vsjo_zhe_izmereno": "knigi polnye: clob_books kod 200, knig 200, urovnej 18231, knig s dvumja storonami 200; za sutki clob_books 5710 knig 274065 urovnej (48.0 na knigu); vsego na diske 137.07 MB, gamma_events 102.24 MB"
   }
 }

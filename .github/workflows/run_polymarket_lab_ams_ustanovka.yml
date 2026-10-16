@@ -487,6 +487,7 @@ jobs:
             2>&1 | tee -a otbor_ams.txt
 
       - name: "Включить таймеры (все пять)"
+        id: tajmery
         if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
@@ -635,23 +636,42 @@ jobs:
             chmod 644 /etc/systemd/system/polymarket-storozh-diska.service \
                       /etc/systemd/system/polymarket-storozh-diska.timer
             systemctl daemon-reload
+            # ЗАПАСНАЯ ТОЧКА ОТСЧЁТА для журнала, если InvocationID пуст.
+            TOCHKA=$(date '+%Y-%m-%d %H:%M:%S')
             VYVOD=$(systemd-analyze verify /etc/systemd/system/polymarket-storozh-diska.service 2>&1 || true)
             printf '%s\n' "${VYVOD:-(bez zamechanij)}" | head -6
             case "$VYVOD" in
               *"fatal error"*) echo "SBOJ: junit storozha ne razbiraetsja"; exit 1 ;;
             esac
             systemctl enable --now polymarket-storozh-diska.timer
+            echo "--- stroka Environment v postavlennom junite ---"
+            grep -n 'Environment=' /etc/systemd/system/polymarket-storozh-diska.service
             echo "--- proba storozha pri zhivom diske (dolzhen tolko napechatat svobodu) ---"
             systemctl start polymarket-storozh-diska.service
             journalctl -u polymarket-storozh-diska.service --no-pager -n 12 | tail -8
             printf 'tajmer: enabled=%s active=%s\n' \
               "$(systemctl is-enabled polymarket-storozh-diska.timer 2>&1)" \
               "$(systemctl is-active polymarket-storozh-diska.timer 2>&1)"
+            # ЖУРНАЛ ЧИТАЕМ ПО InvocationID, А НЕ ПОСЛЕДНИЕ N СТРОК -- ЭТО
+            # ЗАМЕР, А НЕ ВКУС. Прогон 38974890550 (мой же) покраснел именно
+            # здесь: в последних сорока строках журнала лежал ЕЩЁ И ЗАПУСК
+            # 22:08 со старым, незакавыченным юнитом, поэтому 'grep -m1'
+            # выхватывал его строку с одним таймером, а поиск жалобы
+            # "Invalid environment assignment" находил прошлую жалобу. Контроль
+            # ругался на уже исправленный юнит. InvocationID однозначно
+            # указывает на ТОТ запуск, который мы только что сделали.
+            INV=$(systemctl show -p InvocationID --value polymarket-storozh-diska.service 2>/dev/null || true)
+            if [ -n "$INV" ]; then
+              echo "invocation: $INV"
+              ZHURNAL=$(journalctl _SYSTEMD_INVOCATION_ID="$INV" --no-pager 2>/dev/null || true)
+            else
+              echo "invocation: net -- chitaju po vremeni s $TOCHKA"
+              ZHURNAL=$(journalctl -u polymarket-storozh-diska.service --since "$TOCHKA" --no-pager 2>/dev/null || true)
+            fi
             # ПЕРЕМЕННАЯ ДОШЛА ЦЕЛИКОМ -- ПРОВЕРЯЕМ, А НЕ НАДЕЕМСЯ. Скрипт
             # печатает свой список таймеров первой же строкой; если Environment
             # разобрался неверно, в журнале будет один таймер вместо пяти.
-            SPISOK=$(journalctl -u polymarket-storozh-diska.service --no-pager -n 40 2>/dev/null \
-                     | grep -m1 'tajmery:' || true)
+            SPISOK=$(printf '%s\n' "$ZHURNAL" | grep -m1 'tajmery:' || true)
             echo "chto uvidel skript -> ${SPISOK:-stroki tajmerov v zhurnale net}"
             NET=0
             for T in polymarket-otbor polymarket-min polymarket-5min \
@@ -663,8 +683,8 @@ jobs:
             done
             [ "$NET" -eq 0 ] || { echo "SBOJ: storozh poluchil ne vse tajmery ($NET ne hvataet)"; exit 1; }
             echo "storozh vidit vse pjat tajmerov"
-            echo "--- zhalovalsja li systemd na razbor Environment ---"
-            journalctl -u polymarket-storozh-diska.service --no-pager -n 40 2>/dev/null \
+            echo "--- zhalovalsja li systemd na razbor Environment v ETOM zapuske ---"
+            printf '%s\n' "$ZHURNAL" \
               | grep -i 'Invalid environment assignment' && { echo "SBOJ: systemd razbil Environment"; exit 1; } || echo "zhalob na Environment net"
             echo "--- svobodno sejchas ---"
             df -h / | tail -1
@@ -758,8 +778,13 @@ jobs:
           echo "--- kto otvetil 200 ---"
           grep -E 'KANDIDAT .* 200 ' order_ams.txt || echo "ni odin kandidat ne otdal 200"
 
+      # ЗАМЕР ВЛАДЕЛЬЦА НЕ ЗАЛОЖНИК СТОРОЖА. В прогоне 38974890550 шаг
+      # сторожа упал на моём же контроле, и круги были ПРОПУЩЕНЫ -- то есть
+      # главные числа пункта 1 пропали из-за постороннего шага. Условие
+      # привязано к шагу включения таймеров: нет установки -- нет и замера,
+      # а падение сторожа замеру не мешает.
       - name: "ДВА МИНУТНЫХ КРУГА И ГЛУБИНА КНИГ (пункт 1 владельца)"
-        if: ${{ env.TOLKO_DIAGNOZ != 'yes' && env.KRUGI == 'yes' }}
+        if: ${{ !cancelled() && steps.tajmery.outcome == 'success' && env.TOLKO_DIAGNOZ != 'yes' && env.KRUGI == 'yes' }}
         run: |
           set -e
           set -o pipefail
@@ -937,7 +962,7 @@ jobs:
           fi
           echo "=== 8a. STOROZH DISKA lab-ams ==="
           if [ -f storozh_ams.txt ]; then
-            grep -E '^(tajmer:|storozh diska:|MALO MESTA|marker polozhen|markera net|/dev/)' storozh_ams.txt || tail -5 storozh_ams.txt
+            grep -E '^([0-9]+:Environment|tajmer:|invocation:|chto uvidel skript|storozh vidit|zhalob na Environment|SBOJ|storozh diska:|MALO MESTA|marker polozhen|markera net|/dev/)' storozh_ams.txt || tail -5 storozh_ams.txt
           else
             echo "(shag ne shjol)"
           fi
