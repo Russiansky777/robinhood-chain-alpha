@@ -519,7 +519,7 @@ jobs:
             KN=$(find "$KOREN/data/polymarket/clob_books" -type f -name '*.jsonl.gz' 2>/dev/null | sort | tail -1)
             echo "svezhij snimok knig: ${KN:-net}"
             if [ -n "$KN" ]; then
-              zcat "$KN" | tail -1 | python3 -c "import json,sys; s=json.loads(sys.stdin.read() or '{}'); t=s.get('тело'); z=s.get('запрос') or {}; print('kod', s.get('код'), '| bajt', s.get('байт'), '| oshibka', s.get('ошибка')); print('zaprosheno tokenov:', (len(z.get('token_ids') or z.get('params') or []) if isinstance(z, dict) else 'neizvestno')); print('tip tela:', type(t).__name__, '| knig v otvete:', (len(t) if isinstance(t, list) else 'ne spisok')); print('pervaja kniga:', json.dumps((t[0] if isinstance(t, list) and t else t), ensure_ascii=False)[:400]); print('razbor:', json.dumps(s.get('разбор'), ensure_ascii=False)[:300])" 2>&1 | head -12
+              zcat "$KN" | tail -1 | python3 -c "import json,sys; s=json.loads(sys.stdin.read() or '{}'); t=s.get('тело'); z=s.get('запрос') or {}; print('kod', s.get('код'), '| bajt', s.get('байт'), '| oshibka', s.get('ошибка')); print('zaprosheno tokenov:', (z.get('tokenov') if isinstance(z, dict) and 'tokenov' in z else ('podpis: ' + json.dumps(z, ensure_ascii=False)[:120]))); print('tip tela:', type(t).__name__, '| knig v otvete:', (len(t) if isinstance(t, list) else 'ne spisok')); print('pervaja kniga:', json.dumps((t[0] if isinstance(t, list) and t else t), ensure_ascii=False)[:400]); print('razbor:', json.dumps(s.get('разбор'), ensure_ascii=False)[:300])" 2>&1 | head -12
             fi
             echo "--- kody prochih spiskov ---"
             for SP in clob_books clob_prices clob_time data_trades clob_midpoints; do

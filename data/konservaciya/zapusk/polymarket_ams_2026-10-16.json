@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 10,
+  "popytka": 11,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -27,7 +27,7 @@
     "glavnaja_bela": "data/polymarket/vybor.json NE LOZHITSJA -- zapros /events ne udalsja, poetomu minutnomu krugu nechego chitat: 9 fajlov, vsego 0.08 MB, iz nih data_trades 0.08"
   },
   "novoe_v_etoj_popytke": {
-    "uzor_svoda": "svod teper pechataet i stroki pro knigi (kod, skolko tokenov zaprosheno, skolko knig prishlo, pervaja kniga)"
+    "zaprosheno_protiv_prishlo": "stroka pro zapros chitala ne to pole: u knig podpis -- {'tokenov': N}, a ja iskal token_ids, i pechatalos 0. Ispravleno; teper vidno, skolko tokenov zaprosheno protiv togo, skolko knig prishlo"
   },
   "zamereno_progonom_38933292283": {
     "koren_molchanija": "gamma_events otdajot 422, telo {'type': 'validation error', 'error': 'order fields are not valid'} -- server otvergaet IMJA POLJA sortirovki (order=volume_24hr) iz dokumenta Code-3",
@@ -46,5 +46,10 @@
     "knigi": "knig v otvete teper 100 (bylo 30), no urovnej po-prezhnemu 0; GLUBINA strok 140, mediana bid/ask 0.0",
     "mb_za_chas": "gamma_events 5.82, data_trades 4.59, clob_books 0.03, clob_prices/spreads/midpoints po 0.02, data_holders 0.04, clob_time 0.01, clob_fee_rate 0.00 -- okolo 10-11 MB v chas, to est 250-290 MB v sutki, chto shoditsja s ocenkoj dokumenta (340 MB) dazhe pri pustyh knigah",
     "vsego": "13.48 MB s momenta ustanovki"
+  },
+  "zamereno_progonom_38943246059": {
+    "telo_knigi": "kod 200, 3507 bajt, knig v otvete 10, i kazhdaja PUSTA: bids [], asks [], last_trade_price '' -- pri etom CLOB otdajot polnyj objekt knigi (market, asset_id, hash, timestamp, tick_size 0.001, min_order_size 5). Znachit token_id VERNYE, a rynki prosto nikogda ne torgovalis",
+    "vsego": "17.16 MB; gamma_events 8.72 MB/chas, data_trades 5.07 MB/chas",
+    "glubina": "GLUBINA strok 200, mediana bid i ask 0.0"
   }
 }
