@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 3,
+  "popytka": 4,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -27,7 +27,8 @@
     "glavnaja_bela": "data/polymarket/vybor.json NE LOZHITSJA -- zapros /events ne udalsja, poetomu minutnomu krugu nechego chitat: 9 fajlov, vsego 0.08 MB, iz nih data_trades 0.08"
   },
   "novoe_v_etoj_popytke": {
-    "proba_order": "shest kandidatov imeni polja sortirovki /events s samogo jashchika, pervyj i poslednij kontrolnye (dokument -- zhdjom 422; sovsem bez order -- zhdjom 200). Tolko chtenie: GET bez podpisi, ni odnoj zajavki, kljuchej net. Skript Code-3 etim shagom NE pravitsja -- eto zamer dlja nego i dlja vladelca"
+    "prava_begunku": "gruppa polzovatelja begunka poluchaet zapis na data/polymarket (chgrp, 2775, setgid): sutochnyj artefakt i push proizvodnyh idut PROGONOM na begunke, i otmetku ob artefakte (--otmetit-artefakt) on PISHET v data/polymarket/artefakty",
+    "zachem_progon": "punkt 2 vladelca: vzjat metku begunka iz svodki etogo progona i postavit progon sutochnogo artefakta (retention 30) i pusha proizvodnyh 03:23Z cherez GITHUB_TOKEN"
   },
   "zamereno_progonom_38933292283": {
     "koren_molchanija": "gamma_events otdajot 422, telo {'type': 'validation error', 'error': 'order fields are not valid'} -- server otvergaet IMJA POLJA sortirovki (order=volume_24hr) iz dokumenta Code-3",

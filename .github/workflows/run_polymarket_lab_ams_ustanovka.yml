@@ -191,6 +191,36 @@ jobs:
             git log --oneline -1
             mkdir -p "$KOREN/data/polymarket"
             chown -R polymarket:polymarket "$KOREN"
+            # ГРУППА БЕГУНКА ПОЛУЧАЕТ ЗАПИСЬ НА КАТАЛОГ ДАННЫХ, и это нужно
+            # именно прогону, а не таймерам. Суточный артефакт сырого и пуш
+            # производных идут ПРОГОНОМ НА БЕГУНКЕ (токен на ящик не кладём),
+            # то есть под пользователем бегунка. Читать ему хватило бы и так,
+            # но отметку об артефакте (--otmetit-artefakt) он ПИШЕТ в
+            # data/polymarket/artefakty, а без права на каталог это
+            # "Permission denied". Ровно это уже ловилось на lab-miami.
+            # Бит setgid на каталогах -- отдельно: без него каталог, созданный
+            # завтра таймером от polymarket, лёг бы с группой polymarket, и
+            # отметка опять упёрлась бы в права. UMask=0002 в юнитах уже стоит,
+            # поэтому новые каталоги выходят 2775, а файлы 664.
+            # Имя пользователя бегунка НЕ УГАДЫВАЕМ: берём владельца его
+            # рабочего каталога.
+            RAB_BEGUNKA=$(ls -d /home/*/actions-runner/_work 2>/dev/null | head -1)
+            if [ -n "$RAB_BEGUNKA" ]; then
+              BEGUNOK=$(stat -c %U "$RAB_BEGUNKA")
+            else
+              BEGUNOK=""
+            fi
+            echo "polzovatel begunka: ${BEGUNOK:-ne najden} (po ${RAB_BEGUNKA:-net})"
+            if [ -n "$BEGUNOK" ] && id "$BEGUNOK" >/dev/null 2>&1; then
+              chgrp -R "$BEGUNOK" "$KOREN/data/polymarket"
+              find "$KOREN/data/polymarket" -type d -exec chmod 2775 {} +
+              find "$KOREN/data/polymarket" -type f -exec chmod 664 {} + 2>/dev/null || true
+              echo "prava na katalog dannyh:"
+              ls -ld "$KOREN/data/polymarket"
+            else
+              echo "VNIMANIE: polzovatelja begunka na mashine net -- otmetka ob"
+              echo "artefakte iz progona upadjot na Permission denied."
+            fi
             test -f "$KOREN/analysis/polymarket_put.py" \
               || { echo "SBOJ: v klone net analysis/polymarket_put.py"; exit 1; }
             # БИТ ВЫПОЛНЕНИЯ ПРОВЕРЯЕМ ОТДЕЛЬНО: в ветке файл лежит как 100755,
