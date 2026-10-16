@@ -73,6 +73,11 @@ jobs:
         env:
           SHYFT_API_KEY: ${{ secrets.SHYFT_API_KEY }}
           HELIUS_API_KEY: ${{ secrets.HELIUS_API }}
+          # Apify: тариф владельца. Токен приходит секретом репозитория, на диск не
+          # кладётся и в журнал не печатается -- скрипт подставляет его только заголовком
+          # Authorization. Пустой секрет не ломает прочие задания: скрипты, которым Apify
+          # не нужен, переменную не читают.
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           PODB_HELIUS_RPS: ${{ matrix.helius_rps }}
           SKRIPT: ${{ matrix.skript }}
           ARGS: ${{ matrix.args }}
