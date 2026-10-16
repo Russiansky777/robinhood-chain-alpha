@@ -128,17 +128,25 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
             о_сл = gzip.open(сл_ф, "wt", encoding="utf-8") if слим else None
             оборван = None
             причина = None
+            последняя_цела = True
             try:
                 if ф.stat().st_size == 0:
                     raise EOFError("файл нулевой длины")
-                with gzip.open(ф, "rt", encoding="utf-8") as о:
-                    for ln in о:
+                # Двоично и с errors="replace": обрыв посреди многобайтового символа
+                # валил строгий декодер UnicodeDecodeError (подкласс ValueError, не
+                # OSError) -- на нём остались 13.10 и 15.10.
+                with gzip.open(ф, "rb") as о:
+                    for сырая in о:
+                        ln = сырая.decode("utf-8", "replace")
                         try:
                             с = json.loads(ln)
                         except ValueError:
                             по_списку["[битая строка]"]["снимков"] += 1
+                            строк += 1
+                            последняя_цела = False
                             continue
                         строк += 1
+                        последняя_цела = True
                         к = по_списку[с.get("список") or "?"]
                         к["снимков"] += 1
                         к["коды"][с.get("код")] += 1
@@ -156,7 +164,7 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
                                 "строки": [{п_: р.get(п_) for п_ in ПОЛЯ_СТРОКИ}
                                            for р in (с.get("строки") or [])],
                             }, ensure_ascii=False) + "\n")
-            except (zlib.error, EOFError, OSError) as e:
+            except (zlib.error, EOFError, OSError, UnicodeDecodeError) as e:
                 # ОБРЫВ GZIP -- не повод потерять сутки. Диск на lab-miami кончился
                 # 14-16.10, и 9 файлов из 47 остались с обрезанным хвостом: начало цело.
                 # Прочитанное до обрыва идёт в счёт, обрыв записывается числом строк.
@@ -166,6 +174,12 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
             finally:
                 if о_сл is not None:
                     о_сл.close()
+            if оборван is None and not последняя_цела:
+                # Поток gzip кончился ровно, а последняя строка не разобралась: запись
+                # оборвана на середине строки -- так ложится обрыв посреди символа.
+                оборван = строк
+                причина = "последняя строка не разобралась: запись оборвана"
+                print(f"  ОБРЫВ {ф}: прочитано строк {строк}, {причина}", flush=True)
             if сл_ф is not None and сл_ф.exists():
                 записанные.append(сл_ф)
             для_суток = {}
