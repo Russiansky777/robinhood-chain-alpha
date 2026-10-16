@@ -166,8 +166,19 @@ jobs:
           echo "arhiv=$ARHIV" >> "$GITHUB_OUTPUT"
           echo "sutki=$SUTKI" >> "$GITHUB_OUTPUT"
           echo "razmer=$RAZMER" >> "$GITHUB_OUTPUT"
-          tar -tzf "$ARHIV" | head -5 | sed 's/^/  v arhive: /'
-          echo "fajlov v arhive: $(tar -tzf "$ARHIV" | wc -l)"
+          # ОПИСЬ АРХИВА -- В ФАЙЛ, А НЕ В КОНВЕЙЕР С head, И ЭТО ЗАМЕР, А НЕ
+          # ОСТОРОЖНОСТЬ. Прогон 38940276494 упал ровно здесь: было
+          # 'tar -tzf "$ARHIV" | head -5', head закрыл конвейер после пятой
+          # строки, tar получил EPIPE и напечатал "tar: stdout: write error",
+          # а при set -o pipefail это код шага 2 -- и загрузку артефакта
+          # ПРОПУСТИЛИ, хотя архив был собран (5 333 669 Б, девять списков).
+          # Своя же локальная проверка этого не поймала: в подставном архиве
+          # было 4 записи, и head -5 конвейер не закрывал. Теперь один проход
+          # tar в файл, и оба числа читаются из него.
+          OPIS="$RUNNER_TEMP/opis-$SUTKI.txt"
+          tar -tzf "$ARHIV" > "$OPIS"
+          sed -n '1,5p' "$OPIS" | sed 's/^/  v arhive: /'
+          echo "fajlov v arhive: $(wc -l < "$OPIS")"
 
       - name: "2. Загрузить артефакт (retention 30 -- слово владельца)"
         id: up
@@ -261,7 +272,7 @@ jobs:
                     | grep -vE "^($PUT_PROIZVODNYH|$PUT_OTMETOK)/" || true)
           if [ -n "$LISHNEE" ]; then
             echo "OTKAZ: v indekse puti vne proizvodnyh i otmetok:"
-            printf '%s\n' "$LISHNEE" | head -10 | sed 's/^/  /'
+            printf '%s\n' "$LISHNEE" | sed -n '1,10p' | sed 's/^/  /'
             exit 1
           fi
           if git diff --cached --quiet -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"; then
