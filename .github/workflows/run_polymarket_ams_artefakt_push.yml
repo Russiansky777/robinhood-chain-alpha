@@ -1,0 +1,331 @@
+name: "Polymarket lab-ams: суточный артефакт сырого (30) и пуш производных"
+
+# ЗАЧЕМ (пункт 2 владельца 16.10): суточный артефакт сырого с retention 30 и
+# пуш производных рядов в ветку -- ПРОГОНОМ НА БЕГУНКЕ lab-ams. Токен выдаёт
+# сам GitHub на время прогона (GITHUB_TOKEN у actions/checkout), на диск машины
+# он не ложится и после прогона не остаётся. Именно поэтому строка
+# ExecStartPost с --push из документа Code-3 в юнит НЕ ставилась.
+#
+# ПОРЯДОК ШАГОВ ИЗ ДОКУМЕНТА, И МЕНЯТЬ ЕГО НЕЛЬЗЯ:
+#   1) упаковать сырое за сутки;
+#   2) загрузить артефакт (retention-days: 30 -- слово владельца, не 90);
+#   3) ТОЛЬКО ЕСЛИ шаг 2 прошёл -- поставить отметку --otmetit-artefakt;
+#   4) чистка (--rotacija) -- ОТДЕЛЬНЫМ таймером на машине в 05:11Z, здесь её
+#      нет вовсе. Скрипт удаляет сырое только там, где отметка есть.
+# Отметка после загрузки -- не формальность: без неё ротация не удалит ничего
+# и назовёт сутки вслух ("ЖДУТ АРТЕФАКТА"), а пустая отметка (без имени
+# артефакта) отбивается самим скриптом.
+#
+# СЫРОЕ В ВЕТКУ НЕ ИДЁТ ВОВСЕ. В коммит едут только data/polymarket/proizvodnye
+# и data/polymarket/artefakty; архив сырого лежит в $RUNNER_TEMP, то есть ВНЕ
+# рабочего дерева, и попасть в коммит не может. Ниже стоит отдельная проверка,
+# которая отказывается пушить, если в индексе оказался хоть один путь сырого.
+#
+# РАСПИСАНИЕ GITHUB В ЭТОМ РЕПОЗИТОРИИ ОПАЗДЫВАЕТ НА ЧАСЫ -- замерено: 02:17Z
+# у трендингов срабатывало в 07:28-09:27Z. Поэтому 03:23Z -- это "не раньше",
+# а не "в". Для суточного артефакта это безразлично: сутки уже закрыты, а
+# производные к этому времени посчитал таймер на машине.
+on:
+  schedule:
+    # 03:23Z выбран документом Code-3: не 02:17Z (там суточный пуш трендингов
+    # на lab-miami) и не 07:17Z (тяжёлые проходы архива).
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      koren:
+        description: "клон регистратора на lab-ams"
+        required: false
+        default: "/opt/polymarket-put"
+      sutki:
+        description: "сутки ГГГГ-ММ-ДД; пусто -- вчерашние по UTC"
+        required: false
+        default: ""
+      otmechat:
+        description: "'no' -- не ставить отметку об артефакте (только упаковать и загрузить)"
+        required: false
+        default: "yes"
+
+concurrency:
+  group: polymarket-ams-artefakt
+  cancel-in-progress: false
+
+env:
+  KOREN_PM: "/opt/polymarket-put"
+  VETKA_KODA: "claude/stroiteli"
+  PUT_PROIZVODNYH: "data/polymarket/proizvodnye"
+  PUT_OTMETOK: "data/polymarket/artefakty"
+  OTMECHAT: "yes"
+  TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
+
+jobs:
+  artefakt:
+    # МЕТКА ВЗЯТА ИЗ ЗАМЕРА, А НЕ УГАДАНА: имя службы бегунка на ящике
+    # печатает сводка прогона установки. Прогон с несуществующей меткой не
+    # краснеет, а ВИСИТ В ОЧЕРЕДИ -- то есть ошибка была бы молчаливой.
+    # fromJSON -- тем же приёмом, каким задана метка у суточного пуша
+    # трендингов на lab-miami.
+    # ЗАМЕР: прогон 38939399893 напечатал METKA_BEGUNKA=lab-ams. Догадка
+    # была другой (nl-host -- в репозитории есть прогон с такой меткой),
+    # и она оказалась НЕВЕРНОЙ -- поэтому и мерили.
+    runs-on: ${{ fromJSON('["self-hosted","lab-ams"]') }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/stroiteli
+          fetch-depth: 1
+          # ВЫБОРКА ТОЛЬКО ПРОИЗВОДНЫХ И ОТМЕТОК. По исходнику действия
+          # (src/git-source-provider.ts): если filter не задан, но задан
+          # sparseCheckout, fetchOptions.filter становится 'blob:none', то
+          # есть выборка blobless включается сама. Дерево репозитория -- 8.77
+          # ГБ, и тащить его на двухъядерный ящик незачем.
+          # cone-mode выключен намеренно: в cone-режиме к выборке добавляются
+          # файлы прямо в data/, а это сотни мегабайт мимо дела.
+          sparse-checkout: |
+            /data/polymarket/proizvodnye/
+            /data/polymarket/artefakty/
+          sparse-checkout-cone-mode: false
+
+      - name: "ПРЕДОХРАНИТЕЛЬ: это не торговый хост"
+        run: |
+          set -e
+          # Прогон идёт НА МАШИНЕ, поэтому адрес проверяем у самой машины, а
+          # не у переменной: сверяем все её адреса с торговым.
+          SVOI=$(hostname -I 2>/dev/null || echo "")
+          echo "adresa mashiny: ${SVOI:-neizvestny}"
+          for A in $SVOI; do
+            if [ "$A" = "$TORGOVYJ_ZAPRESHCHEN" ]; then
+              echo "STOP: eto torgovyj host. Nichego zdes ne delaem."
+              exit 1
+            fi
+          done
+          echo "hostname: $(hostname)"
+          echo "torgovyj $TORGOVYJ_ZAPRESHCHEN sredi adresov ne najden -- prodolzhaem"
+
+      - name: "Параметры: вход прогона сильнее умолчания"
+        env:
+          VHOD_KOREN: ${{ inputs.koren }}
+          VHOD_SUTKI: ${{ inputs.sutki }}
+          VHOD_OTMECHAT: ${{ inputs.otmechat }}
+        run: |
+          set -e
+          [ -n "$VHOD_KOREN" ] && echo "KOREN_PM=$VHOD_KOREN" >> "$GITHUB_ENV"
+          [ -n "$VHOD_OTMECHAT" ] && echo "OTMECHAT=$VHOD_OTMECHAT" >> "$GITHUB_ENV"
+          # СУТКИ ПО УМОЛЧАНИЮ -- ВЧЕРАШНИЕ ПО UTC: на 03:23Z они уже закрыты,
+          # а сегодняшние ещё пишутся, и артефакт вышел бы неполным.
+          if [ -n "$VHOD_SUTKI" ]; then
+            SUTKI="$VHOD_SUTKI"
+          else
+            SUTKI=$(date -u -d yesterday +%F)
+          fi
+          case "$SUTKI" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) : ;;
+            *) echo "SBOJ: sutki '$SUTKI' ne pohozhi na GGGG-MM-DD"; exit 1 ;;
+          esac
+          echo "SUTKI=$SUTKI" >> "$GITHUB_ENV"
+          echo "sutki: $SUTKI"
+          echo "koren: ${VHOD_KOREN:-$KOREN_PM}"
+          df -h / | tail -1
+
+      - name: "1. Упаковать сырое за сутки (архив -- вне рабочего дерева)"
+        id: pack
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          ARHIV="$RUNNER_TEMP/polymarket-syroe-$SUTKI.tar.gz"
+          # АРХИВ ЛЕЖИТ В $RUNNER_TEMP, А НЕ В РЕПОЗИТОРИИ, и это не вкус:
+          # из рабочего дерева он мог бы попасть в коммит, а сырое в ветку не
+          # идёт вовсе (340 МБ в сутки при 100 рынках).
+          case "$ARHIV" in
+            "$GITHUB_WORKSPACE"/*) echo "SBOJ: arhiv vnutri rabochego dereva"; exit 1 ;;
+          esac
+          # ИСКЛЮЧАЕМ ПРОИЗВОДНЫЕ И ОТМЕТКИ: они едут в ветку коммитом, и в
+          # архиве сырого им делать нечего. Раскрой у них такой же
+          # (<каталог>/<дата>/), поэтому без исключения они бы попали.
+          KATALOGI=$(cd "$KOREN" && find data/polymarket -mindepth 2 -maxdepth 2 \
+                     -type d -name "$SUTKI" \
+                     -not -path 'data/polymarket/proizvodnye/*' \
+                     -not -path 'data/polymarket/artefakty/*' | sort)
+          if [ -z "$KATALOGI" ]; then
+            echo "SBOJ: za $SUTKI syryh katalogov net ni u odnogo spiska."
+            echo "Eto ne pustaja formalnost: sutki bez syrogo znachat, chto sbor"
+            echo "stojal -- imenno takuju tihuju poterju i lovim."
+            exit 1
+          fi
+          echo "--- chto upakovyvaem ---"
+          printf '%s\n' "$KATALOGI" | sed 's/^/  /'
+          # gzip -1: тела снимков УЖЕ в gzip, второй проход почти ничего не
+          # жмёт, а на двухъядерном ящике стоит времени.
+          printf '%s\n' "$KATALOGI" \
+            | tar -I 'gzip -1' -cf "$ARHIV" -C "$KOREN" -T -
+          RAZMER=$(stat -c %s "$ARHIV")
+          echo "arhiv: $ARHIV, $RAZMER B ($((RAZMER / 1048576)) MB)"
+          echo "arhiv=$ARHIV" >> "$GITHUB_OUTPUT"
+          echo "sutki=$SUTKI" >> "$GITHUB_OUTPUT"
+          echo "razmer=$RAZMER" >> "$GITHUB_OUTPUT"
+          tar -tzf "$ARHIV" | head -5 | sed 's/^/  v arhive: /'
+          echo "fajlov v arhive: $(tar -tzf "$ARHIV" | wc -l)"
+
+      - name: "2. Загрузить артефакт (retention 30 -- слово владельца)"
+        id: up
+        uses: actions/upload-artifact@v4
+        with:
+          name: polymarket-syroe-${{ steps.pack.outputs.sutki }}
+          path: ${{ steps.pack.outputs.arhiv }}
+          retention-days: 30
+          # error, А НЕ warn: отметка об артефакте ставится следующим шагом, и
+          # поставить её без загруженного артефакта -- значит открыть ротации
+          # удаление сырого, которого больше нигде нет.
+          if-no-files-found: error
+          # Содержимое уже сжато (tar.gz из gzip-снимков) -- второй проход zip
+          # не даёт почти ничего, а время на двух ядрах стоит.
+          compression-level: 0
+
+      - name: "3. Отметка -- ТОЛЬКО после удачной загрузки"
+        if: ${{ success() && env.OTMECHAT != 'no' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          ID="${{ steps.up.outputs.artifact-id }}"
+          URL="${{ steps.up.outputs.artifact-url }}"
+          # ПУСТОЙ id -- ОТКАЗ. Пустая отметка (без имени артефакта) отбивается
+          # и самим скриптом, но ловить её надо здесь: иначе шаг прошёл бы
+          # "успешно", ничего не подтвердив.
+          if [ -z "$ID" ]; then
+            echo "SBOJ: zagruzka ne vernula artifact-id -- otmetku ne stavlju"
+            exit 1
+          fi
+          echo "artefakt id: $ID"
+          echo "artefakt url: ${URL:-net}"
+          cd "$KOREN"
+          python3 analysis/polymarket_put.py --otmetit-artefakt "$SUTKI" --artefakt "$ID"
+          echo "--- otmetka na mashine ---"
+          ls -l "$KOREN/$PUT_OTMETOK" | tail -5
+
+      - name: "Производные и отметки -- в рабочее дерево ветки (без --delete)"
+        if: ${{ always() && job.status != 'cancelled' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          mkdir -p "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
+          # ПЕРЕНОС ТОЛЬКО ДОБАВЛЯЮЩИЙ: ни --delete, ни --delete-after. На
+          # машине работает ротация сырого, а зеркалящий перенос стёр бы из
+          # ветки то, чего на машине уже нет.
+          if [ -d "$KOREN/$PUT_PROIZVODNYH" ]; then
+            rsync -a "$KOREN/$PUT_PROIZVODNYH/" "$PUT_PROIZVODNYH/" \
+              || cp -r "$KOREN/$PUT_PROIZVODNYH/." "$PUT_PROIZVODNYH/"
+          else
+            echo "VNIMANIE: na mashine net $PUT_PROIZVODNYH -- tajmer"
+            echo "polymarket-proizvodnye v 03:23Z libo ne shjol, libo nechego bylo schitat."
+          fi
+          if [ -d "$KOREN/$PUT_OTMETOK" ]; then
+            rsync -a "$KOREN/$PUT_OTMETOK/" "$PUT_OTMETOK/" \
+              || cp -r "$KOREN/$PUT_OTMETOK/." "$PUT_OTMETOK/"
+          fi
+          echo "--- chto polozheno ---"
+          echo "proizvodnyh na mashine: $(find "$KOREN/$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
+          echo "proizvodnyh v dereve:   $(find "$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
+          echo "otmetok v dereve:       $(find "$PUT_OTMETOK" -type f 2>/dev/null | wc -l)"
+          echo "za $SUTKI v dereve:     $(find "$PUT_PROIZVODNYH" -type f -path "*/$SUTKI/*" 2>/dev/null | wc -l)"
+          # ПРЕДЕЛ GITHUB ПРОВЕРЯЕТСЯ ДО ПУША: файл крупнее 100 МБ сервер
+          # отвергает наотрез, и узнать об этом из отказа пуша хуже, чем из
+          # своей же проверки с названным размером.
+          PREDEL=$((95 * 1024 * 1024))
+          KRUPNYE=$(find "$PUT_PROIZVODNYH" "$PUT_OTMETOK" -type f \
+                    -size +$((PREDEL / 1024))k -printf '%s %p\n' 2>/dev/null || true)
+          if [ -n "$KRUPNYE" ]; then
+            echo "OTKAZ: est fajly krupnee 95 MB -- GitHub ih ne primet:"
+            echo "$KRUPNYE" | awk '{printf "  %8.1f MB  %s\n", $1/1048576, $2}'
+            exit 1
+          fi
+          echo "fajlov krupnee 95 MB net"
+
+      - name: "Пуш производных в ветку claude/stroiteli (токен от GitHub)"
+        if: ${{ always() && job.status != 'cancelled' }}
+        run: |
+          set -e
+          set -o pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
+          # СЫРОЕ В ИНДЕКСЕ -- ОТКАЗ, И ЭТО ПРОВЕРКА, А НЕ ОБЕЩАНИЕ. В ветку
+          # едут только производные и отметки; всё прочее под data/polymarket
+          # (книги, цены, сделки) -- сырое, 340 МБ в сутки, ему в истории git
+          # места нет.
+          LISHNEE=$(git diff --cached --name-only -- data/polymarket \
+                    | grep -vE "^($PUT_PROIZVODNYH|$PUT_OTMETOK)/" || true)
+          if [ -n "$LISHNEE" ]; then
+            echo "OTKAZ: v indekse puti vne proizvodnyh i otmetok:"
+            printf '%s\n' "$LISHNEE" | head -10 | sed 's/^/  /'
+            exit 1
+          fi
+          if git diff --cached --quiet -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"; then
+            echo "novogo net: v vetke uzhe to zhe samoe"
+            echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          FAJLOV=$(git diff --cached --numstat -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK" | wc -l)
+          echo "fajlov k pushu: $FAJLOV"
+          for POPYTKA in 1 2 3 4 5 6 7 8; do
+            git fetch -q --depth=1 origin "$VETKA_KODA"
+            git reset -q FETCH_HEAD
+            git add -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
+            if git diff --cached --quiet -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"; then
+              echo "uzhe v vetke (popytka $POPYTKA)"
+              echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            git commit -q -m "Polymarket: proizvodnye i otmetki za $SUTKI ($FAJLOV fajlov) [automated]" \
+              -- "$PUT_PROIZVODNYH" "$PUT_OTMETOK"
+            # git push БЕЗ КОНВЕЙЕРА: 'git push | tail' отдаёт код tail, то
+            # есть 0 даже на отказе, и отчёт о пуше врал бы.
+            if git push -q origin HEAD:"$VETKA_KODA"; then
+              echo "push gotov s popytki $POPYTKA"
+              echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "popytka $POPYTKA: push otklonjon, dogonjaju vetku"
+            sleep $((POPYTKA * 2))
+          done
+          echo "SBOJ: push ne proshjol za vosem popytok"
+          exit 1
+
+      - name: "ДОКАЗАТЕЛЬСТВО ПУША: наш коммит виден в ветке"
+        if: ${{ always() && job.status != 'cancelled' }}
+        run: |
+          set -e
+          set -o pipefail
+          # КОДУ git push ВЕРИМ НЕ НА СЛОВО. Сверяем с вершиной ветки, какой
+          # её отдаёт сервер: либо наш коммит и есть вершина, либо он её предок.
+          [ -n "${NASH_KOMMIT:-}" ] || { echo "SBOJ: shag pusha ne nazval svoj kommit"; exit 1; }
+          git fetch -q --depth=50 origin "$VETKA_KODA"
+          VERSHINA=$(git rev-parse FETCH_HEAD)
+          echo "nash kommit: $NASH_KOMMIT"
+          echo "vershina vetki: $VERSHINA"
+          if [ "$NASH_KOMMIT" = "$VERSHINA" ]; then
+            echo "DOKAZANO: nash kommit -- vershina vetki"
+          elif git merge-base --is-ancestor "$NASH_KOMMIT" "$VERSHINA"; then
+            echo "DOKAZANO: nash kommit -- predok vershiny (poverh legli chuzhie)"
+          else
+            echo "SBOJ: nashego kommita v vetke net"
+            exit 1
+          fi
+          git reset -q "$VERSHINA"
+
+      - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
+        if: ${{ always() }}
+        run: |
+          set -e
+          echo "sutki:                 ${SUTKI:-?}"
+          echo "arhiv syrogo:          ${{ steps.pack.outputs.razmer }} B"
+          echo "artefakt id:           ${{ steps.up.outputs.artifact-id }}"
+          echo "otmetku stavili:       ${OTMECHAT:-yes}"
+          echo "proizvodnyh v dereve:  $(find "$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
+          echo "otmetok v dereve:      $(find "$PUT_OTMETOK" -type f 2>/dev/null | wc -l)"
+          echo "nash kommit:           ${NASH_KOMMIT:-net}"
+          echo "rotacija zdes NE delaetsja -- ona otdelnym tajmerom na mashine v 05:11Z"

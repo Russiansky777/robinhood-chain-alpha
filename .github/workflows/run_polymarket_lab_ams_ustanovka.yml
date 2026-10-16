@@ -62,6 +62,12 @@ env:
   VETKA_KODA: "claude/stroiteli"
   KOREN_PM: "/opt/polymarket-put"
   RYNKOV: "100"
+  # ДВА МИНУТНЫХ КРУГА И ГЛУБИНА КНИГ -- ПО УМОЛЧАНИЮ ВЫКЛЮЧЕНО. Пункт 1
+  # владельца 17.10: это делается ПОСЛЕ правки order=volume24hr от Code-4,
+  # когда состав рынков наконец ложится. До того круги мерить нечего:
+  # /events отдаёт 422, и семь списков стоят с причиной "нет выбора рынков".
+  # Включается меткой запуска (krugi: yes) или входом прогона.
+  KRUGI: "no"
   SUTOK_SYROGO: "30"
   HOST_LAB: 216.73.157.61
   TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
@@ -109,7 +115,7 @@ jobs:
           # 'ls -1t' выбрал бы не самую позднюю метку, а первую по алфавиту.
           METKA_FAJL=$(ls -1 data/konservaciya/zapusk/polymarket_ams_*.json 2>/dev/null | sort | tail -1 || true)
           echo "fajl-metka: ${METKA_FAJL:-net}"
-          for IMJA in VETKA_KODA KOREN_PM TOLKO_DIAGNOZ; do
+          for IMJA in VETKA_KODA KOREN_PM TOLKO_DIAGNOZ KRUGI; do
             KLJUCH=$(printf '%s' "$IMJA" | tr 'A-Z' 'a-z')
             NOVO=$(printf '%s' "$VHODY" | jq -r --arg k "$KLJUCH" '((. // {})[$k] // "") | tostring' 2>/dev/null || true)
             if [ -z "$NOVO" ] && [ -n "$METKA_FAJL" ]; then
@@ -529,6 +535,61 @@ jobs:
           echo "--- kto otvetil 200 ---"
           grep -E 'KANDIDAT .* 200 ' order_ams.txt || echo "ni odin kandidat ne otdal 200"
 
+      - name: "ДВА МИНУТНЫХ КРУГА И ГЛУБИНА КНИГ (пункт 1 владельца)"
+        if: ${{ env.TOLKO_DIAGNOZ != 'yes' && env.KRUGI == 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PM"
+          # КРУГИ ЗАПУСКАЕМ САМИ, А НЕ ЖДЁМ ТАЙМЕРА, и это не нетерпение:
+          # ждать минутный таймер значит ждать случайную долю минуты плюс
+          # AccuracySec, а доклад просили по ДВУМ кругам. Юнит oneshot, два
+          # запуска с паузой дают ровно два круга и ничего не ломают.
+          ssh $SSH_OPTS root@"$HOST_LAB" "KOREN='$KOREN' bash -s" <<'KRUGI_SH' 2>&1 | tee krugi_ams.txt
+            set -e
+            SEGODNJA=$(date -u +%F)
+            CHAS=$(date -u +%H)
+            echo "--- krug 1 ---"
+            systemctl start polymarket-min.service || true
+            systemctl show polymarket-min.service -p ExecMainStatus --value
+            sleep 60
+            echo "--- krug 2 ---"
+            systemctl start polymarket-min.service || true
+            systemctl show polymarket-min.service -p ExecMainStatus --value
+            sleep 5
+            echo "--- sostav rynkov ---"
+            if [ -f "$KOREN/data/polymarket/vybor.json" ]; then
+              python3 -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print('RYNKOV=', len(d.get('markets') or []), 'TOKENOV=', len(d.get('tokens') or []))" \
+                "$KOREN/data/polymarket/vybor.json"
+            else
+              echo "RYNKOV= 0 TOKENOV= 0 (vybor.json ne polozhen -- /events vsjo eshchjo otkazyvaet)"
+            fi
+            echo "--- MB za chas $CHAS po spiskam ---"
+            for D in "$KOREN"/data/polymarket/*/"$SEGODNJA"; do
+              [ -d "$D" ] || continue
+              SP=$(basename "$(dirname "$D")")
+              case "$SP" in proizvodnye|artefakty) continue ;; esac
+              BAJT=$(find "$D" -maxdepth 1 -type f -name "$CHAS*.jsonl.gz" -printf '%s\n' 2>/dev/null \
+                     | awk '{s+=$1} END {printf "%d", s+0}')
+              STROK=$(find "$D" -maxdepth 1 -type f -name "$CHAS*.jsonl.gz" -exec zcat {} + 2>/dev/null | wc -l)
+              printf '  %-16s %8.2f MB  snimkov %5s\n' "$SP" "$(awk -v b="$BAJT" 'BEGIN{print b/1048576}')" "$STROK"
+            done
+            echo "--- proizvodnye za segodnja (dlja glubiny knig) ---"
+            if command -v sudo >/dev/null 2>&1; then
+              (cd "$KOREN" && sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --proizvodnye --sutki "$SEGODNJA") || echo "proizvodnye otkazali -- prichina vyshe"
+            else
+              (cd "$KOREN" && runuser -u polymarket -- /usr/bin/python3 analysis/polymarket_put.py --proizvodnye --sutki "$SEGODNJA") || echo "proizvodnye otkazali -- prichina vyshe"
+            fi
+            PR="$KOREN/data/polymarket/proizvodnye/$SEGODNJA"
+            if [ -d "$PR" ]; then
+              echo "--- GLUBINA KNIG: mediana urovnej bid/ask ---"
+              find "$PR" -type f -name '*.jsonl.gz' -exec zcat {} + 2>/dev/null \
+                | python3 -c "import json,sys,statistics as st; r=[json.loads(l) for l in sys.stdin if l.strip()]; b=[x.get('urovnej_bid') for x in r if isinstance(x.get('urovnej_bid'), (int, float))]; a=[x.get('urovnej_ask') for x in r if isinstance(x.get('urovnej_ask'), (int, float))]; print('GLUBINA strok', len(r), 'mediana_bid', (st.median(b) if b else 'net'), 'mediana_ask', (st.median(a) if a else 'net'))"
+            else
+              echo "GLUBINA: proizvodnyh za $SEGODNJA net -- schitat ne iz chego"
+            fi
+          KRUGI_SH
+
       - name: "Выложить первый доклад артефактом"
         if: always()
         uses: actions/upload-artifact@v4
@@ -543,6 +604,7 @@ jobs:
             svodka_ams.txt
             prichina_ams.txt
             order_ams.txt
+            krugi_ams.txt
           retention-days: 30
           if-no-files-found: warn
 
@@ -611,7 +673,13 @@ jobs:
           # предыдущих трёх прогонах имя оставалось выше окна хвоста. Метка
           # нужна для runs-on последней мили, а угадывать её нельзя: прогон с
           # несуществующей меткой не краснеет, а молча висит в очереди.
-          echo "=== 8. METKA BEGUNKA (poslednej strokoj) ==="
+          echo "=== 8. DVA MINUTNYH KRUGA I GLUBINA KNIG ==="
+          if [ -f krugi_ams.txt ]; then
+            grep -E '^(RYNKOV=|GLUBINA|  [a-z_]+ +[0-9])' krugi_ams.txt || tail -6 krugi_ams.txt
+          else
+            echo "(shag ne shjol -- KRUGI=${KRUGI:-no})"
+          fi
+          echo "=== 9. METKA BEGUNKA (poslednej strokoj) ==="
           if [ -f diagnoz_ams.txt ]; then
             grep -oE 'actions\.runner\.[A-Za-z0-9_.-]+' diagnoz_ams.txt \
               | sed 's/\.service$//' | awk -F. '{print "METKA_BEGUNKA=" $NF}' | head -1 \
