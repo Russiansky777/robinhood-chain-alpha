@@ -250,7 +250,18 @@ jobs:
           # file(s) known to git" -- то есть обычный пуш БЕЗ маркера падал бы.
           # Поэтому маркер попадает в пути только когда он есть на диске либо
           # уже лежит в ветке (второе -- чтобы его можно было СНЯТЬ).
-          PUTI() {
+          #
+          # И СЧИТАЮТСЯ ОНИ ДО ПРАВКИ ИНДЕКСА, А НЕ ПОСЛЕ. Это была настоящая
+          # ошибка, пойманная сухим прогоном на игрушечном репозитории: когда
+          # место возвращается, снятие убирает маркер И из индекса, И с диска,
+          # после чего оба условия ложны и путь маркера ИЗ ПУТЕЙ ВЫПАДАЕТ.
+          # Тогда 'git diff --cached --quiet' по одним таблицам не видит
+          # изменений, шаг говорит "нечего пушить" -- и снятие не уезжает:
+          # устаревший STOP остался бы в ветке навсегда, то есть ровно то, от
+          # чего вся эта возня. Поэтому пути вычисляются один раз в
+          # PUTI_TEK -- ДО STAVIM -- и внутри цикла пересчитываются сразу
+          # после reset, пока маркер ещё виден в индексе ветки.
+          SOBRAT_PUTI() {
             printf '%s' "$PUT_PERVYH"
             if [ -f "$PUT_MARKERA" ] \
                || git ls-files --error-unmatch -- "$PUT_MARKERA" >/dev/null 2>&1; then
@@ -267,9 +278,11 @@ jobs:
               rm -f "$PUT_MARKERA"
             fi
           }
+          PUTI_TEK=$(SOBRAT_PUTI)
+          echo "puti kommita: $PUTI_TEK"
           STAVIM
-          # shellcheck disable=SC2046
-          if git diff --cached --quiet -- $(PUTI); then
+          # shellcheck disable=SC2086
+          if git diff --cached --quiet -- $PUTI_TEK; then
             echo "novyh tablic net: v vetke uzhe to zhe samoe"
             # Свой коммит всё равно называем: шагу доказательства нужно, что
             # сверять с вершиной ветки, а уборке -- право работать и в этом
@@ -277,8 +290,8 @@ jobs:
             echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
             exit 0
           fi
-          # shellcheck disable=SC2046
-          FAJLOV=$(git diff --cached --numstat -- $(PUTI) | wc -l)
+          # shellcheck disable=SC2086
+          FAJLOV=$(git diff --cached --numstat -- $PUTI_TEK | wc -l)
           echo "fajlov k pushu: $FAJLOV"
           # Ветку догоняем fetch+reset, а не rebase: клон мелкий (depth=1),
           # rebase в нём делать нечем. Тот же приём у run_podbivka2_miami.yml
@@ -286,16 +299,20 @@ jobs:
           for POPYTKA in 1 2 3 4 5 6 7 8; do
             git fetch -q --depth=1 origin "$VETKA_SNIMKOV"
             git reset -q FETCH_HEAD
+            # ПЕРЕСЧЁТ СРАЗУ ПОСЛЕ reset: индекс теперь равен новой вершине
+            # ветки, и маркер, если он там лежит, снова виден -- значит его
+            # можно снять. После STAVIM он уже не виден, и считать поздно.
+            PUTI_TEK=$(SOBRAT_PUTI)
             STAVIM
-            # shellcheck disable=SC2046
-            if git diff --cached --quiet -- $(PUTI); then
+            # shellcheck disable=SC2086
+            if git diff --cached --quiet -- $PUTI_TEK; then
               echo "uzhe v vetke (popytka $POPYTKA)"
               echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
               exit 0
             fi
-            # shellcheck disable=SC2046
+            # shellcheck disable=SC2086
             git commit -q -m "Trending: pervye pojavlenija za sutki ($FAJLOV fajlov) [automated]" \
-              -- $(PUTI)
+              -- $PUTI_TEK
             # git push БЕЗ КОНВЕЙЕРА, и это главное. 'git push | tail' отдаёт
             # код tail, то есть 0 даже на отказе, и отчёт о пуше врёт. Здесь
             # код возврата честный -- но и ему мы верим не на слово: ниже

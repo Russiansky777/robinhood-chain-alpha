@@ -138,6 +138,8 @@ jobs:
             python3 -V 2>&1
             systemctl --version 2>/dev/null | head -1
             echo "ruff: $(command -v ruff 2>/dev/null || echo net)"
+            echo "sudo: $(command -v sudo 2>/dev/null || echo net)"
+            echo "runuser: $(command -v runuser 2>/dev/null || echo net)"
             echo "--- EST LI BEGUNOK GitHub NA ETOJ MASHINE ---"
             # ЭТО НЕ ЛЮБОПЫТСТВО: пуш производных и суточный артефакт идут
             # ПРОГОНОМ НА БЕГУНКЕ (иначе на машину пришлось бы положить токен).
@@ -210,8 +212,12 @@ jobs:
           # СЛОВО ВЛАДЕЛЬЦА: "самопроверка 35/35 -- пройти заново на месте,
           # ruff". На месте, а не на слово: у ящика своя версия Python и свой
           # набор правил ruff. Сети самопроверка не просит.
+          # ОТ ПОЛЬЗОВАТЕЛЯ polymarket, НО НЕ ЧЕРЕЗ ОДИН ТОЛЬКО sudo: на
+          # лабораторной машине sudo может не стоять вовсе, и шаг упал бы на
+          # "sudo: command not found", ничего не поставив и ничего не измерив.
+          # runuser входит в util-linux и есть всюду, где есть systemd.
           ssh -n $SSH_OPTS root@"$HOST_LAB" \
-            "cd $KOREN && sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --self-test" \
+            "cd $KOREN && if command -v sudo >/dev/null 2>&1; then sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --self-test; else runuser -u polymarket -- /usr/bin/python3 analysis/polymarket_put.py --self-test; fi" \
             2>&1 | tee samoproverka_ams.txt
           # ЧИСЛО ПРОВЕРОК СВЕРЯЕТСЯ, А НЕ ПРОСМАТРИВАЕТСЯ: ждём ровно 35 и
           # ровно 0 упавших. Код возврата ssh -- это код самопроверки
@@ -373,7 +379,7 @@ jobs:
           # Запуск от того же пользователя, что и таймер: иначе проверили бы
           # доступ не того, кто ходит в сеть по-настоящему.
           ssh -n $SSH_OPTS root@"$HOST_LAB" \
-            "cd $KOREN && sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --kazhdye все --rynkov $RYNKOV --probno" \
+            "cd $KOREN && if command -v sudo >/dev/null 2>&1; then sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --kazhdye все --rynkov $RYNKOV --probno; else runuser -u polymarket -- /usr/bin/python3 analysis/polymarket_put.py --kazhdye все --rynkov $RYNKOV --probno; fi" \
             2>&1 | tee probno_ams.txt
           echo "--- itog proby ---"
           tail -3 probno_ams.txt
@@ -412,7 +418,11 @@ jobs:
             fi
             echo "--- svodka ---"
             cd "$KOREN"
-            sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --svodka || true
+            if command -v sudo >/dev/null 2>&1; then
+              sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --svodka || true
+            else
+              runuser -u polymarket -- /usr/bin/python3 analysis/polymarket_put.py --svodka || true
+            fi
           PROBA
 
       - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
