@@ -341,9 +341,18 @@ jobs:
             echo "markera storozha na jashchike net -- mesta hvataet"
           fi
           echo "--- chto polozheno ---"
-          echo "proizvodnyh na mashine za $SUTKI: $(find "$KOREN/$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
+          # РЯДЫ -- ЭТО *.jsonl.gz, И СЧИТАТЬ НАДО ИХ, А НЕ ВСЕ ФАЙЛЫ. В том
+          # же каталоге производных лежит otbor.json, который кладёт ТАЙМЕР
+          # ОТБОРА в 00:02Z (polymarket_put.py: "сп = ПАПКА / proizvodnye /
+          # сутки / otbor.json"), а часовые ряды берут имя часового файла
+          # сырого, то есть <ЧЧ>.jsonl.gz. Разница не косметическая: на ней
+          # держится проверка ниже.
+          RJADOV_MASH=$(find "$KOREN/$PUT_PROIZVODNYH/$SUTKI" -type f -name '*.jsonl.gz' 2>/dev/null | wc -l)
+          RJADOV_DEREVO=$(find "$PUT_PROIZVODNYH/$SUTKI" -type f -name '*.jsonl.gz' 2>/dev/null | wc -l)
+          echo "rjadov na mashine za $SUTKI:      $RJADOV_MASH"
+          echo "vsego fajlov na mashine za sutki: $(find "$KOREN/$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l) (sredi nih otbor.json)"
           echo "proizvodnyh na mashine vsego:     $(find "$KOREN/$PUT_PROIZVODNYH" -type f 2>/dev/null | wc -l)"
-          echo "za $SUTKI v dereve:               $(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
+          echo "rjadov za $SUTKI v dereve:        $RJADOV_DEREVO"
           echo "otmetka za $SUTKI v dereve:       $([ -f "$PUT_OTMETOK/$SUTKI.json" ] && echo est || echo net)"
           # ПРЕДЕЛ GITHUB ПРОВЕРЯЕТСЯ ДО ПУША: файл крупнее 100 МБ сервер
           # отвергает наотрез, и узнать об этом из отказа пуша хуже, чем из
@@ -357,27 +366,34 @@ jobs:
             exit 1
           fi
           echo "fajlov krupnee 95 MB net"
-          # СЫРОЕ ЕСТЬ, А ПРОИЗВОДНЫХ НЕТ -- ЭТО НЕ ПОВОД ВЫЙТИ ЗЕЛЁНЫМ.
-          # Упаковка выше доказала, что за эти сутки сырьё на ящике ЕСТЬ.
-          # Значит таймер polymarket-proizvodnye обязан был их посчитать
-          # (юнит зовёт --proizvodnye без --sutki, то есть пересчитывает все
-          # сутки). Если производных за эти сутки нет -- таймер не шёл либо
-          # упал, и ночь прошла бы впустую при зелёном прогоне. Молчаливая
-          # потеря -- худший исход, её и ловим.
-          # На плановом прогоне это ОТКАЗ; на ручном запуске (dispatch)
-          # громкое предупреждение: вручную мы часто целимся в сегодняшние
-          # сутки, которых таймер ещё не считал.
-          ZA_SUTKI=$(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)
-          if [ "$ZA_SUTKI" -eq 0 ]; then
-            echo "VNIMANIE: za $SUTKI syroe upakovano, a proizvodnyh NET ni odnoj."
-            echo "Znachit tajmer polymarket-proizvodnye za eti sutki ne schital."
-            if [ "${GITHUB_EVENT_NAME:-}" = "schedule" ]; then
-              echo "SBOJ: planovyj progon -- eto otkaz, a ne zamechanie."
-              exit 1
-            fi
-            echo "(ruchnoj zapusk -- prodolzhaju, no chislo nazvano)"
+          # СЫРОЕ ЕСТЬ, А РЯДОВ НЕТ -- ЭТО НЕ ПОВОД ВЫЙТИ ЗЕЛЁНЫМ. Упаковка
+          # выше доказала, что сырьё за эти сутки на ящике ЕСТЬ, значит таймер
+          # polymarket-proizvodnye обязан был посчитать ряды. Их отсутствие
+          # означает одно из двух: юнит не шёл (упал ExecStartPre --sbory либо
+          # его снял TimeoutStartSec), либо все минутные снимки книг пришли с
+          # кодом НЕ 200 -- тогда снимки на диске есть и полновесны (упаковка
+          # считает файлы и байты, а не коды), а производные их отбрасывают
+          # ("if стр.get(код) != 200: continue") и при пустом накоплении файла
+          # не пишут вовсе.
+          #
+          # ПРОВЕРКА БЫЛА МЕРТВА, И ЭТО НАШЁЛ РАЗБОР, А ПОДТВЕРДИЛ ЗАМЕР:
+          # считались ВСЕ файлы каталога, а в нём всегда лежит otbor.json от
+          # таймера отбора, то есть wc -l никогда не давал нуля и условие
+          # -eq 0 не могло сработать ни разу. Сутки с нулём рядов уезжали бы
+          # в ветку ЗЕЛЁНЫМИ, с одним otbor.json внутри.
+          #
+          # ОТКАЗ -- ОТДЕЛЬНЫМ ШАГОМ ПОСЛЕ ПУША, А НЕ ЗДЕСЬ. Если уронить
+          # перенос, вместе с ним пропадут пуш и доказательство, а с ними --
+          # МАРКЕР СТОРОЖА, который едет этим же пушем и нужен тем сильнее,
+          # чем хуже дела на ящике. Поэтому здесь только число и громкие
+          # слова, а краснеет прогон ниже, когда всё уже уехало.
+          echo "RJADOV_ZA_SUTKI=$RJADOV_DEREVO" >> "$GITHUB_ENV"
+          if [ "$RJADOV_DEREVO" -eq 0 ]; then
+            echo "VNIMANIE: za $SUTKI syroe upakovano, a RJADOV NET ni odnogo."
+            echo "V kataloge proizvodnyh est tolko otbor.json libo nichego."
+            echo "Prichina -- libo junit proizvodnyh ne shjol, libo vse snimki knig prishli s kodom ne 200."
           else
-            echo "proizvodnyh za $SUTKI: $ZA_SUTKI"
+            echo "rjadov za $SUTKI: $RJADOV_DEREVO"
           fi
 
       - name: "Пуш производных в ветку claude/stroiteli (токен от GitHub)"
@@ -584,6 +600,29 @@ jobs:
           fi
           git reset -q "$VERSHINA"
 
+      - name: "СУТКИ БЕЗ РЯДОВ -- ОТКАЗ, НО ПОСЛЕ ПУША"
+        # ПОСЛЕ пуша и доказательства нарочно: маркер сторожа и otbor.json
+        # уже уехали в ветку, число названо, и только теперь прогон краснеет.
+        # Так владелец утром видит и отказ, и то, что успело уехать.
+        if: ${{ always() && job.status != 'cancelled'
+                && steps.perenos.outcome == 'success' }}
+        run: |
+          set -e
+          RJADOV="${RJADOV_ZA_SUTKI:-net}"
+          echo "rjadov za ${SUTKI:-?}: $RJADOV"
+          if [ "$RJADOV" = "0" ]; then
+            echo "SBOJ: za $SUTKI sobrano syroe, no ne poschitano ni odnogo chasovogo rjada."
+            echo "Chto eto znachit: artefakt syrogo zagruzhen i otmetka postavlena, poetomu"
+            echo "rotacija vprave snjat syroe etih sutok cherez 30 sutok -- a proizvodnye po"
+            echo "nim ne poschitany. Okno na ispravlenie -- 30 sutok, ne menshe."
+            echo "Chto delat na jashchike: python3 analysis/polymarket_put.py --proizvodnye --sutki $SUTKI"
+            echo "i posle etogo ruchnoj zapusk etogo progona s sutki=$SUTKI."
+            if [ "${GITHUB_EVENT_NAME:-}" = "schedule" ]; then
+              exit 1
+            fi
+            echo "(ruchnoj zapusk -- ne krasneju, no chislo nazvano)"
+          fi
+
       - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
         if: ${{ always() }}
         run: |
@@ -593,7 +632,8 @@ jobs:
           echo "syryh fajlov za sutki: ${{ steps.pack.outputs.syryh_fajlov }}"
           echo "artefakt id:           ${{ steps.up.outputs.artifact-id }}"
           echo "otmetku stavili:       ${OTMECHAT:-yes}"
-          echo "proizvodnyh za sutki:  $(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l)"
+          echo "rjadov za sutki:       ${RJADOV_ZA_SUTKI:-?} (*.jsonl.gz)"
+          echo "vsego fajlov za sutki: $(find "$PUT_PROIZVODNYH/$SUTKI" -type f 2>/dev/null | wc -l) (sredi nih otbor.json)"
           echo "otmetka za sutki:      $([ -f "$PUT_OTMETOK/$SUTKI.json" ] && echo est || echo net)"
           echo "marker storozha:       ${MARKER_EST:-?}"
           echo "nash kommit:           ${NASH_KOMMIT:-net}"
