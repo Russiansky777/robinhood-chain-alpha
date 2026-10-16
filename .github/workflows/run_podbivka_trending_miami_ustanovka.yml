@@ -148,8 +148,38 @@ jobs:
             find /opt/robinhood-chain-alpha/data/trending -type f -printf '%TY-%Tm-%Td %10s %p\n' 2>/dev/null | sort | head -40
             echo "fajlov: $(find /opt/robinhood-chain-alpha/data/trending -type f 2>/dev/null | wc -l)"
             echo
-            echo "=== 6. ZHIV LI BEGUNOK ==="
+            echo "=== 5a. SNIMKI PO SUTKAM, SVODKOJ ==="
+            # По суткам одной строкой: владелец просил размеры по дням, а не
+            # простыню по файлам. Считается сложением, а не на глаз.
+            find /opt/robinhood-chain-alpha/data/trending -type f -name '*.jsonl.gz' \
+              -printf '%f %s\n' 2>/dev/null \
+              | awk '{d=substr($1,1,10); b[d]+=$2; n[d]++} END {for (d in b) printf "  %s: fajlov %d, %10.2f MB\n", d, n[d], b[d]/1048576}' \
+              | sort
+            echo
+            echo "=== 6. ZHIV LI BEGUNOK I POCHEMU NE BERJOT ZADANIJA ==="
             systemctl list-units 'actions.runner.*' --all --no-pager 2>/dev/null | head -5
+            echo "--- sostojanie sluzhby begunka podrobno ---"
+            SL=$(systemctl list-units 'actions.runner.*' --all --no-legend --plain 2>/dev/null | awk '{print $1}' | head -1)
+            if [ -n "$SL" ]; then
+              systemctl show "$SL" -p ActiveState -p SubState -p NRestarts \
+                -p ExecMainStartTimestamp -p ExecMainPID -p MemoryCurrent 2>/dev/null
+              echo "--- poslednie 25 strok zhurnala sluzhby ---"
+              journalctl -u "$SL" -n 25 --no-pager 2>/dev/null | tail -25
+            else
+              echo "sluzhby begunka ne nashel vovse"
+            fi
+            echo "--- zhurnal slushatelja begunka (_diag), poslednie stroki ---"
+            ls -1t /home/*/actions-runner/_diag/Runner_*.log 2>/dev/null | head -2
+            tail -n 12 "$(ls -1t /home/*/actions-runner/_diag/Runner_*.log 2>/dev/null | head -1)" 2>/dev/null \
+              || echo "zhurnala slushatelja net"
+            echo
+            echo "=== 6a. PAMJAT I NAGRUZKA ==="
+            free -h 2>/dev/null
+            echo "--- srednjaja nagruzka i vremja raboty ---"
+            uptime 2>/dev/null
+            echo "--- ubitye po pamjati za nedelju (OOM) ---"
+            journalctl --since '-7 days' --no-pager 2>/dev/null | grep -ciE 'out of memory|oom-kill' \
+              || echo 0
             echo
             echo "=== 7. TAJMERY REGISTRATORA ==="
             systemctl list-timers 'podbivka-trending*' --all --no-pager 2>/dev/null | head -6
