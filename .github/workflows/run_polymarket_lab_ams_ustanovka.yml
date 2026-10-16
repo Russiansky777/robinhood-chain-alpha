@@ -467,7 +467,14 @@ jobs:
           set -e
           echo "=== 1. MASHINA I BEGUNOK ==="
           if [ -f diagnoz_ams.txt ]; then
-            grep -E '^(BEGUNKOV=|ruff:|Python|/dev/)' diagnoz_ams.txt || true
+            grep -E '^(BEGUNKOV=|ruff:|sudo:|runuser:|Python|/dev/|jader:)' diagnoz_ams.txt || true
+            # ИМЯ СЛУЖБЫ БЕГУНКА -- ЭТО И ЕСТЬ ЕГО МЕТКА. Последняя миля
+            # (суточный артефакт сырого и пуш производных) должна идти
+            # прогоном НА БЕГУНКЕ, а runs-on требует метку. Имя бегунка стоит
+            # в имени службы actions.runner.<владелец>-<репозиторий>.<ИМЯ>,
+            # и на miami оно совпало с меткой lab-miami. Угадывать метку
+            # нельзя -- печатаем её.
+            grep -oE 'actions\.runner\.[A-Za-z0-9_.-]+' diagnoz_ams.txt | head -2 || echo "imeni sluzhby begunka v vyvode net"
             head -2 diagnoz_ams.txt
           else
             echo "(shag ne shjol)"
