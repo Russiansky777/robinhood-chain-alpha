@@ -110,8 +110,12 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
         СЛИМ.mkdir(parents=True, exist_ok=True)
     записанные = []
     for папка in sorted(p for p in каталог.iterdir() if p.is_dir()):
-        for ф in sorted(папка.glob("*.jsonl.gz")):
-            дата = ф.name.split(".")[0]   # 2026-10-12.jsonl.gz -> 2026-10-12
+        if папка.name == "pervye":        # таблицы первых появлений -- не снимки
+            continue
+        # Два раскроя рядом: часовой <источник>/<дата>/<ЧЧ>.jsonl.gz (с 16.10) и старый
+        # суточный <источник>/<дата>.jsonl.gz. Дата берётся из папки, если она есть.
+        for ф in sorted(папка.rglob("*.jsonl.gz")):
+            дата = (ф.parent.name if ф.parent != папка else ф.name.split(".")[0])
             if дни and дата not in дни:
                 continue
             по_списку: dict = collections.defaultdict(
@@ -172,7 +176,7 @@ def свод_записи(каталог: Path, порог_с: int, слим: bo
                     "пропусков": len(пропуски),
                     "минут_без_снимка_всего": round(sum(x["минут"] for x in пропуски), 1),
                     "пропуски": пропуски[:40]}
-            из_[f"{папка.name}/{дата}"] = {
+            из_[f"{папка.name}/{дата}/{ф.name}"] = {
                 "файл_байт": ф.stat().st_size,
                 "изменён": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                          time.gmtime(ф.stat().st_mtime)),

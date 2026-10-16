@@ -64,10 +64,17 @@ def мс(utc: str) -> int:
 def снимки(дни: tuple):
     """Снимки из тонкой выгрузки, иначе из сырых файлов. Отдаёт (источник, список, utc, строки)."""
     тонкие = sorted(glob.glob(str(СЛИМ / "*.jsonl.gz")))
-    файлы = тонкие or sorted(glob.glob(str(СЫРЬЁ / "*" / "*.jsonl.gz")))
+    # Сырьё лежит в двух раскроях: часовом <источник>/<дата>/<ЧЧ>.jsonl.gz (с 16.10) и
+    # старом суточном <источник>/<дата>.jsonl.gz. Папка pervye -- не снимки.
+    сырые = [x for x in sorted(glob.glob(str(СЫРЬЁ / "*" / "*.jsonl.gz"))
+                               + glob.glob(str(СЫРЬЁ / "*" / "*" / "*.jsonl.gz")))
+             if "/pervye/" not in x]
+    файлы = тонкие or сырые
     for ф in файлы:
-        имя = Path(ф).name
-        if дни and not any(д in имя for д in дни):
+        # Дата у часового раскроя стоит в ПАПКЕ (<источник>/<дата>/<ЧЧ>.jsonl.gz), а не в
+        # имени файла, поэтому сверяется весь путь: по имени «00.jsonl.gz» сутки не узнать.
+        путь = str(ф)
+        if дни and not any(д in путь for д in дни):
             continue
         with gzip.open(ф, "rt", encoding="utf-8") as о:
             for ln in о:
