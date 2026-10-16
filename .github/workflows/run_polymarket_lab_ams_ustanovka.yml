@@ -686,7 +686,12 @@ jobs:
           fi
           echo "=== 5. POCHEMU NET VYBORA RYNKOV ==="
           if [ -f prichina_ams.txt ]; then
-            grep -E '^(svezhij snimok|utc |  telo|clob_|data_)' prichina_ams.txt | head -14
+            # УЗОР ЛОВИТ И СТРОКИ ПРО КНИГИ. Прогон 38942828252 напечатал их
+            # в середине журнала, а в свод они не попали -- узор их не
+            # покрывал, и главное число (сколько книг пришло и что в первой)
+            # осталось нечитаемым: из контейнера доступен только хвост.
+            grep -E '^(svezhij snimok|utc |  telo|clob_|data_|kod |zaprosheno|tip tela|pervaja kniga|razbor:)' \
+              prichina_ams.txt | head -22
           else
             echo "(shag ne shjol)"
           fi
