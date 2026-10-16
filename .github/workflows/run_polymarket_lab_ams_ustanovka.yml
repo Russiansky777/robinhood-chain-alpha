@@ -185,7 +185,23 @@ jobs:
               git config --global --get-all safe.directory 2>/dev/null \
                 | grep -qxF "$KOREN" \
                 || git config --global --add safe.directory "$KOREN"
-              git fetch -q --depth=1 origin "$VETKA"
+              # СЕТЬ С ЯЩИКА БЫВАЕТ НЕДОСТУПНА, И ЭТО НЕ ДОГАДКА: прогон
+              # 38975558290 упал ровно здесь -- "fatal: unable to access ...
+              # Failed to connect to github.com port 443 after 133597 ms".
+              # Не права, не диск и не ssh: ssh доехал, удалённый bash
+              # отработал, упёрся исходящий HTTPS с ящика. Три попытки с
+              # паузой; если сеть не вернулась -- отказ громкий, а не
+              # установка на непроверенном коде.
+              POPYTKA=1
+              until git fetch -q --depth=1 origin "$VETKA"; do
+                if [ "$POPYTKA" -ge 3 ]; then
+                  echo "SBOJ: git fetch ne proshjol s treh popytok -- set s jashchika do github.com nedostupna"
+                  exit 1
+                fi
+                echo "fetch ne proshjol (popytka $POPYTKA) -- zhdu 15 s i probuju snova"
+                POPYTKA=$((POPYTKA + 1))
+                sleep 15
+              done
               # ВЕТКУ ДОГОНЯЕМ reset-ом, А КОД БЕРЁМ checkout-ом ПО ПУТЯМ:
               # прямой checkout -B отказал бы, как только таймер начнёт
               # дописывать data/polymarket -- для git это локальные изменения
@@ -286,6 +302,19 @@ jobs:
           [ "$BYLO" = "$ZHDALI" ] \
             || { echo "SBOJ: sdelano proverok $BYLO, a objavleno $ZHDALI"; exit 1; }
           [ "$PLOHO" = "0" ] || { echo "SBOJ: ne proshlo $PLOHO proverok"; exit 1; }
+          # НЕ МЕНЬШЕ 55 ОБЪЯВЛЕННЫХ -- ПОРОГ СНИЗУ, А НЕ РАВЕНСТВО. Документ
+          # 1b9c8b0e говорит прямо: "если увидишь ждали 35 или ждали 42 --
+          # файл на ящике старый", и слово владельца -- "ждём 55/55". Одного
+          # согласия сделанного с объявленным мало: доправочный скрипт
+          # самосогласован и дал бы зелёные ворота на 35/35, после чего
+          # таймеры включились бы на коде, который час за часом пишет 422 на
+          # order=volume_24hr либо пустые книги -- ровно те отказы, из-за
+          # которых переделывались попытки 11-13. Зашитое РАВЕНСТВО уже
+          # однажды отбило зелёную самопроверку (прогон 38941978050, когда
+          # Code-4 поднял число с 35 до 42), поэтому здесь порог снизу: числу
+          # разрешено расти, но не падать.
+          [ "$ZHDALI" -ge 55 ] 2>/dev/null \
+            || { echo "SBOJ: objavleno proverok $ZHDALI, a zhdjom ne menshe 55 -- na jashchike staryj fajl"; exit 1; }
           if grep -qE 'ПЛОХО|СБОЙ' samoproverka_ams.txt; then
             echo "SBOJ: v vyvode samoproverki est ПЛОХО libo СБОЙ"
             exit 1
@@ -598,6 +627,26 @@ jobs:
             deploy/lab_storozh_diska.sh \
             root@"$HOST_LAB":/usr/local/sbin/lab_storozh_diska.sh
           mkdir -p junity_st
+          # ОСТАНАВЛИВАЕМ ТОЛЬКО СОБИРАТЕЛЕЙ -- ОТБОР, МИНУТНЫЙ И ПЯТИМИНУТНЫЙ.
+          # Сначала в списке стояли все пять, и это была ловушка, из которой
+          # ящик не вышел бы сам:
+          #   -- polymarket-rotacija -- ЕДИНСТВЕННОЕ, что освобождает место
+          #      (удаляет сырое старше 30 суток с подтверждённой отметкой).
+          #      Остановив её вместе с остальными, сторож замораживал
+          #      свободное место ровно на том значении, при котором маркер не
+          #      снимается: собирать нечего, удалять нечем, возврата не будет
+          #      НИКОГДА -- при обещании скрипта "маркер снимется сам";
+          #   -- polymarket-proizvodnye считает производные, которые суточный
+          #      прогон и везёт в ветку. Без них шаг переноса видит ноль
+          #      файлов за сутки и отказывает, а вместе с ним пропускается
+          #      пуш -- то есть МАРКЕР НЕ УЕЗЖАЕТ именно в ту ночь, для
+          #      которой он придуман. Слово владельца -- "кладёт маркер,
+          #      который уезжает твоим пушем", значит путь пуша глушить нельзя.
+          # Рост диска дают собиратели (gamma_events 1.2 МБ на снимок каждые
+          # 5 минут, книги и сделки -- каждую минуту); производные за сутки --
+          # 0.19 МБ, одна сборка --sbory перед ними около 2 МБ. Останавливаем
+          # то, что пишет много, и оставляем то, что убирает и докладывает.
+          #
           # ЗНАЧЕНИЕ С ПРОБЕЛАМИ В Environment= ОБЯЗАНО БЫТЬ В КАВЫЧКАХ, и это
           # замер, а не вкус. Без кавычек systemd разбивает строку по пробелам
           # и ругается "Invalid environment assignment, ignoring: b.timer",
@@ -611,7 +660,7 @@ jobs:
             "Environment=PODB_KOREN=$KOREN" \
             "Environment=STOROZH_POROG_GB=10" \
             "Environment=STOROZH_METKA=$KOREN/data/polymarket/DISK_STOP" \
-            'Environment="STOROZH_TAJMERY=polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer polymarket-proizvodnye.timer polymarket-rotacija.timer"' \
+            'Environment="STOROZH_TAJMERY=polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer"' \
             "ExecStart=/usr/local/sbin/lab_storozh_diska.sh" \
             "TimeoutStartSec=120" "Nice=10" \
             > junity_st/polymarket-storozh-diska.service
@@ -630,7 +679,9 @@ jobs:
             junity_st/polymarket-storozh-diska.service \
             junity_st/polymarket-storozh-diska.timer \
             root@"$HOST_LAB":/etc/systemd/system/
-          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'STOROZH' 2>&1 | tee storozh_ams.txt
+          # КОРЕНЬ ПЕРЕДАЁМ ЯВНО: внутри ssh-пятки своё окружение, и проверка
+          # маркера должна смотреть на ТОТ путь, который записан в юните.
+          ssh $SSH_OPTS root@"$HOST_LAB" "KOREN='$KOREN' bash -s" <<'STOROZH' 2>&1 | tee storozh_ams.txt
             set -e
             chmod 755 /usr/local/sbin/lab_storozh_diska.sh
             chmod 644 /etc/systemd/system/polymarket-storozh-diska.service \
@@ -674,22 +725,28 @@ jobs:
             SPISOK=$(printf '%s\n' "$ZHURNAL" | grep -m1 'tajmery:' || true)
             echo "chto uvidel skript -> ${SPISOK:-stroki tajmerov v zhurnale net}"
             NET=0
-            for T in polymarket-otbor polymarket-min polymarket-5min \
-                     polymarket-proizvodnye polymarket-rotacija; do
+            for T in polymarket-otbor polymarket-min polymarket-5min; do
               case "$SPISOK" in
                 *"$T.timer"*) : ;;
                 *) echo "SBOJ: v spiske storozha net $T.timer"; NET=$((NET + 1)) ;;
               esac
             done
             [ "$NET" -eq 0 ] || { echo "SBOJ: storozh poluchil ne vse tajmery ($NET ne hvataet)"; exit 1; }
-            echo "storozh vidit vse pjat tajmerov"
+            # РОТАЦИИ И ПРОИЗВОДНЫХ В СПИСКЕ БЫТЬ НЕ ДОЛЖНО -- см. объяснение
+            # выше. Проверяем это, а не держим в голове.
+            case "$SPISOK" in
+              *polymarket-rotacija*|*polymarket-proizvodnye*)
+                echo "SBOJ: v spiske storozha est rotacija libo proizvodnye -- togda vozvrat mesta i push markera nevozmozhny"
+                exit 1 ;;
+            esac
+            echo "storozh vidit vse tri tajmera sobiratelej i ne vidit rotacii"
             echo "--- zhalovalsja li systemd na razbor Environment v ETOM zapuske ---"
             printf '%s\n' "$ZHURNAL" \
               | grep -i 'Invalid environment assignment' && { echo "SBOJ: systemd razbil Environment"; exit 1; } || echo "zhalob na Environment net"
             echo "--- svobodno sejchas ---"
             df -h / | tail -1
             echo "--- marker (dolzhen otsutstvovat pri svobodnom diske) ---"
-            ls -l /opt/polymarket-put/data/polymarket/DISK_STOP 2>&1 || echo "markera net -- tak i dolzhno byt"
+            ls -l "$KOREN/data/polymarket/DISK_STOP" 2>&1 || echo "markera net -- tak i dolzhno byt"
           STOROZH
 
       - name: "ПОЧЕМУ НЕ ЛЁГ ВЫБОР РЫНКОВ: код и причина из самого снимка"
@@ -839,6 +896,14 @@ jobs:
               # середины и у рынков разный tick_size, так что спред в тиках --
               # единственная сравнимая мера.
               #
+              # СТРОКА -- ЭТО СНИМОК, А НЕ КНИГА, и потому число названо
+              # strok_nepustyh, а не knig_nepustyh. В суточных производных на
+              # каждый токен приходится по строке на каждый минутный круг,
+              # поэтому прежнее имя отвечало на другой вопрос: при 200 токенах
+              # выбора оно выдало 1000 -- впятеро больше, чем книг. На вопрос
+              # владельца "у скольких книга непуста" отвечает
+              # tokenov_s_nepustoj_knigoj во второй строке.
+              #
               # ВТОРАЯ СТРОКА, ПО НЕПУСТЫМ КНИГАМ -- НЕ УКРАШЕНИЕ. Прогон
               # 38973828932 отдал медианы 0.0 при 1000 непустых книгах из
               # 3710 строк: в суточных производных лежат И строки ДО правки
@@ -847,7 +912,7 @@ jobs:
               # прошлое, а не нынешний сбор. Считаем оба числа и печатаем
               # оба -- иначе доклад соврёт в обе стороны сразу.
               find "$PR" -type f -name '*.jsonl.gz' -exec zcat {} + 2>/dev/null \
-                | python3 -c "import json,sys,statistics as st; r=[json.loads(l) for l in sys.stdin if l.strip()]; chis=lambda v: isinstance(v, (int, float)) and not isinstance(v, bool); nz=[x for x in r if (x.get('urovnej_bid') or 0) + (x.get('urovnej_ask') or 0) > 0]; med=lambda s: (round(st.median(s), 2) if s else 'net'); ur=lambda s, k: med([x.get(k) for x in s if chis(x.get(k))]); tiki=lambda s: [x['spred'] / x['tick_size'] for x in s if chis(x.get('spred')) and chis(x.get('tick_size')) and x['tick_size'] > 0]; print('GLUBINA strok', len(r), 'tokenov', len({x.get('token_id') for x in r}), 'knig_nepustyh', len(nz), 'knig_pustyh', len(r) - len(nz), 'mediana_bid', ur(r, 'urovnej_bid'), 'mediana_ask', ur(r, 'urovnej_ask'), 'mediana_spreda_v_tikah', med(tiki(r))); print('GLUBINA_NEPUSTYE strok', len(nz), 'tokenov', len({x.get('token_id') for x in nz}), 'mediana_bid', ur(nz, 'urovnej_bid'), 'mediana_ask', ur(nz, 'urovnej_ask'), 'mediana_spreda_v_tikah', med(tiki(nz)))"
+                | python3 -c "import json,sys,statistics as st; r=[json.loads(l) for l in sys.stdin if l.strip()]; chis=lambda v: isinstance(v, (int, float)) and not isinstance(v, bool); nz=[x for x in r if (x.get('urovnej_bid') or 0) + (x.get('urovnej_ask') or 0) > 0]; med=lambda s: (round(st.median(s), 2) if s else 'net'); ur=lambda s, k: med([x.get(k) for x in s if chis(x.get(k))]); tiki=lambda s: [x['spred'] / x['tick_size'] for x in s if chis(x.get('spred')) and chis(x.get('tick_size')) and x['tick_size'] > 0]; print('GLUBINA strok', len(r), 'tokenov', len({x.get('token_id') for x in r}), 'strok_nepustyh', len(nz), 'strok_pustyh', len(r) - len(nz), 'mediana_bid', ur(r, 'urovnej_bid'), 'mediana_ask', ur(r, 'urovnej_ask'), 'mediana_spreda_v_tikah', med(tiki(r))); print('GLUBINA_NEPUSTYE strok', len(nz), 'tokenov_s_nepustoj_knigoj', len({x.get('token_id') for x in nz}), 'mediana_bid', ur(nz, 'urovnej_bid'), 'mediana_ask', ur(nz, 'urovnej_ask'), 'mediana_spreda_v_tikah', med(tiki(nz)))"
             else
               echo "GLUBINA: proizvodnyh za $SEGODNJA net -- schitat ne iz chego"
             fi
@@ -962,7 +1027,12 @@ jobs:
           fi
           echo "=== 8a. STOROZH DISKA lab-ams ==="
           if [ -f storozh_ams.txt ]; then
-            grep -E '^([0-9]+:Environment|tajmer:|invocation:|chto uvidel skript|storozh vidit|zhalob na Environment|SBOJ|storozh diska:|MALO MESTA|marker polozhen|markera net|/dev/)' storozh_ams.txt || tail -5 storozh_ams.txt
+            # БЕЗ ПРИВЯЗКИ К НАЧАЛУ СТРОКИ: строки самого сторожа приходят из
+            # journalctl с префиксом "Oct 16 22:37:00 nl-reserve
+            # lab_storozh_diska.sh[123]:", поэтому узоры с ^ не совпадали бы
+            # никогда -- ни порог, ни свободное место глазами сторожа, ни
+            # список таймеров в свод не попадали.
+            grep -E '(Environment=|^tajmer:|^invocation:|chto uvidel skript|storozh vidit|zhalob na Environment|SBOJ|storozh diska:|MALO MESTA|marker polozhen|markera net|^/dev/)' storozh_ams.txt || tail -5 storozh_ams.txt
           else
             echo "(shag ne shjol)"
           fi

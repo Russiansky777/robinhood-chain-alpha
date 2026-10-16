@@ -268,7 +268,23 @@ jobs:
                 | grep -qxF "$KOREN" \
                 || git config --global --add safe.directory "$KOREN"
               git remote -v | head -2
-              git fetch -q --depth=1 origin "$VETKA"
+              # СЕТЬ С ЯЩИКА БЫВАЕТ НЕДОСТУПНА, И ЭТО НЕ ДОГАДКА: прогон
+              # 38975558290 упал ровно здесь -- "fatal: unable to access ...
+              # Failed to connect to github.com port 443 after 133597 ms".
+              # Не права, не диск и не ssh: ssh доехал, удалённый bash
+              # отработал, упёрся исходящий HTTPS с ящика. Три попытки с
+              # паузой; если сеть не вернулась -- отказ громкий, а не
+              # установка на непроверенном коде.
+              POPYTKA=1
+              until git fetch -q --depth=1 origin "$VETKA"; do
+                if [ "$POPYTKA" -ge 3 ]; then
+                  echo "SBOJ: git fetch ne proshjol s treh popytok -- set s jashchika do github.com nedostupna"
+                  exit 1
+                fi
+                echo "fetch ne proshjol (popytka $POPYTKA) -- zhdu 15 s i probuju snova"
+                POPYTKA=$((POPYTKA + 1))
+                sleep 15
+              done
               # ВЕТКУ ДОГОНЯЕМ reset-ом, А КОД ЗАБИРАЕМ ПО ПУТЯМ, и это не вкус.
               # Прежний checkout -B FETCH_HEAD отказывал бы начиная с первого
               # суточного пуша: пуш положил data/trending/*/ДАТА.jsonl.gz В

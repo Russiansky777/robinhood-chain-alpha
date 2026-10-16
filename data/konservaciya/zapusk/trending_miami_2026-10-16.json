@@ -11,7 +11,7 @@
     "pravka_code_2": "aab848193: 'Obryv posredi mnogobajtovogo simvola: chtenie dvoichnoe, UnicodeDecodeError v perehvate'. Hesh nazvan vladelcem i svereny s vetkoj",
     "zachem": "pereschitat --pervye za 13.10 i 15.10, dolozhit stroki i chislo oborvannyh fajlov iz svodki"
   },
-  "popytka": 13,
+  "popytka": 14,
   "zamereno_progonom_38930238689": {
     "samoproverka": "proshla na mashine, junity postavleny posle nejo",
     "tablica_12_10": "30807 strok, 2441310 B (2.44 MB), spiskov 17, snimkov 1404 na minutnyj spisok",
@@ -29,5 +29,10 @@
     "posle_pravki_code_2": "podnjalis dva dnja iz chetyrjoh: 14.10 -- 1139 strok (72 421 B), 16.10 -- 4335 strok (318 365 B); 12.10 vyros do 30 808 strok (2 499 997 B). 13.10 i 15.10 po-prezhnemu padajut",
     "storozh": "tajmer srabotal SAM po raspisaniju v 17:47Z (*:47), marker ne polozhen -- mesta hvataet",
     "probno": "otdali spisok 9 iz 16 (bylo 12 iz 16 dvumja chasami ranshe)"
+  },
+  "zachem_popytka_14": {
+    "storozh": "obnovljaetsja skript deploy/lab_storozh_diska.sh: sled na tmpfs (na polnom diske marker ne zapisat -- imenno sluchaj miami 13-16.10, i togda vetka vozvrata ne otkrylas by nikogda), marker pishetsja cherez chernovik i mv (obrezannyj JSON v vetku ne poedet), vozvrat snimaet marker TOLKO posle proverki is-active po kazhdomu tajmeru, i skript otkazyvaetsja rabotat, esli ni odnogo iz nazvannyh tajmerov na mashine net",
+    "fetch": "tri popytki git fetch na jashchike -- posle otkaza seti na lab-ams v progone 38975558290",
+    "pervye": "pereschjot --pervye za pjat sutok proveren v 38973828907: 13.10 strok 14049, 15.10 strok 331 (do pravki Code-2 oba padali s UnicodeDecodeError)"
   }
 }

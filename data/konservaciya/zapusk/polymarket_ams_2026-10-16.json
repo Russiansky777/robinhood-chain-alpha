@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 15,
+  "popytka": 16,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -80,5 +80,11 @@
     "pravka": "zhurnal chitaetsja po InvocationID (zapasnoj put -- --since s tochkoj do zapuska); krugi privjazany k shagu vkljuchenija tajmerov, a ne k storozhu; v junit dobavlena pechat samoj stroki Environment=, i svodka teper pokazyvaet, na chjom kontrol upal",
     "proverka_zaplaty": "na stende s podlozhennym zhurnalom: STAROE telo dajot rovno tu zhe oshibku (4 tajmera ne najdeno), NOVOE prohodit i po InvocationID, i po vremeni; zuby na meste -- slomannyj tekushchij zapusk i odinochnaja zhaloba oba dajut kod 1",
     "chto_vsjo_zhe_izmereno": "knigi polnye: clob_books kod 200, knig 200, urovnej 18231, knig s dvumja storonami 200; za sutki clob_books 5710 knig 274065 urovnej (48.0 na knigu); vsego na diske 137.07 MB, gamma_events 102.24 MB"
+  },
+  "zamereno_progonom_38975558290": {
+    "itog": "KRASNYJ na shage klona, i prichina ne moja i ne v kode",
+    "prichina": "git fetch s jashchika: \"fatal: unable to access https://github.com/Russiansky777/robinhood-chain-alpha.git/: Failed to connect to github.com port 443 after 133597 ms: Couldn t connect to server\", kod 128. Ssh doehal (vyvod id=999(polymarket) prishjol s lab-ams), udaljonnyj bash otrabotal -- uprjolsja ishodjashchij HTTPS s ams do github.com",
+    "pravka": "git fetch na jashchike teper s tremja popytkami i pauzoj 15 s; to zhe dobavleno v ustanovshchik miami. Nevernuvshajasja set -- otkaz gromkij, a ne ustanovka na neproverennom kode",
+    "chto_ne_proverilos": "ni odin shag posle klona ne shjol, poetomu zaplata po InvocationID v etom progone ne proverena na mashine -- tolko na stende"
   }
 }
