@@ -180,7 +180,14 @@ jobs:
               /home/*/arhiv_pumpapi) : ;;
               *) echo "OTKAZ: put $KESH ne pohozh na kesh arhiva"; exit 1 ;;
             esac
-            [ -d "$KESH" ] || { echo "OTKAZ: $KESH ne katalog"; exit 1; }
+            # КЭША НЕТ -- ЭТО НЕ СБОЙ, А УЖЕ СДЕЛАННАЯ РАБОТА. Прежний замок
+            # выходил с 1, и повторный прогон падал на успешно убранном кэше,
+            # а вместе с ним пропускались шаги ПОСЛЕ -- в том числе оживление
+            # бегунка. Поймано вторым прогоном 38926153968.
+            if [ ! -d "$KESH" ]; then
+              echo "kesha $KESH net -- udalen ranshe, rabota sdelana"
+              exit 0
+            fi
             CHASOV=$(find "$KESH" -type f -name '*.jsonl.zst' | wc -l)
             BAJT=$(du -sb "$KESH" | cut -f1)
             echo "chasov v keshe: $CHASOV, bajt: $BAJT"
@@ -262,7 +269,10 @@ jobs:
         # Место теперь есть, но сама служба всё это время считалась "active
         # running" -- жива была обёртка, а не слушатель. Поэтому перезапуск
         # нужен, и проверять надо именно слушателя, а не состояние юнита.
-        if: ${{ env.OZHIVIT != 'no' }}
+        # always(): оживление -- пункт 2 владельца, и оно нужно независимо
+        # от того, нашлось ли что удалять. Иначе успешно убранный кэш отменял
+        # бы перезапуск бегунка -- ровно это и вышло на прогоне 38926153968.
+        if: ${{ always() && env.OZHIVIT != 'no' }}
         run: |
           set -e
           set -o pipefail
