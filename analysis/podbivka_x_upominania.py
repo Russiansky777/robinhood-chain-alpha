@@ -40,19 +40,31 @@ from pathlib import Path
 ТАЙМАУТ = 120
 
 
-def токен() -> str:
+def токен(нужен: bool = True) -> str:
+    """Токен из окружения. В журнал уходит только ДЛИНА -- значение никогда."""
     т = os.environ.get("APIFY_TOKEN") or ""
-    if not т:
-        raise SystemExit("нет APIFY_TOKEN в окружении: прогон должен давать его секретом")
+    print(f"APIFY_TOKEN: {'есть, знаков ' + str(len(т)) if т else 'НЕТ в окружении'}",
+          flush=True)
+    if нужен and not т:
+        raise SystemExit("нет APIFY_TOKEN: прогон должен давать его секретом репозитория")
     return т
 
 
-def запрос(путь: str, тело=None, метод: str = "GET", т: str = "") -> dict:
-    """Запрос к Apify. Токен идёт ЗАГОЛОВКОМ -- в URL его быть не должно."""
+def запрос(путь: str, тело=None, метод: str = "GET", т: str = "",
+           нужен_токен: bool = True) -> dict:
+    """Запрос к Apify. Токен идёт ЗАГОЛОВКОМ -- в URL его быть не должно.
+
+    Магазин и метаданные актора читаются и без токена: перечень акторов не должен падать
+    из-за ненастроенного секрета -- иначе не узнать даже, что выбирать.
+    """
     url = путь if путь.startswith("http") else f"{БАЗА}{путь}"
     данные = json.dumps(тело).encode("utf-8") if тело is not None else None
     зап = urllib.request.Request(url, data=данные, method=метод)
-    зап.add_header("Authorization", f"Bearer {т or токен()}")
+    ключ = т if т else os.environ.get("APIFY_TOKEN") or ""
+    if ключ:
+        зап.add_header("Authorization", f"Bearer {ключ}")
+    elif нужен_токен:
+        raise SystemExit("нет APIFY_TOKEN: прогон должен давать его секретом репозитория")
     зап.add_header("Content-Type", "application/json")
     try:
         with urllib.request.urlopen(зап, timeout=ТАЙМАУТ) as о:
@@ -60,12 +72,19 @@ def запрос(путь: str, тело=None, метод: str = "GET", т: str 
     except urllib.error.HTTPError as e:
         тело_ош = e.read()[:400].decode("utf-8", "replace")
         raise SystemExit(f"Apify {метод} {url.split('?')[0]}: http {e.code}: {тело_ош}")
+    except urllib.error.URLError as e:
+        # Из контейнера подбивки api.apify.com закрыт сетевой политикой (403 на CONNECT):
+        # сбор идёт заданием Actions, а не здесь. Пусть это будет сказано словами.
+        raise SystemExit(f"сеть до {url.split('/v2')[0]} закрыта: {e.reason}; "
+                         f"этот проход надо гонять заданием Actions")
     return json.loads(сырое.decode("utf-8", "replace")) if сырое else {}
 
 
 def магазин(поиск: str, предел: int) -> int:
     """Перечень акторов магазина -- что есть и сколько стоит. Денег не тратит."""
-    д = запрос(f"/store?search={urllib.parse.quote(поиск)}&limit={предел}")
+    токен(нужен=False)      # печатает только наличие и длину
+    д = запрос(f"/store?search={urllib.parse.quote(поиск)}&limit={предел}",
+               нужен_токен=False)
     ряды = (д.get("data") or {}).get("items") or []
     print(f"найдено акторов: {len(ряды)}", flush=True)
     из_ = []
@@ -94,8 +113,9 @@ def магазин(поиск: str, предел: int) -> int:
 def схема(актор: str) -> int:
     """Схема входа актора: по ней собирается вход сбора. Денег не тратит."""
     ид = актор.replace("/", "~")
-    мета = (запрос(f"/acts/{ид}") or {}).get("data") or {}
-    сб = (запрос(f"/acts/{ид}/builds/default") or {}).get("data") or {}
+    токен(нужен=False)
+    мета = (запрос(f"/acts/{ид}", нужен_токен=False) or {}).get("data") or {}
+    сб = (запрос(f"/acts/{ид}/builds/default", нужен_токен=False) or {}).get("data") or {}
     сх = сб.get("inputSchema")
     if isinstance(сх, str):
         try:
