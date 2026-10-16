@@ -425,6 +425,38 @@ jobs:
             fi
           PROBA
 
+      - name: "ПОЧЕМУ НЕ ЛЁГ ВЫБОР РЫНКОВ: код и причина из самого снимка"
+        if: ${{ always() && env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ. Прогон 38932243665: таймеры включены, самопроверка зелёная,
+          # но data/polymarket/vybor.json не лёг -- значит запрос /events не
+          # удался, и минутному кругу читать нечего. Состав рынков -- корень
+          # всего сбора, поэтому код и причину берём ИЗ САМОГО СНИМКА, а не из
+          # догадки: снимок отказа хранится такой же строкой, с кодом.
+          #
+          # ПИТОН ОДНОЙ СТРОКОЙ, И ЭТО НЕ СТИЛЬ. Многострочная строка в
+          # двойных кавычках внутри блока run начинается с меньшим отступом и
+          # ЗАКРЫВАЕТ блок YAML -- поймано своей же проверкой разбора
+          # ("could not find expected ':'"), на этом же месте, второй раз за
+          # день. Поэтому списковое включение в одну строку, без переносов.
+          ssh $SSH_OPTS root@"$HOST_LAB" "KOREN='$KOREN_PM' bash -s" \
+            <<'PRICHINA' 2>&1 | tee prichina_ams.txt
+            set -e
+            SV=$(find "$KOREN/data/polymarket/gamma_events" -type f -name '*.jsonl.gz' 2>/dev/null | sort | tail -1)
+            echo "svezhij snimok sostava: ${SV:-net}"
+            if [ -n "$SV" ]; then
+              zcat "$SV" | python3 -c "import json,sys; [print('utc', s.get('utc'), '| kod', s.get('код'), '| bajt', s.get('байт'), '| oshibka', s.get('ошибка'), '| telo', str(s.get('тело'))[:200]) for s in (json.loads(l) for l in sys.stdin if l.strip())]" 2>&1 | head -8
+            fi
+            echo "--- kody prochih spiskov ---"
+            for SP in clob_books clob_prices clob_time data_trades clob_midpoints; do
+              F=$(find "$KOREN/data/polymarket/$SP" -type f -name '*.jsonl.gz' 2>/dev/null | sort | tail -1)
+              [ -n "$F" ] || { echo "$SP: fajlov net"; continue; }
+              echo "$SP: $(zcat "$F" | python3 -c "import json,sys; print(','.join(str(json.loads(l).get('код')) + '/' + str(json.loads(l).get('ошибка'))[:40] for l in sys.stdin if l.strip())[:200])" 2>&1)"
+            done
+          PRICHINA
+
       - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
         # Архив журналов и артефакты из этого контейнера недоступны (прокси
         # отвечает Forbidden и на results-receiver, и на хранилище артефактов),
@@ -453,13 +485,24 @@ jobs:
           else
             echo "(shag ne shjol)"
           fi
-          echo "=== 4. PROBA ENDPOINTOV ==="
+          echo "=== 4. PROBA ENDPOINTOV (vse spiski, s kodami) ==="
+          # ЦЕЛИКОМ, А НЕ ХВОСТОМ: владелец просил "ошибки", а хвост из
+          # четырёх строк их прячет. Списков всего девять -- печатаем все.
+          # Прогон 38932243665 на этом и попался: итог "ответили 2 из 9" был
+          # виден, а ПРИЧИНА каждого отказа -- нет.
           if [ -f probno_ams.txt ]; then
-            tail -4 probno_ams.txt
+            grep -E '^[a-z_]+:' probno_ams.txt || cat probno_ams.txt
+            grep -E 'итого' probno_ams.txt || true
           else
             echo "(shag ne shjol)"
           fi
-          echo "=== 5. SNIMKI I SVODKA ==="
+          echo "=== 5. POCHEMU NET VYBORA RYNKOV ==="
+          if [ -f prichina_ams.txt ]; then
+            grep -E '^(svezhij snimok|utc |  telo|clob_|data_)' prichina_ams.txt | head -14
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 6. SNIMKI I SVODKA ==="
           if [ -f svodka_ams.txt ]; then
             grep -E '^(rynkov:|fajlov:|vybor.json)' svodka_ams.txt || true
             sed -n '/--- svodka ---/,$p' svodka_ams.txt | tail -14
@@ -479,5 +522,6 @@ jobs:
             tajmery_ams.txt
             probno_ams.txt
             svodka_ams.txt
+            prichina_ams.txt
           retention-days: 30
           if-no-files-found: warn

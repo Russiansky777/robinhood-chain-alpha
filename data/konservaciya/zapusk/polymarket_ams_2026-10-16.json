@@ -17,5 +17,17 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 1
+  "popytka": 2,
+  "zamereno_progonom_38932243665": {
+    "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
+    "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
+    "samoproverka": "na meste: 'proverok 35, zhdali 35, ne proshlo 0'",
+    "tajmery": "vse chetyre enabled=enabled active=active",
+    "probno": "otvetili 2 iz 9; clob_fee_rate i data_holders -- 'net vybora rynkov', clob_time 200",
+    "glavnaja_bela": "data/polymarket/vybor.json NE LOZHITSJA -- zapros /events ne udalsja, poetomu minutnomu krugu nechego chitat: 9 fajlov, vsego 0.08 MB, iz nih data_trades 0.08"
+  },
+  "novoe_v_etoj_popytke": {
+    "prichina": "shag chitaet KOD i PRICHINU iz samogo snimka gamma_events (otkaz hranitsja takoj zhe strokoj) i kody prochih spiskov -- bez etogo 'otvetili 2 iz 9' est itog bez prichiny",
+    "probno_celikom": "v hvostovoj svodke teper vse devjat strok proby, a ne hvost iz chetyrjoh"
+  }
 }
