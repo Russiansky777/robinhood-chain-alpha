@@ -457,6 +457,48 @@ jobs:
             done
           PRICHINA
 
+      - name: "ПРОБА ПОЛЯ СОРТИРОВКИ /events (только чтение, ни одной заявки)"
+        if: ${{ always() && env.TOLKO_DIAGNOZ != 'yes' }}
+        run: |
+          set -e
+          set -o pipefail
+          # ЗАЧЕМ ЭТОТ ШАГ, А НЕ ПРАВКА ПО ДОГАДКЕ. Прогон 38933292283 назвал
+          # причину молчания регистратора: /events отдаёт 422 с телом
+          # {'type': 'validation error', 'error': 'order fields are not
+          # valid'} -- то есть сервер отвергает ИМЯ ПОЛЯ сортировки
+          # (order=volume_24hr) из документа Code-3. Без состава рынков
+          # минутный круг пуст, и это корень всего сбора.
+          #
+          # Поэтому меряем, а не угадываем: шесть кандидатов, первый и
+          # последний -- контрольные (документ, ждём 422; совсем без order,
+          # ждём 200). Тот же приём, каким ловился живой путь KOTH у
+          # трендингов. ТОЛЬКО ЧТЕНИЕ: GET без подписи, ни одной заявки,
+          # ключей нет; скрипт Code-3 этим шагом НЕ правится.
+          ssh $SSH_OPTS root@"$HOST_LAB" 'bash -s' <<'PROBA_ORDER' 2>&1 | tee order_ams.txt
+            set -e
+            BAZA="https://gamma-api.polymarket.com/events?active=true&closed=false&limit=5"
+            # Имя кандидата и хвост запроса разделены двоеточием.
+            KANDIDATY="dokument:&order=volume_24hr&ascending=false
+            bez_podchjorkivanija:&order=volume24hr&ascending=false
+            volume:&order=volume&ascending=false
+            liquidity:&order=liquidity&ascending=false
+            camel:&order=volume24Hr&ascending=false
+            bez_order_kontrol:"
+            printf '%s\n' "$KANDIDATY" | while IFS= read -r STROKA; do
+              IMJA=${STROKA%%:*}
+              HVOST=${STROKA#*:}
+              IMJA=$(printf '%s' "$IMJA" | tr -d ' ')
+              URL="$BAZA$HVOST"
+              OTVET=$(curl -sS -o /tmp/.ev_telo -w '%{http_code} %{size_download}' \
+                      --max-time 20 -A 'polymarket-put/1.0 (+read-only)' "$URL" 2>&1 || echo "sboj svjazi")
+              NACH=$(head -c 120 /tmp/.ev_telo 2>/dev/null | tr -d '\n')
+              printf 'KANDIDAT %-22s %s | telo: %s\n' "$IMJA" "$OTVET" "$NACH"
+            done
+            rm -f /tmp/.ev_telo
+          PROBA_ORDER
+          echo "--- kto otvetil 200 ---"
+          grep -E 'KANDIDAT .* 200 ' order_ams.txt || echo "ni odin kandidat ne otdal 200"
+
       - name: "СВОДКА ПРОГОНА: всё главное одним куском в конце"
         # Архив журналов и артефакты из этого контейнера недоступны (прокси
         # отвечает Forbidden и на results-receiver, и на хранилище артефактов),
@@ -509,7 +551,13 @@ jobs:
           else
             echo "(shag ne shjol)"
           fi
-          echo "=== 6. SNIMKI I SVODKA ==="
+          echo "=== 6. PROBA POLJA SORTIROVKI /events ==="
+          if [ -f order_ams.txt ]; then
+            grep -E '^KANDIDAT' order_ams.txt || cat order_ams.txt
+          else
+            echo "(shag ne shjol)"
+          fi
+          echo "=== 7. SNIMKI I SVODKA ==="
           if [ -f svodka_ams.txt ]; then
             grep -E '^(rynkov:|fajlov:|vybor.json)' svodka_ams.txt || true
             sed -n '/--- svodka ---/,$p' svodka_ams.txt | tail -14
@@ -530,5 +578,6 @@ jobs:
             probno_ams.txt
             svodka_ams.txt
             prichina_ams.txt
+            order_ams.txt
           retention-days: 30
           if-no-files-found: warn
