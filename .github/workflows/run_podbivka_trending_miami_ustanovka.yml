@@ -756,7 +756,15 @@ jobs:
                 echo "ITOG $D: snimkov net, tablicu schitat ne iz chego"
                 continue
               fi
-              if sudo -u podbivka /usr/bin/python3 analysis/podbivka_trending.py --pervye "$D"; then
+              # ВЫВОД ЛОВИМ В ПЕРЕМЕННУЮ, А ПРИЧИНУ КЛАДЁМ В СТРОКУ ИТОГА.
+              # Прежде итог говорил "причина выше (см. traceback)" -- и это
+              # бесполезно: из контейнера читается только ХВОСТ журнала, а
+              # traceback остаётся выше окна. Замер прогона 38942430142:
+              # после правки Code-2 (5d87ee55) поднялись 14.10 и 16.10, а
+              # 13.10 и 15.10 по-прежнему падают -- и ПОЧЕМУ, из журнала было
+              # не узнать. Теперь последняя строка ошибки стоит в самом итоге.
+              if VYVOD=$(sudo -u podbivka /usr/bin/python3 analysis/podbivka_trending.py --pervye "$D" 2>&1); then
+                printf '%s\n' "$VYVOD" | tail -3
                 T="$KOREN/data/trending/pervye/$D.jsonl.gz"
                 if [ -f "$T" ]; then
                   echo "ITOG $D: tablica $(stat -c %s "$T") B, strok $(zcat "$T" | wc -l)"
@@ -764,7 +772,8 @@ jobs:
                   echo "ITOG $D: skript proshel, a fajla $T net"
                 fi
               else
-                echo "ITOG $D: --pervye upal, prichina vyshe (sm. traceback)"
+                printf '%s\n' "$VYVOD" | tail -6 | sed 's/^/    /'
+                echo "ITOG $D: --pervye upal: $(printf '%s' "$VYVOD" | tail -1 | cut -c1-160)"
               fi
             done
             echo "--- chasovoj raskroj jupiter: pervyj i poslednij fajl ---"
