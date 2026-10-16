@@ -53,8 +53,17 @@ env:
   KOREN_PODBIVKI: "/opt/robinhood-chain-alpha"
   VETKA_SNIMKOV: "claude/podbivka"
   UDALJAT: "yes"
-  # 2880 минут = 48 часов. Словами владельца -- "старше 2 суток".
-  STARSHE_MINUT: "2880"
+  # ЧТО ИМЕННО ЕДЕТ В ВЕТКУ. Только суточная таблица первых появлений.
+  # СЫРОЕ В GIT НЕ ПУШИТСЯ ВОВСЕ, и это не осторожность, а предел GitHub:
+  # файл крупнее 100 МБ отвергается наотрез. Замерено на машине 16.10 --
+  # сырой jupiter за полные сутки 12.10 весит 469 МБ, то есть пуш сырого был
+  # обречён независимо от места на диске. Первый пуш 12.10 прошёл только
+  # потому, что в файлах было два часа сбора (55 МБ), а не сутки (598 МБ).
+  PUT_PERVYH: "data/trending/pervye"
+  # 60 суток = 86400 минут. Словами владельца -- "уборка сырого не раньше
+  # 60 суток". Регистратор начал 12.10, значит первое удаление возможно
+  # не раньше 11.12 -- до тех пор шаг уборки честно печатает ноль.
+  STARSHE_SUTOK_SYROE: "60"
 
 jobs:
   push_snimkov:
@@ -99,8 +108,10 @@ jobs:
           # остаются в индексе с пометкой SKIP_WORKTREE, а шаги ниже делают
           # git add и git commit ТОЛЬКО по пути data/trending, поэтому дерево
           # коммита сохраняет всё прочее нетронутым.
+          # С 16.10 в выборке ТОЛЬКО таблица первых появлений: сырое в ветку
+          # больше не едет, и тянуть его в рабочее дерево незачем.
           sparse-checkout: |
-            /data/trending/
+            /data/trending/pervye/
           sparse-checkout-cone-mode: false
 
       - name: "Параметры и кто мы на машине"
@@ -129,7 +140,7 @@ jobs:
           # не догадкой.
           echo "polzovatel progona: $(id -un), gruppy: $(id -Gn)"
 
-      - name: "Снимки с диска машины -- в рабочее дерево ветки (без --delete)"
+      - name: "СЧЁТ ПЕРВЫХ ПОЯВЛЕНИЙ: --pervye скриптом Code-2 на самой машине"
         run: |
           set -e
           set -o pipefail
@@ -139,23 +150,70 @@ jobs:
             echo "Postav ego progonom run_podbivka_trending_miami_ustanovka.yml"
             exit 1
           fi
-          mkdir -p data/trending
-          # ПЕРЕНОС -- ТОЛЬКО ДОБАВЛЯЮЩИЙ. Ни --delete, ни --delete-after:
-          # этот прогон убирает старьё с машины, и зеркалящий перенос стёр бы
-          # то же самое из ветки на следующем же проходе. Откат на cp -r --
-          # приём шага пуша в run_podbivka_trending_svodka_miami.yml, он
-          # прошёл с первой попытки на прогоне 38192956775.
-          rsync -a "$KOREN/data/trending/" data/trending/ \
-            || cp -r "$KOREN/data/trending/." data/trending/
-          NA_MASHINE=$(find "$KOREN/data/trending" -type f | wc -l)
-          V_DEREVE=$(find data/trending -type f | wc -l)
-          MESTO_MASHINY=$(du -sh "$KOREN/data/trending" | cut -f1 || echo "?")
-          MESTO_DEREVA=$(du -sh data/trending | cut -f1 || echo "?")
+          SKRIPT="$KOREN/analysis/podbivka_trending.py"
+          test -f "$SKRIPT" || { echo "SBOJ: net $SKRIPT"; exit 1; }
+          # ФЛАГ ПРОВЕРЯЕТСЯ, А НЕ ПРЕДПОЛАГАЕТСЯ. --pervye считает Code-2, и
+          # на 16.10 его в ветке claude/podbivka ЕЩЁ НЕТ: в разборе доводов
+          # стоят только --kazhdye, --istochnik, --pauza, --probno, --svodka.
+          # Пока флага нет, прогон должен ОТКАЗАТЬ С НАЗВАННОЙ ПРИЧИНОЙ, а не
+          # пушить пустоту и не делать вид, что всё прошло.
+          if ! /usr/bin/python3 "$SKRIPT" --help 2>&1 | grep -q -- '--pervye'; then
+            echo "OTKAZ: skript Code-2 poka ne znaet --pervye."
+            echo "Razbor dovodov skripta:"
+            /usr/bin/python3 "$SKRIPT" --help 2>&1 | grep -oE '\-\-[a-z-]+' | sort -u | tr '\n' ' '
+            echo
+            echo "Sutochnaja tablica pervyh pojavlenij -- rabota Code-2;"
+            echo "do ejo pojavlenija pushit nechego, i SYROE v git ne idjot."
+            exit 1
+          fi
+          # ПОД КЕМ СЧИТАЕМ. Прогон идёт под пользователем бегунка, а клон
+          # отдан podbivka. sudo у бегунка в репозитории не настроен (проверено
+          # grep-ом по sudoers и NOPASSWD -- пусто), поэтому считаем от себя:
+          # каталоги снимков имеют группу бегунка и бит 2775, то есть писать
+          # в data/trending бегунок может. Если не может -- пусть это будет
+          # видно отказом с правами, а не пустой таблицей.
+          echo "schitaju pod: $(id -un), gruppy: $(id -Gn)"
+          mkdir -p "$KOREN/$PUT_PERVYH"
+          ( cd "$KOREN" && /usr/bin/python3 analysis/podbivka_trending.py --pervye ) 2>&1 | tail -20
+          echo "--- chto poluchilos na mashine ---"
+          find "$KOREN/$PUT_PERVYH" -type f -printf '%10s %p\n' 2>/dev/null | sort -k2 | tail -10
+          SCHJOT=$(find "$KOREN/$PUT_PERVYH" -type f -name '*.jsonl.gz' 2>/dev/null | wc -l)
+          echo "tablic pervyh pojavlenij na mashine: $SCHJOT"
+          if [ "$SCHJOT" -eq 0 ]; then
+            echo "SBOJ: --pervye proshjol, no ni odnoj tablicy v $PUT_PERVYH net."
+            exit 1
+          fi
+
+      - name: "Таблица первых появлений -- в рабочее дерево ветки (без --delete)"
+        run: |
+          set -e
+          set -o pipefail
+          KOREN="$KOREN_PODBIVKI"
+          mkdir -p "$PUT_PERVYH"
+          # ПЕРЕНОС ТОЛЬКО ДОБАВЛЯЮЩИЙ: ни --delete, ни --delete-after. На
+          # машине работает уборка сырого, и зеркалящий перенос стёр бы из
+          # ветки то же самое. Откат на cp -r -- приём шага пуша сводки,
+          # прошедший с первой попытки на прогоне 38192956775.
+          rsync -a "$KOREN/$PUT_PERVYH/" "$PUT_PERVYH/" \
+            || cp -r "$KOREN/$PUT_PERVYH/." "$PUT_PERVYH/"
           echo "--- chto polozheno ---"
-          echo "snimkov na mashine:      $NA_MASHINE"
-          echo "snimkov v dereve vetki:  $V_DEREVE"
-          echo "mesto na mashine:        $MESTO_MASHINY"
-          echo "mesto v dereve:          $MESTO_DEREVA"
+          echo "tablic na mashine:      $(find "$KOREN/$PUT_PERVYH" -type f | wc -l)"
+          echo "tablic v dereve vetki:  $(find "$PUT_PERVYH" -type f | wc -l)"
+          echo "mesto v dereve:         $(du -sh "$PUT_PERVYH" | cut -f1 || echo '?')"
+          # ПРЕДЕЛ GITHUB ПРОВЕРЯЕТСЯ ДО ПУША, А НЕ ПОСЛЕ ОТКАЗА. Файл крупнее
+          # 100 МБ сервер отвергает наотрез, и узнать об этом из отказа пуша
+          # хуже, чем из своей же проверки с названным размером. Порог 95 МБ --
+          # с запасом под предел.
+          PREDEL=$((95 * 1024 * 1024))
+          KRUPNYE=$(find "$PUT_PERVYH" -type f -size +$((PREDEL / 1024))k -printf '%s %p\n' 2>/dev/null || true)
+          if [ -n "$KRUPNYE" ]; then
+            echo "OTKAZ: est fajly krupnee 95 MB -- GitHub ih ne primet:"
+            echo "$KRUPNYE" | awk '{printf "  %8.1f MB  %s\n", $1/1048576, $2}'
+            echo "Tablica pervyh pojavlenij ne dolzhna byt takogo razmera:"
+            echo "znachit libo --pervye polozhil tuda syroe, libo pomenjalsja format."
+            exit 1
+          fi
+          echo "fajlov krupnee 95 MB net -- predel GitHub soblyudjon"
 
       - name: "Пуш в ветку claude/podbivka (токен от GitHub, не с диска)"
         run: |
@@ -163,18 +221,19 @@ jobs:
           set -o pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # КЛАДЁТСЯ ТОЛЬКО data/trending: у регистратора своя папка, и выйти
-          # за неё ему незачем. Поэтому все git add и git commit -- по пути.
-          git add -- data/trending
-          if git diff --cached --quiet -- data/trending; then
-            echo "novyh snimkov net: v vetke uzhe to zhe samoe"
+          # КЛАДЁТСЯ ТОЛЬКО таблица первых появлений: сырое в git не идёт вовсе
+          # (предел 100 МБ). Все git add и git commit -- строго по этому пути,
+          # поэтому остальные 6393 файла ветки остаются нетронутыми.
+          git add -- "$PUT_PERVYH"
+          if git diff --cached --quiet -- "$PUT_PERVYH"; then
+            echo "novyh tablic net: v vetke uzhe to zhe samoe"
             # Свой коммит всё равно называем: шагу доказательства нужно, что
             # сверять с вершиной ветки, а уборке -- право работать и в этом
             # случае (файлы в ветке лежат, просто положены не нами).
             echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
             exit 0
           fi
-          FAJLOV=$(git diff --cached --numstat -- data/trending | wc -l)
+          FAJLOV=$(git diff --cached --numstat -- "$PUT_PERVYH" | wc -l)
           echo "fajlov k pushu: $FAJLOV"
           # Ветку догоняем fetch+reset, а не rebase: клон мелкий (depth=1),
           # rebase в нём делать нечем. Тот же приём у run_podbivka2_miami.yml
@@ -182,13 +241,13 @@ jobs:
           for POPYTKA in 1 2 3 4 5 6 7 8; do
             git fetch -q --depth=1 origin "$VETKA_SNIMKOV"
             git reset -q FETCH_HEAD
-            git add -- data/trending
-            if git diff --cached --quiet -- data/trending; then
+            git add -- "$PUT_PERVYH"
+            if git diff --cached --quiet -- "$PUT_PERVYH"; then
               echo "uzhe v vetke (popytka $POPYTKA)"
               echo "NASH_KOMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
               exit 0
             fi
-            git commit -q -m "Trending: sutochnye snimki ($FAJLOV fajlov) [automated]" -- data/trending
+            git commit -q -m "Trending: pervye pojavlenija za sutki ($FAJLOV fajlov) [automated]" -- "$PUT_PERVYH"
             # git push БЕЗ КОНВЕЙЕРА, и это главное. 'git push | tail' отдаёт
             # код tail, то есть 0 даже на отказе, и отчёт о пуше врёт. Здесь
             # код возврата честный -- но и ему мы верим не на слово: ниже
@@ -249,53 +308,67 @@ jobs:
           set -e
           set -o pipefail
           KOREN="$KOREN_PODBIVKI"
-          SPISOK_VETKI="$RUNNER_TEMP/v_vetke.txt"
           SPISOK_STARYH="$RUNNER_TEMP/staroe.txt"
           # ЧЕЙ КАТАЛОГ И ЧТО НАМ В НЁМ МОЖНО -- в журнал до первого rm:
           # клон регистратора отдан пользователю podbivka, а прогон идёт под
-          # ghrunner. Если удалять нельзя, пусть это будет видно замером.
+          # бегунком. Если удалять нельзя, пусть это будет видно замером.
           ls -ld "$KOREN/data/trending" || true
           # || true НА КОНВЕЙЕРЕ С head, и порог НАЗВАН ЗАМЕРОМ, а не на глаз.
           # При pipefail find, получивший SIGPIPE от закрывшегося head, валит
           # весь конвейер. Но head закрывает трубу НЕ на 20-й строке: пока
           # вывод find влезает в буфер трубы, find успевает закончиться сам.
           # Прогнано на настоящих каталогах: 20 -> код 0, 25 -> 0, 60 -> 0,
-          # 100 -> 141. То есть "больше 20 источников" было бы неправдой --
-          # ломается это где-то между 60 и 100. Сейчас источников 8, но || true
-          # стоит всё равно: порог зависит от длины путей, а не только от их
-          # числа, и угадывать его на живом прогоне незачем.
+          # 100 -> 141. Сейчас источников 8, но || true стоит всё равно:
+          # порог зависит и от длины путей, а не только от их числа.
           find "$KOREN/data/trending" -mindepth 1 -maxdepth 1 -type d \
             -printf '%M %u:%g %p\n' | head -20 || true
-          # Что РЕАЛЬНО лежит в ветке. Берётся с доказанной вершины.
-          git ls-tree -r --name-only HEAD -- data/trending > "$SPISOK_VETKI"
-          echo "fajlov v vetke $VETKA_SNIMKOV: $(wc -l < "$SPISOK_VETKI")"
-          # -mmin +2880, А НЕ -mtime +2. '-mtime +2' для find значит "старше
-          # ТРЁХ суток" (целые сутки, дробь отбрасывается) -- не то, что просил
-          # владелец. Минуты считаются честно: 48 часов и ни часом больше.
-          find "$KOREN/data/trending" -type f -mmin "+$STARSHE_MINUT" \
-            > "$SPISOK_STARYH" || true
-          echo "kandidatov starshe 2 sutok (${STARSHE_MINUT} min): $(wc -l < "$SPISOK_STARYH")"
+          #
+          # СВЕРКИ СО СПИСКОМ ВЕТКИ ЗДЕСЬ БОЛЬШЕ НЕТ, И ЭТО НАДО НАЗВАТЬ, А НЕ
+          # ЗАМОЛЧАТЬ. Прежняя уборка удаляла только то, что УЖЕ лежит в ветке:
+          # сырое туда пушилось, и список ветки был честной страховкой. С 16.10
+          # сырое в git не идёт вовсе (предел 100 МБ), значит такой страховки
+          # больше не существует: ни один сырой файл в ветке не найдётся, и
+          # сверка запретила бы удалять вообще всё. Поэтому замок теперь
+          # ВРЕМЕННОЙ, и он один -- возраст 60 суток. Это слово владельца
+          # ("уборка сырого -- не раньше 60 суток"), и оно значит, что удаляется
+          # то, чего больше нигде нет. Поэтому ограничений на удаление три,
+          # и все проверяются:
+          #   1. только внутри $KOREN/data/trending;
+          #   2. только файлы вида <источник>/<дата>.jsonl.gz на ОДНОМ уровне
+          #      вложенности -- таблица первых появлений лежит в pervye/ и под
+          #      образец не попадает, но для верности она исключена отдельно;
+          #   3. только старше 60 суток по mtime.
+          STARSHE_MINUT=$((STARSHE_SUTOK_SYROE * 1440))
+          echo "porog uborki syrogo: $STARSHE_SUTOK_SYROE sutok = $STARSHE_MINUT minut"
+          # -mmin, А НЕ -mtime: '-mtime +60' у find значит "старше 61 суток"
+          # (целые сутки, дробь отбрасывается) -- не то, что просил владелец.
+          find "$KOREN/data/trending" -mindepth 2 -maxdepth 2 -type f \
+            -name '*.jsonl.gz' -not -path "$KOREN/$PUT_PERVYH/*" \
+            -mmin "+$STARSHE_MINUT" > "$SPISOK_STARYH" || true
+          echo "kandidatov starshe $STARSHE_SUTOK_SYROE sutok: $(wc -l < "$SPISOK_STARYH")"
           UDALENO=0
           PROPUSHCHENO=0
           NE_VYSHLO=0
           OSVOBOZHDENO=0
           # Читаем из ФАЙЛА, а не из конвейера: 'find | while' увёл бы счётчики
-          # в подоболочку, и все числа ниже оказались бы нулями. Имена снимков
-          # -- data/trending/<istochnik>/<DATA>.jsonl.gz, без пробелов и
-          # переводов строки (замерено на ветке), поэтому построчного чтения
-          # здесь довольно.
+          # в подоболочку, и все числа ниже оказались бы нулями.
           while IFS= read -r PUT; do
             [ -n "$PUT" ] || continue
             OTN="${PUT#"$KOREN"/}"
-            # СВЕРКА СО СПИСКОМ ВЕТКИ -- ПОФАЙЛОВО. Доказанный пуш говорит,
-            # что наш коммит в ветке, но не говорит, что в ветке именно ЭТОТ
-            # файл: его могли не донести, переименовать или удалить поверх.
-            # Нет в списке -- не удаляем и печатаем почему.
-            if ! grep -Fxq -- "$OTN" "$SPISOK_VETKI"; then
-              PROPUSHCHENO=$((PROPUSHCHENO + 1))
-              echo "NE UDALJAJU $OTN -- etogo puti v vetke $VETKA_SNIMKOV net"
-              continue
-            fi
+            # ПОСЛЕДНЯЯ ПРОВЕРКА ПЕРЕД rm -- НА САМОМ ПУТИ. Если find когда-то
+            # расширят или образец изменят, этот замок всё равно не пустит
+            # удалять таблицу первых появлений и что-либо вне каталога сырого.
+            case "$OTN" in
+              "$PUT_PERVYH"/*)
+                PROPUSHCHENO=$((PROPUSHCHENO + 1))
+                echo "NE UDALJAJU $OTN -- eto tablica pervyh pojavlenij, ne syroe"
+                continue ;;
+              data/trending/*/*.jsonl.gz) : ;;
+              *)
+                PROPUSHCHENO=$((PROPUSHCHENO + 1))
+                echo "NE UDALJAJU $OTN -- put ne pohozh na syroj snimok"
+                continue ;;
+            esac
             RAZMER=$(stat -c %s -- "$PUT" || echo 0)
             if rm -f -- "$PUT"; then
               UDALENO=$((UDALENO + 1))
@@ -309,15 +382,15 @@ jobs:
           OSTALOS=$(find "$KOREN/data/trending" -type f | wc -l)
           MESTO=$(du -sh "$KOREN/data/trending" | cut -f1 || echo "?")
           echo "--- chisla uborki ---"
-          echo "udaleno fajlov:             $UDALENO"
-          echo "propushcheno (net v vetke): $PROPUSHCHENO"
-          echo "ne vyshlo udalit:           $NE_VYSHLO"
-          echo "ostalos fajlov na mashine:  $OSTALOS"
-          echo "osvobozhdeno bajt:          $OSVOBOZHDENO"
-          echo "mesto pod snimkami teper:   $MESTO"
+          echo "udaleno fajlov:                $UDALENO"
+          echo "propushcheno (ne syroe):       $PROPUSHCHENO"
+          echo "ne vyshlo udalit:              $NE_VYSHLO"
+          echo "ostalos fajlov na mashine:     $OSTALOS"
+          echo "osvobozhdeno bajt:             $OSVOBOZHDENO"
+          echo "mesto pod snimkami teper:      $MESTO"
           if [ "$NE_VYSHLO" != 0 ]; then
             echo "SBOJ: $NE_VYSHLO fajlov udalit ne poluchilos."
-            echo "Dannye cely -- oni v vetke, no mesto na mashine ne osvobodilos."
+            echo "Dannye cely, no mesto na mashine ne osvobodilos."
             echo "Pochti navernjaka prava: klon otdan polzovatelju podbivka,"
             echo "a progon idjot pod $(id -un). Smotri vyvod ls -ld vyshe."
             exit 1
