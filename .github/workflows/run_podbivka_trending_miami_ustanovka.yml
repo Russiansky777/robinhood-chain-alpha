@@ -840,6 +840,19 @@ jobs:
         if: ${{ always() }}
         run: |
           set -e
+          # МАШИНА И ДИСК -- ПЕРВОЙ СТРОКОЙ СВОДКИ. Из контейнера читается
+          # только ХВОСТ журнала задания, а df печатается шагом диагноза в
+          # середине -- то есть выше окна хвоста. В утреннем докладе 17.10
+          # свободного места на miami просто не оказалось чем подтвердить, и
+          # пришлось гонять прогон второй раз. У установщика ams такой раздел
+          # есть с самого начала; здесь его не было.
+          echo "=== 0. MASHINA I DISK ==="
+          if [ -f diagnoz_miami.txt ]; then
+            grep -E '^(Filesystem|/dev/|tmpfs .* /$)' diagnoz_miami.txt | head -6 || true
+            grep -E '^(miami|nproc|Python|systemd)' diagnoz_miami.txt | head -4 || true
+          else
+            echo "(shag diagnoza ne shjol)"
+          fi
           echo "=== 1. SAMOPROVERKA DO USTANOVKI ==="
           if [ -f samoproverka_miami.txt ]; then
             grep -cE '^  ОК' samoproverka_miami.txt | sed 's/^/strok OK: /'
