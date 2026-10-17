@@ -3,7 +3,7 @@
   "vetka_koda": "claude/stroiteli",
   "koren_pm": "/opt/polymarket-put",
   "tolko_diagnoz": "no",
-  "versija_koda": "vladelec nazval b371d350 -- eto golova CHERNOVOJ vetki claude/stroiteli-draft. Na samoj claude/stroiteli lezhit pozdnejshij 57653e0d (Code-4): retention 30, samoproverka 35/35 progana, ruff zeljonyj. Stavim s claude/stroiteli",
+  "versija_koda": "d350b3e6 -- golova claude/stroiteli, \"rotacija: syroe ne udaljat, poka za sutki ne poschitany proizvodnye\". Svereno: hesh vladelca est v vetke i on i est golova; dovody CLI ne menjalis, poetomu juniti pravit ne nado; ZHDEM_PROVEROK = 57",
   "retention_artefakta": "30, ne 90 -- v versii vetki eto uzhe zapisano tak",
   "kljuchej_net": "skript ne chitaet ni odnoj peremennoj okruzhenija -- eto dokazyvaet ego zhe samoproverka",
   "tokena_zapisi_na_mashine_net": "stroka ExecStartPost s --push iz dokumenta NE stavitsja: push s mashiny treboval by tokena na diske. Dokument sam predlagaet etot put i sovetuet ego; proverka v shage otkazyvaet, esli stroka pusha vsjo zhe popala v junit",
@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 19,
+  "popytka": 20,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -101,5 +101,6 @@
     "prichina": "scp perechisljal imena junitov RUKAMI, i imeni polymarket-15min v spiske ne bylo: junit sobran i provereno lokalno, no na jashchik ne uehal, a dalshe systemctl enable --now polymarket-15min.timer otkazal",
     "cena": "vyshe krasnogo progona: novaja pjatiminutka BEZ sobytij uzhe uehala i perechitalas, a junita sobytij ne bylo -- sobytija ne sobiralis vovse okolo desjati minut, poka eto ne ispravili",
     "pravka": "edet vsja papka junity_pm, a nabor imjon proverjaetsja ZDES po tomu zhe spisku, kotoryj nizhe vkljuchaetsja na mashine; posle scp spisok fajlov na jashchike pechataetsja dlja sverki"
-  }
+  },
+  "vorota_samoproverki": "porog snizu >= 57 (slovo vladelca 17.10)"
 }
