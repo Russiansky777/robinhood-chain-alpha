@@ -1,0 +1,582 @@
+{
+ "актор": "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest",
+ "название": "Tweet Scraper|$0.18/1K Tweets | Pay-Per Result | No Rate Limits",
+ "тариф": null,
+ "пример_входа": {
+  "body": "{ \"helloWorld\": 123 }",
+  "contentType": "application/json; charset=utf-8"
+ },
+ "поля_входа": [
+  "tweetIDs",
+  "twitterContent",
+  "searchTerms",
+  "maxItems",
+  "queryType",
+  "lang",
+  "from",
+  "to",
+  "@",
+  "list",
+  "filter:blue_verified",
+  "near",
+  "within",
+  "geocode",
+  "since_time",
+  "until_time",
+  "since_id",
+  "max_id",
+  "filter:nativeretweets",
+  "include:nativeretweets",
+  "filter:replies",
+  "conversation_id",
+  "filter:quote",
+  "quoted_tweet_id",
+  "quoted_user_id",
+  "card_name",
+  "filter:has_engagement",
+  "min_retweets",
+  "min_faves",
+  "min_replies",
+  "-min_retweets",
+  "-min_faves",
+  "-min_replies",
+  "filter:media",
+  "filter:twimg",
+  "filter:images",
+  "filter:videos",
+  "filter:native_video",
+  "filter:vine",
+  "filter:consumer_video",
+  "filter:pro_video",
+  "filter:spaces",
+  "filter:links",
+  "filter:mentions",
+  "filter:news",
+  "filter:safe",
+  "filter:hashtags",
+  "url"
+ ],
+ "схема": {
+  "title": "Only $0.25/1000 tweets for Twitter scraping, with 150 tweets/sec speed. 100% reliability, swift data retrieval by our expert team.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+   "tweetIDs": {
+    "title": "Tweet IDs",
+    "type": "array",
+    "description": "Enter the tweet ids you want to scrape. Case1: 1846987139428634858,1858743654778892784. Note: When this field has a value, all other filter conditions will be ignored.",
+    "editor": "stringList",
+    "prefill": [
+     "1846987139428634858"
+    ]
+   },
+   "twitterContent": {
+    "title": "Tweet Content",
+    "type": "string",
+    "description": "Enter the content of the tweet you want to scrape.eg \"from:same  since:2021-02-17_00:00:00_UTC until:2021-03-03_23:59:59_UTC\" .please ref:https://github.com/igorbrigadir/twitter-advanced-search for more use case",
+    "editor": "textfield",
+    "prefill": "from:elonmusk make -\"live laugh love\""
+   },
+   "searchTerms": {
+    "title": "Search Terms",
+    "type": "array",
+    "description": "Enter the search terms you want to scrape. Each term should follow Twitter's search syntax. Multiple terms will be processed separately. If set, this field will override the twitterContent field,and the field 'Maximum number of items on output' means the maximum number of items for each search term.please ref:https://github.com/igorbrigadir/twitter-advanced-search for more use case",
+    "editor": "stringList",
+    "prefill": [
+     "from:elonmusk since:2024-01-01_00:00:00_UTC until:2024-01-02_00:00:00_UTC",
+     "from:NASA starsince:2024-01-01_00:00:00_UTC until:2024-01-02_00:00:00_UTC"
+    ]
+   },
+   "maxItems": {
+    "title": "Maximum number of items on output",
+    "type": "integer",
+    "description": "Maximum number of items that you want as output. When searchTerms is set, this field means the maximum number of items for each search term.The minimum value is 20.The max_items parameter defines the minimum number of items to return, not a strict limit.Due to the pagination behavior of Twitter/X, individual pages may contain more items than requested. As a result, the final response may slightly exceed the specified max_items value.However, the number of returned items will never be lower than the requested amount.",
+    "editor": "number",
+    "minimum": 1,
+    "maximum": 1000000,
+    "default": 200
+   },
+   "queryType": {
+    "title": "Query Type, support Latest,Top,Photos,Videos",
+    "type": "string",
+    "description": "This field determines the type of Twitter search to be performed. The options are 'Latest', 'Top', 'Photos', 'Photos', Videos'. 'Latest' will return the most recent tweets. 'Top' will return the most popular or relevant tweets according to Twitter's algorithm. 'Photos' will return tweets containing photos. 'Videos' will return tweets  containing photos videos.",
+    "editor": "select",
+    "enum": [
+     "Latest",
+     "Top",
+     "Photos",
+     "Videos"
+    ],
+    "enumTitles": [
+     "Latest",
+     "Top",
+     "Photos",
+     "Videos"
+    ],
+    "default": "Latest"
+   },
+   "lang": {
+    "title": "Language",
+    "type": "string",
+    "description": "Search for tweets in specified language, not always accurate.Language is specified as https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes.",
+    "editor": "select",
+    "enum": [
+     "am",
+     "ar",
+     "bg",
+     "bn",
+     "bo",
+     "ca",
+     "ch`",
+     "cs",
+     "da",
+     "de",
+     "dv",
+     "el",
+     "en",
+     "es",
+     "et",
+     "fa",
+     "fi",
+     "fr",
+     "gu",
+     "hi",
+     "ht",
+     "hu",
+     "hy",
+     "in",
+     "is",
+     "it",
+     "iu",
+     "iw",
+     "ja",
+     "ka",
+     "km",
+     "kn",
+     "ko",
+     "lo",
+     "lt",
+     "lv",
+     "ml",
+     "my",
+     "ne",
+     "nl",
+     "no",
+     "or",
+     "pa",
+     "pl",
+     "pt",
+     "ro",
+     "ru",
+     "si",
+     "sk",
+     "sl",
+     "sv",
+     "ta",
+     "te",
+     "th",
+     "tl",
+     "tr",
+     "uk",
+     "ur",
+     "vi",
+     "zh"
+    ],
+    "enumTitles": [
+     "Amharic (አማርኛ)",
+     "Arabic (العربية)",
+     "Bulgarian (Български)",
+     "Bengali (বাংলা)",
+     "Tibetan (བོད་སྐད)",
+     "Catalan (Català)",
+     "Cherokee (ᏣᎳᎩ)",
+     "Czech (čeština)",
+     "Danish (Dansk)",
+     "German (Deutsch)",
+     "Maldivian (ދިވެހި)",
+     "Greek (Ελληνικά)",
+     "English (English)",
+     "Spanish (Español)",
+     "Estonian (eesti)",
+     "Persian (فارسی)",
+     "Finnish (Suomi)",
+     "French (Français)",
+     "Gujarati (ગુજરાતી)",
+     "Hindi (हिंदी)",
+     "Haitian Creole (Kreyòl ayisyen)",
+     "Hungarian (Magyar)",
+     "Armenian (Հայերեն)",
+     "Indonesian (Bahasa Indonesia)",
+     "Icelandic (Íslenska)",
+     "Italian (Italiano)",
+     "Inuktitut (ᐃᓄᒃᑎᑐᑦ)",
+     "Hebrew (עברית)",
+     "Japanese (日本語)",
+     "Georgian (ქართული)",
+     "Khmer (ខ្មែរ)",
+     "Kannada (ಕನ್ನಡ)",
+     "Korean (한국어)",
+     "Lao (ລາວ)",
+     "Lithuanian (Lietuvių)",
+     "Latvian (latviešu valoda)",
+     "Malayalam (മലയാളം)",
+     "Myanmar (မြန်မာဘာသာ)",
+     "Nepali (नेपाली)",
+     "Dutch (Nederlands)",
+     "Norwegian (Norsk)",
+     "Oriya (ଓଡ଼ିଆ)",
+     "Panjabi (ਪੰਜਾਬੀ)",
+     "Polish (Polski)",
+     "Portuguese (Português)",
+     "Romanian (limba română)",
+     "Russian (Русский)",
+     "Sinhala (සිංහල)",
+     "Slovak (slovenčina)",
+     "Slovene (slovenski jezik)",
+     "Swedish (Svenska)",
+     "Tamil (தமிழ்)",
+     "Telugu (తెలుగు)",
+     "Thai (ไทย)",
+     "Tagalog (Tagalog)",
+     "Turkish (Türkçe)",
+     "Ukrainian (українська мова)",
+     "Urdu (ﺍﺭﺩﻭ)",
+     "Vietnamese (Tiếng Việt)",
+     "Chinese (中文)"
+    ],
+    "prefill": "en"
+   },
+   "from": {
+    "title": "From User",
+    "type": "string",
+    "description": "Sent by a particular @username e.g. \"NASA\" .https://twitter.com/search?q=dogs%20from%3Anasa&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": "elonmusk",
+    "sectionCaption": "User-Based Filters",
+    "sectionDescription": "Filter tweet by user from/to/Mention/list..."
+   },
+   "to": {
+    "title": "To User",
+    "type": "string",
+    "description": "Replying to a particular @username. eg. \"NASA\".https://twitter.com/search?q=%23MoonTunes%20to%3Anasa&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "@": {
+    "title": "Mention User",
+    "type": "string",
+    "description": "Mentioning a particular @username. Combine with -from:username to get only mentions.Eg.https://twitter.com/search?q=%40cern%20-from%3Acern&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "list": {
+    "title": "List",
+    "type": "string",
+    "description": "Tweets from members of this public list. Use the list ID from the API or with urls like twitter.com/i/lists/715919216927322112. List slug is for old list urls like twitter.com/esa/lists/astronauts.",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "filter:blue_verified": {
+    "title": "Filter Blue Verified",
+    "type": "boolean",
+    "description": "Filter tweets from blue verified users only.However, I found that using filter:blue_verified alone causes issues and needs to be used together with filter:verified, possibly due to a Twitter bug.Eg.https://twitter.com/search?q=filter%3Ablue_verified%20-filter%3Averified&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "near": {
+    "title": "Near",
+    "type": "string",
+    "description": "Geotagged in this place. Also supports Phrases, eg: near:\"The Hague\" . eg https://twitter.com/search?q=near%3A%22The%20Hague%22&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": "",
+    "sectionCaption": "Geo-Based Filters",
+    "sectionDescription": "Filter tweet by geo location"
+   },
+   "within": {
+    "title": "Within",
+    "type": "string",
+    "description": "Within specific radius of the \"near\" operator, to apply a limit. Can use km or mi. e.g. fire near:san-francisco within:10km.eg:https://twitter.com/search?q=fire%20near%3Asan-francisco%20within%3A10km&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "geocode": {
+    "title": "Geo Code",
+    "type": "string",
+    "description": "Search within a specific radius of a coordinate. E.g. to get tweets 10km around twitters hq, use geocode:37.7764685,-122.4172004,10km.Eg.https://twitter.com/search?q=geocode%3A37.7764685%2C-122.4172004%2C10km&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "since_time": {
+    "title": "Since Time",
+    "type": "string",
+    "description": "On or after a specified unix timestamp in seconds. Combine with the \"Until Time\" operator for dates between. Maybe easier to use than since_id below.Eg.https://twitter.com/search?q=since_time%3A1561720321%20until_time%3A1562198400%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "until_time": {
+    "title": "Until Time",
+    "type": "string",
+    "description": "Before a specified unix timestamp in seconds. Combine with a \"Since Time\" operator for dates between. Maybe easier to use than max_id below.Eg.https://twitter.com/search?q=since_time%3A1561720321%20until_time%3A1562198400%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "since_id": {
+    "title": "Since ID",
+    "type": "string",
+    "description": "On or after a specified tweet ID. Combine with the \"Until ID\" operator for dates between. Maybe easier to use than since_time above.Eg.https://twitter.com/search?q=since_id%3A1138872932887924737%20max_id%3A1144730280353247233%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "max_id": {
+    "title": "Max ID    ",
+    "type": "string",
+    "description": "Before a specified tweet ID. Combine with a \"Since ID\" operator for dates between. Maybe easier to use than until_time above.Eg.https://twitter.com/search?q=since_id%3A1138872932887924737%20max_id%3A1144730280353247233%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "filter:nativeretweets": {
+    "title": "Filter Native Retweets",
+    "type": "boolean",
+    "description": "Only retweets created using the retweet button. Works well combined with from: to show only retweets. Only works within the last 7-10 days or so.Eg.https://twitter.com/search?q=from%3Anasa%20filter%3Anativeretweets&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false,
+    "sectionCaption": "Type-Based Filters",
+    "sectionDescription": "Filter tweet by type"
+   },
+   "include:nativeretweets": {
+    "title": "Include Native Retweets",
+    "type": "boolean",
+    "description": "Native retweets are excluded by default. This shows them. In contrast to filter:, which shows only retweets, this includes retweets in addition to other tweets. Only works within the last 7-10 days or so.Eg.https://twitter.com/search?q=from%3Anasa%20include%3Anativeretweets%20&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:replies": {
+    "title": "Filter Retweets",
+    "type": "boolean",
+    "description": "Tweet is a reply to another Tweet. good for finding conversations, or threads if you add or remove to:user.eg.https://twitter.com/search?q=from%3Anasa%20filter%3Areplies%20-to%3Anasa&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "conversation_id": {
+    "title": "Conversation ID",
+    "type": "string",
+    "description": "Tweets that are part of a thread (direct replies and other replies).Eg.https://twitter.com/search?q=conversation_id%3A1140437409710116865%20lang%3Aen&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "filter:quote": {
+    "title": "Filter Quote",
+    "type": "boolean",
+    "description": "Contain Quote Tweets.Eg.https://twitter.com/search?q=from%3Anasa%20filter%3Aquote&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "quoted_tweet_id": {
+    "title": "Quoted Tweet ID",
+    "type": "string",
+    "description": "Search for quotes of a specific tweet.Eg.https://twitter.com/search?q=quoted_user_id%3A11348282&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "quoted_user_id": {
+    "title": "Quoted User ID",
+    "type": "string",
+    "description": "Search for all quotes of a specific user, by numeric User ID.Eg.https://twitter.com/search?q=quoted_user_id%3A11348282&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   },
+   "card_name": {
+    "title": "Tweets containing polls type",
+    "type": "string",
+    "description": "Tweets containing polls. For polls containing 2, 3, 4 choices, or image Polls.Eg.https://twitter.com/search?q=lang%3Aen%20card_name%3Apoll4choice_text_only%20OR%20card_name%3Apoll3choice_text_only%20OR%20card_name%3Apoll2choice_text_only&src=typed_query&f=live",
+    "editor": "select",
+    "enum": [
+     "poll2choice_text_only",
+     "poll3choice_text_only",
+     "poll4choice_text_only",
+     "poll2choice_image",
+     "poll3choice_image",
+     "poll4choice_image"
+    ],
+    "enumTitles": [
+     "poll2choice_text_only",
+     "poll3choice_text_only",
+     "poll4choice_text_only",
+     "poll2choice_image",
+     "poll3choice_image",
+     "poll4choice_image"
+    ],
+    "prefill": ""
+   },
+   "filter:has_engagement": {
+    "title": "Filter Has Engagement",
+    "type": "boolean",
+    "description": "Has some engagement (replies, likes, retweets). Can be negated to find tweets with no engagement. Note all of these are mutually exclusive with filter:nativeretweets or include:nativeretweets, as they apply to the retweet, not the original tweet, so they won't work as expected.Eg.https://twitter.com/search?q=breaking%20filter%3Anews%20-filter%3Ahas_engagement&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false,
+    "sectionCaption": "Engagement-Based Filters",
+    "sectionDescription": "Engagement on Twitter refers to the level of interaction users have with your content, including likes, retweets, comments, clicks, mentions, and direct messages."
+   },
+   "min_retweets": {
+    "title": "Minimum Retweets",
+    "type": "integer",
+    "description": "Minimum number of retweets.Eg.https://twitter.com/search?q=min_retweets%3A5000%20nasa&src=typed_query&f=live",
+    "editor": "number",
+    "minimum": 0,
+    "default": 0
+   },
+   "min_faves": {
+    "title": "Minimum Faves",
+    "type": "integer",
+    "description": "Minimum number of favorites.Eg.https://twitter.com/search?q=min_faves%3A5000%20nasa&src=typed_query&f=live",
+    "editor": "number",
+    "minimum": 0,
+    "default": 0
+   },
+   "min_replies": {
+    "title": "Minimum Replies",
+    "type": "integer",
+    "description": "Minimum number of replies.Eg.https://twitter.com/search?q=min_replies%3A5000%20nasa&src=typed_query&f=live",
+    "editor": "number",
+    "minimum": 0,
+    "default": 0
+   },
+   "-min_retweets": {
+    "title": "Maximum Retweets",
+    "type": "integer",
+    "description": "A maximum number of Retweets.Eg.https://twitter.com/search?q=-min_retweets%3A5000%20nasa&src=typed_query&f=live",
+    "editor": "number",
+    "minimum": 0,
+    "default": 0
+   },
+   "-min_faves": {
+    "title": "Minimum Faves",
+    "type": "integer",
+    "description": "A maximum number of Faves.Eg.https://twitter.com/search?q=-min_faves%3A5000%20nasa&src=typed_query&f=live",
+    "editor": "number",
+    "minimum": 0,
+    "default": 0
+   },
+   "-min_replies": {
+    "title": "Minimum Replies",
+    "type": "integer",
+    "description": "A maximum number of Replies.Eg.https://twitter.com/search?q=-min_replies%3A5000%20nasa&src=typed_query&f=live",
+    "editor": "number",
+    "minimum": 0,
+    "default": 0
+   },
+   "filter:media": {
+    "title": "Filter Media",
+    "type": "boolean",
+    "description": "Filter tweets with media,All media types.Eg.https://twitter.com/search?q=filter%3Amedia%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false,
+    "sectionCaption": "Media-Based Filters",
+    "sectionDescription": "Filter tweet by media"
+   },
+   "filter:twimg": {
+    "title": "Filter twimg",
+    "type": "boolean",
+    "description": "Native Twitter images (pic.twitter.com links).Eg.https://twitter.com/search?q=filter%3Atwimg%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:images": {
+    "title": "Filter Images",
+    "type": "boolean",
+    "description": "Filter tweets with images.Eg.https://twitter.com/search?q=filter%3Aimages%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:videos": {
+    "title": "Filter Videos",
+    "type": "boolean",
+    "description": "All video types, including native Twitter video and external sources such as Youtube.Eg.https://twitter.com/search?q=filter%3Avideos%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:native_video": {
+    "title": "Filter Native Video",
+    "type": "boolean",
+    "description": "All Twitter-owned video types (native video, vine, periscope).Eg.https://twitter.com/search?q=filter%3Anative_video%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:vine": {
+    "title": "Vines (RIP)",
+    "type": "boolean",
+    "description": "Vine videos.Eg.https://twitter.com/search?q=filter%3Avine%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:consumer_video": {
+    "title": "Consumer Video",
+    "type": "boolean",
+    "description": "Twitter native video only.Eg.https://twitter.com/search?q=filter%3Aconsumer_video%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:pro_video": {
+    "title": "Pro Video",
+    "type": "boolean",
+    "description": "Twitter pro video (Amplify) only.Eg.https://twitter.com/search?q=filter%3Apro_video%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:spaces": {
+    "title": "Twitter Spaces only",
+    "type": "boolean",
+    "description": "Twitter Spaces only.Eg.https://twitter.com/search?q=filter%3Aspaces%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:links": {
+    "title": "Filter Links",
+    "type": "boolean",
+    "description": "Only containing some URL, includes media. use -filter:media for urls that aren't media.Eg.https://twitter.com/search?q=filter%3Alinks%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false,
+    "sectionCaption": "More",
+    "sectionDescription": "Filter tweet by more"
+   },
+   "filter:mentions": {
+    "title": "Filter Mentions",
+    "type": "boolean",
+    "description": "Containing any sort of @mentions.Eg.https://twitter.com/search?q=filter%3Amentions%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:news": {
+    "title": "Filter News",
+    "type": "boolean",
+    "description": "Containing link to a news story. Combine with a list operator to narrow the user set down further. Matches on a list of Domains.(See Note for full list :https://github.com/igorbrigadir/twitter-advanced-search?tab=readme-ov-file#news-sites)",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:safe": {
+    "title": "Filter Videos",
+    "type": "boolean",
+    "description": "Excluding NSFW content. Excludes content that users have marked as \"Potentially Sensitive\". Doesn't always guarantee SFW results.",
+    "editor": "checkbox",
+    "default": false
+   },
+   "filter:hashtags": {
+    "title": "Filter Hashtags",
+    "type": "boolean",
+    "description": "Containing any sort of hashtags.Eg.https://twitter.com/search?q=filter%3Ahashtags%20%23nasamoontunes&src=typed_query&f=live",
+    "editor": "checkbox",
+    "default": false
+   },
+   "url": {
+    "title": "Search for Tweets Containing Specific URLs.",
+    "type": "string",
+    "description": "urls are tokenized and matched, works very well for subdomains and domains, not so well for long urls, depends on url. Youtube ids work well. Works for both shortened and canonical urls, eg: gu.com shortener for theguardian.com. When searching for Domains with hyphens in it, you have to replace the hyphen by an underscore (like url:t_mobile.com) but underscores _ are also tokenized out, and may not match.Eg. https://twitter.com/search?q=url%3Agu.com&src=typed_query&f=live",
+    "editor": "textfield",
+    "prefill": ""
+   }
+  },
+  "required": [
+   "maxItems"
+  ]
+ }
+}
