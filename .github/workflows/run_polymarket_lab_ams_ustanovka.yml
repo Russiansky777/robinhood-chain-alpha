@@ -524,14 +524,32 @@ jobs:
             exit 1
           fi
           echo "stroki pusha s mashiny net ni v odnom junite"
+          # ПЕРЕЧИСЛЕНИЕ ИМЁН РУКАМИ -- ИМЕННО ОНО СЛОМАЛО ПРОГОН 39030264557.
+          # Новый юнит polymarket-15min.* был собран и проверен локально, но в
+          # списке scp его имени не было: на ящик он не уехал, и дальше
+          # `systemctl enable --now polymarket-15min.timer` отказал ("Unit
+          # ... does not exist"), а шаг упал. Цена ошибки оказалась выше
+          # красного прогона: новая пятиминутка БЕЗ событий уже уехала и
+          # перечиталась, а юнита событий не было -- то есть события не
+          # собирались вовсе, пока это не исправили.
+          #
+          # Теперь едет вся папка, а список имён проверяется ровно по тому
+          # набору, который ниже включается на машине: не собран хоть один --
+          # отказ ЗДЕСЬ, до единой правки на ящике.
+          for U in otbor min 5min 15min proizvodnye rotacija; do
+            for E in service timer; do
+              [ -s "junity_pm/polymarket-$U.$E" ] \
+                || { echo "SBOJ: ne sobran junity_pm/polymarket-$U.$E"; exit 1; }
+            done
+          done
+          echo "junitov sobrano: $(ls -1 junity_pm | wc -l) fajlov, vse shest par na meste"
           scp -i ~/.ssh/ams_key -o StrictHostKeyChecking=accept-new \
-            junity_pm/polymarket-otbor.service junity_pm/polymarket-otbor.timer \
-            junity_pm/polymarket-min.service junity_pm/polymarket-min.timer \
-            junity_pm/polymarket-5min.service junity_pm/polymarket-5min.timer \
-            junity_pm/polymarket-proizvodnye.service junity_pm/polymarket-proizvodnye.timer \
-            junity_pm/polymarket-rotacija.service junity_pm/polymarket-rotacija.timer \
-            root@"$HOST_LAB":/etc/systemd/system/
+            junity_pm/* root@"$HOST_LAB":/etc/systemd/system/
           echo "juniti dostavleny"
+          # ЧТО ЛЕГЛО НА ЯЩИК -- СВЕРЯЕМ СРАЗУ, а не на следующем шаге: scp
+          # молчит про недосланное, если его имя просто не назвали.
+          ssh -n $SSH_OPTS root@"$HOST_LAB" \
+            "ls -1 /etc/systemd/system/polymarket-*.service /etc/systemd/system/polymarket-*.timer | sed 's#.*/##' | sort | tr '\n' ' '"
 
       - name: "ОТБОР СОСТАВА РУКАМИ -- один раз ДО включения таймеров"
         if: ${{ env.TOLKO_DIAGNOZ != 'yes' && env.OTBOR != 'no' }}

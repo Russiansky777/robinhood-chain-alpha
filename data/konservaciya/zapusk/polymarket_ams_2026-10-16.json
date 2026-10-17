@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 18,
+  "popytka": 19,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -95,5 +95,11 @@
     "proverka_otbora": "svereno s samim reestrom SPISKI skripta: kazhdyj vyzov vybiraet rovno odin spisok, tri spiska pokryvajut gruppu \"pjat\" bez sobytij polnostju; otricatelnyj kontrol -- s umolchaniem --kazhdye minuta otbor pust i skript otkazal by kodom 2, poetomu --kazhdye pjat v junite sobytij objazatelen",
     "ozhidaemyj rost": "sobytija 823 -> 274 MB/sutki, vsego 1.24 -> okolo 0.71 GB/sutki; pri hranenii 25 sutok ustanovivsheesja syroe okolo 17.8 GB, svobodno ostanetsja okolo 21 GB pri poroge 10",
     "storozh": "polymarket-15min.timer dobavlen v spisok ostanovki: eto sobiratel; rotacija i proizvodnye po-prezhnemu ne glushatsja"
+  },
+  "zamereno_progonom_39030264557": {
+    "itog": "KRASNYJ na shage vkljuchenija tajmerov, i vina moja",
+    "prichina": "scp perechisljal imena junitov RUKAMI, i imeni polymarket-15min v spiske ne bylo: junit sobran i provereno lokalno, no na jashchik ne uehal, a dalshe systemctl enable --now polymarket-15min.timer otkazal",
+    "cena": "vyshe krasnogo progona: novaja pjatiminutka BEZ sobytij uzhe uehala i perechitalas, a junita sobytij ne bylo -- sobytija ne sobiralis vovse okolo desjati minut, poka eto ne ispravili",
+    "pravka": "edet vsja papka junity_pm, a nabor imjon proverjaetsja ZDES po tomu zhe spisku, kotoryj nizhe vkljuchaetsja na mashine; posle scp spisok fajlov na jashchike pechataetsja dlja sverki"
   }
 }
