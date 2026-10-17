@@ -17,7 +17,7 @@
     "zashchita_ot_pusha": "otricatelnyj kontrol: podlozhennaja stroka --push lovitsja i valit shag"
   },
   "chego_ne_hvataet_dlja_poslednej_mili": "sutochnyj artefakt syrogo i push proizvodnyh dolzhny idti PROGONOM NA BEGUNKE lab-ams. Ni v odnom progone repozitorija metki lab-ams net (est tolko lab-miami i nl-host), poetomu shag diagnoza na mashine schitaet sluzhby actions.runner.* i pechataet BEGUNKOV=N -- eto i budet otvet, mozhno li stavit poslednjuju milju",
-  "popytka": 17,
+  "popytka": 18,
   "zamereno_progonom_38932243665": {
     "jashchik": "adres 216.73.157.61 otvechaet imenem nl-reserve, a ne lab-ams -- tak i zapisano, bez domyslov; disk 43 GB, svobodno 40 GB; Python 3.12.3; ruff NET",
     "begunok": "BEGUNKOV=1 -- sluzhba actions.runner na mashine est (vidimo metka nl-host)",
@@ -87,5 +87,13 @@
     "pravka": "git fetch na jashchike teper s tremja popytkami i pauzoj 15 s; to zhe dobavleno v ustanovshchik miami. Nevernuvshajasja set -- otkaz gromkij, a ne ustanovka na neproverennom kode",
     "chto_ne_proverilos": "ni odin shag posle klona ne shjol, poetomu zaplata po InvocationID v etom progone ne proverena na mashine -- tolko na stende"
   },
-  "zachem_popytka_17": "utrennij vozvrat 17.10: snjat ROST SYROGO ZA NOCH po spiskam (razdel SNIMKI I SVODKA) i svobodnoe mesto. Krugi yes, otbor no -- sostav na 17.10 polozhil tajmer otbora v 00:02Z"
+  "zachem_popytka_17": "utrennij vozvrat 17.10: snjat ROST SYROGO ZA NOCH po spiskam (razdel SNIMKI I SVODKA) i svobodnoe mesto. Krugi yes, otbor no -- sostav na 17.10 polozhil tajmer otbora v 00:02Z",
+  "slovo_vladelca_17_10": {
+    "sobytija": "gamma_events -- 15 minut vmesto 5; minutnye knigi i 5-min ostalnoe bez izmenenij",
+    "rotacija": "--dnej 25 vmesto 30, retention artefakta 30 ostajotsja -- pjat sutok fory",
+    "kak sdelano": "bez pravki fajla Code-4: u skripta est dovod --spisok, i otbor idjot I po gruppe, I po imeni. Gruppa \"pjat\" razlozhena po imenam: clob_fee_rate, data_holders, clob_time ostalis v polymarket-5min tremja strokami ExecStart, a gamma_events ushjol v novyj junit polymarket-15min s OnCalendar=*:0/15",
+    "proverka_otbora": "svereno s samim reestrom SPISKI skripta: kazhdyj vyzov vybiraet rovno odin spisok, tri spiska pokryvajut gruppu \"pjat\" bez sobytij polnostju; otricatelnyj kontrol -- s umolchaniem --kazhdye minuta otbor pust i skript otkazal by kodom 2, poetomu --kazhdye pjat v junite sobytij objazatelen",
+    "ozhidaemyj rost": "sobytija 823 -> 274 MB/sutki, vsego 1.24 -> okolo 0.71 GB/sutki; pri hranenii 25 sutok ustanovivsheesja syroe okolo 17.8 GB, svobodno ostanetsja okolo 21 GB pri poroge 10",
+    "storozh": "polymarket-15min.timer dobavlen v spisok ostanovki: eto sobiratel; rotacija i proizvodnye po-prezhnemu ne glushatsja"
+  }
 }

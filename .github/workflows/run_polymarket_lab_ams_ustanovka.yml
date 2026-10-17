@@ -74,7 +74,14 @@ env:
   # и добавил в суточные производные ТРЕТИЙ набор токенов -- то есть испортил
   # бы ровно то число, за которым прогон и перезапускают. Метка: otbor: no.
   OTBOR: "yes"
-  SUTOK_SYROGO: "30"
+  # РОТАЦИЯ -- 25 СУТОК, А RETENTION АРТЕФАКТА ОСТАЁТСЯ 30. Слово владельца
+  # 17.10: "пять суток форы". Было 30 на 30, и окна не оставалось вовсе:
+  # артефакт за сутки X истекал примерно в то же утро, когда ротация снимала
+  # сырое за X, то есть скачать и пересчитать можно было только ДО этого утра.
+  # При 25 сырое уходит на пять суток раньше артефакта -- пока он ещё жив и
+  # данные восстановимы. Это число идёт ТОЛЬКО в --dnej юнита ротации;
+  # retention-days: 30 стоит в прогоне артефакта и не меняется.
+  SUTOK_SYROGO: "25"
   HOST_LAB: 216.73.157.61
   TORGOVYJ_ZAPRESHCHEN: 45.59.170.76
 
@@ -329,7 +336,7 @@ jobs:
           fi
           tail -2 samoproverka_ams.txt
 
-      - name: "Пять юнитов systemd (без строки пуша с машины)"
+      - name: "Шесть юнитов systemd (без строки пуша с машины)"
         if: ${{ env.TOLKO_DIAGNOZ != 'yes' }}
         run: |
           set -e
@@ -387,19 +394,61 @@ jobs:
             "[Install]" "WantedBy=timers.target" \
             > junity_pm/polymarket-min.timer
 
+          # СОБЫТИЯ ОТДЕЛЕНЫ ОТ ОСТАЛЬНОЙ ПЯТИМИНУТКИ -- СЛОВО ВЛАДЕЛЬЦА
+          # 17.10: "снимок событий 15 минут вместо 5; минутные книги и 5-мин
+          # остальное -- без изменений". Файл Code-4 для этого править не
+          # пришлось: у скрипта есть довод --spisok ("только этот список"), а
+          # отбор внутри него -- И по группе, и по имени
+          # (что = [x for x in СПИСКИ if (kazhdye == "все" or x[1] ==
+          # kazhdye) and (not spisok or x[0] == spisok)]). Значит группу
+          # "пять" можно разложить по именам.
+          #
+          # В ГРУППЕ "пять" РОВНО ЧЕТЫРЕ СПИСКА -- взято из реестра СПИСКИ
+          # скрипта, а не на память: gamma_events, clob_fee_rate,
+          # data_holders, clob_time. Три последних остаются на пяти минутах
+          # тремя строками ExecStart (oneshot выполняет их по порядку), а
+          # события уходят в свой юнит с OnCalendar=*:0/15.
+          #
+          # ЗАЧЕМ. Замер ночи 17.10: всего 536.60 МБ за 10.2 часа, из них
+          # gamma_events 349.20 МБ -- 65 %, то есть 823 МБ/сутки при 1.24
+          # ГБ/сутки всего. При 30 сутках хранения это 23 суток до порога
+          # сторожа, причём ротации тогда ещё нечего удалять. На 15 минутах
+          # события дают около 274 МБ/сутки, и всё вместе -- около 0.71
+          # ГБ/сутки.
+          #
+          # --kazhdye пять ОСТАЁТСЯ И В ЮНИТЕ СОБЫТИЙ: отбор идёт по И, и с
+          # умолчанием --kazhdye минута фильтр не нашёл бы ни одного списка --
+          # скрипт честно отказал бы кодом 2 ("по отбору не осталось ни
+          # одного списка").
           {
             printf '%s\n' "[Unit]" \
-              "Description=Polymarket: pjatiminutnye spiski (sobytija, nagrady, derzhateli)" \
+              "Description=Polymarket: pjatiminutnye spiski bez sobytij (nagrady, derzhateli, vremja)" \
               "After=network-online.target" "" "[Service]"
             printf '%s\n' "$OBSHCHEE"
             printf '%s\n' \
-              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --kazhdye пять --rynkov $RYNKOV --pauza 0.6" \
-              "TimeoutStartSec=120"
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --kazhdye пять --spisok clob_fee_rate --rynkov $RYNKOV --pauza 0.6" \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --kazhdye пять --spisok data_holders --rynkov $RYNKOV --pauza 0.6" \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --kazhdye пять --spisok clob_time --rynkov $RYNKOV --pauza 0.6" \
+              "TimeoutStartSec=180"
           } > junity_pm/polymarket-5min.service
-          printf '%s\n' "[Unit]" "Description=Polymarket kazhdye pjat minut" "" \
+          printf '%s\n' "[Unit]" "Description=Polymarket kazhdye pjat minut (bez sobytij)" "" \
             "[Timer]" "OnCalendar=*:0/5" "AccuracySec=5s" "Persistent=false" "" \
             "[Install]" "WantedBy=timers.target" \
             > junity_pm/polymarket-5min.timer
+
+          {
+            printf '%s\n' "[Unit]" \
+              "Description=Polymarket: snimok sostava sobytij raz v 15 minut" \
+              "After=network-online.target" "" "[Service]"
+            printf '%s\n' "$OBSHCHEE"
+            printf '%s\n' \
+              "ExecStart=/usr/bin/python3 analysis/polymarket_put.py --kazhdye пять --spisok gamma_events --rynkov $RYNKOV --pauza 0.6" \
+              "TimeoutStartSec=120"
+          } > junity_pm/polymarket-15min.service
+          printf '%s\n' "[Unit]" "Description=Polymarket: sobytija kazhdye 15 minut" "" \
+            "[Timer]" "OnCalendar=*:0/15" "AccuracySec=15s" "Persistent=false" "" \
+            "[Install]" "WantedBy=timers.target" \
+            > junity_pm/polymarket-15min.timer
 
           # ПРОИЗВОДНЫЕ БЕЗ ExecStartPost: пуш с машины требует токена на
           # диске. Документ Code-3 сам предлагает этот путь и советует его.
@@ -543,10 +592,12 @@ jobs:
             chmod 644 /etc/systemd/system/polymarket-*.service \
                       /etc/systemd/system/polymarket-*.timer
             systemctl daemon-reload
-            # VERIFY ПО ВСЕМ ЧЕТЫРЁМ СЛУЖБАМ, и смотрим на слова "fatal error",
+            # VERIFY ПО ВСЕМ ШЕСТИ СЛУЖБАМ, и смотрим на слова "fatal error",
             # а не на код возврата: verify ворчит и на безвредное.
+            # 15min -- юнит снимка событий, отделённый от пятиминутки
+            # словом владельца 17.10.
             PLOHIH=0
-            for U in otbor min 5min proizvodnye rotacija; do
+            for U in otbor min 5min 15min proizvodnye rotacija; do
               F="/etc/systemd/system/polymarket-$U.service"
               echo "--- verify $U ---"
               VYVOD=$(systemd-analyze verify "$F" 2>&1 || true)
@@ -557,13 +608,39 @@ jobs:
             done
             [ "$PLOHIH" -eq 0 ] || { echo "SBOJ: plohih junitov $PLOHIH -- tajmery ne vkljuchaju"; exit 1; }
             systemctl enable --now polymarket-otbor.timer polymarket-min.timer \
-                                   polymarket-5min.timer polymarket-proizvodnye.timer \
+                                   polymarket-5min.timer polymarket-15min.timer \
+                                   polymarket-proizvodnye.timer \
                                    polymarket-rotacija.timer
+            # РЕЖИМ СНИМКОВ И РОТАЦИИ -- ПЕЧАТАЕМ ИЗ САМИХ ЮНИТОВ НА ЯЩИКЕ.
+            # Владелец просил доложить OnCalendar таймера событий и --dnej
+            # ротации; доклад должен опираться на то, что лежит на машине, а
+            # не на то, что я собирался записать.
+            echo "--- REZHIM: chto na samom dele stoit v junitah ---"
+            grep -H 'OnCalendar' /etc/systemd/system/polymarket-min.timer \
+                 /etc/systemd/system/polymarket-5min.timer \
+                 /etc/systemd/system/polymarket-15min.timer \
+                 /etc/systemd/system/polymarket-otbor.timer \
+                 /etc/systemd/system/polymarket-rotacija.timer \
+              | sed 's#/etc/systemd/system/##'
+            grep -H -- '--dnej' /etc/systemd/system/polymarket-rotacija.service \
+              | sed 's#/etc/systemd/system/##'
+            grep -H -- '--spisok' /etc/systemd/system/polymarket-15min.service \
+                 /etc/systemd/system/polymarket-5min.service \
+              | sed 's#/etc/systemd/system/##'
+            # СОБЫТИЙ В ПЯТИМИНУТКЕ БЫТЬ НЕ ДОЛЖНО -- проверяем, а не верим.
+            if grep -q 'gamma_events' /etc/systemd/system/polymarket-5min.service; then
+              echo "SBOJ: gamma_events ostalsja v pjatiminutnom junite -- snimok sobytij shjol by kazhdye 5 minut"
+              exit 1
+            fi
+            grep -q 'gamma_events' /etc/systemd/system/polymarket-15min.service \
+              || { echo "SBOJ: v junite 15min net gamma_events"; exit 1; }
+            echo "sobytija tolko v 15min, pjatiminutka ih ne sobiraet"
             echo "--- tajmery ---"
             systemctl list-timers 'polymarket*' --all --no-pager
             echo "--- sostojanie ---"
             for T in polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer \
-                     polymarket-proizvodnye.timer polymarket-rotacija.timer; do
+                     polymarket-15min.timer polymarket-proizvodnye.timer \
+                     polymarket-rotacija.timer; do
               printf '%s: enabled=%s active=%s\n' "$T" \
                 "$(systemctl is-enabled "$T" 2>&1)" "$(systemctl is-active "$T" 2>&1)"
             done
@@ -591,10 +668,11 @@ jobs:
           ssh $SSH_OPTS root@"$HOST_LAB" "KOREN='$KOREN_PM' bash -s" <<'PROBA' 2>&1 | tee svodka_ams.txt
             set -e
             systemctl start polymarket-5min.service || true
+            systemctl start polymarket-15min.service || true
             systemctl start polymarket-min.service || true
             sleep 3
             echo "--- sostojanie sluzhb posle pervogo zapuska ---"
-            for U in polymarket-min polymarket-5min; do
+            for U in polymarket-min polymarket-5min polymarket-15min; do
               printf '%s: %s\n' "$U" "$(systemctl show "$U" -p ExecMainStatus --value 2>&1)"
               journalctl -u "$U" --no-pager -n 4 2>/dev/null | tail -3 || true
             done
@@ -677,7 +755,7 @@ jobs:
             "Environment=PODB_KOREN=$KOREN" \
             "Environment=STOROZH_POROG_GB=10" \
             "Environment=STOROZH_METKA=$KOREN/data/polymarket/DISK_STOP" \
-            'Environment="STOROZH_TAJMERY=polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer"' \
+            'Environment="STOROZH_TAJMERY=polymarket-otbor.timer polymarket-min.timer polymarket-5min.timer polymarket-15min.timer"' \
             "ExecStart=/usr/local/sbin/lab_storozh_diska.sh" \
             "TimeoutStartSec=120" "Nice=10" \
             > junity_st/polymarket-storozh-diska.service
@@ -755,7 +833,7 @@ jobs:
             SPISOK=$(printf '%s\n' "$ZHURNAL" | grep 'tajmery:' | tail -1 || true)
             echo "chto uvidel skript -> ${SPISOK:-stroki tajmerov v zhurnale net}"
             NET=0
-            for T in polymarket-otbor polymarket-min polymarket-5min; do
+            for T in polymarket-otbor polymarket-min polymarket-5min polymarket-15min; do
               case "$SPISOK" in
                 *"$T.timer"*) : ;;
                 *) echo "SBOJ: v spiske storozha net $T.timer"; NET=$((NET + 1)) ;;
@@ -769,7 +847,7 @@ jobs:
                 echo "SBOJ: v spiske storozha est rotacija libo proizvodnye -- togda vozvrat mesta i push markera nevozmozhny"
                 exit 1 ;;
             esac
-            echo "storozh vidit vse tri tajmera sobiratelej i ne vidit rotacii"
+            echo "storozh vidit vse chetyre tajmera sobiratelej i ne vidit rotacii"
             echo "--- zhalovalsja li systemd na razbor Environment v ETOM zapuske ---"
             printf '%s\n' "$ZHURNAL" \
               | grep -i 'Invalid environment assignment' && { echo "SBOJ: systemd razbil Environment"; exit 1; } || echo "zhalob na Environment net"
@@ -998,9 +1076,12 @@ jobs:
             echo "(otbor ne gonjali namerenno: OTBOR=${OTBOR:-yes})"
           fi
           if [ -f sostav_ams.txt ]; then grep -E '^SOSTAV ' sostav_ams.txt || true; fi
-          echo "=== 3. TAJMERY ==="
+          echo "=== 3. TAJMERY I REZHIM ==="
           if [ -f tajmery_ams.txt ]; then
             grep -E 'enabled=' tajmery_ams.txt || true
+            # РЕЖИМ -- В СВОД, А НЕ ТОЛЬКО В СЕРЕДИНУ ЖУРНАЛА: из контейнера
+            # читается лишь хвост задания, а владельцу нужны ровно эти строки.
+            grep -E '(OnCalendar=|--dnej|--spisok|sobytija tolko v 15min)' tajmery_ams.txt || true
           else
             echo "(shag ne shjol)"
           fi
