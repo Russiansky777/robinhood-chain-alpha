@@ -393,9 +393,67 @@ def проба(а) -> int:
     return 0
 
 
+def контроль(а) -> int:
+    """Контроль: заведомо живой запрос тем же входом -- работает ли сбор вообще.
+
+    Проба на наших адресах вернула 15 служебных записей актора ({id, text, type} с текстом
+    «From KaitoEasyAPI, a reminder: ... minimum charge ...») и ни одного твита. Это может
+    значить и «постов нет вовсе», и «вход не понят». Различает только контроль: тот же
+    вход со словом, у которого твиты есть наверняка, и с двумя окнами -- старым (наши
+    сутки) и свежим (последние двое суток).
+    """
+    слово = а.kontrol or "solana"
+    т = токен()
+    ид = а.aktor.replace("/", "~")
+    сейчас = time.time()
+    окна = [("старое окно (сутки выборки)", а.okno_s, а.okno_po),
+            ("свежее окно (двое суток)",
+             time.strftime("%Y-%m-%d", time.gmtime(сейчас - 2 * 86400)),
+             time.strftime("%Y-%m-%d", time.gmtime(сейчас + 86400)))]
+    отчёт = []
+    for имя, с_, по_ in окна:
+        вход = вход_актора(а.aktor, [слово], с_, по_, 10)
+        print(f"== контроль «{слово}», {имя}: {с_}..{по_}", flush=True)
+        посты, ст, ц, run_id = один_прогон(а, ид, вход, т)
+        первый = посты[0] if посты else {}
+        текст = " ".join(str(первый.get(к) or "") for к in
+                         ("text", "full_text", "fullText", "content", "rawContent"))
+        служебных = sum(1 for п_ in посты
+                        if "KaitoEasyAPI" in json.dumps(п_, ensure_ascii=False)
+                        or set(п_.keys()) <= {"id", "text", "type"})
+        print(f"   постов {len(посты)}, служебных записей {служебных}, "
+              f"стоимость {ц}", flush=True)
+        print(f"   поля первого: {sorted(первый.keys())[:20]}", flush=True)
+        print(f"   текст первого (160): {текст[:160]!r}", flush=True)
+        отчёт.append({"окно": имя, "с": с_, "по": по_, "слово": слово,
+                      "постов": len(посты), "служебных": служебных,
+                      "стоимость_usd": ц, "прогон": run_id,
+                      "поля_первого": sorted(первый.keys()),
+                      "сырые": посты[: а.syroe or 2]})
+    ф = П / f"x_kontrol{а.metka}.json"
+    ф.write_text(json.dumps({"что": "контроль сбора X на заведомо живом запросе",
+                             "актор": а.aktor, "слово": слово,
+                             "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                             "окна": отчёт}, ensure_ascii=False, indent=1),
+                 encoding="utf-8")
+    print(f"записано {ф}", flush=True)
+    try:
+        import sys  # noqa: PLC0415
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import podbivka_run as R  # noqa: PLC0415
+        R.записано(ф)
+    except Exception:  # noqa: BLE001, S110
+        pass
+    return 0
+
+
 def главное(а) -> int:
     if а.spisok:
         return магазин(а.poisk, а.predel_spiska)
+    if а.kontrol_rezhim:
+        if not а.aktor:
+            raise SystemExit("для контроля нужен --aktor")
+        return контроль(а)
     if а.proba:
         if not а.aktor:
             raise SystemExit("для пробы нужен --aktor")
@@ -430,6 +488,11 @@ def main() -> int:
     р.add_argument("--suho", action="store_true", help="показать вход и не запускать")
     р.add_argument("--syroe", type=int, default=0,
                    help="сохранить N сырых постов в выход -- для разбора полей")
+    р.add_argument("--kontrol-rezhim", action="store_true",
+                   help="контроль: заведомо живой запрос тем же входом")
+    р.add_argument("--kontrol", default="solana", help="слово контроля")
+    р.add_argument("--okno-s", default="2026-09-20")
+    р.add_argument("--okno-po", default="2026-09-26")
     р.add_argument("--proba", action="store_true",
                    help="проба входов: три варианта окна на двух адресах по 10 "
                         "результатов -- чтобы понять, почему привязка не нашлась")
