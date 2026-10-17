@@ -3,7 +3,7 @@
   "vetka_podbivki": "claude/podbivka",
   "koren_podbivki": "/opt/robinhood-chain-alpha",
   "probno": "yes",
-  "tolko_diagnoz": "no",
+  "tolko_diagnoz": "yes",
   "birdeye": "NE stavim -- slovo vladelca; Birdeye lozhitsja snimkom s prichinoj 'net kljucha'",
   "torgovyj_host": "ne tragaem",
   "tokena_zapisi_na_mashine_net": "tajmer podbivka-trending-push STAVITSJA, no NE VKLJUCHAETSJA; posledniaia milia -- progon run_podbivka_trending_push_miami.yml v 02:17Z",
@@ -11,7 +11,7 @@
     "pravka_code_2": "aab848193: 'Obryv posredi mnogobajtovogo simvola: chtenie dvoichnoe, UnicodeDecodeError v perehvate'. Hesh nazvan vladelcem i svereny s vetkoj",
     "zachem": "pereschitat --pervye za 13.10 i 15.10, dolozhit stroki i chislo oborvannyh fajlov iz svodki"
   },
-  "popytka": 14,
+  "popytka": 15,
   "zamereno_progonom_38930238689": {
     "samoproverka": "proshla na mashine, junity postavleny posle nejo",
     "tablica_12_10": "30807 strok, 2441310 B (2.44 MB), spiskov 17, snimkov 1404 na minutnyj spisok",
@@ -34,5 +34,6 @@
     "storozh": "obnovljaetsja skript deploy/lab_storozh_diska.sh: sled na tmpfs (na polnom diske marker ne zapisat -- imenno sluchaj miami 13-16.10, i togda vetka vozvrata ne otkrylas by nikogda), marker pishetsja cherez chernovik i mv (obrezannyj JSON v vetku ne poedet), vozvrat snimaet marker TOLKO posle proverki is-active po kazhdomu tajmeru, i skript otkazyvaetsja rabotat, esli ni odnogo iz nazvannyh tajmerov na mashine net",
     "fetch": "tri popytki git fetch na jashchike -- posle otkaza seti na lab-ams v progone 38975558290",
     "pervye": "pereschjot --pervye za pjat sutok proveren v 38973828907: 13.10 strok 14049, 15.10 strok 331 (do pravki Code-2 oba padali s UnicodeDecodeError)"
-  }
+  },
+  "zachem_popytka_15": "utrennij vozvrat 17.10: nuzhno TOLKO svobodnoe mesto na lab-miami (df iz shaga diagnoza). Ustanovku i --pervye ne gonjaem: pereschjot tablic dal by novye bloby i nochnoj push unjos by te zhe sutki zanovo"
 }
