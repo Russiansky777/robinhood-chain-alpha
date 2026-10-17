@@ -1,0 +1,94 @@
+{
+ "актор": "apidojo/twitter-scraper-lite",
+ "название": "Twitter (X.com) Scraper Unlimited: No Limits",
+ "тариф": null,
+ "пример_входа": {
+  "body": "{\"includeSearchTerms\":false,\"maxItems\":1000,\"searchTerms\":[\"apify\"],\"sort\":\"Latest\"}",
+  "contentType": "application/json; charset=utf-8"
+ },
+ "поля_входа": [
+  "searchTerms",
+  "sort",
+  "maxItems",
+  "start",
+  "end",
+  "twitterHandles",
+  "startUrls",
+  "includeSearchTerms"
+ ],
+ "схема": {
+  "title": "Twitter Scraper Lite",
+  "description": "Light as a feather, cheap as a chips! This Twitter scraper is a lightweight version of the Tweet Scraper. It's perfect for scraping tweets by search terms, Twitter handles, or Twitter URLs. It's also great for scraping tweets by date. The scraper is built to be fast and efficient, so you can get the data you need quickly.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+   "searchTerms": {
+    "title": "What search terms do you want to scrape?",
+    "type": "array",
+    "description": "If you add search terms, the scraper will find and extract tweets that mention those terms. Alternatively, see further down to scrape by Twitter URL.",
+    "editor": "stringList",
+    "prefill": [
+     "apify"
+    ],
+    "example": [
+     "apify"
+    ]
+   },
+   "sort": {
+    "title": "Do you want to filter by content?",
+    "type": "string",
+    "description": "Sorts search results. If you are getting low results, try Top instead of Latest. Latest + Top runs both simultaneously to maximize results but may return some duplicate tweets.",
+    "editor": "select",
+    "prefill": "Latest",
+    "example": "Latest",
+    "enum": [
+     "Top",
+     "Latest",
+     "Latest + Top"
+    ]
+   },
+   "maxItems": {
+    "title": "Maximum number of tweets",
+    "type": "integer",
+    "description": "This value lets you set the maximum number of tweets to retrieve. Twitter has a default limit of around 800 tweets per query. Check the README for workarounds.",
+    "editor": "number",
+    "prefill": 1000,
+    "example": 1000
+   },
+   "start": {
+    "title": "Tweets from this date",
+    "type": "string",
+    "description": "Scrape tweets starting from this date",
+    "editor": "datepicker",
+    "sectionCaption": "Do you want to set specific dates?",
+    "sectionDescription": "You can choose to scrape only tweets older or newer than a specific date. You can use YYYY-MM-DD format."
+   },
+   "end": {
+    "title": "Tweets until this date",
+    "type": "string",
+    "description": "Scrape tweets until this date",
+    "editor": "datepicker"
+   },
+   "twitterHandles": {
+    "title": "Do you want to scrape by Twitter handle?",
+    "type": "array",
+    "description": "You can add the twitter handles of specific profiles you want to scrape. This is a shortcut so that you don't have to add full username URLs like https://twitter.com/apify",
+    "editor": "stringList",
+    "sectionCaption": "Scrape by Twitter handle or Twitter URL",
+    "sectionDescription": "The default option is to scrape using search terms, but you can also scrape by Twitter handles or Twitter URLs."
+   },
+   "startUrls": {
+    "title": "Do you want to scrape by Twitter URL?",
+    "type": "array",
+    "description": "This lets you tell the scraper where to start. You can enter Twitter URLs one by one. You can also link to or upload a text file with a list of URLs",
+    "editor": "stringList"
+   },
+   "includeSearchTerms": {
+    "title": "Include Search Terms",
+    "type": "boolean",
+    "description": "If selected, a field will be added to each tweets about the search term that was used to find it.",
+    "editor": "checkbox"
+   }
+  }
+ }
+}
