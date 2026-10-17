@@ -306,6 +306,7 @@ def сбор(а) -> int:
         "стоимость_usd": стоимость,
         "стоимость_на_токен_usd": (round(стоимость / len(адреса), 5)
                                    if (стоимость and адреса) else None),
+        "сырые_посты": посты[: а.syroe] if а.syroe else [],
         "оговорка": "удалённые посты и неполнота поиска X выборку смещают к выжившим: "
                     "покрытие и доля «пост раньше пика» -- нижние границы",
         "ряды": из_,
@@ -335,9 +336,70 @@ def _плюс_час(метка_: str) -> str:
     return "9999"
 
 
+def проба(а) -> int:
+    """Три варианта входа на двух адресах по 10 результатов: что актор вообще отдаёт.
+
+    Пилот на 50 адресах вернул 75 постов, и НИ В ОДНОМ не было адреса в тексте -- значит
+    либо фильтр окна не понят актором, либо поиск идёт не по тем полям, либо текст лежит
+    в другом поле. Это проба, а не вердикт: стоит меньше цента и отвечает числом.
+    """
+    выб = json.loads(Path(а.vyborka).read_text(encoding="utf-8"))
+    адреса = [р["минт"] for р in выб["ряды"][:2]]
+    с_даты, по_даты = окно_суток(выб["ряды"][0], а.zapas)
+    варианты = [
+        ("как в пилоте", {"searchTerms": адреса, "maxItems": 10, "queryType": "Latest",
+                          "since_time": str(int(time.mktime(time.strptime(с_даты, "%Y-%m-%d")))),
+                          "until_time": str(int(time.mktime(time.strptime(по_даты, "%Y-%m-%d"))))}),
+        ("без окна", {"searchTerms": адреса, "maxItems": 10, "queryType": "Latest"}),
+        ("строкой запроса", {"twitterContent": f"{адреса[0]} since:{с_даты} until:{по_даты}",
+                             "maxItems": 10, "queryType": "Latest"}),
+    ]
+    т = токен()
+    ид = а.aktor.replace("/", "~")
+    отчёт = []
+    for имя, вход in варианты:
+        print(f"== проба «{имя}»: {json.dumps({k: (v if k != 'searchTerms' else f'[{len(адреса)}]') for k, v in вход.items()}, ensure_ascii=False)}",
+              flush=True)
+        посты, ст, ц, run_id = один_прогон(а, ид, вход, т)
+        первый = посты[0] if посты else {}
+        текст = " ".join(str(первый.get(к) or "") for к in
+                         ("text", "full_text", "fullText", "content", "rawContent"))
+        есть_адрес = sum(1 for п_ in посты
+                         if any(а_ in json.dumps(п_, ensure_ascii=False) for а_ in адреса))
+        print(f"   постов {len(посты)}, с адресом где-либо в посте {есть_адрес}, "
+              f"стоимость {ц}", flush=True)
+        print(f"   поля первого поста: {sorted(первый.keys())[:25]}", flush=True)
+        print(f"   текст первого (200): {текст[:200]!r}", flush=True)
+        отчёт.append({"вариант": имя, "вход": {k: v for k, v in вход.items()
+                                               if k != "searchTerms"},
+                      "адресов": len(адреса), "постов": len(посты),
+                      "с_адресом_в_посте": есть_адрес, "стоимость_usd": ц,
+                      "прогон": run_id,
+                      "поля_первого": sorted(первый.keys()),
+                      "сырые": посты[: а.syroe or 2]})
+    ф = П / f"x_proba{а.metka}.json"
+    ф.write_text(json.dumps({"что": "проба входов актора X", "актор": а.aktor,
+                             "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                             "варианты": отчёт}, ensure_ascii=False, indent=1),
+                 encoding="utf-8")
+    print(f"записано {ф}", flush=True)
+    try:
+        import sys  # noqa: PLC0415
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import podbivka_run as R  # noqa: PLC0415
+        R.записано(ф)
+    except Exception:  # noqa: BLE001, S110
+        pass
+    return 0
+
+
 def главное(а) -> int:
     if а.spisok:
         return магазин(а.poisk, а.predel_spiska)
+    if а.proba:
+        if not а.aktor:
+            raise SystemExit("для пробы нужен --aktor")
+        return проба(а)
     if а.shema:
         return схема(а.shema)
     if not а.aktor:
@@ -366,6 +428,11 @@ def main() -> int:
                    help="класть наши поля в шаблон, даже если их там нет")
     р.add_argument("--zhdat-s", type=int, default=1500, help="сколько ждать прогон")
     р.add_argument("--suho", action="store_true", help="показать вход и не запускать")
+    р.add_argument("--syroe", type=int, default=0,
+                   help="сохранить N сырых постов в выход -- для разбора полей")
+    р.add_argument("--proba", action="store_true",
+                   help="проба входов: три варианта окна на двух адресах по 10 "
+                        "результатов -- чтобы понять, почему привязка не нашлась")
     р.add_argument("--metka", default="")
     return главное(р.parse_args())
 
