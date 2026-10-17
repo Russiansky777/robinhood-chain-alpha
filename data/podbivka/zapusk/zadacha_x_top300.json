@@ -1,0 +1,19 @@
+{
+  "zachem": "Posledniy zahod po X: 300 verhnih po oborotu pervoy minuty za 21-23.09 (otbor po velichine v moment zapuska, ne po ishodu). Po odnomu adresu na progon, okno ot sozdaniya do +15 minut: lyuboy naydennyy post ranniy, minimum -- verhnyaya ocenka vremeni pervogo upominaniya. Tri zadaniya po 100 adresov, u kazhdogo denezhnyy potolok 0.04 USD -- vsego ne bolshe 0.12, ozhidaemo okolo 0.08.",
+  "skript": "podbivka_x_upominania.py",
+  "zapuski": [
+    ["--po-odnomu", "--aktor", "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest",
+     "--vyborka", "data/podbivka/x_vyborka_top300.json",
+     "--s", "0", "--mintov", "100", "--okno-minut", "15", "--predel-rezultatov", "3",
+     "--potolok-usd", "0.04", "--metka", "_top300_a"],
+    ["--po-odnomu", "--aktor", "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest",
+     "--vyborka", "data/podbivka/x_vyborka_top300.json",
+     "--s", "100", "--mintov", "100", "--okno-minut", "15", "--predel-rezultatov", "3",
+     "--potolok-usd", "0.04", "--metka", "_top300_b"],
+    ["--po-odnomu", "--aktor", "kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest",
+     "--vyborka", "data/podbivka/x_vyborka_top300.json",
+     "--s", "200", "--mintov", "100", "--okno-minut", "15", "--predel-rezultatov", "3",
+     "--potolok-usd", "0.04", "--metka", "_top300_c"]
+  ],
+  "helius_rps_na_paket": 0
+}

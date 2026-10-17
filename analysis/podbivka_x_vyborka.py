@@ -24,7 +24,9 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import collections
 import random
+import statistics
 import time
 from pathlib import Path
 
@@ -83,6 +85,56 @@ def главное(а) -> int:
             счёт["кривых_с_оборотом"] += 1
             не_дошли[м] = ряд(р, д, "не_doshli", окно_z)
 
+    if а.verh_po_oborotu:
+        # ВЕРХНИЕ ПО ОБОРОТУ, без отбора по исходу: отбор идёт по величине, замеренной в
+        # МОМЕНТ запуска (SOL, пришедшие в первую минуту жизни пула), а не по тому, чем
+        # дело кончилось. Это единственная оборотная величина, какая есть в суточных
+        # производных без нового прохода по архиву, и она измерена до исхода -- значит
+        # отбор не подглядывает вперёд. Группы не разделяются: берётся верх по суткам
+        # среди ВСЕХ запусков этих суток.
+        все = list(дошли.values()) + list(не_дошли.values())
+        по_суткам: dict = collections.defaultdict(list)
+        for р in все:
+            по_суткам[р["сутки"]].append(р)
+        верх = []
+        на_сутки = max(1, а.verh_po_oborotu // max(1, len(дни)))
+        for д in дни:
+            сп = sorted(по_суткам.get(д, []), key=lambda x: -(x["оборот_60с_sol"] or 0))
+            верх += сп[:на_сутки]
+        тело = {
+            "что": "выборка токенов для X: верхние по обороту первой минуты, по суткам",
+            "как_отобрано": "верх по SOL первой минуты (волна 60 с) среди ВСЕХ запусков "
+                            "суток; отбор по величине в момент запуска, не по исходу",
+            "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "дни": дни, "на_сутки": на_сутки, "зерно": а.semya,
+            "порог_оборота_sol": а.porog_oborota,
+            "всего_запусков_рассмотрено": len(все),
+            "в_выборке": len(верх),
+            "состав_по_группам": dict(collections.Counter(р["группа"] for р in верх)),
+            "оборот_в_выборке_sol": {
+                "минимум": round(min((р["оборот_60с_sol"] or 0) for р in верх), 3),
+                "медиана": round(statistics.median(
+                    [(р["оборот_60с_sol"] or 0) for р in верх]), 3),
+                "максимум": round(max((р["оборот_60с_sol"] or 0) for р in верх), 3)},
+            "счёт": счёт, "ряды": верх,
+        }
+        ф = П / f"x_vyborka_top{а.verh_po_oborotu}{а.metka}.json"
+        ф.write_text(json.dumps(тело, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"верхние по обороту: {len(верх)} токенов ({на_сутки} на сутки), "
+              f"оборот первой минуты от {тело['оборот_в_выборке_sol']['минимум']} до "
+              f"{тело['оборот_в_выборке_sol']['максимум']} SOL, медиана "
+              f"{тело['оборот_в_выборке_sol']['медиана']}", flush=True)
+        print(f"состав: {тело['состав_по_группам']}", flush=True)
+        print(f"записано {ф}", flush=True)
+        try:
+            import sys  # noqa: PLC0415
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import podbivka_run as R  # noqa: PLC0415
+            R.записано(ф)
+        except Exception:  # noqa: BLE001, S110
+            pass
+        return 0
+
     а_сп = sorted(дошли.values(), key=lambda x: x["ts"] or 0)
     б_сп = sorted(не_дошли.values(), key=lambda x: x["ts"] or 0)
     # Размер групп равный: сколько есть в меньшей, но не больше --predel
@@ -137,6 +189,8 @@ def main() -> int:
     р.add_argument("--porog-oborota", type=float, default=1.0, help="SOL за первую минуту")
     р.add_argument("--predel", type=int, default=150, help="не больше N на группу")
     р.add_argument("--pilot", type=int, default=50, help="размер пилотного среза (0 -- не делать)")
+    р.add_argument("--verh-po-oborotu", type=int, default=0,
+                   help="N верхних по обороту первой минуты, поровну на сутки")
     р.add_argument("--semya", type=int, default=20261017)
     р.add_argument("--metka", default="")
     return главное(р.parse_args())

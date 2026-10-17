@@ -167,6 +167,27 @@ def вход_актора(актор: str, адреса: list, с_даты: str,
     return вход
 
 
+def вход_точный(актор: str, адрес: str, с_мс: int, по_мс: int, предел: int) -> dict:
+    """Вход с окном в СЕКУНДАХ: для «по одному адресу» нужна минутная точность.
+
+    Адрес минта не существует до создания пула, поэтому окно начинается от создания:
+    упоминание раньше этого момента физически невозможно (кроме заранее подобранных
+    красивых адресов -- таких в выборке не ищем).
+    """
+    если_unix = "kaito" in актор
+    вход = {"searchTerms": [адрес], "maxItems": предел}
+    if если_unix:
+        вход.update({"queryType": "Latest",
+                     "since_time": str(int(с_мс / 1000)),
+                     "until_time": str(int(по_мс / 1000))})
+    else:
+        вход.update({"sort": "Latest",
+                     "start": time.strftime("%Y-%m-%d", time.gmtime(с_мс / 1000)),
+                     "end": time.strftime("%Y-%m-%d", time.gmtime(по_мс / 1000)),
+                     "includeSearchTerms": True})
+    return вход
+
+
 def один_прогон(а, ид: str, вход: dict, т: str) -> tuple:
     """(посты, статус, стоимость) одного прогона актора."""
     пуск = (запрос(f"/acts/{ид}/runs?waitForFinish=60", вход, "POST", т)
@@ -447,6 +468,111 @@ def контроль(а) -> int:
     return 0
 
 
+def по_одному(а) -> int:
+    """Один адрес -- один прогон, окно от создания до +N минут, с денежным стопом.
+
+    Зачем так. Поиск отдаёт результаты сортировкой Latest, то есть при общем прогоне на
+    десять адресов один болтливый адрес съедает весь предел, а у остальных не остаётся
+    ничего. Отдельный прогон на адрес это снимает, а узкое окно (создание ... +N минут)
+    делает ЛЮБОЙ найденный пост ранним: значит минимум из найденных -- это верхняя оценка
+    времени первого упоминания, а не «самый свежий из множества».
+
+    Расходы ограничены дважды: предел результатов на прогон и ПОТОЛОК В ДОЛЛАРАХ на весь
+    проход -- по его достижении проход останавливается и говорит, сколько адресов успел.
+    """
+    выб = json.loads(Path(а.vyborka).read_text(encoding="utf-8"))
+    ряды = выб["ряды"][а.s: (а.s + а.mintov) if а.mintov else None]
+    т = токен()
+    ид = а.aktor.replace("/", "~")
+    итог = []
+    стоимость = 0.0
+    остановлен = None
+    нашлось = 0
+    for н, р in enumerate(ряды, 1):
+        if а.potolok_usd and стоимость >= а.potolok_usd:
+            остановлен = f"потолок {а.potolok_usd} USD достигнут на {н - 1} адресах"
+            print(f"СТОП: {остановлен}", flush=True)
+            break
+        с_мс = int(р["ts"])
+        по_мс = с_мс + int(а.okno_minut * 60_000)
+        вход = вход_точный(а.aktor, р["минт"], с_мс, по_мс, а.predel_rezultatov)
+        посты, ст, ц, run_id = один_прогон(а, ид, вход, т)
+        стоимость += float(ц or 0)
+        # служебные записи актора -- не посты: {id, text, type} с его же напоминанием
+        твиты = [п_ for п_ in посты
+                 if not (set(п_.keys()) <= {"id", "text", "type"}
+                         or "KaitoEasyAPI" in json.dumps(п_, ensure_ascii=False))]
+        свои = [п_ for п_ in твиты
+                if р["минт"] in json.dumps(п_, ensure_ascii=False)]
+        метки = sorted(x for x in (_метка_поста(п_) for п_ in свои) if x)
+        if свои:
+            нашлось += 1
+        итог.append({
+            "минт": р["минт"], "группа": р["группа"], "сутки": р["сутки"],
+            "создание_utc": р.get("utc"), "создание_ts": с_мс,
+            "оборот_60с_sol": р.get("оборот_60с_sol"),
+            "окно_минут": а.okno_minut,
+            "постов_в_окне": len(свои), "твитов_получено": len(твиты),
+            "предел_уперся": len(твиты) >= а.predel_rezultatov,
+            "первый_пост_utc": метки[0] if метки else None,
+            "последний_в_окне_utc": метки[-1] if метки else None,
+            "подписчиков_автора": (_подписчики(min(свои, key=lambda x: _метка_поста(x) or "9"))
+                                   if метки else None),
+            "прогон": run_id, "стоимость_usd": ц,
+        })
+        print(f"  {н}/{len(ряды)} {р['минт'][:10]}… постов {len(свои)} "
+              f"первый {метки[0] if метки else '—'} стоимость всего "
+              f"{round(стоимость, 4)}", flush=True)
+    тело = {
+        "что": "первые упоминания в X, по одному адресу на прогон",
+        "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "актор": а.aktor, "выборка": Path(а.vyborka).name,
+        "окно_минут_от_создания": а.okno_minut,
+        "предел_результатов_на_адрес": а.predel_rezultatov,
+        "потолок_usd": а.potolok_usd, "остановлен": остановлен,
+        "адресов_пройдено": len(итог), "нашлось_хоть_что_то": нашлось,
+        "покрытие": round(нашлось / len(итог), 4) if итог else None,
+        "стоимость_usd": round(стоимость, 4),
+        "стоимость_на_токен_usd": (round(стоимость / len(итог), 5) if итог else None),
+        "оговорка": "окно от создания до +N минут: любой найденный пост ранний, а минимум "
+                    "из найденных -- верхняя оценка времени первого упоминания; "
+                    "удалённые посты и неполнота поиска X смещают к выжившим",
+        "ряды": итог,
+    }
+    ф = П / f"x_upominania{а.metka}.json"
+    ф.write_text(json.dumps(тело, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"пройдено {len(итог)}, покрытие {тело['покрытие']}, "
+          f"стоимость {тело['стоимость_usd']} USD "
+          f"({тело['стоимость_на_токен_usd']} на токен); записано {ф}", flush=True)
+    try:
+        import sys  # noqa: PLC0415
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import podbivka_run as R  # noqa: PLC0415
+        R.записано(ф)
+    except Exception:  # noqa: BLE001, S110
+        pass
+    return 0
+
+
+def _метка_поста(п_: dict):
+    for к in ("createdAt", "created_at", "date", "timestamp"):
+        v = п_.get(к)
+        if v:
+            return str(v)
+    return None
+
+
+def _подписчики(п_: dict):
+    for путь in (("author", "followers"), ("author", "followersCount"),
+                 ("user", "followers_count")):
+        z = п_
+        for к in путь:
+            z = (z or {}).get(к) if isinstance(z, dict) else None
+        if isinstance(z, (int, float)):
+            return z
+    return None
+
+
 def главное(а) -> int:
     if а.spisok:
         return магазин(а.poisk, а.predel_spiska)
@@ -462,6 +588,8 @@ def главное(а) -> int:
         return схема(а.shema)
     if not а.aktor:
         raise SystemExit("для сбора нужен --aktor (см. --spisok и --shema)")
+    if а.po_odnomu:
+        return по_одному(а)
     return сбор(а)
 
 
@@ -496,6 +624,13 @@ def main() -> int:
     р.add_argument("--proba", action="store_true",
                    help="проба входов: три варианта окна на двух адресах по 10 "
                         "результатов -- чтобы понять, почему привязка не нашлась")
+    р.add_argument("--po-odnomu", action="store_true",
+                   help="один адрес -- один прогон, окно от создания")
+    р.add_argument("--okno-minut", type=float, default=15.0,
+                   help="окно от создания, минут (режим --po-odnomu)")
+    р.add_argument("--potolok-usd", type=float, default=0.0,
+                   help="денежный потолок на весь проход (0 -- без потолка)")
+    р.add_argument("--s", type=int, default=0, help="начать с N-го ряда выборки")
     р.add_argument("--metka", default="")
     return главное(р.parse_args())
 
