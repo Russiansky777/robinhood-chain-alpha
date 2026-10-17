@@ -145,23 +145,78 @@ def окно_суток(ряд: dict, запас_суток: int) -> tuple:
     return (с, по)
 
 
+def вход_актора(актор: str, адреса: list, с_даты: str, по_даты: str,
+                предел: int) -> dict:
+    """Вход под схему актора: поля окна у них разные, и это замер, а не догадка.
+
+    kaito...pay-per-result: since_time/until_time -- unix-секунды, queryType Latest.
+    apidojo/twitter-scraper-lite и tweet-scraper: start/end -- даты, sort Latest, и есть
+    includeSearchTerms -- он помечает пост поисковой строкой, по которой нашёлся.
+    """
+    если_unix = "kaito" in актор
+    вход = {"searchTerms": адреса, "maxItems": предел}
+    if если_unix:
+        вход["queryType"] = "Latest"
+        вход["since_time"] = str(int(time.mktime(time.strptime(с_даты, "%Y-%m-%d"))))
+        вход["until_time"] = str(int(time.mktime(time.strptime(по_даты, "%Y-%m-%d"))))
+    else:
+        вход["sort"] = "Latest"
+        вход["start"] = с_даты
+        вход["end"] = по_даты
+        вход["includeSearchTerms"] = True
+    return вход
+
+
+def один_прогон(а, ид: str, вход: dict, т: str) -> tuple:
+    """(посты, статус, стоимость) одного прогона актора."""
+    пуск = (запрос(f"/acts/{ид}/runs?waitForFinish=60", вход, "POST", т)
+            or {}).get("data") or {}
+    run_id = пуск.get("id")
+    print(f"  прогон {run_id}: {пуск.get('status')}", flush=True)
+    нач = time.time()
+    сост = пуск
+    while сост.get("status") in ("READY", "RUNNING") and time.time() - нач < а.zhdat_s:
+        time.sleep(10)
+        сост = (запрос(f"/actor-runs/{run_id}", т=т) or {}).get("data") or {}
+    посты = []
+    дс = сост.get("defaultDatasetId")
+    if дс:
+        сдвиг = 0
+        while True:
+            часть = запрос(f"/datasets/{дс}/items?offset={сдвиг}&limit=1000&clean=true",
+                           т=т)
+            if not isinstance(часть, list) or not часть:
+                break
+            посты += часть
+            сдвиг += len(часть)
+            if len(часть) < 1000:
+                break
+    ст = сост.get("usageTotalUsd")
+    print(f"  прогон {run_id}: {сост.get('status')}, постов {len(посты)}, "
+          f"стоимость {ст} USD", flush=True)
+    return (посты, сост.get("status"), ст or 0.0, run_id)
+
+
 def сбор(а) -> int:
     выб = json.loads(Path(а.vyborka).read_text(encoding="utf-8"))
     ряды = выб["ряды"][: а.mintov] if а.mintov else выб["ряды"]
     адреса = [р["минт"] for р in ряды]
     с_даты = min(окно_суток(р, а.zapas)[0] for р in ряды)
     по_даты = max(окно_суток(р, а.zapas)[1] for р in ряды)
-    вход = {"searchTerms": адреса, "maxItems": а.predel_rezultatov,
-            "sort": "Latest", "start": с_даты, "end": по_даты,
-            "tweetLanguage": None}
-    if а.vhod_shablon:
-        шаб = json.loads(Path(а.vhod_shablon).read_text(encoding="utf-8"))
-        шаб.update({к: v for к, v in вход.items() if к in шаб or а.vhod_dopolnjat})
-        вход = шаб
-    вход = {к: v for к, v in вход.items() if v is not None}
-    print(f"актор {а.aktor}: адресов {len(адреса)}, окно {с_даты}..{по_даты}, "
-          f"предел результатов {а.predel_rezultatov}", flush=True)
-    print(f"вход (без токена): {json.dumps({**вход, 'searchTerms': f'[{len(адреса)} адресов]'}, ensure_ascii=False)[:400]}",
+    # ПАРТИЯМИ, и это про деньги: плата у выбранного актора за РЕЗУЛЬТАТ, а не за прогон,
+    # поэтому дробление на партии ничего не добавляет к цене, зато не даёт первым адресам
+    # съесть весь предел результатов и оставить остальные без поиска.
+    партия = а.partiya or len(адреса)
+    пачки = [адреса[i: i + партия] for i in range(0, len(адреса), партия)]
+    print(f"актор {а.aktor}: адресов {len(адреса)}, партий {len(пачки)} по {партия}, "
+          f"окно {с_даты}..{по_даты}, предел результатов на партию "
+          f"{а.predel_rezultatov}", flush=True)
+    обр = вход_актора(а.aktor, пачки[0], с_даты, по_даты, а.predel_rezultatov)
+    print(f"вход (без токена, образец): "
+          f"{json.dumps({**обр, 'searchTerms': f'[{len(пачки[0])} адресов]'}, ensure_ascii=False)[:400]}",
+          flush=True)
+    потолок = round(а.predel_rezultatov * len(пачки) * а.cena_za_1000 / 1000, 4)
+    print(f"потолок расходов по тарифу {а.cena_za_1000} USD/1000: {потолок} USD",
           flush=True)
     if а.suho:
         print("сухой прогон: актор не запускался, денег не тратилось", flush=True)
@@ -169,30 +224,21 @@ def сбор(а) -> int:
 
     т = токен()
     ид = а.aktor.replace("/", "~")
-    пуск = (запрос(f"/acts/{ид}/runs?waitForFinish=60", вход, "POST", т) or {}).get("data") or {}
-    run_id = пуск.get("id")
-    print(f"прогон {run_id} пущен, состояние {пуск.get('status')}", flush=True)
-    нач = time.time()
-    сост = пуск
-    while сост.get("status") in ("READY", "RUNNING") and time.time() - нач < а.zhdat_s:
-        time.sleep(10)
-        сост = (запрос(f"/actor-runs/{run_id}", т=т) or {}).get("data") or {}
-        print(f"  {int(time.time() - нач)} с: {сост.get('status')}", flush=True)
-    статус = сост.get("status")
-    стоимость = сост.get("usageTotalUsd")
-    посты = []
-    дс = сост.get("defaultDatasetId")
-    if дс:
-        сдвиг = 0
-        while True:
-            часть = запрос(f"/datasets/{дс}/items?offset={сдвиг}&limit=1000&clean=true", т=т)
-            if not isinstance(часть, list) or not часть:
-                break
-            посты += часть
-            сдвиг += len(часть)
-            if len(часть) < 1000:
-                break
-    print(f"статус {статус}, постов {len(посты)}, стоимость {стоимость} USD", flush=True)
+    посты: list = []
+    стоимость = 0.0
+    статусы = []
+    прогоны = []
+    for н, пачка in enumerate(пачки, 1):
+        print(f"партия {н} из {len(пачки)}: адресов {len(пачка)}", flush=True)
+        вход = вход_актора(а.aktor, пачка, с_даты, по_даты, а.predel_rezultatov)
+        п_, ст_, ц_, run_id = один_прогон(а, ид, вход, т)
+        посты += п_
+        стоимость += float(ц_ or 0)
+        статусы.append(ст_)
+        прогоны.append(run_id)
+    статус = ",".join(sorted(set(x for x in статусы if x)))
+    run_id = ",".join(x for x in прогоны if x)
+    print(f"итого: постов {len(посты)}, стоимость {round(стоимость, 4)} USD", flush=True)
 
     # привязка обратно к токену -- по вхождению адреса в текст поста
     по_адресу: dict = {а_: [] for а_ in адреса}
@@ -249,7 +295,8 @@ def сбор(а) -> int:
     тело = {
         "что": "первые упоминания адресов токенов в X через Apify",
         "когда": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "актор": а.aktor, "прогон": run_id, "статус": статус,
+        "актор": а.aktor, "прогоны": run_id, "статус": статус,
+        "партий": len(пачки), "партия": партия,
         "окно_поиска": [с_даты, по_даты], "запас_суток": а.zapas,
         "предел_результатов": а.predel_rezultatov,
         "адресов": len(адреса), "постов_получено": len(посты),
@@ -308,8 +355,12 @@ def main() -> int:
     р.add_argument("--vyborka", default=str(П / "x_vyborka_pilot50.json"))
     р.add_argument("--mintov", type=int, default=0, help="взять первые N из выборки")
     р.add_argument("--zapas", type=int, default=1, help="сутки ± N")
-    р.add_argument("--predel-rezultatov", type=int, default=500,
-                   help="maxItems -- он же предел расходов")
+    р.add_argument("--predel-rezultatov", type=int, default=100,
+                   help="maxItems на партию -- он же предел расходов")
+    р.add_argument("--partiya", type=int, default=10,
+                   help="адресов в одной партии (0 -- все одной)")
+    р.add_argument("--cena-za-1000", type=float, default=0.18,
+                   help="тариф актора за 1000 результатов, для потолка расходов")
     р.add_argument("--vhod-shablon", default="", help="json со своим входом актора")
     р.add_argument("--vhod-dopolnjat", action="store_true",
                    help="класть наши поля в шаблон, даже если их там нет")
