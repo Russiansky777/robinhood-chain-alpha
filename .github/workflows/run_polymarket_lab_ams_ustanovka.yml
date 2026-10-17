@@ -634,10 +634,14 @@ jobs:
             # ротации; доклад должен опираться на то, что лежит на машине, а
             # не на то, что я собирался записать.
             echo "--- REZHIM: chto na samom dele stoit v junitah ---"
+            # ВСЕ ШЕСТЬ, А НЕ ПЯТЬ: в прогоне 39034546060 в этой печати не
+            # хватало polymarket-proizvodnye.timer -- таймер есть и включён, а
+            # в доклад его расписание не попадало.
             grep -H 'OnCalendar' /etc/systemd/system/polymarket-min.timer \
                  /etc/systemd/system/polymarket-5min.timer \
                  /etc/systemd/system/polymarket-15min.timer \
                  /etc/systemd/system/polymarket-otbor.timer \
+                 /etc/systemd/system/polymarket-proizvodnye.timer \
                  /etc/systemd/system/polymarket-rotacija.timer \
               | sed 's#/etc/systemd/system/##'
             grep -H -- '--dnej' /etc/systemd/system/polymarket-rotacija.service \
