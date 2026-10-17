@@ -179,15 +179,66 @@ jobs:
           # видно отказом с правами, а не пустой таблицей.
           echo "schitaju pod: $(id -un), gruppy: $(id -Gn)"
           mkdir -p "$KOREN/$PUT_PERVYH"
-          ( cd "$KOREN" && /usr/bin/python3 analysis/podbivka_trending.py --pervye ) 2>&1 | tail -20
+          # ДАТА ОБЯЗАТЕЛЬНА, И ЭТО ЗАМЕР, А НЕ ПРЕДПОЛОЖЕНИЕ. Три ночи подряд
+          # (15, 16, 17.10 -- прогоны 38699024480, 38865789184, 39011926674)
+          # этот шаг падал одинаково: "podbivka_trending.py: error: argument
+          # --pervye: expected one argument", код 2. Code-2 сделал --pervye
+          # доводом с датой (в разборе доводов он стоит как "--pervye PERVYE",
+          # а в самом скрипте default=""), а здесь он звался ПУСТЫМ -- то есть
+          # так, как работало до его правки. Проверка по --help этого не
+          # ловила: имя флага на месте, изменилась ЧИСЛЕННОСТЬ довода.
+          #
+          # СЧИТАЕМ ЗА ВЧЕРА: сутки закрыты, и это ровно та таблица, которую
+          # ночь обязана положить. Плюс догоняем ТОЛЬКО ОТСУТСТВУЮЩИЕ таблицы
+          # за три предыдущих дня -- пересчитывать уже лежащие нельзя:
+          # питоновский gzip штампует в заголовок текущее время, поэтому
+          # пересчёт даёт новый блоб, и ветка получала бы те же сутки заново
+          # каждую ночь.
+          VCHERA=$(date -u -d yesterday +%F)
+          DATY="$VCHERA"
+          for N in 2 3 4; do
+            D=$(date -u -d "$N days ago" +%F)
+            [ -f "$KOREN/$PUT_PERVYH/$D.jsonl.gz" ] || DATY="$DATY $D"
+          done
+          echo "schitaju za: $DATY"
+          for D in $DATY; do
+            echo "--- $D ---"
+            if ( cd "$KOREN" && /usr/bin/python3 analysis/podbivka_trending.py --pervye "$D" ) 2>&1 | tail -8; then
+              T="$KOREN/$PUT_PERVYH/$D.jsonl.gz"
+              if [ -f "$T" ]; then
+                echo "ITOG $D: tablica $(stat -c %s "$T") B, strok $(zcat "$T" | wc -l)"
+              else
+                echo "ITOG $D: tablicy net (za eti sutki schitat bylo nechego)"
+              fi
+            else
+              # ДОГОНЯЮЩИЕ СУТКИ НЕ ИМЕЮТ ПРАВА УРОНИТЬ НОЧЬ, А ВЧЕРАШНИЕ --
+              # имеют: вчера это и есть работа этой ночи.
+              echo "ITOG $D: --pervye upal"
+              # ЯВНЫЙ if, А НЕ "[ ... ] && { ... }": при set -e ложное условие
+              # в такой связке само становится отказом последней команды тела
+              # цикла и роняет шаг -- то есть догоняющие сутки убивали бы
+              # ночь, ради которой всё и затевалось. Поймано у себя до пуша.
+              if [ "$D" = "$VCHERA" ]; then
+                echo "SBOJ: ne poschitalis vcherashnie sutki"
+                exit 1
+              fi
+              echo "(dogonjajushchie sutki -- ne povod ronjat noch, idu dalshe)"
+            fi
+          done
           echo "--- chto poluchilos na mashine ---"
           find "$KOREN/$PUT_PERVYH" -type f -printf '%10s %p\n' 2>/dev/null | sort -k2 | tail -10
           SCHJOT=$(find "$KOREN/$PUT_PERVYH" -type f -name '*.jsonl.gz' 2>/dev/null | wc -l)
           echo "tablic pervyh pojavlenij na mashine: $SCHJOT"
-          if [ "$SCHJOT" -eq 0 ]; then
-            echo "SBOJ: --pervye proshjol, no ni odnoj tablicy v $PUT_PERVYH net."
+          # ПРОВЕРЯЕМ ТАБЛИЦУ ЗА ВЧЕРА, А НЕ "ХОТЬ ОДНУ". Общий счёт -- это
+          # замок того же негодного вида, какой нашёлся у ночного пуша
+          # Polymarket: в каталоге уже лежат таблицы за прошлые сутки, поэтому
+          # ноль недостижим, и ночь без вчерашней таблицы прошла бы зелёной.
+          if [ ! -f "$KOREN/$PUT_PERVYH/$VCHERA.jsonl.gz" ]; then
+            echo "SBOJ: posle scheta tablicy za $VCHERA net -- imenno ejo i dolzhna byla polozhit eta noch."
+            echo "Vsego tablic v kataloge: $SCHJOT -- obshchij schjot nichego ne dokazyvaet."
             exit 1
           fi
+          echo "tablica za $VCHERA na meste"
 
       - name: "Таблица первых появлений -- в рабочее дерево ветки (без --delete)"
         run: |
