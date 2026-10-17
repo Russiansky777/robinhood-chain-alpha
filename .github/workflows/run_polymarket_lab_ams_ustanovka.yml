@@ -995,6 +995,31 @@ jobs:
             else
               echo "RYNKOV= 0 TOKENOV= 0 (vybor.json ne polozhen -- /events vsjo eshchjo otkazyvaet)"
             fi
+            # МБ ПО СУТКАМ -- ПРЯМЫМ ЗАМЕРОМ, А НЕ ВЫЧИТАНИЕМ. Раздел
+            # "--svodka" скрипта Code-4 печатает НАКОПЛЕННОЕ ПО ВСЕМ СУТКАМ на
+            # диске, а не за сутки: его "снимков" и "МБ" складывают все даты.
+            # Я принял эти числа за суточные и доложил владельцу 1.24 ГБ/сутки
+            # вместо настоящих ~0.76 -- ошибка в 1.6 раза, и она касалась
+            # решения о частоте снимка событий. Поэтому суточные числа теперь
+            # берутся отдельно и по датам: сколько МБ лёг КАЖДЫЙ день по
+            # каждому списку. Только чтение.
+            echo "--- MB PO SUTKAM po spiskam (prjamoj zamer, ne vychitanie) ---"
+            for D in $(date -u +%F) $(date -u -d yesterday +%F) $(date -u -d '2 days ago' +%F); do
+              ITOGO=0
+              STROKA=""
+              for SP in "$KOREN"/data/polymarket/*/; do
+                IMJA=$(basename "$SP")
+                case "$IMJA" in proizvodnye|artefakty) continue ;; esac
+                [ -d "$SP$D" ] || continue
+                BAJT=$(find "$SP$D" -type f -name '*.jsonl.gz' -printf '%s\n' 2>/dev/null \
+                       | awk '{s += $1} END {printf "%d", s + 0}')
+                [ "$BAJT" -gt 0 ] || continue
+                ITOGO=$((ITOGO + BAJT))
+                STROKA="$STROKA $IMJA=$(awk -v b="$BAJT" 'BEGIN{printf "%.2f", b/1048576}')"
+              done
+              printf 'SUTKI %s vsego %.2f MB:%s\n' "$D" \
+                "$(awk -v b="$ITOGO" 'BEGIN{print b/1048576}')" "$STROKA"
+            done
             echo "--- MB za chas $CHAS po spiskam ---"
             for D in "$KOREN"/data/polymarket/*/"$SEGODNJA"; do
               [ -d "$D" ] || continue
@@ -1147,7 +1172,7 @@ jobs:
           # несуществующей меткой не краснеет, а молча висит в очереди.
           echo "=== 8. DVA MINUTNYH KRUGA I GLUBINA KNIG ==="
           if [ -f krugi_ams.txt ]; then
-            grep -E '^(RYNKOV=|GLUBINA|  [a-z_]+ +[0-9])' krugi_ams.txt || tail -6 krugi_ams.txt
+            grep -E '^(RYNKOV=|SUTKI |GLUBINA|  [a-z_]+ +[0-9])' krugi_ams.txt || tail -6 krugi_ams.txt
             # clob_books ОТДЕЛЬНОЙ СТРОКОЙ -- слово владельца: по нему видно,
             # наполнились ли книги, а в общем списке он теряется.
             echo "-- clob_books otdelno --"
