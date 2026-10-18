@@ -657,6 +657,19 @@ jobs:
             grep -q 'gamma_events' /etc/systemd/system/polymarket-15min.service \
               || { echo "SBOJ: v junite 15min net gamma_events"; exit 1; }
             echo "sobytija tolko v 15min, pjatiminutka ih ne sobiraet"
+            # ЧТО СКАЗАЛА РОТАЦИЯ В ПОСЛЕДНИЙ РАЗ -- ТОЛЬКО ЧТЕНИЕ ЖУРНАЛА.
+            # С правки d350b3e она удаляет сырое лишь при двух условиях сразу
+            # (артефакт И посчитанные ряды), и единственное место, где видно,
+            # какие сутки она отложила и почему, -- её собственный вывод.
+            # Сами её не запускаем: у неё свой таймер в 05:11Z, а лишний
+            # прогон тронул бы данные.
+            echo "--- ROTACIJA: poslednij zapusk i chto skazala ---"
+            printf 'rotacija: kod=%s zapusk=%s\n' \
+              "$(systemctl show polymarket-rotacija.service -p ExecMainStatus --value 2>&1)" \
+              "$(systemctl show polymarket-rotacija.service -p ActiveEnterTimestamp --value 2>&1)"
+            journalctl -u polymarket-rotacija.service --no-pager -n 30 2>/dev/null \
+              | grep -vE 'Starting|Started|Deactivated|Finished|Consumed' | tail -14 \
+              || echo "(zhurnala rotacii net -- ni razu ne shla)"
             echo "--- tajmery ---"
             systemctl list-timers 'polymarket*' --all --no-pager
             echo "--- sostojanie ---"
@@ -1129,6 +1142,12 @@ jobs:
             # РЕЖИМ -- В СВОД, А НЕ ТОЛЬКО В СЕРЕДИНУ ЖУРНАЛА: из контейнера
             # читается лишь хвост задания, а владельцу нужны ровно эти строки.
             grep -E '(OnCalendar=|--dnej|--spisok|sobytija tolko v 15min)' tajmery_ams.txt || true
+            # РОТАЦИЯ В СВОД: её строки приходят из journalctl с префиксом, и
+            # узор нарочно без привязки к началу строки. Слова русские -- так
+            # их печатает скрипт Code-4.
+            echo "--- rotacija ---"
+            grep -E '(rotacija: kod=|порог |удал|ЖДУТ|ждут|сутки|zhurnala rotacii net)' tajmery_ams.txt \
+              | tail -12 || echo "(strok rotacii net)"
           else
             echo "(shag ne shjol)"
           fi
