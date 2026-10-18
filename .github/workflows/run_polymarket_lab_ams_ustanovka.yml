@@ -664,9 +664,13 @@ jobs:
             # Сами её не запускаем: у неё свой таймер в 05:11Z, а лишний
             # прогон тронул бы данные.
             echo "--- ROTACIJA: poslednij zapusk i chto skazala ---"
-            printf 'rotacija: kod=%s zapusk=%s\n' \
+            # ВРЕМЯ БЕРЁМ ИЗ InactiveEnterTimestamp, А НЕ Active: у юнита типа
+            # oneshot после отработки ActiveEnterTimestamp ПУСТ -- в прогоне
+            # 39118035065 строка так и вышла "zapusk=" без значения, хотя
+            # ротация прошла (журнал это показал).
+            printf 'rotacija: kod=%s zakonchila=%s\n' \
               "$(systemctl show polymarket-rotacija.service -p ExecMainStatus --value 2>&1)" \
-              "$(systemctl show polymarket-rotacija.service -p ActiveEnterTimestamp --value 2>&1)"
+              "$(systemctl show polymarket-rotacija.service -p InactiveEnterTimestamp --value 2>&1)"
             journalctl -u polymarket-rotacija.service --no-pager -n 30 2>/dev/null \
               | grep -vE 'Starting|Started|Deactivated|Finished|Consumed' | tail -14 \
               || echo "(zhurnala rotacii net -- ni razu ne shla)"
@@ -1146,8 +1150,8 @@ jobs:
             # узор нарочно без привязки к началу строки. Слова русские -- так
             # их печатает скрипт Code-4.
             echo "--- rotacija ---"
-            grep -E '(rotacija: kod=|порог |удал|ЖДУТ|ждут|сутки|zhurnala rotacii net)' tajmery_ams.txt \
-              | tail -12 || echo "(strok rotacii net)"
+            grep -E '(rotacija: kod=|порог |удал|ЖДУТ|ждут|сутки|снято|zhurnala rotacii net)' tajmery_ams.txt \
+              | tail -14 || echo "(strok rotacii net)"
           else
             echo "(shag ne shjol)"
           fi
