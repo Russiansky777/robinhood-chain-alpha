@@ -1,0 +1,344 @@
+name: "Закрытие аренды: упаковка и выгрузка в GitHub Release"
+
+# ЗАЧЕМ (слово владельца 25.10): снять всё собранное в постоянное место.
+# Релизы не истекают -- в отличие от артефактов прогонов, где предел
+# retention 90 суток. Предел ОДНОГО актива релиза -- 2 ГБ, поэтому части по
+# 1.7 ГБ.
+#
+# ТОКЕНОВ НА ЯЩИКАХ НЕ ЛОЖИТСЯ. Выгрузка с lab-miami и lab-ams идёт ЗАДАНИЕМ
+# НА БЕГУНКЕ САМОГО ЯЩИКА: токен выдаёт GitHub на время прогона, на диск он
+# не попадает. Тем же путём уже живут суточные пуши.
+#
+# ТОРГОВЫЙ ХОСТ -- ТОЛЬКО ЧТЕНИЕ: tar пишется НЕ на него, а потоком на
+# бегунок GitHub, и там же режется на части. Ни один файл на торговой машине
+# не создаётся и не меняется; чтение идёт под nice/ionice.
+#
+# ОБЪЁМЫ ЗАМЕРЕНЫ ЭТАПОМ 1 (прогон 40210015824): ams 4 813 804 027 Б,
+# miami 6 709 058 461 Б. Свободно: ams 31 ГБ, miami 111 ГБ.
+on:
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/vygruzka_*.json"
+
+concurrency:
+  group: zakrytie-vygruzka
+  cancel-in-progress: false
+
+env:
+  METKA: "dannye-2026-10-25"
+  HOST_NL: 45.59.170.76
+  CHAST_BAJT: "1700m"
+
+jobs:
+  reliz_i_nl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    outputs:
+      reliz: ${{ steps.reliz.outputs.reliz }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 1
+
+      - name: "Релиз: создать либо взять существующий"
+        id: reliz
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          set -o pipefail
+          # ТОКЕН ИДЁТ ПЕРЕМЕННОЙ ОКРУЖЕНИЯ, А НЕ ДОВОДОМ КОМАНДЫ: доводы
+          # видны в ps любому на машине, окружение -- только своему процессу.
+          API="https://api.github.com/repos/$GITHUB_REPOSITORY/releases"
+          KOD=$(curl -sS -o reliz.json -w '%{http_code}' \
+                 -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Accept: application/vnd.github+json" \
+                 "$API/tags/$METKA" || true)
+          if [ "$KOD" = "200" ]; then
+            echo "reliz $METKA uzhe est"
+          else
+            echo "sozdaju reliz $METKA (poisk otvetil $KOD)"
+            # ТЕЛО ЗАПРОСА -- ОДНОЙ СТРОКОЙ python3 -c, БЕЗ ВЛОЖЕННОГО
+            # heredoc: внутри блока run разделитель heredoc идёт с отступом и
+            # не закрывает тело (поймано своей же проверкой разбора). Текст
+            # приходит доводами, поэтому кавычки и русские буквы не страдают.
+            TELO="Сырые снимки и производные ряды с lab-miami, lab-ams и сборщиков торгового хоста. Части tar.zst по 1.7 ГБ; к каждому ящику манифест с sha256 каждого файла внутри и sha256 каждой части. Собрано перед закрытием аренды, сбор остановлен."
+            python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":"Данные лабораторных ящиков на "+sys.argv[1],"body":sys.argv[2],"draft":False,"prerelease":False},ensure_ascii=False))' "$METKA" "$TELO" > telo.json
+            KOD=$(curl -sS -o reliz.json -w '%{http_code}' -X POST \
+                   -H "Authorization: Bearer $GH_TOKEN" \
+                   -H "Accept: application/vnd.github+json" \
+                   --data @telo.json "$API")
+            if [ "$KOD" != "201" ]; then
+              echo "SBOJ: reliz ne sozdan, kod $KOD"
+              head -c 400 reliz.json
+              echo
+              echo "Esli prichina v pravah tokena -- skazat vladelcu prjamo i perejti na"
+              echo "artefakt s retention 90, kak on i razreshil."
+              exit 1
+            fi
+          fi
+          ID=$(python3 -c "import json;print(json.load(open('reliz.json'))['id'])")
+          echo "reliz=$ID" >> "$GITHUB_OUTPUT"
+          echo "RELIZ=$ID" >> "$GITHUB_ENV"
+          echo "reliz id: $ID"
+
+      - name: "Ключ торгового хоста"
+        env:
+          K_NL: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          [ -n "$K_NL" ] || { echo "SBOJ: net sekreta VPS_SSH_KEY"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$K_NL" > ~/.ssh/nl_key
+          chmod 600 ~/.ssh/nl_key
+          ssh-keyscan -T 10 "$HOST_NL" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "OPTS=-o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i $HOME/.ssh/nl_key" >> "$GITHUB_ENV"
+
+      - name: "NL: опись, cron и манифест -- только чтение"
+        run: |
+          set -e
+          set -o pipefail
+          # nice/ionice НЕ ВЕЖЛИВОСТЬ, А УСЛОВИЕ: машина торговая, и чтение
+          # нескольких гигабайт с подсчётом sha256 не должно ей мешать.
+          ssh -n $OPTS root@"$HOST_NL" 'bash -s' <<'OPIS' 2>&1 | tee nl_opis.txt
+            set -e
+            cd /home/bot
+            nice -n 19 ionice -c3 du -sb trend_collector_live_data predmarket_collector_live_data bin 2>/dev/null
+            echo "--- cron pod botom ---"
+            crontab -l -u bot 2>/dev/null | grep -vE '^[[:space:]]*#' \
+              || cat /var/spool/cron/crontabs/bot 2>/dev/null | grep -vE '^[[:space:]]*#' \
+              || echo "crontab bota ne prochitan"
+            echo "--- skripty sborshchikov ---"
+            ls -l bin 2>/dev/null | tail -12
+          OPIS
+          echo "--- manifest: sha256 kazhdogo fajla ---"
+          ssh -n $OPTS root@"$HOST_NL" \
+            "cd /home/bot && nice -n 19 ionice -c3 find trend_collector_live_data predmarket_collector_live_data bin -type f -exec sha256sum {} + 2>/dev/null" \
+            > manifest_nl.txt
+          wc -l < manifest_nl.txt | sed 's/^/strok v manifeste nl: /'
+
+      - name: "NL: поток tar -> части -> релиз"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          set -o pipefail
+          df -h / | tail -1
+          # split --filter ДЕРЖИТ НА ДИСКЕ НЕ БОЛЬШЕ ОДНОЙ ЧАСТИ: она сразу
+          # считается, грузится и удаляется. У бегунка GitHub около 14 ГБ
+          # свободного места, а данных сборщиков может быть больше.
+          cat > zagruzit.sh <<'SH'
+          #!/bin/bash
+          set -e
+          F="$1"
+          IMJA=$(basename "$F")
+          S=$(sha256sum "$F" | cut -d' ' -f1)
+          B=$(stat -c %s "$F")
+          printf 'CHAST %s %s %s\n' "$IMJA" "$B" "$S" >> "$CHASTI_SPISOK"
+          for P in 1 2 3; do
+            KOD=$(curl -sS -o otvet.json -w '%{http_code}' -X POST \
+                   -H "Authorization: Bearer $GH_TOKEN" \
+                   -H "Content-Type: application/octet-stream" \
+                   --data-binary @"$F" \
+                   "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$IMJA" || true)
+            case "$KOD" in
+              201) echo "zagruzheno $IMJA ($B B)"; exit 0 ;;
+              422) echo "$IMJA uzhe est v relize"; exit 0 ;;
+            esac
+            echo "popytka $P dlja $IMJA: kod $KOD"
+            sleep $((P * 10))
+          done
+          echo "SBOJ: $IMJA ne zagruzilsja"
+          exit 1
+          SH
+          chmod +x zagruzit.sh
+          CHASTI_SPISOK="$PWD/chasti_nl.txt"
+          export CHASTI_SPISOK
+          : > "$CHASTI_SPISOK"
+          ssh -n $OPTS root@"$HOST_NL" \
+            "cd /home/bot && nice -n 19 ionice -c3 tar -cf - trend_collector_live_data predmarket_collector_live_data bin" \
+            | zstd -1 -T0 -c \
+            | split -b "$CHAST_BAJT" -d -a 2 \
+                --filter="$PWD/zagruzit.sh \"\$FILE\" && find \"\$(dirname \"\$FILE\")\" -maxdepth 1 -type f -name \"\$(basename \"\$FILE\")\" -delete" \
+                - "nl-sborshchiki-$METKA.tar.zst."
+          cat "$CHASTI_SPISOK"
+          cat manifest_nl.txt "$CHASTI_SPISOK" > "manifest_nl_$METKA.txt"
+          ./zagruzit.sh "manifest_nl_$METKA.txt"
+
+      - name: "СВОДКА NL"
+        if: ${{ always() }}
+        run: |
+          set -e
+          echo "=== RELIZ ==="
+          echo "metka: $METKA, id: ${RELIZ:-?}"
+          echo "=== NL: OPIS (tolko chtenie) ==="
+          if [ -f nl_opis.txt ]; then cat nl_opis.txt; else echo "(shag ne shjol)"; fi
+          echo "=== NL: CHASTI ==="
+          if [ -f chasti_nl.txt ]; then
+            cat chasti_nl.txt
+            awk '{s+=$3} END {printf "ITOGO_NL chastej %d, bajt %d (%.2f GB)\n", NR, s, s/1073741824}' chasti_nl.txt
+          else
+            echo "(chastej net)"
+          fi
+          if [ -f manifest_nl.txt ]; then wc -l < manifest_nl.txt | sed 's/^/strok manifesta nl: /'; fi
+
+  jashchik:
+    needs: reliz_i_nl
+    timeout-minutes: 240
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - imja: miami
+            metka_begunka: lab-miami
+            koren: /opt/robinhood-chain-alpha
+            puti: data/trending
+          - imja: ams
+            metka_begunka: lab-ams
+            koren: /opt/polymarket-put
+            puti: data/polymarket
+    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', matrix.metka_begunka)) }}
+    steps:
+      - name: "ПРЕДОХРАНИТЕЛЬ: это не торговый хост"
+        run: |
+          set -e
+          SVOI=$(hostname -I 2>/dev/null || echo "")
+          echo "adresa: ${SVOI:-neizvestny}"
+          [ -n "$SVOI" ] || { echo "STOP: adresa ne prochitalis"; exit 1; }
+          for A in $SVOI; do
+            if [ "$A" = "45.59.170.76" ]; then echo "STOP: eto torgovyj host"; exit 1; fi
+          done
+          echo "ne torgovyj -- prodolzhaem"
+
+      - name: "Манифест: sha256 каждого файла"
+        run: |
+          set -e
+          set -o pipefail
+          cd "${{ matrix.koren }}"
+          # НИЗКИЙ ПРИОРИТЕТ: на ящике два ядра, и сторож диска тикает каждый
+          # час -- мешать ему незачем.
+          nice -n 19 ionice -c3 find ${{ matrix.puti }} -type f -exec sha256sum {} + \
+            > "$RUNNER_TEMP/manifest_${{ matrix.imja }}.txt"
+          wc -l < "$RUNNER_TEMP/manifest_${{ matrix.imja }}.txt" | sed 's/^/fajlov v manifeste: /'
+          nice -n 19 find ${{ matrix.puti }} -type f -printf '%s\n' \
+            | awk '{s+=$1} END {printf "bajt vsego: %d (%.2f GB)\n", s, s/1073741824}'
+
+      - name: "Упаковка в части по 1.7 ГБ"
+        run: |
+          set -e
+          set -o pipefail
+          cd "${{ matrix.koren }}"
+          df -Pk . | awk 'NR==2 {printf "svobodno na jashchike: %d GB\n", $4/1048576}'
+          # zstd -1, А НЕ -3 И НЕ gzip: тела снимков УЖЕ сжаты gzip-ом, второй
+          # проход почти ничего не даёт, а два ядра стоят времени. Контейнер
+          # нужен ради одного файла на часть, не ради сжатия.
+          nice -n 19 ionice -c3 tar -cf - ${{ matrix.puti }} \
+            | zstd -1 -T0 -c \
+            | split -b "$CHAST_BAJT" -d -a 2 - \
+                "$RUNNER_TEMP/${{ matrix.imja }}-$METKA.tar.zst."
+          find "$RUNNER_TEMP" -maxdepth 1 -type f -name "${{ matrix.imja }}-$METKA.tar.zst.*" \
+            -printf '%s %f\n' | sort -k2
+
+      - name: "Выгрузка частей и манифеста в релиз"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELIZ: ${{ needs.reliz_i_nl.outputs.reliz }}
+        run: |
+          set -e
+          set -o pipefail
+          SPISOK="$RUNNER_TEMP/chasti_${{ matrix.imja }}.txt"
+          : > "$SPISOK"
+          find "$RUNNER_TEMP" -maxdepth 1 -type f -name "${{ matrix.imja }}-$METKA.tar.zst.*" \
+            | sort > "$RUNNER_TEMP/puti.txt"
+          [ -s "$RUNNER_TEMP/puti.txt" ] || { echo "SBOJ: chastej net"; exit 1; }
+          while IFS= read -r F; do
+            IMJA=$(basename "$F")
+            S=$(sha256sum "$F" | cut -d' ' -f1)
+            B=$(stat -c %s "$F")
+            printf 'CHAST %s %s %s\n' "$IMJA" "$B" "$S" >> "$SPISOK"
+            GOTOVO=no
+            for P in 1 2 3; do
+              KOD=$(curl -sS -o "$RUNNER_TEMP/otvet.json" -w '%{http_code}' -X POST \
+                     -H "Authorization: Bearer $GH_TOKEN" \
+                     -H "Content-Type: application/octet-stream" \
+                     --data-binary @"$F" \
+                     "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$IMJA" || true)
+              case "$KOD" in
+                201) echo "zagruzheno $IMJA ($B B)"; GOTOVO=yes; break ;;
+                422) echo "$IMJA uzhe v relize"; GOTOVO=yes; break ;;
+              esac
+              echo "popytka $P dlja $IMJA: kod $KOD"
+              sleep $((P * 15))
+            done
+            if [ "$GOTOVO" != "yes" ]; then echo "SBOJ: $IMJA ne zagruzilsja"; exit 1; fi
+          done < "$RUNNER_TEMP/puti.txt"
+          M="manifest_${{ matrix.imja }}_$METKA.txt"
+          cat "$RUNNER_TEMP/manifest_${{ matrix.imja }}.txt" "$SPISOK" > "$RUNNER_TEMP/$M"
+          KOD=$(curl -sS -o "$RUNNER_TEMP/otvet.json" -w '%{http_code}' -X POST \
+                 -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Content-Type: text/plain" \
+                 --data-binary @"$RUNNER_TEMP/$M" \
+                 "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$M")
+          case "$KOD" in
+            201|422) echo "manifest $M: kod $KOD" ;;
+            *) echo "SBOJ: manifest ne zagruzilsja, kod $KOD"; exit 1 ;;
+          esac
+          cat "$SPISOK"
+
+      - name: "СВЕРКА: скачать одну часть обратно и сверить sha256"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELIZ: ${{ needs.reliz_i_nl.outputs.reliz }}
+        run: |
+          set -e
+          set -o pipefail
+          SPISOK="$RUNNER_TEMP/chasti_${{ matrix.imja }}.txt"
+          IMJA=$(head -1 "$SPISOK" | awk '{print $2}')
+          ZHDEM=$(head -1 "$SPISOK" | awk '{print $4}')
+          echo "sverjaju chast $IMJA, zhdjom sha256 $ZHDEM"
+          # ID АКТИВА БЕРЁМ ИЗ СПИСКА РЕЛИЗА: репозиторий приватный, и
+          # скачивание идёт по API с токеном, а не по открытой ссылке.
+          curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?per_page=100" \
+            > "$RUNNER_TEMP/aktivy.json"
+          AID=$(python3 -c "import json,sys;a=json.load(open(sys.argv[1]));print(next(x['id'] for x in a if x['name']==sys.argv[2]))" \
+                "$RUNNER_TEMP/aktivy.json" "$IMJA")
+          echo "aktiv id: $AID"
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            -o "$RUNNER_TEMP/obratno.bin" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/assets/$AID"
+          BYLO=$(sha256sum "$RUNNER_TEMP/obratno.bin" | cut -d' ' -f1)
+          echo "skachano $(stat -c %s "$RUNNER_TEMP/obratno.bin") B, sha256 $BYLO"
+          if [ "$BYLO" != "$ZHDEM" ]; then echo "SBOJ: sha256 ne sovpal"; exit 1; fi
+          echo "SVERKA PROSHLA: sha256 skachannoj chasti sovpal s otpravlennoj"
+
+      - name: "СВОДКА ЯЩИКА"
+        if: ${{ always() }}
+        run: |
+          set -e
+          echo "=== JASHCHIK ${{ matrix.imja }} ==="
+          M="$RUNNER_TEMP/manifest_${{ matrix.imja }}.txt"
+          if [ -f "$M" ]; then wc -l < "$M" | sed 's/^/fajlov v manifeste: /'; else echo "manifesta net"; fi
+          S="$RUNNER_TEMP/chasti_${{ matrix.imja }}.txt"
+          if [ -f "$S" ]; then
+            cat "$S"
+            awk '{s+=$3} END {printf "ITOGO chastej %d, bajt %d (%.2f GB)\n", NR, s, s/1073741824}' "$S"
+          else
+            echo "chastej net"
+          fi
+          # УБОРКА КОПИЙ-ЧАСТЕЙ, А НЕ ДАННЫХ: find с явным узором имени и
+          # проверенным корнем. Сами снимки в data/ не трогаются вовсе.
+          if [ -n "${RUNNER_TEMP:-}" ] && [ -d "${RUNNER_TEMP:-/net-takogo-puti}" ]; then
+            find "$RUNNER_TEMP" -maxdepth 1 -type f \
+              \( -name "${{ matrix.imja }}-$METKA.tar.zst.*" -o -name "obratno.bin" \) -delete
+            echo "kopii-chasti ubrany s jashchika; dannye v data/ na meste"
+          fi
