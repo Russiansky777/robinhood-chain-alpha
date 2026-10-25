@@ -105,7 +105,10 @@ jobs:
           set -o pipefail
           # nice/ionice НЕ ВЕЖЛИВОСТЬ, А УСЛОВИЕ: машина торговая, и чтение
           # нескольких гигабайт с подсчётом sha256 не должно ей мешать.
-          ssh -n $OPTS root@"$HOST_NL" 'bash -s' <<'OPIS' 2>&1 | tee nl_opis.txt
+          # БЕЗ -n: он подставляет /dev/null на stdin, и 'bash -s' получает
+          # пустой ввод -- шаг тогда выходит зелёным, ничего не сделав.
+          # Именно так опись и оказалась пустой в прогоне 40210650046.
+          ssh $OPTS root@"$HOST_NL" 'bash -s' <<'OPIS' 2>&1 | tee nl_opis.txt
             set -e
             cd /home/bot
             nice -n 19 ionice -c3 du -sb trend_collector_live_data predmarket_collector_live_data bin 2>/dev/null
@@ -122,53 +125,65 @@ jobs:
             > manifest_nl.txt
           wc -l < manifest_nl.txt | sed 's/^/strok v manifeste nl: /'
 
-      - name: "NL: поток tar -> части -> релиз"
+      - name: "NL: tar потоком -> части на бегунке -> релиз"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           set -o pipefail
           df -h / | tail -1
-          # split --filter ДЕРЖИТ НА ДИСКЕ НЕ БОЛЬШЕ ОДНОЙ ЧАСТИ: она сразу
-          # считается, грузится и удаляется. У бегунка GitHub около 14 ГБ
-          # свободного места, а данных сборщиков может быть больше.
-          cat > zagruzit.sh <<'SH'
-          #!/bin/bash
-          set -e
-          F="$1"
-          IMJA=$(basename "$F")
-          S=$(sha256sum "$F" | cut -d' ' -f1)
-          B=$(stat -c %s "$F")
-          printf 'CHAST %s %s %s\n' "$IMJA" "$B" "$S" >> "$CHASTI_SPISOK"
-          for P in 1 2 3; do
-            KOD=$(curl -sS -o otvet.json -w '%{http_code}' -X POST \
-                   -H "Authorization: Bearer $GH_TOKEN" \
-                   -H "Content-Type: application/octet-stream" \
-                   --data-binary @"$F" \
-                   "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$IMJA" || true)
-            case "$KOD" in
-              201) echo "zagruzheno $IMJA ($B B)"; exit 0 ;;
-              422) echo "$IMJA uzhe est v relize"; exit 0 ;;
-            esac
-            echo "popytka $P dlja $IMJA: kod $KOD"
-            sleep $((P * 10))
-          done
-          echo "SBOJ: $IMJA ne zagruzilsja"
-          exit 1
-          SH
-          chmod +x zagruzit.sh
-          CHASTI_SPISOK="$PWD/chasti_nl.txt"
-          export CHASTI_SPISOK
-          : > "$CHASTI_SPISOK"
-          ssh -n $OPTS root@"$HOST_NL" \
+          # ЧАСТИ ПИШЕМ НА ДИСК, А НЕ ЧЕРЕЗ split --filter. Замер прогона
+          # 40210650046: --filter НЕ СОЗДАЁТ ФАЙЛ -- он отдаёт кусок команде на
+          # stdin, а $FILE лишь имя-подсказка; мой загрузчик ждал готовый файл
+          # и падал на sha256sum. А места у бегунка 85 ГБ, не 14, как я считал,
+          # так что ухищрения и не нужны.
+          #
+          # stderr ОТ tar СОХРАНЯЕМ: сборщики на торговом хосте РАБОТАЮТ, и
+          # файл текущих суток может меняться под чтением. В прошлом прогоне
+          # tar так и сказал: "File shrank by 106529786 bytes". Это надо
+          # показать владельцу, а не замолчать.
+          ssh $OPTS root@"$HOST_NL" \
             "cd /home/bot && nice -n 19 ionice -c3 tar -cf - trend_collector_live_data predmarket_collector_live_data bin" \
+            2> tar_nl_stderr.txt \
             | zstd -1 -T0 -c \
-            | split -b "$CHAST_BAJT" -d -a 2 \
-                --filter="$PWD/zagruzit.sh \"\$FILE\" && find \"\$(dirname \"\$FILE\")\" -maxdepth 1 -type f -name \"\$(basename \"\$FILE\")\" -delete" \
-                - "nl-sborshchiki-$METKA.tar.zst."
-          cat "$CHASTI_SPISOK"
-          cat manifest_nl.txt "$CHASTI_SPISOK" > "manifest_nl_$METKA.txt"
-          ./zagruzit.sh "manifest_nl_$METKA.txt"
+            | split -b "$CHAST_BAJT" -d -a 2 - "nl-sborshchiki-$METKA.tar.zst."
+          echo "--- chto skazal tar (pustoe -- znachit nichego ne menjalos pod chteniem) ---"
+          cat tar_nl_stderr.txt || true
+          : > chasti_nl.txt
+          for F in "nl-sborshchiki-$METKA".tar.zst.*; do
+            [ -f "$F" ] || continue
+            S=$(sha256sum "$F" | cut -d' ' -f1)
+            B=$(stat -c %s "$F")
+            printf 'CHAST %s %s %s\n' "$F" "$B" "$S" >> chasti_nl.txt
+            GOTOVO=no
+            for P in 1 2 3; do
+              KOD=$(curl -sS -o otvet.json -w '%{http_code}' -X POST \
+                     -H "Authorization: Bearer $GH_TOKEN" \
+                     -H "Content-Type: application/octet-stream" \
+                     --data-binary @"$F" \
+                     "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$F" || true)
+              case "$KOD" in
+                201) echo "zagruzheno $F ($B B)"; GOTOVO=yes; break ;;
+                422) echo "$F uzhe v relize"; GOTOVO=yes; break ;;
+              esac
+              echo "popytka $P dlja $F: kod $KOD"
+              sleep $((P * 10))
+            done
+            if [ "$GOTOVO" != "yes" ]; then echo "SBOJ: $F ne zagruzilsja"; exit 1; fi
+          done
+          [ -s chasti_nl.txt ] || { echo "SBOJ: ni odnoj chasti ne vyshlo"; exit 1; }
+          M="manifest_nl_$METKA.txt"
+          cat manifest_nl.txt chasti_nl.txt tar_nl_stderr.txt > "$M"
+          KOD=$(curl -sS -o otvet.json -w '%{http_code}' -X POST \
+                 -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Content-Type: text/plain" \
+                 --data-binary @"$M" \
+                 "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$M")
+          case "$KOD" in
+            201|422) echo "manifest $M: kod $KOD" ;;
+            *) echo "SBOJ: manifest nl ne zagruzilsja, kod $KOD"; exit 1 ;;
+          esac
+          cat chasti_nl.txt
 
       - name: "СВОДКА NL"
         if: ${{ always() }}
@@ -189,6 +204,10 @@ jobs:
 
   jashchik:
     needs: reliz_i_nl
+    # ГЛАВНЫЕ 11 ГБ НЕ ЗАЛОЖНИКИ ТОРГОВОГО ХОСТА: от первого задания нужен
+    # только id релиза. В прогоне 40210650046 шаг NL упал, и оба ящика были
+    # ПРОПУЩЕНЫ -- то есть посторонняя беда остановила всю выгрузку.
+    if: ${{ !cancelled() && needs.reliz_i_nl.outputs.reliz != '' }}
     timeout-minutes: 240
     permissions:
       contents: write
