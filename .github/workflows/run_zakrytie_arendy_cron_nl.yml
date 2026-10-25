@@ -1,0 +1,105 @@
+name: "Закрытие аренды: cron-строки сборщиков NL в релиз"
+
+# ЗАЧЕМ: владелец просил снять не только данные сборщиков торгового хоста,
+# но и "их скрипты/cron-строки". Скрипты уехали в релиз внутри архива
+# (/home/bot/bin, 9 файлов), а cron-строки были только напечатаны в журнале
+# прогона выгрузки -- журнал живёт 90 суток, релиз не истекает. Этот прогон
+# кладёт их в релиз отдельным файлом.
+#
+# ТОРГОВЫЙ ХОСТ -- ТОЛЬКО ЧТЕНИЕ: crontab -l, cat, ls. Ни одной команды,
+# что-либо меняющей. Сборщики другой линии продолжают работать: останавливать
+# их без слова владельца нельзя.
+on:
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/cronnl_*.json"
+
+concurrency:
+  group: zakrytie-arendy
+  cancel-in-progress: false
+
+env:
+  HOST_NL: 45.59.170.76
+  METKA_RELIZA: dannye-2026-10-25
+
+jobs:
+  cron_nl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 1
+
+      - name: "Ключ торгового хоста"
+        env:
+          K_NL: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          install -d -m 700 ~/.ssh
+          [ -n "$K_NL" ] || { echo "SBOJ: net sekreta VPS_SSH_KEY"; exit 1; }
+          printf '%s\n' "$K_NL" > ~/.ssh/nl_key
+          chmod 600 ~/.ssh/nl_key
+          ssh-keyscan -T 10 "$HOST_NL" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "OPTS=-o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i ~/.ssh/nl_key" >> "$GITHUB_ENV"
+          echo "kljuch gotov"
+
+      - name: "NL: прочитать cron-строки и список скриптов"
+        run: |
+          set -e
+          set -o pipefail
+          ssh $OPTS root@"$HOST_NL" 'bash -s' <<'CRON_NL' 2>&1 | tee cron_nl.txt
+            set -e
+            echo "# cron-stroki i skripty sborshchikov torgovogo hosta (tolko chtenie)"
+            echo "# host: $(hostname)  snjato: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "--- crontab -l -u bot ---"
+            crontab -l -u bot 2>/dev/null || cat /var/spool/cron/crontabs/bot 2>/dev/null || echo "crontab bota ne prochitan"
+            echo "--- crontab -l -u root ---"
+            crontab -l -u root 2>/dev/null || echo "u root crontab pust"
+            echo "--- /etc/cron.d: stroki so sborshchikami ---"
+            grep -rE 'trend_collector|predmarket' /etc/cron.d /etc/crontab 2>/dev/null || echo "v /etc/cron.d sborshchikov net"
+            echo "--- /home/bot/bin ---"
+            ls -l /home/bot/bin 2>/dev/null || echo "kataloga bin net"
+          CRON_NL
+          if grep -qE 'crontab bota ne prochitan' cron_nl.txt; then
+            echo "SBOJ: cron-stroki bota ne prochitany"
+            exit 1
+          fi
+          wc -c < cron_nl.txt | sed 's/^/bajt v fajle: /'
+
+      - name: "Положить файл в релиз"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          set -o pipefail
+          RELIZ=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                   "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$METKA_RELIZA" \
+                  | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))")
+          [ -n "$RELIZ" ] || { echo "SBOJ: reliz $METKA_RELIZA ne najden"; exit 1; }
+          echo "reliz: $RELIZ"
+          IMJA="cron_nl_$METKA_RELIZA.txt"
+          KOD=$(curl -sS -o otvet.json -w '%{http_code}' -X POST \
+                 -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "Content-Type: text/plain" \
+                 -T cron_nl.txt \
+                 "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$IMJA" || true)
+          echo "zagruzka $IMJA: HTTP $KOD"
+          if [ "$KOD" != "201" ]; then
+            head -5 otvet.json || true
+            echo "SBOJ: fajl ne lozhitsja v reliz"
+            exit 1
+          fi
+          python3 -c "import json; d=json.load(open('otvet.json')); print('asset', d['id'], d['size'], d['state'], d['name'])"
+          sha256sum cron_nl.txt
+
+      - name: "СВОДКА (последний шаг)"
+        if: ${{ always() }}
+        run: |
+          echo "=============== CRON NL ==============="
+          cat cron_nl.txt 2>/dev/null || echo "net dannyh"
