@@ -1,0 +1,266 @@
+name: "Закрытие аренды: хвост суток, остановка сбора, опись объёмов"
+
+# ЗАЧЕМ (слово владельца 25.10): аренда ящиков истекает, новые данные не
+# собирать, всё собранное снять. Это ПЕРВЫЙ этап: дописать хвост суток,
+# остановить сборщиков и ЗАМЕРИТЬ объёмы -- по этим числам режутся части для
+# выгрузки. Ничего не удаляется ни на одном диске.
+#
+# ТОРГОВЫЙ ХОСТ -- ТОЛЬКО ЧТЕНИЕ. Слово владельца: "торговый хост не трогать,
+# кроме чтения данных сборщиков". Поэтому к нему идут лишь ls/du/find/cat и
+# ни одной команды, что-либо меняющей.
+#
+# ПОРЯДОК НЕ СЛУЧАЕН: сперва хвост суток (иначе последние часы не попадут ни
+# в ветку, ни в выгрузку), потом остановка, и только потом опись -- на
+# остановленном сборе числа уже не плывут.
+on:
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/zakrytie_*.json"
+
+concurrency:
+  group: zakrytie-arendy
+  cancel-in-progress: false
+
+env:
+  HOST_MIAMI: 169.128.191.158
+  HOST_AMS: 216.73.157.61
+  HOST_NL: 45.59.170.76
+  KOREN_MIAMI: /opt/robinhood-chain-alpha
+  KOREN_AMS: /opt/polymarket-put
+  SUTKI_HVOSTA: "2026-10-25"
+
+jobs:
+  hvost_i_stop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 1
+
+      - name: "Ключи трёх ящиков"
+        env:
+          K_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+          K_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
+          K_NL: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          install -d -m 700 ~/.ssh
+          for P in "miami:$K_MIAMI" "ams:$K_AMS" "nl:$K_NL"; do
+            IMJA=${P%%:*}
+            [ -n "${P#*:}" ] || { echo "SBOJ: net sekreta dlja $IMJA"; exit 1; }
+            printf '%s\n' "${P#*:}" > ~/.ssh/"$IMJA"_key
+            chmod 600 ~/.ssh/"$IMJA"_key
+          done
+          for H in "$HOST_MIAMI" "$HOST_AMS" "$HOST_NL"; do
+            ssh-keyscan -T 10 "$H" >> ~/.ssh/known_hosts 2>/dev/null || true
+          done
+          echo "OPTS=-o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          echo "kljuchi gotovy"
+
+      - name: "ХВОСТ СУТОК на ams: производные за $SUTKI_HVOSTA"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n -i ~/.ssh/ams_key $OPTS root@"$HOST_AMS" \
+            "cd $KOREN_AMS && sudo -u polymarket /usr/bin/python3 analysis/polymarket_put.py --proizvodnye --sutki $SUTKI_HVOSTA" \
+            2>&1 | tail -6 | tee hvost_ams.txt
+          echo "--- rjadov za $SUTKI_HVOSTA na jashchike ---"
+          ssh -n -i ~/.ssh/ams_key $OPTS root@"$HOST_AMS" \
+            "find $KOREN_AMS/data/polymarket/proizvodnye/$SUTKI_HVOSTA -type f -name '*.jsonl.gz' 2>/dev/null | wc -l" \
+            | tee -a hvost_ams.txt
+
+      - name: "ХВОСТ СУТОК на miami: --pervye $SUTKI_HVOSTA"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -n -i ~/.ssh/miami_key $OPTS root@"$HOST_MIAMI" \
+            "cd $KOREN_MIAMI && sudo -u podbivka /usr/bin/python3 analysis/podbivka_trending.py --pervye $SUTKI_HVOSTA" \
+            2>&1 | tail -6 | tee hvost_miami.txt
+          echo "--- tablica za $SUTKI_HVOSTA na jashchike ---"
+          ssh -n -i ~/.ssh/miami_key $OPTS root@"$HOST_MIAMI" \
+            "ls -l $KOREN_MIAMI/data/trending/pervye/$SUTKI_HVOSTA.jsonl.gz 2>&1 || echo 'tablicy net'" \
+            | tee -a hvost_miami.txt
+
+      - name: "СТОП сбора на ams: шесть таймеров Polymarket (сторож оставляем)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -i ~/.ssh/ams_key $OPTS root@"$HOST_AMS" 'bash -s' <<'STOP_AMS' 2>&1 | tee stop_ams.txt
+            set -e
+            # disable --now, А НЕ ПРОСТО stop: слово владельца -- "новые данные
+            # не собирать". Один stop оставил бы таймеры enabled, и после
+            # перезагрузки ящика сбор пошёл бы снова.
+            for T in polymarket-otbor polymarket-min polymarket-5min \
+                     polymarket-15min polymarket-proizvodnye polymarket-rotacija; do
+              systemctl disable --now "$T.timer" 2>&1 | tail -1 || true
+              printf '%s: enabled=%s active=%s\n' "$T.timer" \
+                "$(systemctl is-enabled "$T.timer" 2>&1)" \
+                "$(systemctl is-active "$T.timer" 2>&1)"
+            done
+            echo "--- storozh ostajotsja ---"
+            printf 'polymarket-storozh-diska.timer: enabled=%s active=%s\n' \
+              "$(systemctl is-enabled polymarket-storozh-diska.timer 2>&1)" \
+              "$(systemctl is-active polymarket-storozh-diska.timer 2>&1)"
+            echo "--- ni odna sluzhba sbora ne dolzhna byt aktivna ---"
+            systemctl list-units 'polymarket-*' --state=active --no-pager --no-legend || true
+          STOP_AMS
+          # ЗАМОК: если хоть один таймер сбора остался включённым -- это отказ,
+          # а не замечание: иначе выгрузка поехала бы на растущих данных.
+          if grep -E '^polymarket-(otbor|min|5min|15min|proizvodnye|rotacija)\.timer: enabled=enabled' stop_ams.txt; then
+            echo "SBOJ: tajmer sbora ostalsja vkljuchjonnym"
+            exit 1
+          fi
+          echo "vse shest tajmerov sbora na ams vykljucheny"
+
+      - name: "СТОП сбора на miami: регистратор и pervye (сторож и пуш оставляем)"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -i ~/.ssh/miami_key $OPTS root@"$HOST_MIAMI" 'bash -s' <<'STOP_MIAMI' 2>&1 | tee stop_miami.txt
+            set -e
+            # ПУШ-ТАЙМЕР НЕ ТРОГАЕМ ЗДЕСЬ: владелец отнёс плановые прогоны к
+            # третьему пункту (после проверки выгрузки). Сторож диска тоже
+            # остаётся -- это прямое слово владельца.
+            for T in podbivka-trending-min podbivka-trending-5min podbivka-trending-pervye; do
+              systemctl disable --now "$T.timer" 2>&1 | tail -1 || true
+              printf '%s: enabled=%s active=%s\n' "$T.timer" \
+                "$(systemctl is-enabled "$T.timer" 2>&1)" \
+                "$(systemctl is-active "$T.timer" 2>&1)"
+            done
+            echo "--- ostajutsja vkljuchjonnymi ---"
+            for T in podbivka-trending-push podbivka-storozh-diska; do
+              printf '%s: enabled=%s active=%s\n' "$T.timer" \
+                "$(systemctl is-enabled "$T.timer" 2>&1)" \
+                "$(systemctl is-active "$T.timer" 2>&1)"
+            done
+            systemctl list-units 'podbivka-*' --state=active --no-pager --no-legend || true
+          STOP_MIAMI
+          if grep -E '^podbivka-trending-(min|5min|pervye)\.timer: enabled=enabled' stop_miami.txt; then
+            echo "SBOJ: tajmer sbora na miami ostalsja vkljuchjonnym"
+            exit 1
+          fi
+          echo "tri tajmera sbora na miami vykljucheny"
+
+      - name: "ОПИСЬ ams: байты по спискам и суткам"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -i ~/.ssh/ams_key $OPTS root@"$HOST_AMS" "KOREN='$KOREN_AMS' bash -s" <<'OPIS_AMS' 2>&1 | tee opis_ams.txt
+            set -e
+            echo "--- mesto ---"
+            df -Pk / | awk 'NR==2 {printf "disk: vsego %d GB, zanjato %d GB, svobodno %d GB\n", $2/1048576, $3/1048576, $4/1048576}'
+            echo "--- instrumenty ---"
+            for I in tar gzip zstd split sha256sum curl; do
+              printf '%s: %s\n' "$I" "$(command -v "$I" 2>/dev/null || echo NET)"
+            done
+            echo "--- bajty po spiskam (vse sutki) ---"
+            VSEGO=0
+            for D in "$KOREN"/data/polymarket/*/; do
+              IMJA=$(basename "$D")
+              B=$(find "$D" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {printf "%d", s+0}')
+              N=$(find "$D" -type f 2>/dev/null | wc -l)
+              VSEGO=$((VSEGO + B))
+              printf 'SPISOK %-18s %14d B  fajlov %7d\n' "$IMJA" "$B" "$N"
+            done
+            printf 'ITOGO_AMS %d B = %.2f GB\n' "$VSEGO" "$(awk -v b="$VSEGO" 'BEGIN{print b/1073741824}')"
+            echo "--- bajty po sutkam ---"
+            for S in $(seq 16 25); do
+              D=$(printf '2026-10-%02d' "$S")
+              B=$(find "$KOREN"/data/polymarket/*/"$D" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {printf "%d", s+0}')
+              [ "$B" -gt 0 ] || continue
+              printf 'SUTKI %s %12d B\n' "$D" "$B"
+            done
+            echo "--- otdelno vybor.json i otbor.json ---"
+            ls -l "$KOREN/data/polymarket/vybor.json" 2>&1 || echo "vybor.json net"
+            find "$KOREN/data/polymarket/proizvodnye" -name 'otbor.json' 2>/dev/null | wc -l | sed 's/^/otbor.json po sutkam: /'
+          OPIS_AMS
+
+      - name: "ОПИСЬ miami: байты по источникам"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -i ~/.ssh/miami_key $OPTS root@"$HOST_MIAMI" "KOREN='$KOREN_MIAMI' bash -s" <<'OPIS_MIAMI' 2>&1 | tee opis_miami.txt
+            set -e
+            echo "--- mesto ---"
+            df -Pk / | awk 'NR==2 {printf "disk: vsego %d GB, zanjato %d GB, svobodno %d GB\n", $2/1048576, $3/1048576, $4/1048576}'
+            echo "--- instrumenty ---"
+            for I in tar gzip zstd split sha256sum curl; do
+              printf '%s: %s\n' "$I" "$(command -v "$I" 2>/dev/null || echo NET)"
+            done
+            echo "--- bajty po istochnikam ---"
+            VSEGO=0
+            for D in "$KOREN"/data/trending/*/; do
+              IMJA=$(basename "$D")
+              B=$(find "$D" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {printf "%d", s+0}')
+              N=$(find "$D" -type f 2>/dev/null | wc -l)
+              VSEGO=$((VSEGO + B))
+              printf 'ISTOCHNIK %-16s %14d B  fajlov %7d\n' "$IMJA" "$B" "$N"
+            done
+            printf 'ITOGO_MIAMI %d B = %.2f GB\n' "$VSEGO" "$(awk -v b="$VSEGO" 'BEGIN{print b/1073741824}')"
+            echo "--- tablicy pervyh pojavlenij ---"
+            ls -l "$KOREN/data/trending/pervye" 2>/dev/null | tail -16 || echo "pervye net"
+          OPIS_MIAMI
+
+      - name: "ОПИСЬ торгового хоста NL -- ТОЛЬКО ЧТЕНИЕ"
+        run: |
+          set -e
+          set -o pipefail
+          # НИ ОДНОЙ ИЗМЕНЯЮЩЕЙ КОМАНДЫ: только ls, du, find, cat, systemctl
+          # show/list. Слово владельца -- "не трогать, кроме чтения данных
+          # сборщиков". Поиск ограничен правдоподобными корнями и глубиной,
+          # чтобы не грузить торговую машину обходом всего диска.
+          ssh -i ~/.ssh/nl_key $OPTS root@"$HOST_NL" 'bash -s' <<'OPIS_NL' 2>&1 | tee opis_nl.txt
+            set -e
+            echo "--- kto my i mesto ---"
+            hostname
+            df -Pk / | awk 'NR==2 {printf "disk: vsego %d GB, zanjato %d GB, svobodno %d GB\n", $2/1048576, $3/1048576, $4/1048576}'
+            echo "--- katalogi sborshchikov ---"
+            for K in /opt /root /srv /home /var/lib; do
+              find "$K" -maxdepth 3 \( -iname '*trend_collector*' -o -iname '*predmarket*' \) \
+                -printf '%y %10s %p\n' 2>/dev/null | head -40
+            done
+            echo "--- sluzhby i tajmery sborshchikov ---"
+            systemctl list-units --all --no-pager --no-legend 2>/dev/null \
+              | grep -iE 'trend|predmarket|collector' | head -20 || echo "sluzhb s takimi imenami net"
+            systemctl list-timers --all --no-pager --no-legend 2>/dev/null \
+              | grep -iE 'trend|predmarket|collector' | head -20 || echo "tajmerov s takimi imenami net"
+            echo "--- cron ---"
+            crontab -l 2>/dev/null | grep -vE '^\s*#' | head -30 || echo "u root crontab pust"
+            ls -l /etc/cron.d 2>/dev/null | tail -20 || true
+            grep -rlE 'trend_collector|predmarket' /etc/cron.d /etc/crontab 2>/dev/null | head -10 || true
+          OPIS_NL
+
+      - name: "СВОДКА ЭТАПА -- всё главное одним куском в конце"
+        if: ${{ always() }}
+        run: |
+          set -e
+          echo "=== 1. HVOST SUTOK $SUTKI_HVOSTA ==="
+          if [ -f hvost_ams.txt ]; then
+            grep -E '(сутки|строк|файлов|^[0-9]+$)' hvost_ams.txt | tail -4 | sed 's/^/  ams: /' || tail -3 hvost_ams.txt
+          else echo "  ams: (shag ne shjol)"; fi
+          if [ -f hvost_miami.txt ]; then
+            grep -E '(строк|таблица|jsonl.gz|tablicy net)' hvost_miami.txt | tail -4 | sed 's/^/  miami: /' || tail -3 hvost_miami.txt
+          else echo "  miami: (shag ne shjol)"; fi
+          echo "=== 2. CHTO OSTANOVLENO ==="
+          if [ -f stop_ams.txt ]; then grep -E 'enabled=' stop_ams.txt | sed 's/^/  ams  /'; else echo "  ams: (shag ne shjol)"; fi
+          if [ -f stop_miami.txt ]; then grep -E 'enabled=' stop_miami.txt | sed 's/^/  miami  /'; else echo "  miami: (shag ne shjol)"; fi
+          echo "=== 3. OPIS AMS ==="
+          if [ -f opis_ams.txt ]; then
+            grep -E '^(disk:|SPISOK|ITOGO_AMS|SUTKI|otbor.json)' opis_ams.txt || tail -5 opis_ams.txt
+            grep -E '^(tar|gzip|zstd|split|sha256sum|curl):' opis_ams.txt | tr '\n' ' '; echo
+          else echo "  (shag ne shjol)"; fi
+          echo "=== 4. OPIS MIAMI ==="
+          if [ -f opis_miami.txt ]; then
+            grep -E '^(disk:|ISTOCHNIK|ITOGO_MIAMI)' opis_miami.txt || tail -5 opis_miami.txt
+            grep -E '^(tar|gzip|zstd|split|sha256sum|curl):' opis_miami.txt | tr '\n' ' '; echo
+          else echo "  (shag ne shjol)"; fi
+          echo "=== 5. OPIS NL (tolko chtenie) ==="
+          if [ -f opis_nl.txt ]; then
+            sed -n '1,60p' opis_nl.txt
+          else echo "  (shag ne shjol)"; fi
