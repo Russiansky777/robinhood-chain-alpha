@@ -1,0 +1,179 @@
+name: "Закрытие аренды: выключить плановые прогоны, сторожей и бегунков"
+
+# ЗАЧЕМ (слово владельца 25.10, пункт 3): выгрузка проверена -- часть скачана
+# обратно, sha256 сошёлся. Теперь гасим всё, что может запуститься само:
+# плановые прогоны GitHub (02:17Z трендинги, 04:41Z Polymarket), сторожей
+# диска на обоих ящиках и службы бегунков. Ящики доживают аренду включёнными.
+#
+# НИЧЕГО НЕ УДАЛЯЕТСЯ: ни файлов данных, ни юнитов, ни бегунков. Только
+# disable --now -- чтобы после перезагрузки ящика ничего не поднялось само.
+#
+# ТОРГОВЫЙ ХОСТ ЗДЕСЬ НЕ УЧАСТВУЕТ ВОВСЕ: его сборщики и его cron -- не наши;
+# слово владельца "торговый хост не трогать". Ни одной команды к нему.
+#
+# ПОРЯДОК: сперва плановые прогоны (иначе ночной прогон поедет на выключенных
+# бегунках и повиснет), потом сторожа, и только в конце службы бегунков --
+# после них самохостные задания в этом репозитории больше не поедут.
+on:
+  push:
+    branches:
+      - claude/nifty-sagan-r0polg
+    paths:
+      - "data/konservaciya/zapusk/vyklyuchenie_*.json"
+
+concurrency:
+  group: zakrytie-arendy
+  cancel-in-progress: false
+
+env:
+  HOST_MIAMI: 169.128.191.158
+  HOST_AMS: 216.73.157.61
+
+jobs:
+  vyklyuchenie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/nifty-sagan-r0polg
+          fetch-depth: 1
+
+      - name: "Ключи двух ящиков"
+        env:
+          K_MIAMI: ${{ secrets.VPS_SSH_KEY_MIAMI }}
+          K_AMS: ${{ secrets.VPS_SSH_KEY_AMS }}
+        run: |
+          set -e
+          install -d -m 700 ~/.ssh
+          for P in "miami:$K_MIAMI" "ams:$K_AMS"; do
+            IMJA=${P%%:*}
+            [ -n "${P#*:}" ] || { echo "SBOJ: net sekreta dlja $IMJA"; exit 1; }
+            printf '%s\n' "${P#*:}" > ~/.ssh/"$IMJA"_key
+            chmod 600 ~/.ssh/"$IMJA"_key
+          done
+          for H in "$HOST_MIAMI" "$HOST_AMS"; do
+            ssh-keyscan -T 10 "$H" >> ~/.ssh/known_hosts 2>/dev/null || true
+          done
+          echo "OPTS=-o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          echo "kljuchi gotovy"
+
+      - name: "Плановые прогоны: 02:17Z трендинги и 04:41Z Polymarket -- выключить"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          set -o pipefail
+          # Гасим на уровне самого рабочего потока, а не правкой cron в файле:
+          # обратимо одной командой, и ветка по умолчанию остаётся как есть.
+          for W in run_podbivka_trending_push_miami.yml run_polymarket_ams_artefakt_push.yml; do
+            KOD=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT \
+                   -H "Authorization: Bearer $GH_TOKEN" \
+                   -H "Accept: application/vnd.github+json" \
+                   "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$W/disable" || true)
+            SOST=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$W" \
+                   | python3 -c "import json,sys; print(json.load(sys.stdin).get('state','net-otveta'))" || true)
+            printf '%s: PUT=%s sostojanie=%s\n' "$W" "$KOD" "$SOST" | tee -a planovye.txt
+          done
+          if grep -vE 'sostojanie=disabled_manually' planovye.txt; then
+            echo "SBOJ: planovyj progon ostalsja vkljuchjonnym"
+            exit 1
+          fi
+          echo "oba planovyh progona vykljucheny"
+
+      - name: "ams: сторож диска и служба бегунка"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -i ~/.ssh/ams_key $OPTS root@"$HOST_AMS" 'bash -s' <<'VYK_AMS' 2>&1 | tee vyk_ams.txt
+            set -e
+            echo "--- storozh diska ---"
+            systemctl disable --now polymarket-storozh-diska.timer 2>&1 | tail -1 || true
+            printf 'polymarket-storozh-diska.timer: enabled=%s active=%s\n' \
+              "$(systemctl is-enabled polymarket-storozh-diska.timer 2>&1)" \
+              "$(systemctl is-active polymarket-storozh-diska.timer 2>&1)"
+            echo "--- vse tajmery polymarket posle ---"
+            for T in polymarket-otbor polymarket-min polymarket-5min \
+                     polymarket-15min polymarket-proizvodnye polymarket-rotacija \
+                     polymarket-storozh-diska; do
+              printf '%s: enabled=%s active=%s\n' "$T.timer" \
+                "$(systemctl is-enabled "$T.timer" 2>&1)" \
+                "$(systemctl is-active "$T.timer" 2>&1)"
+            done
+            echo "--- sluzhby begunka: najdeno ---"
+            systemctl list-unit-files 'actions.runner.*' --no-pager --no-legend 2>/dev/null || true
+            for U in $(systemctl list-unit-files 'actions.runner.*' --no-pager --no-legend 2>/dev/null | awk '{print $1}'); do
+              systemctl disable --now "$U" 2>&1 | tail -1 || true
+              printf 'BEGUNOK %s: enabled=%s active=%s\n' "$U" \
+                "$(systemctl is-enabled "$U" 2>&1)" \
+                "$(systemctl is-active "$U" 2>&1)"
+            done
+            echo "--- katalog begunka na meste (ne udaljali) ---"
+            ls -d /home/ghrunner/actions-runner 2>&1 || ls -d /opt/actions-runner 2>&1 || echo "katalog begunka ne najden po obychnym putjam"
+            echo "--- disk ---"
+            df -Pk / | tail -1
+          VYK_AMS
+          if grep -E '^BEGUNOK .*active=active' vyk_ams.txt; then
+            echo "SBOJ: sluzhba begunka na ams ostalas aktivnoj"
+            exit 1
+          fi
+          if grep -E '^polymarket-.*enabled=enabled' vyk_ams.txt; then
+            echo "SBOJ: tajmer na ams ostalsja vkljuchjonnym"
+            exit 1
+          fi
+          echo "ams: storozh i begunok vykljucheny"
+
+      - name: "miami: пуш-таймер, сторож диска и служба бегунка"
+        run: |
+          set -e
+          set -o pipefail
+          ssh -i ~/.ssh/miami_key $OPTS root@"$HOST_MIAMI" 'bash -s' <<'VYK_MIAMI' 2>&1 | tee vyk_miami.txt
+            set -e
+            echo "--- push i storozh ---"
+            for T in podbivka-trending-push podbivka-storozh-diska; do
+              systemctl disable --now "$T.timer" 2>&1 | tail -1 || true
+            done
+            echo "--- vse tajmery podbivka posle ---"
+            for T in podbivka-trending-min podbivka-trending-5min podbivka-trending-pervye \
+                     podbivka-trending-push podbivka-storozh-diska; do
+              printf '%s: enabled=%s active=%s\n' "$T.timer" \
+                "$(systemctl is-enabled "$T.timer" 2>&1)" \
+                "$(systemctl is-active "$T.timer" 2>&1)"
+            done
+            echo "--- sluzhby begunka: najdeno ---"
+            systemctl list-unit-files 'actions.runner.*' --no-pager --no-legend 2>/dev/null || true
+            for U in $(systemctl list-unit-files 'actions.runner.*' --no-pager --no-legend 2>/dev/null | awk '{print $1}'); do
+              systemctl disable --now "$U" 2>&1 | tail -1 || true
+              printf 'BEGUNOK %s: enabled=%s active=%s\n' "$U" \
+                "$(systemctl is-enabled "$U" 2>&1)" \
+                "$(systemctl is-active "$U" 2>&1)"
+            done
+            echo "--- katalog begunka na meste (ne udaljali) ---"
+            ls -d /home/ghrunner/actions-runner 2>&1 || ls -d /opt/actions-runner 2>&1 || echo "katalog begunka ne najden po obychnym putjam"
+            echo "--- disk ---"
+            df -Pk / | tail -1
+          VYK_MIAMI
+          if grep -E '^BEGUNOK .*active=active' vyk_miami.txt; then
+            echo "SBOJ: sluzhba begunka na miami ostalas aktivnoj"
+            exit 1
+          fi
+          if grep -E '^podbivka-.*enabled=enabled' vyk_miami.txt; then
+            echo "SBOJ: tajmer na miami ostalsja vkljuchjonnym"
+            exit 1
+          fi
+          echo "miami: push, storozh i begunok vykljucheny"
+
+      - name: "СВОДКА (последний шаг)"
+        if: ${{ always() }}
+        run: |
+          echo "=============== PLANOVYE PROGONY ==============="
+          cat planovye.txt 2>/dev/null || echo "net dannyh"
+          echo "=============== AMS ==============="
+          cat vyk_ams.txt 2>/dev/null || echo "net dannyh"
+          echo "=============== MIAMI ==============="
+          cat vyk_miami.txt 2>/dev/null || echo "net dannyh"
