@@ -132,6 +132,13 @@ jobs:
           set -e
           set -o pipefail
           df -h / | tail -1
+          # -T, А НЕ --data-binary: ЗАМЕР ПРОГОНА 40211484939. curl с
+          # "--data-binary @файл" читает файл ЦЕЛИКОМ В ПАМЯТЬ и на части
+          # 1.66 ГиБ умер прямо словами: "curl: option --data-binary: out of
+          # memory" -- три попытки подряд, на двухъядерном ящике. Ключ -T
+          # отправляет потоком и ставит Content-Length из размера файла, а
+          # -X POST оставляет нужный GitHub-у метод (сам -T послал бы PUT).
+          #
           # ЧАСТИ ПИШЕМ НА ДИСК, А НЕ ЧЕРЕЗ split --filter. Замер прогона
           # 40210650046: --filter НЕ СОЗДАЁТ ФАЙЛ -- он отдаёт кусок команде на
           # stdin, а $FILE лишь имя-подсказка; мой загрузчик ждал готовый файл
@@ -142,13 +149,33 @@ jobs:
           # файл текущих суток может меняться под чтением. В прошлом прогоне
           # tar так и сказал: "File shrank by 106529786 bytes". Это надо
           # показать владельцу, а не замолчать.
+          # tar ВЫХОДИТ КОДОМ 1 НА ЖИВОМ ФАЙЛЕ, И ЭТО УБИВАЛО ВЕСЬ КОНВЕЙЕР.
+          # Замер прогона 40211484939: сборщики на торговом хосте работают,
+          # tar сказал "File shrank by 106529786 bytes; padding with zeros" и
+          # вышел кодом 1 -- при set -o pipefail шаг падал УЖЕ ПОСЛЕ нарезки,
+          # и части оставались незагруженными. Поэтому код tar-а снимаем на
+          # той стороне, ssh выходит нулём, а судим по stderr: предупреждение
+          # о живом файле терпим и называем вслух, любую другую беду -- отказ.
           ssh $OPTS root@"$HOST_NL" \
-            "cd /home/bot && nice -n 19 ionice -c3 tar -cf - trend_collector_live_data predmarket_collector_live_data bin" \
+            "cd /home/bot && nice -n 19 ionice -c3 tar -cf - trend_collector_live_data predmarket_collector_live_data bin; echo \"TAR_KOD=\$?\" >&2; exit 0" \
             2> tar_nl_stderr.txt \
             | zstd -1 -T0 -c \
             | split -b "$CHAST_BAJT" -d -a 2 - "nl-sborshchiki-$METKA.tar.zst."
-          echo "--- chto skazal tar (pustoe -- znachit nichego ne menjalos pod chteniem) ---"
+          echo "--- chto skazal tar ---"
           cat tar_nl_stderr.txt || true
+          TKOD=$(grep -oE 'TAR_KOD=[0-9]+' tar_nl_stderr.txt | tail -1 | cut -d= -f2)
+          echo "kod tar-a: ${TKOD:-neizvesten}"
+          [ -n "$TKOD" ] || { echo "SBOJ: tar ne nazval svoj kod -- chtenie ne doshlo do konca"; exit 1; }
+          if [ "$TKOD" != "0" ]; then
+            CHUZHOE=$(grep -vE '(TAR_KOD=|File shrank|padding with zeros|file changed as we read|socket ignored)' tar_nl_stderr.txt || true)
+            if [ -n "$CHUZHOE" ]; then
+              echo "SBOJ: tar zhalovalsja ne tolko na zhivye fajly:"
+              printf '%s\n' "$CHUZHOE" | head -10
+              exit 1
+            fi
+            echo "VNIMANIE: tar vyshel kodom $TKOD tolko iz-za fajlov, menjavshihsja pod chteniem (sborshchiki NL rabotajut)."
+            echo "Dlja etih fajlov sha256 iz manifesta otnositsja k sostojaniju DO upakovki -- eto skazano i v manifeste."
+          fi
           : > chasti_nl.txt
           for F in "nl-sborshchiki-$METKA".tar.zst.*; do
             [ -f "$F" ] || continue
@@ -160,7 +187,7 @@ jobs:
               KOD=$(curl -sS -o otvet.json -w '%{http_code}' -X POST \
                      -H "Authorization: Bearer $GH_TOKEN" \
                      -H "Content-Type: application/octet-stream" \
-                     --data-binary @"$F" \
+                     -T "$F" \
                      "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$F" || true)
               case "$KOD" in
                 201) echo "zagruzheno $F ($B B)"; GOTOVO=yes; break ;;
@@ -177,7 +204,7 @@ jobs:
           KOD=$(curl -sS -o otvet.json -w '%{http_code}' -X POST \
                  -H "Authorization: Bearer $GH_TOKEN" \
                  -H "Content-Type: text/plain" \
-                 --data-binary @"$M" \
+                 -T "$M" \
                  "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$M")
           case "$KOD" in
             201|422) echo "manifest $M: kod $KOD" ;;
@@ -236,7 +263,33 @@ jobs:
           done
           echo "ne torgovyj -- prodolzhaem"
 
+      - name: "Уже выгружено? Тогда не пакуем второй раз"
+        id: nado
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELIZ: ${{ needs.reliz_i_nl.outputs.reliz }}
+        run: |
+          set -e
+          set -o pipefail
+          # ИДЕМПОТЕНТНОСТЬ: повторный прогон (а он нужен, если упало что-то
+          # постороннее) не должен заново считать sha256 и жать гигабайты.
+          # Смотрим, есть ли в релизе манифест этого ящика -- он кладётся
+          # ПОСЛЕДНИМ, значит его наличие означает, что части уже доехали.
+          curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?per_page=100" \
+            > aktivy.json
+          M="manifest_${{ matrix.imja }}_$METKA.txt"
+          if grep -q "\"$M\"" aktivy.json; then
+            echo "nuzhno=no" >> "$GITHUB_OUTPUT"
+            echo "$M uzhe v relize -- jashchik ${{ matrix.imja }} vygruzhen, povtorno ne pakuju"
+          else
+            echo "nuzhno=yes" >> "$GITHUB_OUTPUT"
+            echo "manifesta $M v relize net -- pakuju"
+          fi
+
       - name: "Манифест: sha256 каждого файла"
+        if: ${{ steps.nado.outputs.nuzhno == 'yes' }}
         run: |
           set -e
           set -o pipefail
@@ -250,6 +303,7 @@ jobs:
             | awk '{s+=$1} END {printf "bajt vsego: %d (%.2f GB)\n", s, s/1073741824}'
 
       - name: "Упаковка в части по 1.7 ГБ"
+        if: ${{ steps.nado.outputs.nuzhno == 'yes' }}
         run: |
           set -e
           set -o pipefail
@@ -266,6 +320,7 @@ jobs:
             -printf '%s %f\n' | sort -k2
 
       - name: "Выгрузка частей и манифеста в релиз"
+        if: ${{ steps.nado.outputs.nuzhno == 'yes' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELIZ: ${{ needs.reliz_i_nl.outputs.reliz }}
@@ -287,7 +342,7 @@ jobs:
               KOD=$(curl -sS -o "$RUNNER_TEMP/otvet.json" -w '%{http_code}' -X POST \
                      -H "Authorization: Bearer $GH_TOKEN" \
                      -H "Content-Type: application/octet-stream" \
-                     --data-binary @"$F" \
+                     -T "$F" \
                      "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$IMJA" || true)
               case "$KOD" in
                 201) echo "zagruzheno $IMJA ($B B)"; GOTOVO=yes; break ;;
@@ -303,7 +358,7 @@ jobs:
           KOD=$(curl -sS -o "$RUNNER_TEMP/otvet.json" -w '%{http_code}' -X POST \
                  -H "Authorization: Bearer $GH_TOKEN" \
                  -H "Content-Type: text/plain" \
-                 --data-binary @"$RUNNER_TEMP/$M" \
+                 -T "$RUNNER_TEMP/$M" \
                  "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELIZ/assets?name=$M")
           case "$KOD" in
             201|422) echo "manifest $M: kod $KOD" ;;
@@ -312,6 +367,7 @@ jobs:
           cat "$SPISOK"
 
       - name: "СВЕРКА: скачать одну часть обратно и сверить sha256"
+        if: ${{ steps.nado.outputs.nuzhno == 'yes' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELIZ: ${{ needs.reliz_i_nl.outputs.reliz }}
